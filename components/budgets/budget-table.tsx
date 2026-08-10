@@ -1,17 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { BudgetFormDialog } from './budget-form-dialog';
 import { AutoBudgetDialog } from './auto-budget-dialog';
 import { formatCurrency } from '@/lib/utils/format';
-import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Sparkles, Settings, History, Layers } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { useUserSettings } from '@/components/user-settings-provider';
-
 import { toast } from 'sonner';
 
 type SortField = 'category' | 'budgeted' | 'actual' | 'variance' | 'progress' | 'account';
@@ -35,20 +34,15 @@ interface BudgetData {
   remaining: number;
   percentUsed: number;
   type: 'income' | 'expense';
+  isDiscretionary?: boolean;
+  isCatchAll?: boolean;
+  groupedBreakout?: Array<{ categoryId: string; categoryName: string; actual: number }>;
 }
 
 interface Account {
   id: string;
   name: string;
   tags?: { id: string; name: string; color: string }[];
-}
-
-interface Category {
-  id: string;
-  name: string;
-  isIncome?: boolean;
-  color?: string;
-  parentId?: string | null;
 }
 
 export function BudgetTable() {
@@ -65,7 +59,7 @@ export function BudgetTable() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const { data: budgetData, isLoading: budgetsLoading, error: queryError, refetch } = useQuery({
+  const { data: budgetData, isLoading: budgetsLoading, error: queryError } = useQuery({
     queryKey: ['budgets', periodType, periodKey],
     queryFn: async () => {
       const res = await fetch(`/api/budgets?periodType=${periodType}&periodKey=${periodKey}&includeCategories=true`, { credentials: 'include' });
@@ -94,8 +88,30 @@ export function BudgetTable() {
   const [editBudget, setEditBudget] = useState<BudgetData | null>(null);
   const [deleteBudget, setDeleteBudget] = useState<BudgetData | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [sortField, setSortField] = useState<SortField>('category');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // Default sort set to Budgeted Amount Descending (Item 4)
+  const [sortField, setSortField] = useState<SortField>('budgeted');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Gear actions & popup menu state (Item 6)
+  const [showGearMenu, setShowGearMenu] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [confirmPurgeHistoryOpen, setConfirmPurgeHistoryOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Breakout dropdown state for "All Other" catch-all item (Item 2)
+  const [expandedCatchAll, setExpandedCatchAll] = useState(false);
+
+  const gearMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (gearMenuRef.current && !gearMenuRef.current.contains(e.target as Node)) {
+        setShowGearMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchBudgets = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['budgets'] });
@@ -114,6 +130,36 @@ export function BudgetTable() {
       toast.error(err instanceof Error ? err.message : 'Failed to delete budget');
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleResetBudgets = async () => {
+    setActionLoading(true);
+    try {
+      const res = await fetch('/api/budgets?action=reset', { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to reset budgets');
+      toast.success('All budgets reset successfully');
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      setConfirmResetOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reset budgets');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePurgeHistory = async () => {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/budgets?action=purge_history&periodKey=${periodKey}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to remove budget history');
+      toast.success('Budget history prior to current period removed');
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      setConfirmPurgeHistoryOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove budget history');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -177,10 +223,13 @@ export function BudgetTable() {
     [budgets, sortBudgets]
   );
 
-  const expenseBudgets = useMemo(
-    () => sortBudgets((budgets as BudgetData[]).filter((b) => b.type === 'expense')),
-    [budgets, sortBudgets]
-  );
+  // Expense budgets sorted, with special "All Other" item pinned at the end
+  const expenseBudgets = useMemo(() => {
+    const allExpense = (budgets as BudgetData[]).filter((b) => b.type === 'expense');
+    const regular = allExpense.filter((b) => !b.isCatchAll);
+    const catchAlls = allExpense.filter((b) => b.isCatchAll);
+    return [...sortBudgets(regular), ...catchAlls];
+  }, [budgets, sortBudgets]);
 
   const hasAnyAccount = useMemo(
     () => (budgets as BudgetData[]).some((b) => !!b.fundingAccountId),
@@ -233,9 +282,10 @@ export function BudgetTable() {
   return (
     <>
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <div className="p-3 sm:p-5 pb-3 flex items-center justify-between gap-2">
+        {/* Header flex container formatted for mobile responsiveness without overflow (Item 5) */}
+        <div className="p-3 sm:p-5 pb-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
           <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
             {isMobile && budgets.length > 0 && (
               <select
                 value={`${sortField}-${sortDirection}`}
@@ -246,35 +296,33 @@ export function BudgetTable() {
                 }}
                 className="text-xs bg-muted/50 border border-border rounded-lg px-2 py-1 text-foreground focus:outline-none focus:border-primary"
               >
-                <option value="category-asc">Category (A-Z)</option>
-                <option value="category-desc">Category (Z-A)</option>
                 <option value="budgeted-desc">Budgeted (High-Low)</option>
                 <option value="budgeted-asc">Budgeted (Low-High)</option>
+                <option value="category-asc">Category (A-Z)</option>
+                <option value="category-desc">Category (Z-A)</option>
                 <option value="actual-desc">Actual (High-Low)</option>
                 <option value="actual-asc">Actual (Low-High)</option>
                 <option value="variance-desc">Variance (High-Low)</option>
                 <option value="variance-asc">Variance (Low-High)</option>
                 <option value="progress-desc">Progress (High-Low)</option>
                 <option value="progress-asc">Progress (Low-High)</option>
-                <option value="account-asc">Account (A-Z)</option>
-                <option value="account-desc">Account (Z-A)</option>
               </select>
             )}
             <button
               onClick={() => setShowAutoBudget(true)}
               title="Automatically generate budget proposals based on historical spending"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border/80 rounded-lg transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border/80 rounded-lg transition-all shrink-0"
             >
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Auto
+              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span>Auto</span>
             </button>
             <button
               onClick={() => { setEditBudget(null); setShowForm(true); }}
               title="Manually create a new custom budget item"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all shrink-0"
             >
-              <Plus className="w-3.5 h-3.5" />
-              Budget
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span>Budget</span>
             </button>
           </div>
         </div>
@@ -301,65 +349,27 @@ export function BudgetTable() {
                       <Link
                         href={`/transactions?categoryId=${b.categoryId}`}
                         className="text-foreground font-medium text-sm truncate hover:text-primary hover:underline transition-colors"
-                        title={`View transactions for ${b.categoryName}`}
                       >
                         {b.categoryName}
                       </Link>
-                      {b.periodType !== periodType && b.monthlyAmount !== undefined && (
-                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-muted/70 text-muted-foreground border border-border/50 flex-shrink-0">
-                          {formatCurrency(b.monthlyAmount)}/{b.periodType === 'monthly' ? 'Month' : b.periodType === 'quarterly' ? 'Quarter' : 'Year'}
-                        </span>
-                      )}
-                      <ArrowUpCircle className="w-3 h-3 text-primary flex-shrink-0" />
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button
-                        onClick={() => { setEditBudget(b); setShowForm(true); }}
-                        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                      >
+                      <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => setDeleteBudget(b)}
-                        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive transition-colors"
-                      >
+                      <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                  {b.notes && <div className="text-[10px] text-muted-foreground">{b.notes}</div>}
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-muted-foreground">Budget: <span className="text-foreground blur-number">{formatCurrency(b.budgeted)}</span></span>
                     <span className="text-muted-foreground">Actual: <span className="text-foreground blur-number font-medium">{formatCurrency(b.actual)}</span></span>
-                    <span className={`blur-number font-medium ${isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
-                      {b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 pt-0.5">
-                    <div className="flex-1 h-2 bg-muted/80 rounded-full overflow-hidden">
-                      <div className={`h-full ${isTargetMet ? 'bg-primary' : 'bg-amber-500'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
-                    </div>
-                    <span className={`text-[10px] font-mono flex-shrink-0 ${isTargetMet ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-                      {(b.percentUsed || 0).toFixed(0)}%
-                    </span>
-                    {b.fundingAccountId ? (() => {
-                      const account = accounts.find((a) => a.id === b.fundingAccountId);
-                      return account ? (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-                          <Landmark className="w-3 h-3" />
-                          <span className="truncate max-w-[80px]" title={account.name}>{account.name}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-                          <Landmark className="w-3 h-3" />
-                          {getAccountName(b.fundingAccountId)}
-                        </div>
-                      );
-                    })() : null}
                   </div>
                 </div>
               );
             })}
+
             {expenseBudgets.length > 0 && (
               <div className="px-4 py-2 bg-accent/40 text-xs font-semibold text-foreground uppercase tracking-wider border-y border-border/50 flex items-center gap-1.5">
                 <TrendingDown className="w-3.5 h-3.5 text-primary" />
@@ -374,77 +384,47 @@ export function BudgetTable() {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
-                      <Link
-                        href={`/transactions?categoryId=${b.categoryId}`}
-                        className="text-foreground font-medium text-sm truncate hover:text-primary hover:underline transition-colors"
-                        title={`View transactions for ${b.categoryName}`}
-                      >
+                      <span className="text-foreground font-medium text-sm truncate">
                         {b.categoryName}
-                      </Link>
-                      {b.periodType !== periodType && b.monthlyAmount !== undefined && (
-                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-muted/70 text-muted-foreground border border-border/50 flex-shrink-0">
-                          {formatCurrency(b.monthlyAmount)}/{b.periodType === 'monthly' ? 'Month' : b.periodType === 'quarterly' ? 'Quarter' : 'Year'}
-                        </span>
+                      </span>
+                      {b.isCatchAll && b.groupedBreakout && b.groupedBreakout.length > 0 && (
+                        <button
+                          onClick={() => setExpandedCatchAll(!expandedCatchAll)}
+                          className="px-1.5 py-0.5 text-[10px] font-semibold bg-accent border border-border rounded text-primary flex items-center gap-1"
+                        >
+                          <Layers className="w-3 h-3" />
+                          <span>{b.groupedBreakout.length} items</span>
+                          {expandedCatchAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
                       )}
-                      {b.rollover && <RotateCcw className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />}
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button
-                        onClick={() => { setEditBudget(b); setShowForm(true); }}
-                        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                      >
+                      <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => setDeleteBudget(b)}
-                        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive transition-colors"
-                      >
+                      <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                  {b.notes && <div className="text-[10px] text-muted-foreground">{b.notes}</div>}
+
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-muted-foreground">Budget: <span className="text-foreground blur-number">{formatCurrency(b.budgeted)}</span></span>
                     <span className="text-muted-foreground">Actual: <span className="text-foreground blur-number">{formatCurrency(b.actual)}</span></span>
-                    <span className={`blur-number font-medium ${isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
-                      {formatCurrency(b.remaining)}
-                    </span>
                   </div>
-                  <div className="flex items-center gap-2 pt-0.5">
-                    <div className="flex-1 h-2 bg-muted/80 rounded-full overflow-hidden">
-                      <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+
+                  {/* Catch-all Mobile Breakout sub-card */}
+                  {b.isCatchAll && expandedCatchAll && b.groupedBreakout && b.groupedBreakout.length > 0 && (
+                    <div className="mt-2 p-2.5 bg-muted/40 rounded-lg border border-border/60 space-y-1.5">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Unbudgeted Category Breakout</span>
+                      {b.groupedBreakout.map((item) => (
+                        <div key={item.categoryId} className="flex items-center justify-between text-xs">
+                          <span className="text-foreground/80">{item.categoryName}</span>
+                          <span className="font-mono text-muted-foreground font-medium">{formatCurrency(item.actual)}</span>
+                        </div>
+                      ))}
                     </div>
-                    <span className={`text-[10px] font-mono flex-shrink-0 ${isOver ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                      {(b.percentUsed || 0).toFixed(0)}%
-                    </span>
-                    {b.fundingAccountId ? (() => {
-                      const account = accounts.find((a) => a.id === b.fundingAccountId);
-                      return account ? (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-                          <Landmark className="w-3 h-3" />
-                          <span className="truncate max-w-[80px]" title={account.name}>{account.name}</span>
-                          {showBudgetTags && account.tags && account.tags.length > 0 && (
-                            <div className="flex items-center gap-1">
-                              {account.tags.map((tag) => (
-                                <span
-                                  key={tag.id}
-                                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: tag.color }}
-                                  title={tag.name}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Landmark className="w-3 h-3" />
-                          {getAccountName(b.fundingAccountId)}
-                        </div>
-                      );
-                    })() : null}
-                  </div>
+                  )}
                 </div>
               );
             })}
@@ -462,7 +442,41 @@ export function BudgetTable() {
                   {hasAnyAccount && (
                     <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('account', 'Account', 'left')}</th>
                   )}
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Actions</th>
+                  {/* Actions Column with Gear Dropdown Menu (Item 6) */}
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground relative">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Actions</span>
+                      <div className="relative inline-block text-left" ref={gearMenuRef}>
+                        <button
+                          onClick={() => setShowGearMenu(!showGearMenu)}
+                          title="Budget actions & history settings"
+                          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                        </button>
+                        {showGearMenu && (
+                          <div className="absolute right-0 mt-1 w-56 rounded-xl bg-popover border border-border shadow-lg z-50 py-1.5 text-left animate-in fade-in-50 zoom-in-95">
+                            <button
+                              onClick={() => { setShowGearMenu(false); setConfirmPurgeHistoryOpen(true); }}
+                              title="Erase historical budgets prior to current period while keeping active recurring amounts"
+                              className="w-full px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2 transition-colors"
+                            >
+                              <History className="w-3.5 h-3.5 text-primary shrink-0" />
+                              <span>Remove Budget History</span>
+                            </button>
+                            <button
+                              onClick={() => { setShowGearMenu(false); setConfirmResetOpen(true); }}
+                              title="Permanently erase all budget items"
+                              className="w-full px-3 py-2 text-xs text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-destructive shrink-0" />
+                              <span>Reset All Budgets</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="border-t border-border">
@@ -486,18 +500,11 @@ export function BudgetTable() {
                           <Link
                             href={`/transactions?categoryId=${b.categoryId}`}
                             className="text-foreground font-medium hover:text-primary hover:underline transition-colors"
-                            title={`View transactions for ${b.categoryName}`}
                           >
                             {b.categoryName}
                           </Link>
-                          {b.periodType !== periodType && b.monthlyAmount !== undefined && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-muted/70 text-muted-foreground border border-border/50 flex-shrink-0">
-                              {formatCurrency(b.monthlyAmount)}/{b.periodType === 'monthly' ? 'Month' : b.periodType === 'quarterly' ? 'Quarter' : 'Year'}
-                            </span>
-                          )}
                           <ArrowUpCircle className="w-3 h-3 text-primary" />
                         </div>
-                        {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4.5">{b.notes}</div>}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(b.budgeted)}</td>
                       <td className="px-4 py-3 text-right font-mono text-foreground font-medium blur-number">{formatCurrency(b.actual)}</td>
@@ -516,48 +523,15 @@ export function BudgetTable() {
                       </td>
                       {hasAnyAccount && (
                         <td className="px-4 py-3">
-                          {b.fundingAccountId ? (() => {
-                            const account = accounts.find((a) => a.id === b.fundingAccountId);
-                            return account ? (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Landmark className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
-                                <span className="truncate" title={account.name}>{account.name}</span>
-                                {showBudgetTags && account.tags && account.tags.length > 0 && (
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    {account.tags.map((tag) => (
-                                      <span
-                                        key={tag.id}
-                                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: tag.color }}
-                                        title={tag.name}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Landmark className="w-3 h-3" />
-                                {getAccountName(b.fundingAccountId)}
-                              </div>
-                            );
-                          })() : (
-                            <span className="text-xs text-muted-foreground/50">&mdash;</span>
-                          )}
+                          <span className="text-xs text-muted-foreground/50">&mdash;</span>
                         </td>
                       )}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => { setEditBudget(b); setShowForm(true); }}
-                            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                          >
+                          <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1.5 rounded hover:bg-accent text-muted-foreground">
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => setDeleteBudget(b)}
-                            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-destructive transition-colors"
-                          >
+                          <button onClick={() => setDeleteBudget(b)} className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -565,6 +539,7 @@ export function BudgetTable() {
                     </tr>
                   );
                 })}
+
                 {expenseBudgets.length > 0 && (
                   <tr className="bg-accent/40 border-y border-border/50">
                     <td colSpan={hasAnyAccount ? 7 : 6} className="px-5 py-2 text-xs font-semibold text-foreground uppercase tracking-wider">
@@ -579,90 +554,87 @@ export function BudgetTable() {
                   const isOver = b.remaining < 0;
                   const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
                   return (
-                    <tr key={b.id} className="border-b border-border hover:bg-accent/20 transition-colors">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
-                          <Link
-                            href={`/transactions?categoryId=${b.categoryId}`}
-                            className="text-foreground font-medium hover:text-primary hover:underline transition-colors"
-                            title={`View transactions for ${b.categoryName}`}
-                          >
-                            {b.categoryName}
-                          </Link>
-                          {b.periodType !== periodType && b.monthlyAmount !== undefined && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-muted/70 text-muted-foreground border border-border/50 flex-shrink-0">
-                              {formatCurrency(b.monthlyAmount)}/{b.periodType === 'monthly' ? 'Month' : b.periodType === 'quarterly' ? 'Quarter' : 'Year'}
-                            </span>
-                          )}
-                          {b.rollover && <RotateCcw className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />}
-                        </div>
-                        {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4.5">{b.notes}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(b.budgeted)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(b.actual)}</td>
-                      <td className={`px-4 py-3 text-right font-mono blur-number font-medium ${isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
-                        {formatCurrency(b.remaining)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-20 h-1.5 bg-muted/80 rounded-full overflow-hidden">
-                            <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                    <React.Fragment key={b.id}>
+                      <tr className="border-b border-border hover:bg-accent/20 transition-colors">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
+                            <Link
+                              href={`/transactions?categoryId=${b.categoryId}`}
+                              className="text-foreground font-medium hover:text-primary hover:underline transition-colors"
+                            >
+                              {b.categoryName}
+                            </Link>
+
+                            {/* Catch-all breakout dropdown toggle button (Item 2) */}
+                            {b.isCatchAll && b.groupedBreakout && b.groupedBreakout.length > 0 && (
+                              <button
+                                onClick={() => setExpandedCatchAll(!expandedCatchAll)}
+                                title="Expand to see unbudgeted category spending in this bucket"
+                                className="px-2 py-0.5 text-[10px] font-semibold bg-accent hover:bg-accent/80 border border-border rounded-md text-primary flex items-center gap-1 transition-all"
+                              >
+                                <Layers className="w-3 h-3" />
+                                <span>{b.groupedBreakout.length} items</span>
+                                {expandedCatchAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                            )}
                           </div>
-                          <span className={`text-[10px] font-mono ${isOver ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                            {(b.percentUsed || 0).toFixed(0)}%
-                          </span>
-                        </div>
-                      </td>
-                      {hasAnyAccount && (
-                        <td className="px-4 py-3">
-                          {b.fundingAccountId ? (() => {
-                            const account = accounts.find((a) => a.id === b.fundingAccountId);
-                            return account ? (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Landmark className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
-                                <span className="truncate" title={account.name}>{account.name}</span>
-                                {showBudgetTags && account.tags && account.tags.length > 0 && (
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    {account.tags.map((tag) => (
-                                      <span
-                                        key={tag.id}
-                                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: tag.color }}
-                                        title={tag.name}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Landmark className="w-3 h-3" />
-                                {getAccountName(b.fundingAccountId)}
-                              </div>
-                            );
-                          })() : (
-                            <span className="text-xs text-muted-foreground/50">&mdash;</span>
-                          )}
+                          {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4.5">{b.notes}</div>}
                         </td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(b.budgeted)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(b.actual)}</td>
+                        <td className={`px-4 py-3 text-right font-mono blur-number font-medium ${isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
+                          {formatCurrency(b.remaining)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-20 h-1.5 bg-muted/80 rounded-full overflow-hidden">
+                              <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                            </div>
+                            <span className={`text-[10px] font-mono ${isOver ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                              {(b.percentUsed || 0).toFixed(0)}%
+                            </span>
+                          </div>
+                        </td>
+                        {hasAnyAccount && (
+                          <td className="px-4 py-3">
+                            <span className="text-xs text-muted-foreground/50">&mdash;</span>
+                          </td>
+                        )}
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1.5 rounded hover:bg-accent text-muted-foreground">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setDeleteBudget(b)} className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Desktop Catch-All Breakout expandable sub-row */}
+                      {b.isCatchAll && expandedCatchAll && b.groupedBreakout && b.groupedBreakout.length > 0 && (
+                        <tr className="bg-muted/30 border-b border-border/80">
+                          <td colSpan={hasAnyAccount ? 7 : 6} className="px-6 py-3">
+                            <div className="space-y-2">
+                              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5 text-primary" />
+                                Unbudgeted Categories in this Bucket ({b.groupedBreakout.length})
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {b.groupedBreakout.map((item) => (
+                                  <div key={item.categoryId} className="flex items-center justify-between p-2 rounded-lg bg-background border border-border/60 text-xs">
+                                    <span className="font-medium text-foreground truncate">{item.categoryName}</span>
+                                    <span className="font-mono text-muted-foreground font-semibold">{formatCurrency(item.actual)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => { setEditBudget(b); setShowForm(true); }}
-                            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteBudget(b)}
-                            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-destructive transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -696,6 +668,7 @@ export function BudgetTable() {
         periodKey={periodKey}
       />
 
+      {/* Delete Item Confirmation */}
       <AlertDialog open={!!deleteBudget} onOpenChange={(o) => { if (!o) setDeleteBudget(null); }}>
         <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
@@ -712,6 +685,56 @@ export function BudgetTable() {
               className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {deleteLoading ? 'Deleting...' : 'Delete'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset All Budgets Confirmation Modal (Item 6) */}
+      <AlertDialog open={confirmResetOpen} onOpenChange={setConfirmResetOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              Reset All Budgets
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to <strong>erase all budget items</strong>? This will permanently remove all recurring and period-specific budgets across all categories.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              onClick={handleResetBudgets}
+              disabled={actionLoading}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {actionLoading ? 'Resetting...' : 'Reset All Budgets'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Budget History Confirmation Modal (Item 6) */}
+      <AlertDialog open={confirmPurgeHistoryOpen} onOpenChange={setConfirmPurgeHistoryOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-primary" />
+              Remove Prior Budget History
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to <strong>remove historical budget data prior to {periodKey}</strong>? Active recurring budgets will remain in effect for the current period forward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              onClick={handlePurgeHistory}
+              disabled={actionLoading}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {actionLoading ? 'Removing...' : 'Remove History'}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>

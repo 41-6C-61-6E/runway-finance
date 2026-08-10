@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { budgets, categorySpendingSummary, categoryIncomeSummary, categories } from '@/lib/db/schema';
-import { eq, and, or, isNull, inArray } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 
@@ -12,7 +12,6 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
-  const userId = session.user.id;
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { searchParams } = new URL(request.url);
   const now = new Date();
@@ -21,13 +20,15 @@ export async function GET(request: Request) {
   const db = getDb();
 
   try {
-    const budgetRows = await db
+    const allUserBudgets = await db
       .select({
         budgetId: budgets.id,
         categoryId: budgets.categoryId,
         amount: budgets.amount,
         isRecurring: budgets.isRecurring,
         yearMonth: budgets.yearMonth,
+        effectiveFrom: budgets.effectiveFrom,
+        effectiveTo: budgets.effectiveTo,
         categoryName: categories.name,
         categoryColor: categories.color,
         isIncome: categories.isIncome,
@@ -37,13 +38,18 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(budgets.userId, dataUserId),
-          or(
-            eq(budgets.yearMonth, month),
-            and(isNull(budgets.yearMonth), eq(budgets.isRecurring, true))
-          ),
           eq(categories.excludeFromReports, false)
         )
       );
+
+    const budgetRows = allUserBudgets.filter((b) => {
+      if (!b.isRecurring) {
+        return b.yearMonth === month || b.effectiveFrom === month;
+      }
+      const fromOk = !b.effectiveFrom || b.effectiveFrom <= month;
+      const toOk = !b.effectiveTo || b.effectiveTo >= month;
+      return fromOk && toOk;
+    });
 
     const expenseIds = budgetRows.filter((b) => !b.isIncome).map((b) => b.categoryId);
     const incomeIds = budgetRows.filter((b) => b.isIncome).map((b) => b.categoryId);
@@ -103,10 +109,9 @@ export async function GET(request: Request) {
       };
     }));
 
-    logger.info('GET /api/cash-flow/budgets', { month, count: data.length });
     return NextResponse.json(data);
   } catch (error) {
-    logger.error('Error fetching budgets', { error });
+    logger.error('Error fetching budgets for cash flow', { error });
     return NextResponse.json(
       { error: 'internal_error', message: 'Failed to fetch budget data' },
       { status: 500 }

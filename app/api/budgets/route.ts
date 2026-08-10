@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions, userSettings } from '@/lib/db/schema';
-import { eq, and, or, isNull, sql, inArray, gte, lt } from 'drizzle-orm';
+import { eq, and, or, isNull, sql, inArray, gte, lt, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows, encryptRow } from '@/lib/crypto';
@@ -55,9 +55,23 @@ function getPeriodBounds(periodType: string, periodKey: string | null, now: Date
   return {
     yearMonth,
     startDate: start.toISOString().split('T')[0],
-    endDate: next.toISOString().split('T')[0], // Exclusive end date for LT comparison
+    endDate: next.toISOString().split('T')[0],
     label: yearMonth,
   };
+}
+
+function getPreviousPeriodKey(periodType: string, periodKey: string): string {
+  if (periodType === 'monthly') {
+    const [y, m] = periodKey.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m - 2, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  }
+  if (periodType === 'quarterly') {
+    const [y, q] = periodKey.split('-Q').map(Number);
+    if (q === 1) return `${y - 1}-Q4`;
+    return `${y}-Q${q - 1}`;
+  }
+  return String(Number(periodKey) - 1);
 }
 
 export async function GET(request: Request) {
@@ -77,19 +91,23 @@ export async function GET(request: Request) {
   try {
     await ensureCategoryDiscretionaryColumn();
     const bounds = periodKey ? getPeriodBounds(periodType, periodKey, now) : getPeriodBounds(periodType, null, now);
+    const targetPeriodKey = bounds.yearMonth;
 
-    const budgetRows = await db
+    const allUserBudgets = await db
       .select({
         id: budgets.id,
         categoryId: budgets.categoryId,
         amount: budgets.amount,
         isRecurring: budgets.isRecurring,
+        effectiveFrom: budgets.effectiveFrom,
+        effectiveTo: budgets.effectiveTo,
         yearMonth: budgets.yearMonth,
         periodType: budgets.periodType,
         periodKey: budgets.periodKey,
         fundingAccountId: budgets.fundingAccountId,
         rollover: budgets.rollover,
         notes: budgets.notes,
+        createdAt: budgets.createdAt,
         categoryName: categories.name,
         categoryColor: categories.color,
         isIncome: categories.isIncome,
@@ -101,28 +119,56 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(budgets.userId, dataUserId),
-          or(
-            eq(budgets.yearMonth, bounds.yearMonth),
-            and(isNull(budgets.yearMonth), eq(budgets.isRecurring, true))
-          ),
           eq(categories.excludeFromReports, false),
-          periodType
-            ? (periodType === 'quarterly' || periodType === 'yearly'
-                ? inArray(budgets.periodType, [periodType, 'monthly'])
-                : eq(budgets.periodType, periodType))
-            : undefined,
         )
       );
 
     // Decrypt budget amounts and notes
-    const decryptedBudgetRows = await Promise.all(budgetRows.map(async (row) => ({
+    const decryptedBudgetRows = await Promise.all(allUserBudgets.map(async (row) => ({
       ...row,
       amount: await decryptField(row.amount, dek),
       categoryName: row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized',
       notes: row.notes ? await decryptField(row.notes, dek).catch(() => row.notes) : null,
     })));
 
-    // Fetch all categories to handle sub-category roll-ups and provide to frontend
+    // Filter budget rows for current periodKey respecting effectiveFrom / effectiveTo date bounds
+    const filteredBudgetRows: typeof decryptedBudgetRows = [];
+    const categoryMap = new Map<string, typeof decryptedBudgetRows[0]>();
+
+    for (const b of decryptedBudgetRows) {
+      if (periodType && b.periodType && b.periodType !== periodType) {
+        if (!(periodType === 'quarterly' || periodType === 'yearly') || b.periodType !== 'monthly') {
+          // Keep compatible period types
+        }
+      }
+
+      let matches = false;
+      if (!b.isRecurring) {
+        matches = b.yearMonth === targetPeriodKey || b.periodKey === targetPeriodKey || b.effectiveFrom === targetPeriodKey;
+      } else {
+        const fromOk = !b.effectiveFrom || b.effectiveFrom <= targetPeriodKey;
+        const toOk = !b.effectiveTo || b.effectiveTo >= targetPeriodKey;
+        matches = fromOk && toOk;
+      }
+
+      if (matches) {
+        const existing = categoryMap.get(b.categoryId);
+        if (!existing) {
+          categoryMap.set(b.categoryId, b);
+        } else {
+          // If multiple match, prefer the one with effectiveFrom matching or latest
+          const curFrom = b.effectiveFrom || '';
+          const exFrom = existing.effectiveFrom || '';
+          if (curFrom >= exFrom) {
+            categoryMap.set(b.categoryId, b);
+          }
+        }
+      }
+    }
+
+    const activeBudgetRows = Array.from(categoryMap.values());
+
+    // Fetch all categories to handle sub-category roll-ups and unbudgeted breakouts
     const allCategories = await db
       .select({ 
         id: categories.id, 
@@ -135,16 +181,19 @@ export async function GET(request: Request) {
       .from(categories)
       .where(eq(categories.userId, dataUserId));
 
-    // Helper to find all descendant IDs for a given category (recursive)
+    const decryptedAllCategories = await Promise.all(allCategories.map(async (c) => ({
+      ...c,
+      name: c.name ? await decryptField(c.name, dek) : 'Uncategorized',
+    })));
+
     const getDescendantIds = (catId: string): string[] => {
-      const children = allCategories.filter(c => c.parentId === catId);
+      const children = decryptedAllCategories.filter(c => c.parentId === catId);
       return [catId, ...children.flatMap(c => getDescendantIds(c.id))];
     };
 
     async function fetchActuals(catIds: string[]) {
       if (catIds.length === 0) return new Map<string, number>();
 
-      // Map of every searchable category ID to an array of budget category IDs it contributes to
       const catToBudgetsMap = new Map<string, string[]>();
       const allSearchIds: string[] = [];
       
@@ -158,7 +207,6 @@ export async function GET(request: Request) {
         });
       }
 
-      // Fetch user settings to respect imported data toggles
       const userSettingsList = await db
         .select()
         .from(userSettings)
@@ -201,8 +249,6 @@ export async function GET(request: Request) {
         txConditions.push(eq(transactions.isImported, false));
       }
 
-      // Use exclusive end date comparison to capture timestamps correctly
-      // transactions.date < bounds.endDate captures up to 23:59:59.999 of the actual period end
       const txRows = await db
         .select({
           categoryId: transactions.categoryId,
@@ -212,7 +258,6 @@ export async function GET(request: Request) {
         .from(transactions)
         .where(and(...txConditions));
 
-      // Decrypt and aggregate in memory
       const totals = new Map<string, number>();
       for (const row of txRows) {
         if (!row.categoryId) continue;
@@ -230,7 +275,6 @@ export async function GET(request: Request) {
         }
       }
 
-      // Final values for budgets should be positive (spending total or income total)
       for (const [catId, total] of totals.entries()) {
         totals.set(catId, Math.abs(total));
       }
@@ -238,15 +282,29 @@ export async function GET(request: Request) {
       return totals;
     }
 
-    const incomeCategoryIds = decryptedBudgetRows.filter((b) => b.isIncome && b.categoryType !== 'compound' && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
-    const expenseCategoryIds = decryptedBudgetRows.filter((b) => (!b.isIncome || b.categoryType === 'compound') && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
+    // Fetch actuals for unbudgeted categories (for All Other breakout)
+    const budgetedCategoryIds = new Set(activeBudgetRows.map((b) => b.categoryId));
+    const unbudgetedCategories = decryptedAllCategories.filter(
+      (c) => !c.isIncome && !budgetedCategoryIds.has(c.id)
+    );
+    const unbudgetedActualMap = await fetchActuals(unbudgetedCategories.map((c) => c.id));
+    const allOtherBreakout = unbudgetedCategories
+      .map((c) => ({
+        categoryId: c.id,
+        categoryName: c.name,
+        actual: unbudgetedActualMap.get(c.id) || 0,
+      }))
+      .filter((c) => c.actual > 0);
+
+    const incomeCategoryIds = activeBudgetRows.filter((b) => b.isIncome && b.categoryType !== 'compound' && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
+    const expenseCategoryIds = activeBudgetRows.filter((b) => (!b.isIncome || b.categoryType === 'compound') && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
 
     const [expenseActualMap, incomeActualMap] = await Promise.all([
       fetchActuals(expenseCategoryIds),
       fetchActuals(incomeCategoryIds),
     ]);
 
-    const data = decryptedBudgetRows.map((row) => {
+    const data = activeBudgetRows.map((row) => {
       const nativeAmount = parseFloat(row.amount);
       let budgeted = nativeAmount;
       if (row.isRecurring && row.periodType === 'monthly') {
@@ -256,9 +314,18 @@ export async function GET(request: Request) {
 
       const isIncome = row.isIncome ?? false;
       const isCompound = row.categoryType === 'compound';
-      // Compound budgets track expense-side amounts
       const effectiveIsIncome = isIncome && !isCompound;
-      const actual = (effectiveIsIncome ? incomeActualMap : expenseActualMap).get(row.categoryId) || 0;
+      let actual = (effectiveIsIncome ? incomeActualMap : expenseActualMap).get(row.categoryId) || 0;
+
+      const isCatchAll = (row.categoryName || '').toLowerCase().includes('all other') || (row.categoryName || '').toLowerCase().includes('misc');
+      let groupedBreakout: typeof allOtherBreakout | undefined = undefined;
+
+      if (isCatchAll) {
+        groupedBreakout = allOtherBreakout;
+        const totalUnbudgetedActual = allOtherBreakout.reduce((s, c) => s + c.actual, 0);
+        actual = Math.max(actual, totalUnbudgetedActual);
+      }
+
       const remaining = effectiveIsIncome ? actual - budgeted : budgeted - actual;
       const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0;
 
@@ -270,6 +337,8 @@ export async function GET(request: Request) {
         periodType: row.periodType,
         periodKey: row.periodKey || row.yearMonth || null,
         yearMonth: row.yearMonth || null,
+        effectiveFrom: row.effectiveFrom || null,
+        effectiveTo: row.effectiveTo || null,
         isRecurring: row.isRecurring,
         fundingAccountId: row.fundingAccountId,
         rollover: row.rollover,
@@ -280,20 +349,23 @@ export async function GET(request: Request) {
         remaining,
         percentUsed,
         type: effectiveIsIncome ? 'income' : 'expense',
+        isDiscretionary: row.isDiscretionary ?? true,
+        isCatchAll,
+        groupedBreakout,
       };
     });
 
     const result: Record<string, unknown> = { budgets: data, period: bounds };
 
     if (includeCategories) {
-      result.categories = await Promise.all(allCategories.map(async (c) => ({
+      result.categories = decryptedAllCategories.map((c) => ({
         id: c.id,
-        name: await decryptField(c.name || '', dek),
+        name: c.name,
         color: c.color,
         isIncome: c.isIncome,
         parentId: c.parentId,
         isDiscretionary: c.isDiscretionary,
-      })));
+      }));
     }
     return NextResponse.json(result);
   } catch (error) {
@@ -320,6 +392,7 @@ export async function POST(request: Request) {
     const targetPeriodKey = (body.periodKey as string) ?? null;
     const targetPeriodType = (body.periodType as string) || 'monthly';
     const targetCategoryId = body.categoryId as string;
+    const effectiveFrom = targetPeriodKey || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
     const [existing] = await db
       .select()
@@ -345,8 +418,10 @@ export async function POST(request: Request) {
       userId: dataUserId,
       categoryId: targetCategoryId,
       periodType: targetPeriodType,
-      yearMonth: targetPeriodKey,
-      periodKey: targetPeriodKey,
+      yearMonth: body.isRecurring !== false ? null : targetPeriodKey,
+      periodKey: body.isRecurring !== false ? null : targetPeriodKey,
+      effectiveFrom: effectiveFrom,
+      effectiveTo: null,
       amount: formatToCents(parseFloat(String(body.amount ?? 0)) || 0),
       isRecurring: body.isRecurring !== false,
       fundingAccountId: (body.fundingAccountId as string) ?? null,
@@ -412,15 +487,53 @@ export async function PATCH(request: Request) {
       .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, dataUserId)));
   }
 
+  const applyMode = (body.applyMode as string) || 'future'; // 'future' vs 'all'
+  const currentPeriodKey = (body.periodKey as string) || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const periodType = (body.periodType as string) || existing.periodType;
+
+  // Handle effective date splitting if updating an existing recurring budget from current period onward
+  if (existing.isRecurring && applyMode === 'future' && body.amount !== undefined) {
+    const existingFrom = existing.effectiveFrom || '1970-01';
+    if (existingFrom < currentPeriodKey) {
+      // 1. Close off previous recurring budget period
+      const prevPeriod = getPreviousPeriodKey(periodType, currentPeriodKey);
+      await db
+        .update(budgets)
+        .set({ effectiveTo: prevPeriod, updatedAt: new Date() })
+        .where(eq(budgets.id, id));
+
+      // 2. Insert new budget effective from currentPeriodKey onward
+      const newEncryptedData = await encryptRow('budgets', {
+        userId: dataUserId,
+        categoryId: targetCategoryId,
+        periodType: periodType,
+        yearMonth: null,
+        periodKey: null,
+        effectiveFrom: currentPeriodKey,
+        effectiveTo: null,
+        amount: formatToCents(parseFloat(String(body.amount)) || 0),
+        isRecurring: true,
+        fundingAccountId: (body.fundingAccountId as string) ?? existing.fundingAccountId,
+        rollover: body.rollover !== undefined ? body.rollover === true : existing.rollover,
+        notes: (body.notes as string) ?? existing.notes,
+      }, dek);
+
+      const [newBudget] = await db.insert(budgets).values(newEncryptedData).returning();
+      return NextResponse.json(newBudget);
+    }
+  }
+
   let updateData: Record<string, unknown> = {};
   if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
   if (body.periodType !== undefined) updateData.periodType = body.periodType;
   if (body.amount !== undefined) updateData.amount = formatToCents(parseFloat(String(body.amount)) || 0);
   if (body.isRecurring !== undefined) updateData.isRecurring = body.isRecurring;
   if (body.periodKey !== undefined) {
-    updateData.yearMonth = body.periodKey || null;
-    updateData.periodKey = body.periodKey || null;
+    updateData.yearMonth = body.isRecurring ? null : body.periodKey;
+    updateData.periodKey = body.isRecurring ? null : body.periodKey;
   }
+  if (body.effectiveFrom !== undefined) updateData.effectiveFrom = body.effectiveFrom;
+  if (body.effectiveTo !== undefined) updateData.effectiveTo = body.effectiveTo;
   if (body.fundingAccountId !== undefined) updateData.fundingAccountId = body.fundingAccountId || null;
   if (body.rollover !== undefined) updateData.rollover = body.rollover;
   if (body.notes !== undefined) updateData.notes = body.notes || null;
@@ -437,6 +550,53 @@ export async function PATCH(request: Request) {
     return NextResponse.json(updated);
   } catch (error) {
     logger.error('Error updating budget', { error });
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const session = await auth();
+  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+  if (!session?.user || !dataUserId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get('action');
+  const periodKey = searchParams.get('periodKey') || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+  const db = getDb();
+
+  try {
+    if (action === 'reset') {
+      // Erase ALL budgets for user
+      await db.delete(budgets).where(eq(budgets.userId, dataUserId));
+      return NextResponse.json({ success: true, message: 'All budgets reset' });
+    }
+
+    if (action === 'purge_history') {
+      // Erase prior period budgets and reset effectiveFrom to current period
+      await db
+        .delete(budgets)
+        .where(
+          and(
+            eq(budgets.userId, dataUserId),
+            or(
+              lt(budgets.effectiveTo, periodKey),
+              lt(budgets.yearMonth, periodKey)
+            )
+          )
+        );
+
+      await db
+        .update(budgets)
+        .set({ effectiveFrom: periodKey, effectiveTo: null })
+        .where(eq(budgets.userId, dataUserId));
+
+      return NextResponse.json({ success: true, message: 'Budget history removed' });
+    }
+
+    return NextResponse.json({ error: 'invalid_action' }, { status: 400 });
+  } catch (error) {
+    logger.error('Error in DELETE /api/budgets', { error });
     return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 }

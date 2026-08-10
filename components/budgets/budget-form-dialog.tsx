@@ -31,6 +31,7 @@ interface BudgetFormData {
   rollover: boolean;
   notes: string;
   isDiscretionary: boolean;
+  applyMode: 'future' | 'all';
 }
 
 interface BudgetFormDialogProps {
@@ -65,6 +66,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
     rollover: false,
     notes: '',
     isDiscretionary: true,
+    applyMode: 'future',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -92,6 +94,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         rollover: editBudget.rollover,
         notes: editBudget.notes ?? '',
         isDiscretionary: editBudget.isDiscretionary ?? cat?.isDiscretionary ?? true,
+        applyMode: 'future',
       });
     } else {
       setForm({
@@ -104,6 +107,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         rollover: false,
         notes: '',
         isDiscretionary: true,
+        applyMode: 'future',
       });
     }
     setError('');
@@ -127,11 +131,12 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         periodType: form.periodType,
         amount: parseFloat(form.amount),
         isRecurring: form.isRecurring,
-        periodKey: form.isRecurring ? null : form.periodKey,
+        periodKey: periodKey,
         fundingAccountId: form.fundingAccountId || null,
         rollover: form.rollover,
         notes: form.notes || null,
         isDiscretionary: form.isDiscretionary,
+        applyMode: form.applyMode,
       };
 
       const url = editBudget ? `/api/budgets/${editBudget.id}` : '/api/budgets';
@@ -167,7 +172,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         <DialogHeader className="shrink-0">
           <DialogTitle>{editBudget ? 'Edit Budget' : 'Add Budget'}</DialogTitle>
           <DialogDescription>
-            {editBudget ? 'Update the budget details.' : 'Create a new budget for a category.'}
+            {editBudget ? 'Update the budget details.' : 'Create a new budget for a category starting from the current period forward.'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 flex-1 overflow-y-auto min-h-0 pr-1 pb-2">
@@ -263,6 +268,36 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
               <span className="text-sm text-foreground/80">Rollover unused</span>
             </label>
           </div>
+
+          {editBudget && form.isRecurring && (
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Apply Changes Scope</label>
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
+                  <input
+                    type="radio"
+                    name="applyMode"
+                    value="future"
+                    checked={form.applyMode === 'future'}
+                    onChange={() => setForm((f) => ({ ...f, applyMode: 'future' }))}
+                    className="text-primary"
+                  />
+                  <span>Apply from {periodKey} forward (preserves historical period figures)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
+                  <input
+                    type="radio"
+                    name="applyMode"
+                    value="all"
+                    checked={form.applyMode === 'all'}
+                    onChange={() => setForm((f) => ({ ...f, applyMode: 'all' }))}
+                    className="text-primary"
+                  />
+                  <span>Apply to all past and future periods</span>
+                </label>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Funding Account (optional)</label>
