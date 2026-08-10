@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { BudgetFormDialog } from './budget-form-dialog';
 import { AutoBudgetDialog } from './auto-budget-dialog';
+import { BudgetItemTransactionsIcon, getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
 import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Sparkles, Settings, History, Layers } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -51,6 +52,7 @@ export function BudgetTable() {
   const settingsContext = useUserSettings();
   const showBudgetTags = settingsContext?.settings?.accountTagVisibility?.budgets !== false;
   const { periodType, periodKey } = useBudgetPeriod();
+  const { startDate, endDate } = useMemo(() => getPeriodDateRange(periodType, periodKey), [periodType, periodKey]);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -376,16 +378,22 @@ export function BudgetTable() {
             {incomeBudgets.map((b) => {
               const isTargetMet = b.remaining >= 0;
               return (
-                <div key={b.id} className="px-4 py-3 space-y-2">
+                <div key={b.id} className="px-4 py-3 space-y-2 group/row">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                       <Link
-                        href={`/transactions?categoryId=${b.categoryId}`}
+                        href={`/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`}
                         className="text-foreground font-medium text-sm truncate hover:text-primary hover:underline transition-colors"
                       >
                         {b.categoryName}
                       </Link>
+                      <BudgetItemTransactionsIcon
+                        categoryId={b.categoryId}
+                        categoryName={b.categoryName}
+                        periodType={periodType}
+                        periodKey={periodKey}
+                      />
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
                       <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
@@ -415,13 +423,27 @@ export function BudgetTable() {
               const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
               const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
               return (
-                <div key={b.id} className="px-4 py-3 space-y-2">
+                <div key={b.id} className="px-4 py-3 space-y-2 group/row">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
-                      <span className="text-foreground font-semibold text-sm truncate">
+                      <Link
+                        href={
+                          isEE && b.groupedBreakout && b.groupedBreakout.length > 0
+                            ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
+                            : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
+                        }
+                        className="text-foreground font-semibold text-sm truncate hover:text-primary hover:underline transition-colors"
+                      >
                         {b.categoryName}
-                      </span>
+                      </Link>
+                      <BudgetItemTransactionsIcon
+                        categoryId={isEE ? undefined : b.categoryId}
+                        categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : undefined}
+                        categoryName={b.categoryName}
+                        periodType={periodType}
+                        periodKey={periodKey}
+                      />
                       {isEE && (
                         <button
                           onClick={() => setExpandedCatchAll(!expandedCatchAll)}
@@ -459,10 +481,21 @@ export function BudgetTable() {
                         <p className="text-xs text-muted-foreground italic py-1">No unbudgeted spending in this period.</p>
                       ) : (
                         b.groupedBreakout.map((item) => (
-                          <div key={item.categoryId} className="flex items-center justify-between text-xs p-2 rounded-lg bg-background border border-border/40 gap-2">
+                          <div key={item.categoryId} className="flex items-center justify-between text-xs p-2 rounded-lg bg-background border border-border/40 gap-2 group/row">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.categoryColor || '#6366f1' }} />
-                              <span className="font-medium text-foreground truncate">{item.categoryName}</span>
+                              <Link
+                                href={`/transactions?categoryId=${item.categoryId}&startDate=${startDate}&endDate=${endDate}`}
+                                className="font-medium text-foreground truncate hover:text-primary hover:underline transition-colors"
+                              >
+                                {item.categoryName}
+                              </Link>
+                              <BudgetItemTransactionsIcon
+                                categoryId={item.categoryId}
+                                categoryName={item.categoryName}
+                                periodType={periodType}
+                                periodKey={periodKey}
+                              />
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <span className="font-mono text-muted-foreground font-semibold">{formatCurrency(item.actual)}</span>
@@ -548,17 +581,23 @@ export function BudgetTable() {
                 {incomeBudgets.map((b) => {
                   const isTargetMet = b.remaining >= 0;
                   return (
-                    <tr key={b.id} className="border-b border-border hover:bg-accent/20 transition-colors">
+                    <tr key={b.id} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                           <Link
-                            href={`/transactions?categoryId=${b.categoryId}`}
+                            href={`/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`}
                             className="text-foreground font-medium hover:text-primary hover:underline transition-colors"
                           >
                             {b.categoryName}
                           </Link>
-                          <ArrowUpCircle className="w-3 h-3 text-primary" />
+                          <BudgetItemTransactionsIcon
+                            categoryId={b.categoryId}
+                            categoryName={b.categoryName}
+                            periodType={periodType}
+                            periodKey={periodKey}
+                          />
+                          <ArrowUpCircle className="w-3 h-3 text-primary shrink-0" />
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-foreground blur-number">{formatCurrency(b.budgeted)}</td>
@@ -611,14 +650,28 @@ export function BudgetTable() {
                   const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
                   return (
                     <Fragment key={b.id}>
-                      <tr className={`border-b border-border hover:bg-accent/20 transition-colors ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
+                      <tr className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                             <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                              <span className="text-foreground font-semibold truncate">
+                              <Link
+                                href={
+                                  isEE && b.groupedBreakout && b.groupedBreakout.length > 0
+                                    ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
+                                    : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
+                                }
+                                className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors"
+                              >
                                 {b.categoryName}
-                              </span>
+                              </Link>
+                              <BudgetItemTransactionsIcon
+                                categoryId={isEE ? undefined : b.categoryId}
+                                categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : undefined}
+                                categoryName={b.categoryName}
+                                periodType={periodType}
+                                periodKey={periodKey}
+                              />
 
                               {/* Redesigned compact Everything Else breakout dropdown pill */}
                               {isEE && (
@@ -689,10 +742,21 @@ export function BudgetTable() {
                               ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                                   {b.groupedBreakout.map((item) => (
-                                    <div key={item.categoryId} className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border/60 text-xs gap-2">
+                                    <div key={item.categoryId} className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border/60 text-xs gap-2 group/row">
                                       <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.categoryColor || '#6366f1' }} />
-                                        <span className="font-medium text-foreground truncate">{item.categoryName}</span>
+                                        <Link
+                                          href={`/transactions?categoryId=${item.categoryId}&startDate=${startDate}&endDate=${endDate}`}
+                                          className="font-medium text-foreground truncate hover:text-primary hover:underline transition-colors"
+                                        >
+                                          {item.categoryName}
+                                        </Link>
+                                        <BudgetItemTransactionsIcon
+                                          categoryId={item.categoryId}
+                                          categoryName={item.categoryName}
+                                          periodType={periodType}
+                                          periodKey={periodKey}
+                                        />
                                       </div>
                                       <div className="flex items-center gap-2 shrink-0">
                                         <span className="font-mono text-muted-foreground font-semibold">{formatCurrency(item.actual)}</span>
