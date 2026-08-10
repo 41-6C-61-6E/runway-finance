@@ -28,6 +28,7 @@ import {
   RefreshCw,
   Eye,
   Receipt,
+  Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,7 +45,7 @@ interface ProposalItem {
   existingAmount: number | null;
   isSmallCategory: boolean;
   isSelected: boolean;
-  sampleTransactions?: Array<{ id: string; date: string; description: string; amount: number; source: string }>;
+  sampleTransactions?: Array<{ id: string; date: string; description: string; amount: number; source: string; isExcluded?: boolean }>;
   groupedCategories?: Array<{
     categoryId: string;
     categoryName: string;
@@ -97,8 +98,92 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'expense' | 'income'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [inspectItem, setInspectItem] = useState<ProposalItem | null>(null);
+  const [excludingTxId, setExcludingTxId] = useState<string | null>(null);
 
+  const periodScale = periodType === 'quarterly' ? 3 : periodType === 'yearly' ? 12 : 1;
   const periodLabel = periodType === 'quarterly' ? '/qtr' : periodType === 'yearly' ? '/yr' : '/mo';
+
+  const handleExcludeTransaction = async (txId: string) => {
+    if (!inspectItem) return;
+    setExcludingTxId(txId);
+    try {
+      const res = await fetch(`/api/transactions/${txId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ignored: true }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || data.error || 'Failed to exclude transaction');
+      }
+
+      const targetCatId = inspectItem.categoryId;
+
+      setProposalItems((prevItems) =>
+        prevItems.map((item) => {
+          if (item.categoryId !== targetCatId) return item;
+
+          const updatedTxList = (item.sampleTransactions || []).map((t) =>
+            t.id === txId ? { ...t, isExcluded: true } : t
+          );
+          const activeTxList = updatedTxList.filter((t) => !t.isExcluded);
+
+          const monthlySumMap = new Map<string, number>();
+          for (const t of activeTxList) {
+            const ym = t.date.substring(0, 7);
+            const current = monthlySumMap.get(ym) || 0;
+            monthlySumMap.set(ym, current + t.amount);
+          }
+
+          const monthlySums = Array.from(monthlySumMap.values()).map((sum) =>
+            item.isIncome ? sum : Math.max(0, sum)
+          );
+
+          const divisor = Math.max(0.5, meta?.actualMonthsAvailable || lookbackMonths);
+          const total = monthlySums.reduce((s, a) => s + a, 0);
+          const monthlyAverage = total / divisor;
+
+          const sorted = [...monthlySums].sort((a, b) => a - b);
+          let monthlyMedian = 0;
+          if (sorted.length > 0) {
+            const mid = Math.floor(sorted.length / 2);
+            monthlyMedian = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+          }
+          const monthlyMax = sorted.length > 0 ? Math.max(...sorted) : 0;
+
+          const newAvg = Math.round(monthlyAverage * periodScale);
+          const newMedian = Math.round(monthlyMedian * periodScale);
+          const newMax = Math.round(monthlyMax * periodScale);
+
+          let baseAmount = newAvg;
+          if (calculationMethod === 'median') baseAmount = newMedian;
+          else if (calculationMethod === 'max') baseAmount = newMax;
+
+          const newProposed = Math.round(baseAmount * (1 + bufferPercentage / 100));
+
+          const updatedItem: ProposalItem = {
+            ...item,
+            historicalAverage: newAvg,
+            historicalMedian: newMedian,
+            historicalMax: newMax,
+            proposedAmount: Math.max(0, newProposed),
+            sampleTransactions: updatedTxList,
+          };
+
+          setInspectItem(updatedItem);
+          return updatedItem;
+        })
+      );
+
+      toast.success('Transaction excluded from budget calculation');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to exclude transaction');
+    } finally {
+      setExcludingTxId(null);
+    }
+  };
 
   const handleGenerateProposal = async () => {
     setGenerating(true);
@@ -286,7 +371,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetForm(); } }}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh]">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -576,14 +661,14 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
             </div>
 
             {/* Proposal Table */}
-            <div className="overflow-x-auto overflow-y-auto max-h-[340px] max-w-full border border-border rounded-xl">
-              <table className="w-full text-xs min-w-[480px]">
+            <div className="overflow-y-auto max-h-[340px] border border-border rounded-xl">
+              <table className="w-full text-xs table-fixed">
                 <thead className="bg-muted border-b border-border sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <th className="w-8 px-3 py-2 text-center">#</th>
-                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Category</th>
-                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Hist. Avg</th>
-                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Proposed ({periodLabel})</th>
+                    <th className="w-9 px-2 py-2 text-center">#</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground w-auto">Category</th>
+                    <th className="text-right px-3 py-2 font-medium text-muted-foreground w-28 sm:w-32">Hist. Avg</th>
+                    <th className="text-right px-3 py-2 font-medium text-muted-foreground w-36 sm:w-44">Proposed ({periodLabel})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-card">
@@ -609,8 +694,10 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                           <td className="px-3 py-2.5">
                             <div className="space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.categoryColor }} />
-                                <span className="font-medium text-foreground">{item.categoryName}</span>
+                                <div className="inline-flex items-center gap-1.5 shrink-0">
+                                  <span className="w-2.5 h-2.5 rounded-full shrink-0 inline-block" style={{ backgroundColor: item.categoryColor }} />
+                                  <span className="font-medium text-foreground">{item.categoryName}</span>
+                                </div>
                                 {item.isIncome ? (
                                   <span className="px-1.5 py-0.2 text-[9px] font-semibold bg-constructive/15 text-constructive rounded">
                                     Income
@@ -818,30 +905,53 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
           </div>
 
           <div className="overflow-x-auto overflow-y-auto max-h-[280px] max-w-full border border-border rounded-lg">
-            <table className="w-full text-xs min-w-[340px]">
+            <table className="w-full text-xs min-w-[400px]">
               <thead className="bg-muted sticky top-0 border-b border-border text-muted-foreground font-medium">
                 <tr>
-                  <th className="text-left px-3 py-2">Date</th>
-                  <th className="text-left px-3 py-2">Description / Payee</th>
-                  <th className="text-right px-3 py-2">Amount</th>
+                  <th className="text-left px-3 py-2 w-24">Date</th>
+                  <th className="text-left px-3 py-2 w-auto">Description / Payee</th>
+                  <th className="text-right px-3 py-2 w-24">Amount</th>
+                  <th className="text-center px-3 py-2 w-24">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {inspectItem?.sampleTransactions && inspectItem.sampleTransactions.length > 0 ? (
                   inspectItem.sampleTransactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-accent/30">
+                    <tr key={tx.id} className={`hover:bg-accent/30 transition-colors ${tx.isExcluded ? 'opacity-40 bg-muted/30 line-through' : ''}`}>
                       <td className="px-3 py-2 font-mono text-muted-foreground whitespace-nowrap">{tx.date}</td>
-                      <td className="px-3 py-2 text-foreground font-medium truncate max-w-[200px]" title={tx.description}>
+                      <td className="px-3 py-2 text-foreground font-medium truncate max-w-[180px]" title={tx.description}>
                         {tx.description}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono font-medium text-foreground whitespace-nowrap">
+                      <td className={`px-3 py-2 text-right font-mono font-medium whitespace-nowrap ${tx.amount < 0 ? 'text-constructive' : 'text-foreground'}`}>
                         {formatCurrency(tx.amount)}
+                      </td>
+                      <td className="px-3 py-2 text-center no-underline">
+                        {tx.isExcluded ? (
+                          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-normal inline-block">
+                            Excluded
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleExcludeTransaction(tx.id)}
+                            disabled={excludingTxId === tx.id}
+                            className="inline-flex items-center gap-1 text-[10px] text-destructive hover:bg-destructive/15 border border-destructive/30 px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                            title="Exclude from budget calculation & mark as ignored"
+                          >
+                            {excludingTxId === tx.id ? (
+                              <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                            ) : (
+                              <Ban className="w-2.5 h-2.5" />
+                            )}
+                            <span>Exclude</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="px-3 py-4 text-center text-muted-foreground text-xs">
+                    <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground text-xs">
                       No sample transactions available for this category.
                     </td>
                   </tr>
