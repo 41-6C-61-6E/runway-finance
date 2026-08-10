@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { BudgetFormDialog } from './budget-form-dialog';
+import { AutoBudgetDialog } from './auto-budget-dialog';
 import { formatCurrency } from '@/lib/utils/format';
-import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Sparkles } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { useUserSettings } from '@/components/user-settings-provider';
@@ -89,6 +90,7 @@ export function BudgetTable() {
   const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
 
   const [showForm, setShowForm] = useState(false);
+  const [showAutoBudget, setShowAutoBudget] = useState(false);
   const [editBudget, setEditBudget] = useState<BudgetData | null>(null);
   const [deleteBudget, setDeleteBudget] = useState<BudgetData | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -258,6 +260,13 @@ export function BudgetTable() {
                 <option value="account-desc">Account (Z-A)</option>
               </select>
             )}
+            <button
+              onClick={() => setShowAutoBudget(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border/80 rounded-lg transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              Auto Budget
+            </button>
             <button
               onClick={() => { setEditBudget(null); setShowForm(true); }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
@@ -676,6 +685,13 @@ export function BudgetTable() {
           rollover: editBudget.rollover,
           notes: editBudget.notes,
         } : undefined}
+      />
+
+      <AutoBudgetDialog
+        open={showAutoBudget}
+        onClose={() => setShowAutoBudget(false)}
+        periodType={periodType}
+        periodKey={periodKey}
       />
 
       <AlertDialog open={!!deleteBudget} onOpenChange={(o) => { if (!o) setDeleteBudget(null); }}>
