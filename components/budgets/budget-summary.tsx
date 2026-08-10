@@ -26,6 +26,67 @@ interface BudgetData {
   isDiscretionary?: boolean;
 }
 
+function getPeriodPacingInfo(periodType: string, periodKey: string) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentDay = now.getDate();
+
+  let daysElapsed = 1;
+  let totalDays = 30;
+
+  if (periodType === 'monthly') {
+    const parts = periodKey.split('-').map(Number);
+    const y = parts[0] || currentYear;
+    const m = parts[1] || currentMonth;
+    totalDays = new Date(y, m, 0).getDate();
+    if (y < currentYear || (y === currentYear && m < currentMonth)) {
+      daysElapsed = totalDays;
+    } else if (y === currentYear && m === currentMonth) {
+      daysElapsed = Math.min(Math.max(currentDay, 1), totalDays);
+    } else {
+      daysElapsed = 1;
+    }
+  } else if (periodType === 'quarterly') {
+    const parts = periodKey.split('-Q').map(Number);
+    const y = parts[0] || currentYear;
+    const q = parts[1] || 1;
+    const startMonth = (q - 1) * 3 + 1;
+    const endMonth = q * 3;
+    const startDate = new Date(y, startMonth - 1, 1);
+    const endDate = new Date(y, endMonth, 0);
+    totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    if (now < startDate) {
+      daysElapsed = 1;
+    } else if (now > endDate) {
+      daysElapsed = totalDays;
+    } else {
+      daysElapsed = Math.round((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      daysElapsed = Math.min(Math.max(daysElapsed, 1), totalDays);
+    }
+  } else {
+    // yearly
+    const y = Number(periodKey) || currentYear;
+    const isLeapYear = (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+    totalDays = isLeapYear ? 366 : 365;
+    const startDate = new Date(y, 0, 1);
+    const endDate = new Date(y, 11, 31);
+
+    if (now < startDate) {
+      daysElapsed = 1;
+    } else if (now > endDate) {
+      daysElapsed = totalDays;
+    } else {
+      daysElapsed = Math.round((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      daysElapsed = Math.min(Math.max(daysElapsed, 1), totalDays);
+    }
+  }
+
+  const timePercent = (daysElapsed / totalDays) * 100;
+  return { daysElapsed, totalDays, timePercent };
+}
+
 export function BudgetSummary() {
   const { periodType, periodKey } = useBudgetPeriod();
   const [collapsed, setCollapsed] = useCardCollapsed('budgetSummary');
@@ -81,65 +142,86 @@ export function BudgetSummary() {
   const netActual = totalIncomeActual - totalExpenseActual;
   const isSurplus = netActual >= 0;
 
+  // Period Pacing & Days Elapsed
+  const pacingInfo = getPeriodPacingInfo(periodType, periodKey);
+  const { daysElapsed, totalDays, timePercent } = pacingInfo;
+
+  // Fixed vs Variable expense splitting for smart pacing
+  const fixedExpenseBudgets = expenseBudgets.filter((b) => b.isDiscretionary === false);
+  const variableExpenseBudgets = expenseBudgets.filter((b) => b.isDiscretionary !== false);
+
+  const fixedBudgeted = fixedExpenseBudgets.reduce((s, b) => s + b.budgeted, 0);
+  const fixedActual = fixedExpenseBudgets.reduce((s, b) => s + b.actual, 0);
+
+  const variableBudgeted = variableExpenseBudgets.reduce((s, b) => s + b.budgeted, 0);
+  const variableActual = variableExpenseBudgets.reduce((s, b) => s + b.actual, 0);
+
+  // Variable daily rate & month-end projection
+  const variableDailyRate = daysElapsed > 0 ? variableActual / daysElapsed : 0;
+  const projectedVariableTotal = daysElapsed === totalDays ? variableActual : variableDailyRate * totalDays;
+
+  // Fixed expenses (Mortgage etc) are lump-sum completed when paid.
+  const fixedEffectiveProjection = Math.max(fixedActual, fixedBudgeted);
+  const projectedExpenseTotal = fixedEffectiveProjection + projectedVariableTotal;
+
+  const totalExpenseCushion = Math.max(0, totalExpenseBudgeted - totalExpenseActual);
+  const projectedSurplusOrDeficit = totalExpenseBudgeted - projectedExpenseTotal;
+
   // Categories over budget
   const allOverBudgets = expenseBudgets.filter((b) => b.remaining < -0.01);
-  // Significant over-budget categories: >25% over budget OR over by > $100
   const significantOverBudgets = expenseBudgets.filter(
     (b) => b.remaining < -0.01 && (b.percentUsed > 125 || Math.abs(b.remaining) > 100)
   );
-  // Minor over-budget categories (under 25% AND under $100)
   const minorOverBudgets = expenseBudgets.filter(
     (b) => b.remaining < -0.01 && !significantOverBudgets.includes(b)
   );
-
-  // Categories right at budget target (98% to 105% used or minor overrun)
-  const atBudgetCategoryItems = expenseBudgets.filter(
-    (b) => minorOverBudgets.includes(b) || (b.percentUsed >= 98 && b.percentUsed <= 105)
-  );
-
-  // Categories near budget (85% to 98% used)
-  const nearBudgetCategoryItems = expenseBudgets.filter(
-    (b) => b.isDiscretionary !== false && b.percentUsed >= 85 && b.percentUsed < 98
-  );
-
-  const totalExpenseOver = totalExpenseBudgeted > 0 && (
-    totalExpenseActual > totalExpenseBudgeted * 1.25 || totalExpenseActual > totalExpenseBudgeted + 100
-  );
-  const totalExpenseAtBudget = totalExpenseBudgeted > 0 && expensePercent >= 98 && expensePercent <= 105;
-  const totalExpenseNearBudget = totalExpenseBudgeted > 0 && expensePercent >= 85 && expensePercent < 98;
 
   let healthStatus = {
     label: 'On Track',
     badgeClass: 'bg-constructive/10 text-constructive border-constructive/20',
     icon: ShieldCheck,
-    description: 'Overall spending and categories are performing well within budget limits.',
+    description: `Overall budget is healthy. Projected month-end finish: ${formatCurrency(projectedExpenseTotal)} (${projectedSurplusOrDeficit >= 0 ? `+${formatCurrency(projectedSurplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(projectedSurplusOrDeficit))} deficit`}).`,
   };
 
-  if (totalExpenseOver || significantOverBudgets.length > 0) {
+  // Rule 1: Critical Overrun (Red)
+  if (totalExpenseActual > totalExpenseBudgeted || significantOverBudgets.length > 0) {
     healthStatus = {
-      label: 'Attention Needed',
+      label: 'Critical Overrun',
       badgeClass: 'bg-destructive/10 text-destructive border-destructive/20',
       icon: AlertTriangle,
-      description: totalExpenseOver
-        ? `Total spending (${formatCurrency(totalExpenseActual)}) exceeds budget by >25% or >$100.`
+      description: totalExpenseActual > totalExpenseBudgeted
+        ? `Total actual spending (${formatCurrency(totalExpenseActual)}) has exceeded total expense budget (${formatCurrency(totalExpenseBudgeted)}).`
         : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >25% or >$100 over budget.`,
     };
-  } else if (totalExpenseAtBudget || atBudgetCategoryItems.length > 0) {
+  }
+  // Rule 2: Over Target (Orange)
+  else if (projectedExpenseTotal > totalExpenseBudgeted + 25) {
+    healthStatus = {
+      label: 'Over Target',
+      badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+      icon: TrendingUp,
+      description: `Based on daily variable spending pace (${formatCurrency(variableDailyRate)}/day), projected month-end total (${formatCurrency(projectedExpenseTotal)}) exceeds overall budget target.`,
+    };
+  }
+  // Rule 3: Watch Pacing (Amber)
+  else if (daysElapsed < totalDays && (variableBudgeted > 0 ? (variableActual / variableBudgeted) * 100 > timePercent + 15 : false)) {
+    healthStatus = {
+      label: 'Watch Pacing',
+      badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+      icon: AlertTriangle,
+      description: `Discretionary spending is pacing ahead of schedule (${((variableActual / (variableBudgeted || 1)) * 100).toFixed(0)}% spent vs ${timePercent.toFixed(0)}% of month).`,
+    };
+  }
+  // Rule 4: At Budget (Blue) - when near 100% or small minor overruns absorbed by cushion
+  else if (expensePercent >= 95 || (minorOverBudgets.length > 0 && totalExpenseCushion > 0)) {
     const reasonText = minorOverBudgets.length > 0
-      ? `${minorOverBudgets.length} category with a minor overrun (within 25% / $100 buffer).`
-      : `${atBudgetCategoryItems.length} category is right at budget target (98%–105%).`;
+      ? `${minorOverBudgets.length} minor category overrun is comfortably absorbed by remaining budget cushion (${formatCurrency(totalExpenseCushion)} remaining).`
+      : `Spending is approaching full budget capacity (${expensePercent.toFixed(0)}% used).`;
     healthStatus = {
       label: 'At Budget',
       badgeClass: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
       icon: Target,
       description: reasonText,
-    };
-  } else if (totalExpenseNearBudget || nearBudgetCategoryItems.length > 0) {
-    healthStatus = {
-      label: 'Near Budget',
-      badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-      icon: AlertTriangle,
-      description: `${nearBudgetCategoryItems.length} discretionary ${nearBudgetCategoryItems.length === 1 ? 'category is' : 'categories are'} approaching budget (85%–98%).`,
     };
   }
 
@@ -155,13 +237,13 @@ export function BudgetSummary() {
     alertText = `${significantOverBudgets.length} categories over budget`;
     alertHref = `/transactions?categoryIds=${significantOverBudgets.map((b) => b.categoryId).join(',')}`;
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
-  } else if (atBudgetCategoryItems.length > 0) {
-    alertText = `${atBudgetCategoryItems.length} ${atBudgetCategoryItems.length === 1 ? 'category' : 'categories'} at budget target`;
-    alertHref = `/transactions?categoryIds=${atBudgetCategoryItems.map((b) => b.categoryId).join(',')}`;
-    alertClass = 'text-blue-500 bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/15';
-  } else if (nearBudgetCategoryItems.length > 0) {
-    alertText = `${nearBudgetCategoryItems.length} ${nearBudgetCategoryItems.length === 1 ? 'category' : 'categories'} near budget`;
-    alertHref = `/transactions?categoryIds=${nearBudgetCategoryItems.map((b) => b.categoryId).join(',')}`;
+  } else if (healthStatus.label === 'Over Target') {
+    alertText = `Projected to exceed budget by end of month`;
+    alertHref = `/budgets`;
+    alertClass = 'text-orange-500 bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15';
+  } else if (healthStatus.label === 'Watch Pacing') {
+    alertText = `Discretionary spending is pacing fast`;
+    alertHref = `/budgets`;
     alertClass = 'text-amber-500 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15';
   }
 
@@ -175,10 +257,8 @@ export function BudgetSummary() {
       ];
 
   // Fixed vs Discretionary calculation (Metric 1.2)
-  const fixedExpenseBudgets = expenseBudgets.filter((b) => b.isDiscretionary === false);
-  const discretionaryExpenseBudgets = expenseBudgets.filter((b) => b.isDiscretionary !== false);
-  const fixedBudgeted = fixedExpenseBudgets.reduce((s, b) => s + b.budgeted, 0);
-  const discretionaryBudgeted = discretionaryExpenseBudgets.reduce((s, b) => s + b.budgeted, 0);
+  const discretionaryExpenseBudgets = variableExpenseBudgets;
+  const discretionaryBudgeted = variableBudgeted;
   const totalExpBud = fixedBudgeted + discretionaryBudgeted;
   const fixedPct = totalExpBud > 0 ? (fixedBudgeted / totalExpBud) * 100 : 0;
   const discretionaryPct = totalExpBud > 0 ? (discretionaryBudgeted / totalExpBud) * 100 : 0;
@@ -224,81 +304,77 @@ export function BudgetSummary() {
                         </span>
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" align="start" className="w-72 sm:w-80 p-3 bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl space-y-2 text-xs">
+                    <TooltipContent side="bottom" align="start" className="w-72 sm:w-84 p-3.5 bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl space-y-2.5 text-xs">
                       <div className="flex items-center justify-between border-b border-border pb-1.5">
                         <span className="font-bold text-foreground flex items-center gap-1.5">
                           <healthStatus.icon className={cn("w-3.5 h-3.5", healthStatus.badgeClass.split(' ')[1])} />
-                          Budget Status Criteria
+                          Budget Status Analysis
                         </span>
                         <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", healthStatus.badgeClass)}>
                           {healthStatus.label}
                         </span>
                       </div>
 
-                      <p className="text-muted-foreground text-[11px]">
+                      <p className="text-muted-foreground text-[11px] leading-relaxed">
                         {healthStatus.description}
                       </p>
 
-                      <div className="space-y-1.5 pt-1.5 border-t border-border/50 text-[11px]">
-                        <div className="flex justify-between font-mono">
-                          <span className="text-muted-foreground">Total Expense Budget:</span>
-                          <span className="font-semibold text-foreground">{formatCurrency(totalExpenseBudgeted)}</span>
-                        </div>
-                        <div className="flex justify-between font-mono">
-                          <span className="text-muted-foreground">Total Actual Spent:</span>
-                          <span className={cn("font-semibold", totalExpenseActual > totalExpenseBudgeted ? "text-destructive" : "text-foreground")}>
-                            {formatCurrency(totalExpenseActual)} ({expensePercent.toFixed(0)}%)
+                      {/* Smart Forecast Card */}
+                      <div className="bg-muted/40 p-2 rounded-lg border border-border/50 space-y-1 text-[11px]">
+                        <div className="flex justify-between items-center text-muted-foreground">
+                          <span>Month Pacing:</span>
+                          <span className="font-medium text-foreground">
+                            Day {daysElapsed} of {totalDays} ({timePercent.toFixed(0)}% elapsed)
                           </span>
                         </div>
-
-                        {significantOverBudgets.length > 0 && (
-                          <div className="pt-1 space-y-1">
-                            <span className="font-semibold text-destructive block">Major Overruns (&gt;25% or &gt;$100):</span>
-                            <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-destructive/40">
-                              {significantOverBudgets.map((b) => (
-                                <div key={b.id} className="flex justify-between text-[10px]">
-                                  <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
-                                  <span className="font-mono text-destructive font-semibold">+{formatCurrency(Math.abs(b.remaining))}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {atBudgetCategoryItems.length > 0 && (
-                          <div className="pt-1 space-y-1">
-                            <span className="font-semibold text-blue-500 block">At Budget (98%-105%):</span>
-                            <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-blue-500/40">
-                              {atBudgetCategoryItems.map((b) => (
-                                <div key={b.id} className="flex justify-between text-[10px]">
-                                  <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
-                                  <span className="font-mono text-blue-500 font-semibold">{b.remaining < 0 ? `+${formatCurrency(Math.abs(b.remaining))}` : `${b.percentUsed.toFixed(0)}%`}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {nearBudgetCategoryItems.length > 0 && (
-                          <div className="pt-1 space-y-1">
-                            <span className="font-semibold text-amber-500 block">Near Budget (85%-98%):</span>
-                            <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-amber-500/40">
-                              {nearBudgetCategoryItems.map((b) => (
-                                <div key={b.id} className="flex justify-between text-[10px]">
-                                  <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
-                                  <span className="font-mono text-amber-500 font-semibold">{b.percentUsed.toFixed(0)}% used</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {allOverBudgets.length === 0 && nearBudgetCategoryItems.length === 0 && atBudgetCategoryItems.length === 0 && (
-                          <div className="text-[10px] text-constructive font-medium italic pt-0.5">
-                            ✓ All categories are performing comfortably within budget limits.
-                          </div>
-                        )}
+                        <div className="flex justify-between items-center text-muted-foreground">
+                          <span>Fixed Expenses (Mortgage):</span>
+                          <span className="font-mono text-foreground">{formatCurrency(fixedActual)} paid</span>
+                        </div>
+                        <div className="flex justify-between items-center text-muted-foreground">
+                          <span>Variable Pace:</span>
+                          <span className="font-mono text-foreground">{formatCurrency(variableDailyRate)}/day</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t border-border/40 font-semibold">
+                          <span className="text-foreground">Projected Month Finish:</span>
+                          <span className={cn("font-mono", projectedSurplusOrDeficit >= 0 ? "text-constructive" : "text-destructive")}>
+                            {formatCurrency(projectedExpenseTotal)} ({projectedSurplusOrDeficit >= 0 ? `+${formatCurrency(projectedSurplusOrDeficit)}` : `-${formatCurrency(Math.abs(projectedSurplusOrDeficit))}`})
+                          </span>
+                        </div>
                       </div>
+
+                      <div className="flex justify-between items-center text-[11px] font-mono pt-0.5">
+                        <span className="text-muted-foreground">Remaining Budget Cushion:</span>
+                        <span className="font-bold text-constructive">{formatCurrency(totalExpenseCushion)}</span>
+                      </div>
+
+                      {minorOverBudgets.length > 0 && (
+                        <div className="pt-1 space-y-1 text-[11px]">
+                          <span className="font-semibold text-amber-500 block">Absorbed Minor Overruns:</span>
+                          <div className="max-h-20 overflow-y-auto space-y-1 pl-2 border-l-2 border-amber-500/40">
+                            {minorOverBudgets.map((b) => (
+                              <div key={b.id} className="flex justify-between text-[10px]">
+                                <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
+                                <span className="font-mono text-amber-500 font-semibold">+{formatCurrency(Math.abs(b.remaining))}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {significantOverBudgets.length > 0 && (
+                        <div className="pt-1 space-y-1 text-[11px]">
+                          <span className="font-semibold text-destructive block">Major Overruns (&gt;25% or &gt;$100):</span>
+                          <div className="max-h-20 overflow-y-auto space-y-1 pl-2 border-l-2 border-destructive/40">
+                            {significantOverBudgets.map((b) => (
+                              <div key={b.id} className="flex justify-between text-[10px]">
+                                <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
+                                <span className="font-mono text-destructive font-semibold">+{formatCurrency(Math.abs(b.remaining))}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
