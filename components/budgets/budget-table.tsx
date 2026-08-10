@@ -35,8 +35,9 @@ interface BudgetData {
   percentUsed: number;
   type: 'income' | 'expense';
   isDiscretionary?: boolean;
+  isEverythingElse?: boolean;
   isCatchAll?: boolean;
-  groupedBreakout?: Array<{ categoryId: string; categoryName: string; actual: number }>;
+  groupedBreakout?: Array<{ categoryId: string; categoryName: string; categoryColor?: string; actual: number }>;
 }
 
 interface Account {
@@ -89,18 +90,19 @@ export function BudgetTable() {
   const [deleteBudget, setDeleteBudget] = useState<BudgetData | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Default sort set to Budgeted Amount Descending (Item 4)
+  // Default sort set to Budgeted Amount Descending
   const [sortField, setSortField] = useState<SortField>('budgeted');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Gear actions & popup menu state (Item 6)
+  // Gear actions & popup menu state
   const [showGearMenu, setShowGearMenu] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmPurgeHistoryOpen, setConfirmPurgeHistoryOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Breakout dropdown state for "All Other" catch-all item (Item 2)
+  // Breakout dropdown state for "Everything Else" catch-all item
   const [expandedCatchAll, setExpandedCatchAll] = useState(false);
+  const [convertingCatId, setConvertingCatId] = useState<string | null>(null);
 
   const gearMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -160,6 +162,38 @@ export function BudgetTable() {
       toast.error(err instanceof Error ? err.message : 'Failed to remove budget history');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleConvertToBudget = async (item: { categoryId: string; categoryName: string; actual: number }) => {
+    setConvertingCatId(item.categoryId);
+    try {
+      const amountToBudget = Math.max(1, Math.round(item.actual));
+      const res = await fetch('/api/budgets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          categoryId: item.categoryId,
+          periodType: periodType,
+          periodKey: periodKey,
+          amount: amountToBudget,
+          isRecurring: true,
+          isDiscretionary: true,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to create budget');
+      }
+
+      toast.success(`Converted "${item.categoryName}" to standalone budget (${formatCurrency(amountToBudget)}/mo)`);
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to convert category to budget item');
+    } finally {
+      setConvertingCatId(null);
     }
   };
 
@@ -223,11 +257,12 @@ export function BudgetTable() {
     [budgets, sortBudgets]
   );
 
-  // Expense budgets sorted, with special "All Other" item pinned at the end
+  // Expense budgets sorted, with special "Everything Else" item pinned at the end
   const expenseBudgets = useMemo(() => {
     const allExpense = (budgets as BudgetData[]).filter((b) => b.type === 'expense');
-    const regular = allExpense.filter((b) => !b.isCatchAll);
-    const catchAlls = allExpense.filter((b) => b.isCatchAll);
+    const isCatchAllItem = (b: BudgetData) => b.isEverythingElse || b.isCatchAll || (b.categoryName || '').toLowerCase() === 'everything else';
+    const regular = allExpense.filter((b) => !isCatchAllItem(b));
+    const catchAlls = allExpense.filter((b) => isCatchAllItem(b));
     return [...sortBudgets(regular), ...catchAlls];
   }, [budgets, sortBudgets]);
 
@@ -282,7 +317,6 @@ export function BudgetTable() {
   return (
     <>
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        {/* Header flex container formatted for mobile responsiveness without overflow (Item 5) */}
         <div className="p-3 sm:p-5 pb-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
           <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
@@ -378,22 +412,23 @@ export function BudgetTable() {
             )}
             {expenseBudgets.map((b) => {
               const isOver = b.remaining < 0;
+              const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
               const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
               return (
                 <div key={b.id} className="px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
-                      <span className="text-foreground font-medium text-sm truncate">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
+                      <span className="text-foreground font-semibold text-sm truncate">
                         {b.categoryName}
                       </span>
-                      {b.isCatchAll && b.groupedBreakout && b.groupedBreakout.length > 0 && (
+                      {isEE && (
                         <button
                           onClick={() => setExpandedCatchAll(!expandedCatchAll)}
-                          className="px-1.5 py-0.5 text-[10px] font-semibold bg-accent border border-border rounded text-primary flex items-center gap-1"
+                          className="px-2 py-0.5 text-[10px] font-semibold bg-accent border border-border rounded text-primary flex items-center gap-1 shrink-0"
                         >
                           <Layers className="w-3 h-3" />
-                          <span>{b.groupedBreakout.length} items</span>
+                          <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} items</span>
                           {expandedCatchAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </button>
                       )}
@@ -413,16 +448,37 @@ export function BudgetTable() {
                     <span className="text-muted-foreground">Actual: <span className="text-foreground blur-number">{formatCurrency(b.actual)}</span></span>
                   </div>
 
-                  {/* Catch-all Mobile Breakout sub-card */}
-                  {b.isCatchAll && expandedCatchAll && b.groupedBreakout && b.groupedBreakout.length > 0 && (
-                    <div className="mt-2 p-2.5 bg-muted/40 rounded-lg border border-border/60 space-y-1.5">
-                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Unbudgeted Category Breakout</span>
-                      {b.groupedBreakout.map((item) => (
-                        <div key={item.categoryId} className="flex items-center justify-between text-xs">
-                          <span className="text-foreground/80">{item.categoryName}</span>
-                          <span className="font-mono text-muted-foreground font-medium">{formatCurrency(item.actual)}</span>
-                        </div>
-                      ))}
+                  {/* Everything Else Mobile Breakout sub-card */}
+                  {isEE && expandedCatchAll && b.groupedBreakout && (
+                    <div className="mt-2 p-3 bg-muted/40 rounded-xl border border-border/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Unbudgeted Category Breakout</span>
+                        <span className="text-[10px] text-muted-foreground">{b.groupedBreakout.length} items</span>
+                      </div>
+                      {b.groupedBreakout.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic py-1">No unbudgeted spending in this period.</p>
+                      ) : (
+                        b.groupedBreakout.map((item) => (
+                          <div key={item.categoryId} className="flex items-center justify-between text-xs p-2 rounded-lg bg-background border border-border/40 gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.categoryColor || '#6366f1' }} />
+                              <span className="font-medium text-foreground truncate">{item.categoryName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-mono text-muted-foreground font-semibold">{formatCurrency(item.actual)}</span>
+                              <button
+                                onClick={() => handleConvertToBudget(item)}
+                                disabled={convertingCatId === item.categoryId}
+                                title={`Create standalone budget for ${item.categoryName}`}
+                                className="px-2 py-1 text-[10px] font-semibold bg-primary text-primary-foreground hover:opacity-90 rounded flex items-center gap-1 transition-all disabled:opacity-50"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>{convertingCatId === item.categoryId ? '...' : 'Convert'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
@@ -442,7 +498,6 @@ export function BudgetTable() {
                   {hasAnyAccount && (
                     <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('account', 'Account', 'left')}</th>
                   )}
-                  {/* Actions Column with Gear Dropdown Menu (Item 6) */}
                   <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground relative">
                     <div className="flex items-center justify-end gap-1.5">
                       <span>Actions</span>
@@ -552,29 +607,27 @@ export function BudgetTable() {
                 )}
                 {expenseBudgets.map((b) => {
                   const isOver = b.remaining < 0;
+                  const isEE = b.isEverythingElse || b.isCatchAll || (b.categoryName || '').toLowerCase() === 'everything else';
                   const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
                   return (
-                    <React.Fragment key={b.id}>
-                      <tr className="border-b border-border hover:bg-accent/20 transition-colors">
+                    <Fragment key={b.id}>
+                      <tr className={`border-b border-border hover:bg-accent/20 transition-colors ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
-                            <Link
-                              href={`/transactions?categoryId=${b.categoryId}`}
-                              className="text-foreground font-medium hover:text-primary hover:underline transition-colors"
-                            >
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
+                            <span className="text-foreground font-semibold">
                               {b.categoryName}
-                            </Link>
+                            </span>
 
-                            {/* Catch-all breakout dropdown toggle button (Item 2) */}
-                            {b.isCatchAll && b.groupedBreakout && b.groupedBreakout.length > 0 && (
+                            {/* Everything Else breakout dropdown toggle button */}
+                            {isEE && (
                               <button
                                 onClick={() => setExpandedCatchAll(!expandedCatchAll)}
                                 title="Expand to see unbudgeted category spending in this bucket"
-                                className="px-2 py-0.5 text-[10px] font-semibold bg-accent hover:bg-accent/80 border border-border rounded-md text-primary flex items-center gap-1 transition-all"
+                                className="px-2 py-0.5 text-[10px] font-semibold bg-accent hover:bg-accent/80 border border-border rounded-md text-primary flex items-center gap-1 transition-all ml-1 shrink-0 cursor-pointer"
                               >
-                                <Layers className="w-3 h-3" />
-                                <span>{b.groupedBreakout.length} items</span>
+                                <Layers className="w-3 h-3 text-primary" />
+                                <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} unbudgeted items</span>
                                 {expandedCatchAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                               </button>
                             )}
@@ -613,28 +666,53 @@ export function BudgetTable() {
                         </td>
                       </tr>
 
-                      {/* Desktop Catch-All Breakout expandable sub-row */}
-                      {b.isCatchAll && expandedCatchAll && b.groupedBreakout && b.groupedBreakout.length > 0 && (
+                      {/* Everything Else Desktop Catch-All Breakout expandable sub-row */}
+                      {isEE && expandedCatchAll && b.groupedBreakout && (
                         <tr className="bg-muted/30 border-b border-border/80">
                           <td colSpan={hasAnyAccount ? 7 : 6} className="px-6 py-3">
-                            <div className="space-y-2">
-                              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                                <Layers className="w-3.5 h-3.5 text-primary" />
-                                Unbudgeted Categories in this Bucket ({b.groupedBreakout.length})
-                              </span>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                {b.groupedBreakout.map((item) => (
-                                  <div key={item.categoryId} className="flex items-center justify-between p-2 rounded-lg bg-background border border-border/60 text-xs">
-                                    <span className="font-medium text-foreground truncate">{item.categoryName}</span>
-                                    <span className="font-mono text-muted-foreground font-semibold">{formatCurrency(item.actual)}</span>
-                                  </div>
-                                ))}
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                  <Layers className="w-3.5 h-3.5 text-primary" />
+                                  Unbudgeted Categories in "Everything Else" ({b.groupedBreakout.length})
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  Click "Convert to Budget Item" to promote any item to its own standalone budget
+                                </span>
                               </div>
+                              {b.groupedBreakout.length === 0 ? (
+                                <div className="p-3 text-xs text-muted-foreground italic bg-background rounded-lg border border-border/50">
+                                  No unbudgeted category spending in this period. All active spending is individually budgeted!
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                  {b.groupedBreakout.map((item) => (
+                                    <div key={item.categoryId} className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border/60 text-xs gap-2">
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.categoryColor || '#6366f1' }} />
+                                        <span className="font-medium text-foreground truncate">{item.categoryName}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <span className="font-mono text-muted-foreground font-semibold">{formatCurrency(item.actual)}</span>
+                                        <button
+                                          onClick={() => handleConvertToBudget(item)}
+                                          disabled={convertingCatId === item.categoryId}
+                                          title={`Convert ${item.categoryName} to a standalone budget item`}
+                                          className="px-2 py-1 text-[10px] font-semibold bg-primary text-primary-foreground hover:opacity-90 rounded flex items-center gap-1 transition-all disabled:opacity-50"
+                                        >
+                                          <Plus className="w-3 h-3" />
+                                          <span>{convertingCatId === item.categoryId ? '...' : 'Convert'}</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
                       )}
-                    </React.Fragment>
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -668,7 +746,6 @@ export function BudgetTable() {
         periodKey={periodKey}
       />
 
-      {/* Delete Item Confirmation */}
       <AlertDialog open={!!deleteBudget} onOpenChange={(o) => { if (!o) setDeleteBudget(null); }}>
         <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
@@ -690,7 +767,6 @@ export function BudgetTable() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Reset All Budgets Confirmation Modal (Item 6) */}
       <AlertDialog open={confirmResetOpen} onOpenChange={setConfirmResetOpen}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
@@ -715,7 +791,6 @@ export function BudgetTable() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Remove Budget History Confirmation Modal (Item 6) */}
       <AlertDialog open={confirmPurgeHistoryOpen} onOpenChange={setConfirmPurgeHistoryOpen}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>

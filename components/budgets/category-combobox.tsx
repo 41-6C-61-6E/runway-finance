@@ -148,6 +148,27 @@ export function CategoryCombobox({ categories, value, onSelect, disabled }: Cate
               <Check className="h-4 w-4 opacity-0" />
               None / Uncategorized
             </div>
+            {(() => {
+              const eeCat = categories.find((c) => c.name.toLowerCase() === 'everything else') || {
+                id: 'everything-else-special',
+                name: 'Everything Else',
+                color: '#64748b',
+              };
+              const isSelected = value === eeCat.id;
+              if (search !== '' && !'everything else'.includes(search.toLowerCase())) return null;
+              return (
+                <div
+                  onClick={() => handleSelect(eeCat.id)}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors border-b border-border/50 ${
+                    isSelected ? 'bg-accent/50 text-accent-foreground' : ''
+                  }`}
+                >
+                  <Check className={`h-4 w-4 shrink-0 ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-[#64748b]" />
+                  <span className="truncate text-foreground">Everything Else (Catch-All Bucket)</span>
+                </div>
+              );
+            })()}
             {filteredCategories.length === 0 ? (
               <div className="px-3 py-6 text-sm text-center text-muted-foreground">
                 No category found.

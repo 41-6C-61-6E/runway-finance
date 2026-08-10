@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     );
 
     let catchAllCategory = decryptedCategories.find(
-      (c) => c.name.toLowerCase().includes('other') || c.name.toLowerCase().includes('misc')
+      (c) => c.name.toLowerCase().includes('everything else') || c.name.toLowerCase().includes('other') || c.name.toLowerCase().includes('misc')
     );
 
     let appliedCount = 0;
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
             'categories',
             {
               userId: dataUserId,
-              name: 'All Other',
+              name: 'Everything Else',
               color: '#64748b',
               isIncome: false,
               categoryType: 'expense',
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
             dek
           );
           const [newCat] = await db.insert(categories).values(encryptedCat).returning({ id: categories.id });
-          catchAllCategory = { id: newCat.id, name: 'All Other' } as any;
+          catchAllCategory = { id: newCat.id, name: 'Everything Else' } as any;
         }
         catId = catchAllCategory?.id;
       }

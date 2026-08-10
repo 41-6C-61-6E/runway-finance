@@ -165,7 +165,7 @@ export async function POST(request: Request) {
     );
 
     const validCategories = decryptedCategories.filter(
-      (c) => !c.excludeFromReports && c.categoryType !== 'transfer'
+      (c) => !c.excludeFromReports && c.categoryType !== 'transfer' && c.categoryType !== 'compound'
     );
     const categoryMap = new Map(validCategories.map((c) => [c.id, c]));
 
@@ -290,6 +290,7 @@ export async function POST(request: Request) {
       proposedAmount: number;
       existingAmount: number | null;
       isSmallCategory: boolean;
+      isEverythingElse?: boolean;
       isSelected: boolean;
       sampleTransactions?: Array<{ id: string; date: string; description: string; amount: number; source: string }>;
       groupedCategories?: Array<{
@@ -409,15 +410,15 @@ export async function POST(request: Request) {
       }
     }
 
-    // Add grouped "All Other (Small Categories)" item if any small categories exist
+    // Add grouped "Everything Else" item if any small categories exist
     if (groupSmallCategories && smallCategoriesGroup.length > 0) {
       const otherCategory = validCategories.find(
-        (c) => c.name.toLowerCase().includes('other') || c.name.toLowerCase().includes('misc')
+        (c) => c.name.toLowerCase().includes('everything else') || c.name.toLowerCase().includes('other') || c.name.toLowerCase().includes('misc')
       );
 
       proposalItems.push({
         categoryId: otherCategory?.id || 'all-other-grouped',
-        categoryName: 'All Other (Small Categories)',
+        categoryName: 'Everything Else',
         categoryColor: '#64748b',
         isIncome: false,
         isDiscretionary: true,
@@ -427,6 +428,7 @@ export async function POST(request: Request) {
         proposedAmount: Math.round(totalSmallGroupProposed),
         existingAmount: otherCategory ? existingBudgetMap.get(otherCategory.id) ?? null : null,
         isSmallCategory: true,
+        isEverythingElse: true,
         isSelected: true,
         groupedCategories: smallCategoriesGroup,
       });
