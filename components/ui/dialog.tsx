@@ -36,7 +36,16 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "dialog-content-responsive fixed left-[50%] top-[50%] z-[10000] grid w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-5 border border-border bg-card p-6 shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-98 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-xl overflow-y-auto max-h-[85dvh]",
+        "fixed z-[10000] flex flex-col gap-4 border border-border bg-card p-6 shadow-xl duration-300 overflow-y-auto max-h-[90dvh] md:max-h-[85dvh]",
+        // Mobile bottom-sheet positioning (viewport < 768px)
+        "bottom-0 inset-x-0 top-auto w-full max-w-full rounded-b-none rounded-t-2xl border-b-0 translate-x-0 translate-y-0",
+        // Desktop centered positioning (viewport >= 768px)
+        "md:bottom-auto md:left-[50%] md:top-[50%] md:w-[calc(100%-2rem)] md:max-w-lg md:translate-x-[-50%] md:translate-y-[-50%] md:rounded-xl md:border-b",
+        // Animations
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-98",
+        "data-[state=closed]:slide-out-to-bottom md:data-[state=closed]:slide-out-to-left-1/2 md:data-[state=closed]:slide-out-to-top-[48%]",
+        "data-[state=open]:slide-in-from-bottom md:data-[state=open]:slide-in-from-left-1/2 md:data-[state=open]:slide-in-from-top-[48%]",
         className
       )}
       {...props}

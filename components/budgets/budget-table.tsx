@@ -262,17 +262,19 @@ export function BudgetTable() {
             )}
             <button
               onClick={() => setShowAutoBudget(true)}
+              title="Automatically generate budget proposals based on historical spending"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border/80 rounded-lg transition-all"
             >
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Auto Budget
+              Auto
             </button>
             <button
               onClick={() => { setEditBudget(null); setShowForm(true); }}
+              title="Manually create a new custom budget item"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
-              Add Budget
+              Budget
             </button>
           </div>
         </div>

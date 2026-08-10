@@ -64,11 +64,12 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
       if (customEv.detail?.hasUpdate !== undefined) {
         setHasUpdate(Boolean(customEv.detail.hasUpdate));
       }
-      setIsOpen(true);
+      setInternalOpen(true);
+      onOpenChange?.(true);
     };
     window.addEventListener('open-changelog', handleOpen);
     return () => window.removeEventListener('open-changelog', handleOpen);
-  }, []);
+  }, [onOpenChange]);
 
   // Fetch changelog data when modal opens
   useEffect(() => {
@@ -178,9 +179,9 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden border-border bg-card shadow-2xl rounded-xl opacity-100">
-        <DialogHeader className="p-6 pb-4 border-b border-border/60 bg-muted/40">
-          <div className="flex items-center justify-between">
+      <DialogContent className="max-w-2xl max-h-[90dvh] sm:max-h-[85vh] flex flex-col p-0 gap-0 border-border bg-card shadow-2xl rounded-xl opacity-100">
+        <DialogHeader className="p-4 sm:p-6 pb-4 border-b border-border/60 bg-muted/40 shrink-0">
+          <div className="flex items-center justify-between pr-6">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
                 <History className="w-5 h-5" />
@@ -230,7 +231,7 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
         </DialogHeader>
 
         {/* Filter Controls */}
-        <div className="p-4 border-b border-border/40 bg-muted/20 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div className="p-3 sm:p-4 border-b border-border/40 bg-muted/20 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between shrink-0">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -267,7 +268,7 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
         </div>
 
         {/* Commit List / Changelog Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6 space-y-4">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
               <RefreshCw className="w-6 h-6 animate-spin text-primary" />
@@ -359,7 +360,7 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-border/60 bg-muted/30 flex items-center justify-between">
+        <div className="p-3 sm:p-4 border-t border-border/60 bg-muted/30 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-muted-foreground">
             Personal Finance Dashboard • Version History
           </span>

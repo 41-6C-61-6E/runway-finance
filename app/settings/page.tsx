@@ -2484,8 +2484,8 @@ function SettingsPageBody() {
 
       {/* Plaid Credentials Dialog */}
       <Dialog open={isPlaidCredentialsDialogOpen} onOpenChange={setIsPlaidCredentialsDialogOpen}>
-        <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
-          <DialogHeader className="p-6 pb-4 border-b border-border">
+        <DialogContent className="max-w-md max-h-[90dvh] sm:max-h-[85dvh] flex flex-col gap-0 p-0">
+          <DialogHeader className="p-4 sm:p-6 pb-4 border-b border-border shrink-0">
             <DialogTitle>
               {connections.some((c) => c.provider === 'plaid') ? 'Update Plaid API Credentials' : 'Configure Plaid API Credentials'}
             </DialogTitle>
@@ -2565,8 +2565,8 @@ function SettingsPageBody() {
 
       {/* Connection Details Dialog */}
           <Dialog open={!!detailsConn} onOpenChange={(open) => !open && setDetailsConn(null)}>
-            <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
-              <DialogHeader className="p-6 pb-4 border-b border-border">
+            <DialogContent className="max-w-md max-h-[90dvh] sm:max-h-[85dvh] flex flex-col gap-0 p-0">
+              <DialogHeader className="p-4 sm:p-6 pb-4 border-b border-border shrink-0">
                 <DialogTitle>Connection Details</DialogTitle>
                 <DialogDescription>View and manage your SimpleFIN connection.</DialogDescription>
               </DialogHeader>
@@ -2733,8 +2733,8 @@ function SettingsPageBody() {
 
           {/* Re-mapping Dialog */}
           <Dialog open={isRemapDialogOpen} onOpenChange={setIsRemapDialogOpen}>
-            <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
-              <DialogHeader className="p-6 pb-4 border-b border-border">
+            <DialogContent className="max-w-md max-h-[90dvh] sm:max-h-[85dvh] flex flex-col gap-0 p-0">
+              <DialogHeader className="p-4 sm:p-6 pb-4 border-b border-border shrink-0">
                 <DialogTitle>Re-map Unlinked Account</DialogTitle>
                 <DialogDescription>
                   Reconnect an orphaned automatic account to an active synced account to preserve all history.
@@ -2874,8 +2874,8 @@ function SettingsPageBody() {
 
           {/* Re-linking Dialog */}
           <Dialog open={isRelinkDialogOpen} onOpenChange={setIsRelinkDialogOpen}>
-            <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
-              <DialogHeader className="p-6 pb-4 border-b border-border">
+            <DialogContent className="max-w-md max-h-[90dvh] sm:max-h-[85dvh] flex flex-col gap-0 p-0">
+              <DialogHeader className="p-4 sm:p-6 pb-4 border-b border-border shrink-0">
                 <DialogTitle>Re-link to Sync Connection</DialogTitle>
                 <DialogDescription>
                   Reconnect this unlinked account to one of your active sync connections.
@@ -2951,8 +2951,8 @@ function SettingsPageBody() {
 
           {/* Manage Sync Dialog */}
           <Dialog open={isManageSyncDialogOpen} onOpenChange={setIsManageSyncDialogOpen}>
-            <DialogContent className="max-w-md max-h-[85dvh] flex flex-col gap-0 p-0 overflow-hidden">
-              <DialogHeader className="p-6 pb-4 border-b border-border">
+            <DialogContent className="max-w-md max-h-[90dvh] sm:max-h-[85dvh] flex flex-col gap-0 p-0">
+              <DialogHeader className="p-4 sm:p-6 pb-4 border-b border-border shrink-0">
                 <DialogTitle>Manage Sync Accounts</DialogTitle>
                 <DialogDescription>
                   Configure which accounts retrieved from SimpleFIN are actively syncing data to this application.

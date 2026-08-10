@@ -163,14 +163,14 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[90dvh] sm:max-h-[85vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{editBudget ? 'Edit Budget' : 'Add Budget'}</DialogTitle>
           <DialogDescription>
             {editBudget ? 'Update the budget details.' : 'Create a new budget for a category.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1 overflow-y-auto min-h-0 pr-1 pb-2">
           {error && (
             <div className="p-3 bg-destructive/20 border border-destructive/30 rounded-lg">
               <p className="text-destructive text-sm">{error}</p>
@@ -235,7 +235,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
               <label className="block text-sm font-medium text-foreground mb-1">Amount</label>
               <Input
                 type="number"
-                step="0.01"
+                step="1"
                 value={form.amount}
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                 placeholder="e.g., 400"
