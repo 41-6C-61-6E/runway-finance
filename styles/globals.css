@@ -577,10 +577,15 @@ button,
     right: 0 !important;
     transform: none !important;
     translate: none !important;
+    --tw-translate-x: 0px !important;
+    --tw-translate-y: 0px !important;
     width: 100% !important;
     max-width: 100% !important;
     border-radius: 1.25rem 1.25rem 0 0 !important;
     max-height: 90dvh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
     overflow-y: auto !important;
   }
   /* Slide from bottom instead of center zoom */

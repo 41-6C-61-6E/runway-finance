@@ -947,7 +947,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto p-6 font-sans">
+      <DialogContent className="max-w-4xl w-full max-h-[90dvh] sm:max-h-[85vh] p-4 sm:p-6 font-sans">
         <DialogHeader className="border-b border-border pb-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">

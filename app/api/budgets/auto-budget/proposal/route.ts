@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { budgets, categories, transactions, userSettings } from '@/lib/db/schema';
+import { accounts, budgets, categories, transactions, userSettings } from '@/lib/db/schema';
 import { eq, and, gte, lt, min, count } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -29,11 +29,11 @@ export async function POST(request: Request) {
     : 'average';
   const bufferPercentage = Math.max(-50, Math.min(100, parseFloat(String(body.bufferPercentage || 0)) || 0));
   const excludeOutliers = body.excludeOutliers === true;
+  const excludeVirtualAccounts = body.excludeVirtualAccounts !== false; // checked by default
   const groupSmallCategories = body.groupSmallCategories !== false;
   const smallCategoryThreshold = Math.max(0, parseFloat(String(body.smallCategoryThreshold ?? 50)) || 50);
   const includeIncome = body.includeIncome === true;
   const onlyUnbudgeted = body.onlyUnbudgeted === true;
-  const includeZeroSpending = body.includeZeroSpending === true;
   const periodType = (body.periodType as string) || 'monthly';
   const periodKey = (body.periodKey as string) || null;
 
@@ -60,6 +60,21 @@ export async function POST(request: Request) {
     } as Record<string, boolean>;
 
     const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+
+    // Fetch virtual accounts if excludeVirtualAccounts is enabled
+    let virtualAccountIds = new Set<string>();
+    if (excludeVirtualAccounts) {
+      const userAccounts = await db
+        .select({ id: accounts.id, externalId: accounts.externalId, type: accounts.type })
+        .from(accounts)
+        .where(eq(accounts.userId, dataUserId));
+
+      virtualAccountIds = new Set(
+        userAccounts
+          .filter((a) => a.type === 'paystub' || (a.externalId && a.externalId.startsWith('virtual-')))
+          .map((a) => a.id)
+      );
+    }
 
     // 2. Determine earliest transaction date across all user transactions
     const [oldestTxRow] = await db
@@ -175,15 +190,33 @@ export async function POST(request: Request) {
         date: transactions.date,
         amount: transactions.amount,
         categoryId: transactions.categoryId,
+        description: transactions.description,
+        payee: transactions.payee,
+        source: transactions.source,
+        paystubId: transactions.paystubId,
+        accountId: transactions.accountId,
       })
       .from(transactions)
       .where(and(...txConditions));
 
-    // Decrypt amounts & group by category & month (YYYY-MM)
+    // Decrypt amounts & group by category & month (YYYY-MM), plus sample transactions
     const categoryMonthlyTotals = new Map<string, Map<string, number[]>>();
+    const categoryTxSamples = new Map<string, Array<{ id: string; date: string; description: string; amount: number; source: string }>>();
 
     for (const row of txRows) {
       if (!row.categoryId || !categoryMap.has(row.categoryId)) continue;
+      
+      // Virtual account filtering
+      if (excludeVirtualAccounts) {
+        if (
+          row.source === 'paystub' ||
+          row.paystubId ||
+          (row.accountId && virtualAccountIds.has(row.accountId))
+        ) {
+          continue;
+        }
+      }
+
       const decryptedAmt = parseFloat(await decryptField(row.amount, dek));
       if (isNaN(decryptedAmt)) continue;
 
@@ -203,6 +236,23 @@ export async function POST(request: Request) {
         monthMap.set(ym, []);
       }
       monthMap.get(ym)!.push(effectiveAmount);
+
+      // Collect sample transactions for inspection (up to 15)
+      if (!categoryTxSamples.has(row.categoryId)) {
+        categoryTxSamples.set(row.categoryId, []);
+      }
+      const samples = categoryTxSamples.get(row.categoryId)!;
+      if (samples.length < 15) {
+        const rawDesc = row.description || row.payee || 'Transaction';
+        const decryptedDesc = await decryptField(rawDesc, dek).catch(() => rawDesc);
+        samples.push({
+          id: row.id,
+          date: row.date,
+          description: decryptedDesc,
+          amount: Math.round(effectiveAmount * 100) / 100,
+          source: row.source || 'bank',
+        });
+      }
     }
 
     // 6. Compute proposals per category
@@ -220,6 +270,7 @@ export async function POST(request: Request) {
       existingAmount: number | null;
       isSmallCategory: boolean;
       isSelected: boolean;
+      sampleTransactions?: Array<{ id: string; date: string; description: string; amount: number; source: string }>;
       groupedCategories?: Array<{
         categoryId: string;
         categoryName: string;
@@ -255,6 +306,11 @@ export async function POST(request: Request) {
         }
       }
 
+      // Zero-spending categories are NEVER included unless an existing budget was set
+      if (monthlySumList.length === 0 && !existingBudgetMap.has(cat.id)) {
+        continue;
+      }
+
       // Outlier exclusion at monthly totals level
       if (excludeOutliers && monthlySumList.length >= 3) {
         const mean = monthlySumList.reduce((s, m) => s + m, 0) / monthlySumList.length;
@@ -281,26 +337,25 @@ export async function POST(request: Request) {
       const monthlyMax = sortedMonthly.length > 0 ? Math.max(...sortedMonthly) : 0;
 
       // Scale base amounts for target periodType (1 for monthly, 3 for quarterly, 12 for yearly)
-      const historicalAverage = Math.round(monthlyAverage * periodScale * 100) / 100;
-      const historicalMedian = Math.round(monthlyMedian * periodScale * 100) / 100;
-      const historicalMax = Math.round(monthlyMax * periodScale * 100) / 100;
+      const historicalAverage = Math.round(monthlyAverage * periodScale);
+      const historicalMedian = Math.round(monthlyMedian * periodScale);
+      const historicalMax = Math.round(monthlyMax * periodScale);
 
       // Select base figure based on calculationMethod
       let baseAmount = historicalAverage;
       if (calculationMethod === 'median') baseAmount = historicalMedian;
       else if (calculationMethod === 'max') baseAmount = historicalMax;
 
-      // Apply buffer
-      let calculatedProposed = baseAmount * (1 + bufferPercentage / 100);
-      calculatedProposed = Math.round(calculatedProposed * 100) / 100;
+      // Apply buffer & round to nearest integer dollar
+      let calculatedProposed = Math.round(baseAmount * (1 + bufferPercentage / 100));
 
-      // Filter out zero spending categories unless requested or existing budget set
-      if (calculatedProposed === 0 && !existingBudgetMap.has(cat.id) && !includeZeroSpending) {
+      if (calculatedProposed === 0 && !existingBudgetMap.has(cat.id)) {
         continue;
       }
 
       const existingAmt = existingBudgetMap.get(cat.id) ?? null;
-      const isSmall = !cat.isIncome && calculatedProposed > 0 && calculatedProposed <= scaledSmallThreshold;
+      // Group categories whose average spending is <= threshold
+      const isSmall = !cat.isIncome && historicalAverage > 0 && historicalAverage <= scaledSmallThreshold;
 
       if (groupSmallCategories && isSmall) {
         smallCategoriesGroup.push({
@@ -327,6 +382,7 @@ export async function POST(request: Request) {
           existingAmount: existingAmt,
           isSmallCategory: false,
           isSelected: true,
+          sampleTransactions: categoryTxSamples.get(cat.id) || [],
         });
       }
     }
@@ -343,10 +399,10 @@ export async function POST(request: Request) {
         categoryColor: '#64748b',
         isIncome: false,
         isDiscretionary: true,
-        historicalAverage: Math.round(totalSmallGroupAvg * 100) / 100,
-        historicalMedian: Math.round(totalSmallGroupMedian * 100) / 100,
-        historicalMax: Math.round(totalSmallGroupMax * 100) / 100,
-        proposedAmount: Math.round(totalSmallGroupProposed * 100) / 100,
+        historicalAverage: Math.round(totalSmallGroupAvg),
+        historicalMedian: Math.round(totalSmallGroupMedian),
+        historicalMax: Math.round(totalSmallGroupMax),
+        proposedAmount: Math.round(totalSmallGroupProposed),
         existingAmount: otherCategory ? existingBudgetMap.get(otherCategory.id) ?? null : null,
         isSmallCategory: true,
         isSelected: true,

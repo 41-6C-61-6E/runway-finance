@@ -245,9 +245,9 @@ export function ClientErrorReporter({ children }: { children: ReactNode }) {
 
       {/* Dialog to inspect details and report errors */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-6">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+        <DialogContent className="max-w-2xl max-h-[90dvh] sm:max-h-[85vh] flex flex-col p-4 sm:p-6">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Terminal className="w-5 h-5 text-destructive" />
               Captured Client Errors ({errors.length})
             </DialogTitle>
@@ -257,7 +257,7 @@ export function ClientErrorReporter({ children }: { children: ReactNode }) {
           </DialogHeader>
 
           {/* List of errors */}
-          <div className="flex-1 overflow-y-auto space-y-4 my-4 pr-1">
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-4 my-3 sm:my-4 pr-1">
             {errors.map((err) => (
               <div key={err.id} className="border border-border rounded-lg bg-muted/30 p-4 space-y-2 text-xs">
                 <div className="flex justify-between items-start gap-2">

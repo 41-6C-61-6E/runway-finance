@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1786377422184",
-  "buildTime": "2026-08-10T15:57:02.184Z",
-  "hash": "0d5eb16",
-  "fullHash": "0d5eb166253c9e9ba3cd14a87fb8d8b1dd8efa93",
+  "buildNumber": "26.08.1786380308253",
+  "buildTime": "2026-08-10T16:45:08.253Z",
+  "hash": "1a2add5",
+  "fullHash": "1a2add5e2a445da30955e86663a3a4e5dd5378d7",
   "commits": [
+    "feat: add support for quarterly and yearly auto-budgets with improved outlier filtering and zero-spending inclusion options.",
     "feat: implement auto-budgeting system with automated calculation proposals and batch application endpoints",
     "feat: implement responsive mobile tab navigation and optimize TransactionTable dependency array",
     "feat: implement responsive mobile tab navigation with swipe gestures and auto-closing notification menus",
@@ -202,18 +203,25 @@
     "ios UI",
     "investment page updates",
     "tooltip improvements",
-    "touch UI",
-    "contrast improvements"
+    "touch UI"
   ],
   "history": [
+    {
+      "hash": "1a2add5",
+      "fullHash": "1a2add5e2a445da30955e86663a3a4e5dd5378d7",
+      "author": "Alan Racek",
+      "date": "2026-08-10T08:58:04-07:00",
+      "message": "feat: add support for quarterly and yearly auto-budgets with improved outlier filtering and zero-spending inclusion options.",
+      "type": "feat",
+      "buildNumber": "26.08.1786380308253"
+    },
     {
       "hash": "0d5eb16",
       "fullHash": "0d5eb166253c9e9ba3cd14a87fb8d8b1dd8efa93",
       "author": "Alan Racek",
       "date": "2026-08-10T08:47:31-07:00",
       "message": "feat: implement auto-budgeting system with automated calculation proposals and batch application endpoints",
-      "type": "feat",
-      "buildNumber": "26.08.1786377422184"
+      "type": "feat"
     },
     {
       "hash": "31968a7",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-24T15:56:04-07:00",
       "message": "touch UI",
-      "type": "other"
-    },
-    {
-      "hash": "149e176",
-      "fullHash": "149e176e907637e1f09a7260fa004ee0372b7d3e",
-      "author": "Alan Racek",
-      "date": "2026-06-24T15:40:31-07:00",
-      "message": "contrast improvements",
       "type": "other"
     }
   ]

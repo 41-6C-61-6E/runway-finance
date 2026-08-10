@@ -80,8 +80,9 @@ export async function POST(request: Request) {
       }
       if (!catId) continue;
 
-      const numAmount = parseFloat(String(item.amount ?? 0));
-      if (isNaN(numAmount) || numAmount <= 0) continue;
+      const rawAmount = parseFloat(String(item.amount ?? 0));
+      if (isNaN(rawAmount) || rawAmount <= 0) continue;
+      const numAmount = Math.round(rawAmount);
 
       // Check if existing budget exists for this category & period
       // When isRecurring is true, yearMonth is null, so query must match isNull(budgets.yearMonth)

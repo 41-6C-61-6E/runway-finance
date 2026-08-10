@@ -26,6 +26,8 @@ import {
   TrendingDown,
   Wand2,
   RefreshCw,
+  Eye,
+  Receipt,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -42,6 +44,7 @@ interface ProposalItem {
   existingAmount: number | null;
   isSmallCategory: boolean;
   isSelected: boolean;
+  sampleTransactions?: Array<{ id: string; date: string; description: string; amount: number; source: string }>;
   groupedCategories?: Array<{
     categoryId: string;
     categoryName: string;
@@ -75,11 +78,11 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
   const [calculationMethod, setCalculationMethod] = useState<'average' | 'median' | 'max'>('average');
   const [bufferPercentage, setBufferPercentage] = useState<number>(5);
   const [excludeOutliers, setExcludeOutliers] = useState<boolean>(true);
+  const [excludeVirtualAccounts, setExcludeVirtualAccounts] = useState<boolean>(true);
   const [groupSmallCategories, setGroupSmallCategories] = useState<boolean>(true);
   const [smallCategoryThreshold, setSmallCategoryThreshold] = useState<number>(50);
   const [includeIncome, setIncludeIncome] = useState<boolean>(false);
   const [onlyUnbudgeted, setOnlyUnbudgeted] = useState<boolean>(false);
-  const [includeZeroSpending, setIncludeZeroSpending] = useState<boolean>(false);
   const [overwriteExisting, setOverwriteExisting] = useState<boolean>(true);
 
   // Proposal state
@@ -93,6 +96,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
   const [expandedGroup, setExpandedGroup] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'expense' | 'income'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [inspectItem, setInspectItem] = useState<ProposalItem | null>(null);
 
   const periodLabel = periodType === 'quarterly' ? '/qtr' : periodType === 'yearly' ? '/yr' : '/mo';
 
@@ -109,11 +113,11 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
           calculationMethod,
           bufferPercentage,
           excludeOutliers,
+          excludeVirtualAccounts,
           groupSmallCategories,
           smallCategoryThreshold,
           includeIncome,
           onlyUnbudgeted,
-          includeZeroSpending,
           periodType,
           periodKey,
         }),
@@ -188,6 +192,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
     setMeta(null);
     setError('');
     setSearchQuery('');
+    setInspectItem(null);
   };
 
   const toggleSelectAll = (select: boolean) => {
@@ -196,7 +201,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
 
   const updateProposedAmount = (categoryId: string, amount: number) => {
     setProposalItems((prev) =>
-      prev.map((item) => (item.categoryId === categoryId ? { ...item, proposedAmount: Math.max(0, amount) } : item))
+      prev.map((item) => (item.categoryId === categoryId ? { ...item, proposedAmount: Math.round(Math.max(0, amount)) } : item))
     );
   };
 
@@ -279,7 +284,8 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
   });
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetForm(); } }}>
+    <>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetForm(); } }}>
       <DialogContent className="max-w-3xl max-h-[90vh]">
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -312,7 +318,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                 Historical Lookback Period
               </label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { value: 1, label: '1 Month' },
                   { value: 3, label: '3 Months' },
@@ -421,6 +427,16 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
               <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
                 <input
                   type="checkbox"
+                  checked={excludeVirtualAccounts}
+                  onChange={(e) => setExcludeVirtualAccounts(e.target.checked)}
+                  className="w-4 h-4 rounded border-border bg-background text-primary cursor-pointer"
+                />
+                <span>Exclude transactions from virtual accounts (i.e. paystub)</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
+                <input
+                  type="checkbox"
                   checked={excludeOutliers}
                   onChange={(e) => setExcludeOutliers(e.target.checked)}
                   className="w-4 h-4 rounded border-border bg-background text-primary cursor-pointer"
@@ -446,16 +462,6 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                   className="w-4 h-4 rounded border-border bg-background text-primary cursor-pointer"
                 />
                 <span>Only generate proposals for categories that don't have a budget set</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
-                <input
-                  type="checkbox"
-                  checked={includeZeroSpending}
-                  onChange={(e) => setIncludeZeroSpending(e.target.checked)}
-                  className="w-4 h-4 rounded border-border bg-background text-primary cursor-pointer"
-                />
-                <span>Include categories with zero spending history</span>
               </label>
             </div>
           </div>
@@ -508,7 +514,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
             </div>
 
             {/* Table Controls with Category Search */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-2">
               <div className="flex items-center gap-1.5 text-xs">
                 <button
                   type="button"
@@ -570,9 +576,9 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
             </div>
 
             {/* Proposal Table */}
-            <div className="overflow-y-auto max-h-[340px] border border-border rounded-xl">
-              <table className="w-full text-xs">
-                <thead className="bg-muted/50 border-b border-border sticky top-0 z-10">
+            <div className="overflow-x-auto overflow-y-auto max-h-[340px] max-w-full border border-border rounded-xl">
+              <table className="w-full text-xs min-w-[480px]">
+                <thead className="bg-muted border-b border-border sticky top-0 z-10 shadow-xs">
                   <tr>
                     <th className="w-8 px-3 py-2 text-center">#</th>
                     <th className="text-left px-3 py-2 font-medium text-muted-foreground">Category</th>
@@ -580,7 +586,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                     <th className="text-right px-3 py-2 font-medium text-muted-foreground">Proposed ({periodLabel})</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border bg-card">
                   {filteredProposalItems.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground text-xs">
@@ -621,6 +627,18 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                                     }`}
                                   >
                                     {item.isDiscretionary ? 'Discretionary' : 'Essential'}
+                                  </button>
+                                )}
+
+                                {item.sampleTransactions && item.sampleTransactions.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setInspectItem(item)}
+                                    title="View transactions used in calculation"
+                                    className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary hover:bg-accent px-1.5 py-0.5 rounded transition-colors"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    <span>{item.sampleTransactions.length} txns</span>
                                   </button>
                                 )}
                               </div>
@@ -669,7 +687,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                                 <span className="text-muted-foreground font-mono">$</span>
                                 <Input
                                   type="number"
-                                  step="0.01"
+                                  step="1"
                                   value={item.proposedAmount}
                                   onChange={(e) => updateProposedAmount(item.categoryId, parseFloat(e.target.value) || 0)}
                                   className="w-24 text-right font-mono h-7 text-xs"
@@ -767,5 +785,83 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Transaction Inspection Dialog */}
+    <Dialog open={!!inspectItem} onOpenChange={(o) => { if (!o) setInspectItem(null); }}>
+      <DialogContent className="max-w-lg max-h-[80vh]">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: inspectItem?.categoryColor }} />
+            <DialogTitle className="text-base font-semibold">
+              {inspectItem?.categoryName} &mdash; Transactions Analyzed
+            </DialogTitle>
+          </div>
+          <DialogDescription className="text-xs">
+            Showing transactions analyzed during historical lookback to calculate proposed budget.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="p-2 bg-muted/40 rounded-lg">
+              <span className="text-[10px] text-muted-foreground block uppercase font-medium">Hist. Avg</span>
+              <span className="font-mono font-bold text-foreground">{formatCurrency(inspectItem?.historicalAverage)}</span>
+            </div>
+            <div className="p-2 bg-muted/40 rounded-lg">
+              <span className="text-[10px] text-muted-foreground block uppercase font-medium">Hist. Median</span>
+              <span className="font-mono font-bold text-foreground">{formatCurrency(inspectItem?.historicalMedian)}</span>
+            </div>
+            <div className="p-2 bg-muted/40 rounded-lg">
+              <span className="text-[10px] text-muted-foreground block uppercase font-medium">Hist. Max</span>
+              <span className="font-mono font-bold text-foreground">{formatCurrency(inspectItem?.historicalMax)}</span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto overflow-y-auto max-h-[280px] max-w-full border border-border rounded-lg">
+            <table className="w-full text-xs min-w-[340px]">
+              <thead className="bg-muted sticky top-0 border-b border-border text-muted-foreground font-medium">
+                <tr>
+                  <th className="text-left px-3 py-2">Date</th>
+                  <th className="text-left px-3 py-2">Description / Payee</th>
+                  <th className="text-right px-3 py-2">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {inspectItem?.sampleTransactions && inspectItem.sampleTransactions.length > 0 ? (
+                  inspectItem.sampleTransactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-accent/30">
+                      <td className="px-3 py-2 font-mono text-muted-foreground whitespace-nowrap">{tx.date}</td>
+                      <td className="px-3 py-2 text-foreground font-medium truncate max-w-[200px]" title={tx.description}>
+                        {tx.description}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono font-medium text-foreground whitespace-nowrap">
+                        {formatCurrency(tx.amount)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-4 text-center text-muted-foreground text-xs">
+                      No sample transactions available for this category.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => setInspectItem(null)}
+            className="px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+          >
+            Close
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
