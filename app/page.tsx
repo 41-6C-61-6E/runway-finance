@@ -51,7 +51,8 @@ function NetWorthContent() {
             main={mainContent}
             summary={summaryContent}
             mainLabel="Charts"
-            summaryLabel="Summary"
+            summaryLabel="Overview"
+            summaryCardId="netWorthSidePanel"
           />
         ) : (
           mainContent

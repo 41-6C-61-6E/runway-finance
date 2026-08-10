@@ -52,7 +52,8 @@ function BudgetsContent() {
             main={mainContent}
             summary={summaryContent}
             mainLabel="Table"
-            summaryLabel="Summary"
+            summaryLabel="Overview"
+            summaryCardId="budgetSummary"
           />
         ) : (
           <div className="space-y-6">

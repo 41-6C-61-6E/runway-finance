@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { useMobileSubNav } from '@/components/mobile-subnav-context';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
 interface MobileViewSwitcherProps {
   main: ReactNode;
@@ -13,6 +15,7 @@ interface MobileViewSwitcherProps {
   className?: string;
   desktopHeader?: ReactNode;
   desktopLayout?: 'grid' | 'stacked';
+  summaryCardId?: string;
 }
 
 export function MobileViewSwitcher({
@@ -23,9 +26,13 @@ export function MobileViewSwitcher({
   className = '',
   desktopHeader,
   desktopLayout = 'grid',
+  summaryCardId,
 }: MobileViewSwitcherProps) {
   const [activeTab, setActiveTab] = useState<'main' | 'summary'>('main');
   const { registerSubNav, unregisterSubNav } = useMobileSubNav();
+  const [isSummaryCollapsed, setIsSummaryCollapsed] = useCardCollapsed(summaryCardId || '_none_', false);
+
+  const isHorizontalCollapseEnabled = Boolean(summaryCardId) && isSummaryCollapsed;
 
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
@@ -111,10 +118,27 @@ export function MobileViewSwitcher({
             {main}
             {summary}
           </div>
+        ) : isHorizontalCollapseEnabled ? (
+          <div className="grid grid-cols-12 gap-6 items-start">
+            <div className="col-span-11 space-y-6 transition-all duration-300">{main}</div>
+            <div className="col-span-1 flex justify-end sticky top-[84px] transition-all duration-300">
+              <button
+                onClick={() => setIsSummaryCollapsed(false)}
+                className="flex flex-col items-center gap-3 py-4 px-2.5 bg-sidebar border border-sidebar-border/80 hover:bg-sidebar/90 rounded-2xl shadow-sm text-sidebar-foreground transition-all cursor-pointer group"
+                title={`Expand ${summaryLabel}`}
+                type="button"
+              >
+                <ChevronLeft className="w-4 h-4 text-primary group-hover:-translate-x-0.5 transition-transform shrink-0" />
+                <span className="text-[11px] font-bold tracking-widest text-muted-foreground uppercase [writing-mode:vertical-lr] rotate-180 shrink-0 select-none">
+                  {summaryLabel}
+                </span>
+              </button>
+            </div>
+          </div>
         ) : (
-          <div className="grid grid-cols-3 gap-6 items-start">
-            <div className="col-span-2 space-y-6">{main}</div>
-            <div className="col-span-1 sticky top-6">{summary}</div>
+          <div className="grid grid-cols-12 gap-6 items-start">
+            <div className="col-span-8 space-y-6 transition-all duration-300">{main}</div>
+            <div className="col-span-4 sticky top-[84px] transition-all duration-300">{summary}</div>
           </div>
         )}
       </div>

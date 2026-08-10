@@ -42,11 +42,11 @@ export function BudgetSummary() {
 
   if (loading) {
     return (
-      <Card className="animate-pulse">
+      <Card className="animate-pulse bg-sidebar border border-sidebar-border rounded-2xl">
         <CardContent className="p-5 space-y-4">
-          <div className="h-5 bg-muted rounded w-36 mb-2" />
-          <div className="h-32 bg-muted/60 rounded-xl" />
-          <div className="h-20 bg-muted/40 rounded-xl" />
+          <div className="h-5 bg-muted/60 rounded w-36 mb-2" />
+          <div className="h-32 bg-card rounded-xl" />
+          <div className="h-20 bg-card rounded-xl" />
         </CardContent>
       </Card>
     );
@@ -153,21 +153,23 @@ export function BudgetSummary() {
   const overPct = totalCatCount > 0 ? (overBudgetCount / totalCatCount) * 100 : 0;
 
   return (
-    <Card className="@container overflow-hidden border border-border/70 shadow-sm bg-card">
+    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
       <CollapsibleCardHeader
         isCollapsed={collapsed}
         onToggle={setCollapsed}
+        collapseDirection="horizontal"
         title={
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-semibold text-sm">Budget Overview</span>
+            <span className="font-bold text-foreground">Overview</span>
           </div>
         }
+        className="border-b border-sidebar-border/60 bg-sidebar"
       />
       {!collapsed && (
-        <CardContent className="p-4 sm:p-5 space-y-4">
-          {/* Header Status & Net Position Row */}
-          <div className="flex items-center justify-between pb-3 border-b border-border/40">
+        <div className="p-4 sm:p-5 space-y-4 divide-y divide-sidebar-border/50">
+          {/* Section 1: Header Status & Net Position */}
+          <div className="flex items-center justify-between pb-3">
             <div className="space-y-0.5">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Status</span>
               <div className="flex items-center gap-1.5 pt-0.5">
@@ -185,185 +187,191 @@ export function BudgetSummary() {
             </div>
           </div>
 
-          {/* Donut Chart & Percent Ring Section */}
-          {hasExpenses && (
-            <div className="flex items-center justify-center relative py-1">
-              <div className="w-36 h-36 relative flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={44}
-                      outerRadius={58}
-                      startAngle={90}
-                      endAngle={-270}
-                      dataKey="value"
-                      strokeWidth={0}
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-xl font-bold font-mono text-foreground leading-none">
-                    {expensePercent.toFixed(0)}%
-                  </span>
-                  <span className="text-[10px] text-muted-foreground font-medium mt-0.5">used</span>
+          {/* Section 2: Donut Chart & Progress Section */}
+          <div className="pt-4 space-y-4">
+            {hasExpenses && (
+              <div className="flex items-center justify-center relative py-1">
+                <div className="w-36 h-36 relative flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={44}
+                        outerRadius={58}
+                        startAngle={90}
+                        endAngle={-270}
+                        dataKey="value"
+                        strokeWidth={0}
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                    <span className="text-xl font-bold font-mono text-foreground leading-none">
+                      {expensePercent.toFixed(0)}%
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-medium mt-0.5">used</span>
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* Expense & Income Progress Bars */}
+            <div className="space-y-3">
+              {hasExpenses && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="flex items-center gap-1 text-foreground/90 font-semibold text-[11px]">
+                      <TrendingDown className="w-3.5 h-3.5 text-primary" />
+                      Expenses
+                    </span>
+                    <span className="font-mono text-xs text-foreground">
+                      <span className="blur-number">{formatCurrency(totalExpenseActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalExpenseBudgeted)}</span>
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full transition-all duration-500 rounded-full',
+                        expensePercent > 100 ? 'bg-destructive' : expensePercent > 85 ? 'bg-amber-500' : 'bg-primary'
+                      )}
+                      style={{ width: `${Math.min(expensePercent, 100)}%` }}
+                    />
+                  </div>
+                  <p className={cn('text-[11px] text-right font-mono blur-number', expenseRemaining < 0 ? 'text-destructive font-medium' : 'text-muted-foreground')}>
+                    {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over limit`}
+                  </p>
+                </div>
+              )}
+
+              {hasIncome && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-xs font-medium">
+                    <span className="flex items-center gap-1 text-primary font-semibold text-[11px]">
+                      <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                      Income Target
+                    </span>
+                    <span className="font-mono text-xs text-foreground">
+                      <span className="blur-number">{formatCurrency(totalIncomeActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalIncomeBudgeted)}</span>
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-500 rounded-full"
+                      style={{ width: `${Math.min(incomePercent, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section 3: Fixed vs Discretionary Allocation */}
+          {hasExpenses && totalExpBud > 0 && (
+            <div className="pt-4">
+              <ChartHoverTooltip
+                content={
+                  <>
+                    <TooltipHeader>Fixed vs. Discretionary Expenses</TooltipHeader>
+                    <TooltipRow label="Fixed (Essential)" value={`${formatCurrency(fixedBudgeted)} (${fixedPct.toFixed(1)}%)`} color="var(--color-chart-1)" />
+                    <TooltipRow label="Discretionary" value={`${formatCurrency(discretionaryBudgeted)} (${discretionaryPct.toFixed(1)}%)`} color="var(--color-chart-4)" />
+                    <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1 text-[10px] text-muted-foreground">
+                      <div>Fixed: Rent, Utilities, Insurance, Debt</div>
+                      <div>Discretionary: Dining, Entertainment, Shopping</div>
+                    </div>
+                  </>
+                }
+              >
+                <div className="space-y-2 cursor-help">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-foreground flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5 text-chart-1" />
+                      Fixed vs. Discretionary
+                      <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                    </span>
+                    <span className="text-muted-foreground font-mono text-[11px]">
+                      {fixedPct.toFixed(0)}% / {discretionaryPct.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                    <div
+                      className="h-full bg-chart-1 transition-all duration-500 rounded-l-full"
+                      style={{ width: `${fixedPct}%` }}
+                    />
+                    <div
+                      className="h-full bg-chart-4 transition-all duration-500 rounded-r-full"
+                      style={{ width: `${discretionaryPct}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
+                    <span>Fixed: {fixedPct.toFixed(0)}%</span>
+                    <span>Discretionary: {discretionaryPct.toFixed(0)}%</span>
+                  </div>
+                </div>
+              </ChartHoverTooltip>
             </div>
           )}
 
-          {/* Expense & Income Progress Bars */}
-          <div className="space-y-3 pt-1">
-            {hasExpenses && (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-medium">
-                  <span className="flex items-center gap-1 text-foreground/90 font-semibold text-[11px]">
-                    <TrendingDown className="w-3.5 h-3.5 text-primary" />
-                    Expenses
-                  </span>
-                  <span className="font-mono text-xs text-foreground">
-                    <span className="blur-number">{formatCurrency(totalExpenseActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalExpenseBudgeted)}</span>
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      'h-full transition-all duration-500 rounded-full',
-                      expensePercent > 100 ? 'bg-destructive' : expensePercent > 85 ? 'bg-amber-500' : 'bg-primary'
-                    )}
-                    style={{ width: `${Math.min(expensePercent, 100)}%` }}
-                  />
-                </div>
-                <p className={cn('text-[11px] text-right font-mono blur-number', expenseRemaining < 0 ? 'text-destructive font-medium' : 'text-muted-foreground')}>
-                  {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over limit`}
-                </p>
-              </div>
-            )}
-
-            {hasIncome && (
-              <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between text-xs font-medium">
-                  <span className="flex items-center gap-1 text-primary font-semibold text-[11px]">
-                    <TrendingUp className="w-3.5 h-3.5 text-primary" />
-                    Income Target
-                  </span>
-                  <span className="font-mono text-xs text-foreground">
-                    <span className="blur-number">{formatCurrency(totalIncomeActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalIncomeBudgeted)}</span>
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-500 rounded-full"
-                    style={{ width: `${Math.min(incomePercent, 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Metric 1.2: Fixed vs Discretionary Allocation Card */}
-          {hasExpenses && totalExpBud > 0 && (
-            <ChartHoverTooltip
-              content={
-                <>
-                  <TooltipHeader>Fixed vs. Discretionary Expenses</TooltipHeader>
-                  <TooltipRow label="Fixed (Essential)" value={`${formatCurrency(fixedBudgeted)} (${fixedPct.toFixed(1)}%)`} color="var(--color-chart-1)" />
-                  <TooltipRow label="Discretionary" value={`${formatCurrency(discretionaryBudgeted)} (${discretionaryPct.toFixed(1)}%)`} color="var(--color-chart-4)" />
-                  <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1 text-[10px] text-muted-foreground">
-                    <div>Fixed: Rent, Utilities, Insurance, Debt</div>
-                    <div>Discretionary: Dining, Entertainment, Shopping</div>
-                  </div>
-                </>
-              }
-            >
-              <div className="space-y-2 cursor-help p-3 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-foreground flex items-center gap-1">
-                    <Layers className="w-3.5 h-3.5 text-chart-1" />
-                    Fixed vs. Discretionary
-                    <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
-                  </span>
-                  <span className="text-muted-foreground font-mono text-[11px]">
-                    {fixedPct.toFixed(0)}% / {discretionaryPct.toFixed(0)}%
-                  </span>
-                </div>
-                <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
-                  <div
-                    className="h-full bg-chart-1 transition-all duration-500 rounded-l-full"
-                    style={{ width: `${fixedPct}%` }}
-                  />
-                  <div
-                    className="h-full bg-chart-4 transition-all duration-500 rounded-r-full"
-                    style={{ width: `${discretionaryPct}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
-                  <span>Fixed: {fixedPct.toFixed(0)}%</span>
-                  <span>Discretionary: {discretionaryPct.toFixed(0)}%</span>
-                </div>
-              </div>
-            </ChartHoverTooltip>
-          )}
-
-          {/* Metric 1.3: Category Risk / Variance Distribution Card */}
+          {/* Section 4: Category Risk / Variance Distribution */}
           {hasExpenses && totalCatCount > 0 && (
-            <ChartHoverTooltip
-              content={
-                <>
-                  <TooltipHeader>Category Budget Risk Breakdown</TooltipHeader>
-                  <TooltipRow label="On Track (<=85%)" value={`${underBudgetCount} categories (${underPct.toFixed(0)}%)`} color="var(--color-chart-1)" />
-                  <TooltipRow label="Near Limit (85-100%)" value={`${nearLimitCount} categories (${nearPct.toFixed(0)}%)`} color="var(--color-status-warning)" />
-                  <TooltipRow label="Over Budget (>100%)" value={`${overBudgetCount} categories (${overPct.toFixed(0)}%)`} color="var(--color-destructive)" />
-                </>
-              }
-            >
-              <div className="space-y-2 cursor-help p-3 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-foreground flex items-center gap-1">
-                    <BarChart3 className="w-3.5 h-3.5 text-primary" />
-                    Budget Compliance
-                    <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
-                  </span>
-                  <span className="text-muted-foreground font-mono text-[11px]">
-                    {totalCatCount} categories
-                  </span>
+            <div className="pt-4">
+              <ChartHoverTooltip
+                content={
+                  <>
+                    <TooltipHeader>Category Budget Risk Breakdown</TooltipHeader>
+                    <TooltipRow label="On Track (<=85%)" value={`${underBudgetCount} categories (${underPct.toFixed(0)}%)`} color="var(--color-chart-1)" />
+                    <TooltipRow label="Near Limit (85-100%)" value={`${nearLimitCount} categories (${nearPct.toFixed(0)}%)`} color="var(--color-status-warning)" />
+                    <TooltipRow label="Over Budget (>100%)" value={`${overBudgetCount} categories (${overPct.toFixed(0)}%)`} color="var(--color-destructive)" />
+                  </>
+                }
+              >
+                <div className="space-y-2 cursor-help">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-foreground flex items-center gap-1">
+                      <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                      Budget Compliance
+                      <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                    </span>
+                    <span className="text-muted-foreground font-mono text-[11px]">
+                      {totalCatCount} categories
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                    {underPct > 0 && (
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${underPct}%` }}
+                      />
+                    )}
+                    {nearPct > 0 && (
+                      <div
+                        className="h-full bg-amber-500 transition-all duration-500"
+                        style={{ width: `${nearPct}%` }}
+                      />
+                    )}
+                    {overPct > 0 && (
+                      <div
+                        className="h-full bg-destructive transition-all duration-500"
+                        style={{ width: `${overPct}%` }}
+                      />
+                    )}
+                  </div>
+                  <div className="flex justify-between text-[10px] font-mono font-semibold text-muted-foreground">
+                    <span className="text-emerald-500">{underBudgetCount} On Track</span>
+                    {nearLimitCount > 0 && <span className="text-amber-500">{nearLimitCount} Near</span>}
+                    {overBudgetCount > 0 && <span className="text-destructive">{overBudgetCount} Over</span>}
+                  </div>
                 </div>
-                <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
-                  {underPct > 0 && (
-                    <div
-                      className="h-full bg-emerald-500 transition-all duration-500"
-                      style={{ width: `${underPct}%` }}
-                    />
-                  )}
-                  {nearPct > 0 && (
-                    <div
-                      className="h-full bg-amber-500 transition-all duration-500"
-                      style={{ width: `${nearPct}%` }}
-                    />
-                  )}
-                  {overPct > 0 && (
-                    <div
-                      className="h-full bg-destructive transition-all duration-500"
-                      style={{ width: `${overPct}%` }}
-                    />
-                  )}
-                </div>
-                <div className="flex justify-between text-[10px] font-mono font-semibold text-muted-foreground">
-                  <span className="text-emerald-500">{underBudgetCount} On Track</span>
-                  {nearLimitCount > 0 && <span className="text-amber-500">{nearLimitCount} Near</span>}
-                  {overBudgetCount > 0 && <span className="text-destructive">{overBudgetCount} Over</span>}
-                </div>
-              </div>
-            </ChartHoverTooltip>
+              </ChartHoverTooltip>
+            </div>
           )}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }

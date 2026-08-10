@@ -51,7 +51,8 @@ function GoalsContent() {
               main={mainContent}
               summary={summaryContent}
               mainLabel="Goals"
-              summaryLabel="Summary"
+              summaryLabel="Overview"
+              summaryCardId="goalsSidePanel"
             />
           ) : (
             mainContent
