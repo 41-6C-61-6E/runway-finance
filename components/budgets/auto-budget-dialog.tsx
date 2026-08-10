@@ -79,6 +79,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
   const [smallCategoryThreshold, setSmallCategoryThreshold] = useState<number>(50);
   const [includeIncome, setIncludeIncome] = useState<boolean>(false);
   const [onlyUnbudgeted, setOnlyUnbudgeted] = useState<boolean>(false);
+  const [includeZeroSpending, setIncludeZeroSpending] = useState<boolean>(false);
   const [overwriteExisting, setOverwriteExisting] = useState<boolean>(true);
 
   // Proposal state
@@ -91,6 +92,9 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
   // UI state for proposal table
   const [expandedGroup, setExpandedGroup] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'expense' | 'income'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const periodLabel = periodType === 'quarterly' ? '/qtr' : periodType === 'yearly' ? '/yr' : '/mo';
 
   const handleGenerateProposal = async () => {
     setGenerating(true);
@@ -109,6 +113,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
           smallCategoryThreshold,
           includeIncome,
           onlyUnbudgeted,
+          includeZeroSpending,
           periodType,
           periodKey,
         }),
@@ -182,6 +187,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
     setProposalItems([]);
     setMeta(null);
     setError('');
+    setSearchQuery('');
   };
 
   const toggleSelectAll = (select: boolean) => {
@@ -197,6 +203,12 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
   const toggleSelectItem = (categoryId: string) => {
     setProposalItems((prev) =>
       prev.map((item) => (item.categoryId === categoryId ? { ...item, isSelected: !item.isSelected } : item))
+    );
+  };
+
+  const toggleDiscretionary = (categoryId: string) => {
+    setProposalItems((prev) =>
+      prev.map((item) => (item.categoryId === categoryId ? { ...item, isDiscretionary: !item.isDiscretionary } : item))
     );
   };
 
@@ -237,7 +249,6 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
         return item;
       });
 
-      // Filter out all-other item if now empty
       if (updatedGrouped.length === 0) {
         nextItems = nextItems.filter((i) => !i.isSmallCategory);
       }
@@ -256,8 +267,14 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
     .reduce((s, i) => s + i.proposedAmount, 0);
 
   const filteredProposalItems = proposalItems.filter((item) => {
-    if (categoryFilter === 'expense') return !item.isIncome;
-    if (categoryFilter === 'income') return item.isIncome;
+    if (categoryFilter === 'expense' && item.isIncome) return false;
+    if (categoryFilter === 'income' && !item.isIncome) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = item.categoryName.toLowerCase().includes(q);
+      const matchGrouped = item.groupedCategories?.some((gc) => gc.categoryName.toLowerCase().includes(q));
+      if (!matchName && !matchGrouped) return false;
+    }
     return true;
   });
 
@@ -329,7 +346,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                   onChange={(e) => setCalculationMethod(e.target.value as any)}
                   className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="average">Monthly Average (Mean spending)</option>
+                  <option value="average">Average Spending (Mean)</option>
                   <option value="median">Median Spending (Outlier resilient)</option>
                   <option value="max">Peak Spending (Conservative high)</option>
                 </select>
@@ -337,7 +354,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
 
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                  Safety Buffer (%)
+                  Adjustment Buffer (%)
                 </label>
                 <div className="flex items-center gap-2">
                   <select
@@ -345,6 +362,9 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                     onChange={(e) => setBufferPercentage(parseFloat(e.target.value))}
                     className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
+                    <option value={-15}>-15% Aggressive Reduction</option>
+                    <option value={-10}>-10% Frugal Target</option>
+                    <option value={-5}>-5% Savings Target</option>
                     <option value={0}>Exact (0% buffer)</option>
                     <option value={5}>+5% Safety Buffer</option>
                     <option value={10}>+10% Safety Buffer</option>
@@ -381,7 +401,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
 
               {groupSmallCategories && (
                 <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-foreground">Group categories with monthly average &le;</span>
+                  <span className="text-xs text-foreground">Group categories with average spending &le;</span>
                   <div className="relative w-28">
                     <span className="absolute left-2.5 top-1.5 text-xs text-muted-foreground">$</span>
                     <Input
@@ -391,7 +411,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                       className="pl-6 text-xs h-8"
                     />
                   </div>
-                  <span className="text-xs text-muted-foreground">/month</span>
+                  <span className="text-xs text-muted-foreground">{periodLabel}</span>
                 </div>
               )}
             </div>
@@ -405,7 +425,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                   onChange={(e) => setExcludeOutliers(e.target.checked)}
                   className="w-4 h-4 rounded border-border bg-background text-primary cursor-pointer"
                 />
-                <span>Exclude rare large single transactions (outliers) from monthly average</span>
+                <span>Exclude rare large monthly spending spikes (outliers)</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
@@ -426,6 +446,16 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                   className="w-4 h-4 rounded border-border bg-background text-primary cursor-pointer"
                 />
                 <span>Only generate proposals for categories that don't have a budget set</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-foreground">
+                <input
+                  type="checkbox"
+                  checked={includeZeroSpending}
+                  onChange={(e) => setIncludeZeroSpending(e.target.checked)}
+                  className="w-4 h-4 rounded border-border bg-background text-primary cursor-pointer"
+                />
+                <span>Include categories with zero spending history</span>
               </label>
             </div>
           </div>
@@ -449,7 +479,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3 bg-card border border-border rounded-xl">
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                  Proposed Expenses
+                  Proposed Expenses ({periodLabel.substring(1)})
                 </span>
                 <span className="text-base font-bold text-foreground font-mono mt-0.5 block">
                   {formatCurrency(totalProposedExpenses)}
@@ -459,7 +489,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
               {includeIncome && (
                 <div className="p-3 bg-card border border-border rounded-xl">
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                    Proposed Income
+                    Proposed Income ({periodLabel.substring(1)})
                   </span>
                   <span className="text-base font-bold text-constructive font-mono mt-0.5 block">
                     {formatCurrency(totalProposedIncome)}
@@ -477,8 +507,8 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
               </div>
             </div>
 
-            {/* Table Controls */}
-            <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+            {/* Table Controls with Category Search */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
               <div className="flex items-center gap-1.5 text-xs">
                 <button
                   type="button"
@@ -496,126 +526,170 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                 </button>
               </div>
 
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter('all')}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
-                    categoryFilter === 'all' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter('expense')}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
-                    categoryFilter === 'expense' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Expenses
-                </button>
-                {includeIncome && (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  placeholder="Search categories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-7 text-xs w-36 sm:w-44"
+                />
+
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => setCategoryFilter('income')}
-                    className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
-                      categoryFilter === 'income' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                    onClick={() => setCategoryFilter('all')}
+                    className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                      categoryFilter === 'all' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    Income
+                    All
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter('expense')}
+                    className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                      categoryFilter === 'expense' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Expenses
+                  </button>
+                  {includeIncome && (
+                    <button
+                      type="button"
+                      onClick={() => setCategoryFilter('income')}
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                        categoryFilter === 'income' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Income
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Proposal Table */}
-            <div className="overflow-y-auto max-h-[320px] border border-border rounded-xl">
+            <div className="overflow-y-auto max-h-[340px] border border-border rounded-xl">
               <table className="w-full text-xs">
                 <thead className="bg-muted/50 border-b border-border sticky top-0 z-10">
                   <tr>
                     <th className="w-8 px-3 py-2 text-center">#</th>
                     <th className="text-left px-3 py-2 font-medium text-muted-foreground">Category</th>
                     <th className="text-right px-3 py-2 font-medium text-muted-foreground">Hist. Avg</th>
-                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Proposed Budget</th>
+                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Proposed ({periodLabel})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredProposalItems.map((item) => (
-                    <tr key={item.categoryId} className={`hover:bg-accent/30 transition-colors ${!item.isSelected ? 'opacity-50' : ''}`}>
-                      <td className="px-3 py-2.5 text-center">
-                        <input
-                          type="checkbox"
-                          checked={item.isSelected}
-                          onChange={() => toggleSelectItem(item.categoryId)}
-                          className="w-3.5 h-3.5 rounded border-border bg-background text-primary cursor-pointer"
-                        />
+                  {filteredProposalItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground text-xs">
+                        No matching category proposals found.
                       </td>
-                      <td className="px-3 py-2.5">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.categoryColor }} />
-                            <span className="font-medium text-foreground">{item.categoryName}</span>
-                            {item.isIncome && (
-                              <span className="px-1.5 py-0.2 text-[9px] font-semibold bg-constructive/15 text-constructive rounded">
-                                Income
-                              </span>
-                            )}
-                          </div>
+                    </tr>
+                  ) : (
+                    filteredProposalItems.map((item) => {
+                      const delta = item.existingAmount !== null ? item.proposedAmount - item.existingAmount : null;
+                      return (
+                        <tr key={item.categoryId} className={`hover:bg-accent/30 transition-colors ${!item.isSelected ? 'opacity-50' : ''}`}>
+                          <td className="px-3 py-2.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={item.isSelected}
+                              onChange={() => toggleSelectItem(item.categoryId)}
+                              className="w-3.5 h-3.5 rounded border-border bg-background text-primary cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.categoryColor }} />
+                                <span className="font-medium text-foreground">{item.categoryName}</span>
+                                {item.isIncome ? (
+                                  <span className="px-1.5 py-0.2 text-[9px] font-semibold bg-constructive/15 text-constructive rounded">
+                                    Income
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleDiscretionary(item.categoryId)}
+                                    title="Click to toggle Essential / Discretionary"
+                                    className={`px-1.5 py-0.2 text-[9px] font-semibold rounded transition-colors ${
+                                      item.isDiscretionary
+                                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25'
+                                        : 'bg-primary/15 text-primary hover:bg-primary/25'
+                                    }`}
+                                  >
+                                    {item.isDiscretionary ? 'Discretionary' : 'Essential'}
+                                  </button>
+                                )}
+                              </div>
 
-                          {/* "All Other" Grouped Drawer */}
-                          {item.isSmallCategory && item.groupedCategories && item.groupedCategories.length > 0 && (
-                            <div className="mt-1 pl-4.5 space-y-1">
-                              <button
-                                type="button"
-                                onClick={() => setExpandedGroup(!expandedGroup)}
-                                className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-                              >
-                                {expandedGroup ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                                <span>Includes {item.groupedCategories.length} small categories</span>
-                              </button>
+                              {/* "All Other" Grouped Drawer */}
+                              {item.isSmallCategory && item.groupedCategories && item.groupedCategories.length > 0 && (
+                                <div className="mt-1 pl-4.5 space-y-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedGroup(!expandedGroup)}
+                                    className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                  >
+                                    {expandedGroup ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                    <span>Includes {item.groupedCategories.length} small categories</span>
+                                  </button>
 
-                              {expandedGroup && (
-                                <div className="p-2 bg-muted/50 border border-border/60 rounded-lg space-y-1 mt-1 text-[11px]">
-                                  {item.groupedCategories.map((gc) => (
-                                    <div key={gc.categoryId} className="flex items-center justify-between gap-2">
-                                      <span className="text-foreground truncate">{gc.categoryName}</span>
-                                      <div className="flex items-center gap-2 font-mono">
-                                        <span className="text-muted-foreground">{formatCurrency(gc.proposedAmount)}/mo</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => ungroupCategory(gc.categoryId)}
-                                          className="text-[10px] text-primary hover:underline px-1 rounded hover:bg-accent"
-                                        >
-                                          Un-group
-                                        </button>
-                                      </div>
+                                  {expandedGroup && (
+                                    <div className="p-2 bg-muted/50 border border-border/60 rounded-lg space-y-1 mt-1 text-[11px]">
+                                      {item.groupedCategories.map((gc) => (
+                                        <div key={gc.categoryId} className="flex items-center justify-between gap-2">
+                                          <span className="text-foreground truncate">{gc.categoryName}</span>
+                                          <div className="flex items-center gap-2 font-mono">
+                                            <span className="text-muted-foreground">{formatCurrency(gc.proposedAmount)}{periodLabel}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => ungroupCategory(gc.categoryId)}
+                                              className="text-[10px] text-primary hover:underline px-1 rounded hover:bg-accent"
+                                            >
+                                              Un-group
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
-                                  ))}
+                                  )}
                                 </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">
-                        {formatCurrency(item.historicalAverage)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="text-muted-foreground font-mono">$</span>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.proposedAmount}
-                            onChange={(e) => updateProposedAmount(item.categoryId, parseFloat(e.target.value) || 0)}
-                            className="w-24 text-right font-mono h-7 text-xs"
-                            disabled={!item.isSelected}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">
+                            {formatCurrency(item.historicalAverage)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            <div className="flex flex-col items-end gap-0.5">
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-muted-foreground font-mono">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.proposedAmount}
+                                  onChange={(e) => updateProposedAmount(item.categoryId, parseFloat(e.target.value) || 0)}
+                                  className="w-24 text-right font-mono h-7 text-xs"
+                                  disabled={!item.isSelected}
+                                />
+                              </div>
+                              {item.existingAmount !== null && delta !== null && delta !== 0 && (
+                                <div className="flex items-center gap-1 text-[10px] font-mono">
+                                  <span className="text-muted-foreground">Was: {formatCurrency(item.existingAmount)}</span>
+                                  <span className={`px-1 py-0.2 rounded font-semibold ${delta > 0 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-constructive/15 text-constructive'}`}>
+                                    {delta > 0 ? `+${formatCurrency(delta)}` : formatCurrency(delta)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
