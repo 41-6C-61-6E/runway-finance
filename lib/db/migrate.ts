@@ -127,6 +127,21 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
+    // 3b. Check if effective_from and effective_to columns exist on budgets
+    const budgetColCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'budgets' AND column_name IN ('effective_from', 'effective_to')
+    `);
+    const budgetColsFound = new Set(budgetColCheck.rows.map((r: { column_name: string }) => r.column_name));
+    if (!budgetColsFound.has('effective_from')) {
+      logger.info('[migrate] [self-heal] Adding missing effective_from column to budgets...');
+      await client.query(`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS effective_from TEXT`);
+    }
+    if (!budgetColsFound.has('effective_to')) {
+      logger.info('[migrate] [self-heal] Adding missing effective_to column to budgets...');
+      await client.query(`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS effective_to TEXT`);
+    }
+
     // 4. Check if account_sharing_invitations table exists
     const tableCheck1 = await client.query(`
       SELECT table_name FROM information_schema.tables

@@ -25,6 +25,8 @@ export const budgets = pgTable('budgets', {
   periodKey: text('period_key'),
   amount: text('amount').notNull(),
   isRecurring: boolean('is_recurring').notNull().default(true),
+  effectiveFrom: text('effective_from'),
+  effectiveTo: text('effective_to'),
   fundingAccountId: uuid('funding_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   rollover: boolean('rollover').notNull().default(false),
   notes: text('notes'),
