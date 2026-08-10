@@ -466,13 +466,13 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
               </div>
             </div>
 
-            {/* Small Category Grouping ("All Other") */}
+            {/* Small Category Grouping ("Everything Else") */}
             <div className="p-3.5 bg-muted/40 border border-border/70 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Layers className="w-4 h-4 text-primary" />
                   <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                    Group Small Categories ("All Other")
+                    Group Small Categories ("Everything Else")
                   </span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -485,10 +485,6 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                   <div className="w-9 h-5 bg-muted-foreground/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary" />
                 </label>
               </div>
-
-              <p className="text-xs text-muted-foreground">
-                Bundle small edge-case categories into a single catch-all <strong>"All Other"</strong> budget item to avoid table clutter.
-              </p>
 
               {groupSmallCategories && (
                 <div className="flex items-center gap-2 pt-1">
@@ -505,6 +501,10 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                   <span className="text-xs text-muted-foreground">{periodLabel}</span>
                 </div>
               )}
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Bundle small edge-case categories into a single catch-all <strong>"Everything Else"</strong> budget item to avoid table clutter.
+              </p>
             </div>
 
             {/* Advanced Filters & Rules */}
@@ -730,7 +730,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                                 )}
                               </div>
 
-                              {/* "All Other" Grouped Drawer */}
+                              {/* "Everything Else" Grouped Drawer */}
                               {item.isSmallCategory && item.groupedCategories && item.groupedCategories.length > 0 && (
                                 <div className="mt-1 pl-4.5 space-y-1">
                                   <button

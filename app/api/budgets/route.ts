@@ -132,16 +132,9 @@ export async function GET(request: Request) {
     })));
 
     // Filter budget rows for current periodKey respecting effectiveFrom / effectiveTo date bounds
-    const filteredBudgetRows: typeof decryptedBudgetRows = [];
     const categoryMap = new Map<string, typeof decryptedBudgetRows[0]>();
 
     for (const b of decryptedBudgetRows) {
-      if (periodType && b.periodType && b.periodType !== periodType) {
-        if (!(periodType === 'quarterly' || periodType === 'yearly') || b.periodType !== 'monthly') {
-          // Keep compatible period types
-        }
-      }
-
       let matches = false;
       if (!b.isRecurring) {
         matches = b.yearMonth === targetPeriodKey || b.periodKey === targetPeriodKey || b.effectiveFrom === targetPeriodKey;
@@ -156,7 +149,6 @@ export async function GET(request: Request) {
         if (!existing) {
           categoryMap.set(b.categoryId, b);
         } else {
-          // If multiple match, prefer the one with effectiveFrom matching or latest
           const curFrom = b.effectiveFrom || '';
           const exFrom = existing.effectiveFrom || '';
           if (curFrom >= exFrom) {
@@ -176,6 +168,7 @@ export async function GET(request: Request) {
         color: categories.color, 
         parentId: categories.parentId, 
         isIncome: categories.isIncome,
+        categoryType: categories.categoryType,
         isDiscretionary: categories.isDiscretionary,
       })
       .from(categories)
@@ -282,19 +275,25 @@ export async function GET(request: Request) {
       return totals;
     }
 
-    // Fetch actuals for unbudgeted categories (for All Other breakout)
+    // Fetch actuals for unbudgeted categories (for Everything Else breakout - excluding compound & transfer categories)
     const budgetedCategoryIds = new Set(activeBudgetRows.map((b) => b.categoryId));
     const unbudgetedCategories = decryptedAllCategories.filter(
-      (c) => !c.isIncome && !budgetedCategoryIds.has(c.id)
+      (c) => !c.isIncome &&
+             c.categoryType !== 'compound' &&
+             c.categoryType !== 'transfer' &&
+             !budgetedCategoryIds.has(c.id) &&
+             c.name.toLowerCase() !== 'everything else'
     );
     const unbudgetedActualMap = await fetchActuals(unbudgetedCategories.map((c) => c.id));
-    const allOtherBreakout = unbudgetedCategories
+    const everythingElseBreakout = unbudgetedCategories
       .map((c) => ({
         categoryId: c.id,
         categoryName: c.name,
+        categoryColor: c.color || '#6366f1',
         actual: unbudgetedActualMap.get(c.id) || 0,
       }))
-      .filter((c) => c.actual > 0);
+      .filter((c) => c.actual > 0)
+      .sort((a, b) => b.actual - a.actual);
 
     const incomeCategoryIds = activeBudgetRows.filter((b) => b.isIncome && b.categoryType !== 'compound' && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
     const expenseCategoryIds = activeBudgetRows.filter((b) => (!b.isIncome || b.categoryType === 'compound') && b.categoryType !== 'transfer').map((b) => b.categoryId).filter(Boolean) as string[];
@@ -317,12 +316,14 @@ export async function GET(request: Request) {
       const effectiveIsIncome = isIncome && !isCompound;
       let actual = (effectiveIsIncome ? incomeActualMap : expenseActualMap).get(row.categoryId) || 0;
 
-      const isCatchAll = (row.categoryName || '').toLowerCase().includes('all other') || (row.categoryName || '').toLowerCase().includes('misc');
-      let groupedBreakout: typeof allOtherBreakout | undefined = undefined;
+      const isEverythingElse = (row.categoryName || '').toLowerCase().includes('everything else') ||
+                               (row.categoryName || '').toLowerCase().includes('all other') ||
+                               (row.categoryName || '').toLowerCase().includes('misc');
+      let groupedBreakout: typeof everythingElseBreakout | undefined = undefined;
 
-      if (isCatchAll) {
-        groupedBreakout = allOtherBreakout;
-        const totalUnbudgetedActual = allOtherBreakout.reduce((s, c) => s + c.actual, 0);
+      if (isEverythingElse) {
+        groupedBreakout = everythingElseBreakout;
+        const totalUnbudgetedActual = everythingElseBreakout.reduce((s, c) => s + c.actual, 0);
         actual = Math.max(actual, totalUnbudgetedActual);
       }
 
@@ -332,8 +333,8 @@ export async function GET(request: Request) {
       return {
         id: row.id,
         categoryId: row.categoryId,
-        categoryName: row.categoryName,
-        categoryColor: row.categoryColor || '#6366f1',
+        categoryName: isEverythingElse ? 'Everything Else' : row.categoryName,
+        categoryColor: isEverythingElse ? '#64748b' : (row.categoryColor || '#6366f1'),
         periodType: row.periodType,
         periodKey: row.periodKey || row.yearMonth || null,
         yearMonth: row.yearMonth || null,
@@ -350,7 +351,7 @@ export async function GET(request: Request) {
         percentUsed,
         type: effectiveIsIncome ? 'income' : 'expense',
         isDiscretionary: row.isDiscretionary ?? true,
-        isCatchAll,
+        isEverythingElse,
         groupedBreakout,
       };
     });
@@ -358,7 +359,7 @@ export async function GET(request: Request) {
     const result: Record<string, unknown> = { budgets: data, period: bounds };
 
     if (includeCategories) {
-      result.categories = decryptedAllCategories.map((c) => ({
+      let catList = decryptedAllCategories.map((c) => ({
         id: c.id,
         name: c.name,
         color: c.color,
@@ -366,6 +367,20 @@ export async function GET(request: Request) {
         parentId: c.parentId,
         isDiscretionary: c.isDiscretionary,
       }));
+
+      // Ensure "Everything Else" is in categories list for selection
+      if (!catList.some((c) => c.name.toLowerCase() === 'everything else')) {
+        catList.push({
+          id: 'everything-else-special',
+          name: 'Everything Else',
+          color: '#64748b',
+          isIncome: false,
+          parentId: null,
+          isDiscretionary: true,
+        });
+      }
+
+      result.categories = catList;
     }
     return NextResponse.json(result);
   } catch (error) {
@@ -377,7 +392,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await auth();
   const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (!session?.user || !dataUserId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
   let body: Record<string, unknown>;
@@ -391,8 +406,44 @@ export async function POST(request: Request) {
   try {
     const targetPeriodKey = (body.periodKey as string) ?? null;
     const targetPeriodType = (body.periodType as string) || 'monthly';
-    const targetCategoryId = body.categoryId as string;
+    let targetCategoryId = body.categoryId as string;
     const effectiveFrom = targetPeriodKey || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+    // Handle synthetic or named 'Everything Else' category creation
+    if (targetCategoryId === 'everything-else-special' || !targetCategoryId) {
+      const userCategories = await db
+        .select()
+        .from(categories)
+        .where(eq(categories.userId, dataUserId));
+
+      const decryptedCategories = await Promise.all(
+        userCategories.map(async (c) => ({
+          ...c,
+          name: c.name ? await decryptField(c.name, dek) : '',
+        }))
+      );
+
+      let eeCat = decryptedCategories.find((c) => c.name.toLowerCase() === 'everything else');
+      if (!eeCat) {
+        const encryptedCat = await encryptRow(
+          'categories',
+          {
+            userId: dataUserId,
+            name: 'Everything Else',
+            color: '#64748b',
+            isIncome: false,
+            categoryType: 'expense',
+            excludeFromReports: false,
+            isDiscretionary: true,
+          },
+          dek
+        );
+        const [newCat] = await db.insert(categories).values(encryptedCat).returning({ id: categories.id });
+        targetCategoryId = newCat.id;
+      } else {
+        targetCategoryId = eeCat.id;
+      }
+    }
 
     const [existing] = await db
       .select()
@@ -487,22 +538,19 @@ export async function PATCH(request: Request) {
       .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, dataUserId)));
   }
 
-  const applyMode = (body.applyMode as string) || 'future'; // 'future' vs 'all'
+  const applyMode = (body.applyMode as string) || 'future';
   const currentPeriodKey = (body.periodKey as string) || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const periodType = (body.periodType as string) || existing.periodType;
 
-  // Handle effective date splitting if updating an existing recurring budget from current period onward
   if (existing.isRecurring && applyMode === 'future' && body.amount !== undefined) {
     const existingFrom = existing.effectiveFrom || '1970-01';
     if (existingFrom < currentPeriodKey) {
-      // 1. Close off previous recurring budget period
       const prevPeriod = getPreviousPeriodKey(periodType, currentPeriodKey);
       await db
         .update(budgets)
         .set({ effectiveTo: prevPeriod, updatedAt: new Date() })
         .where(eq(budgets.id, id));
 
-      // 2. Insert new budget effective from currentPeriodKey onward
       const newEncryptedData = await encryptRow('budgets', {
         userId: dataUserId,
         categoryId: targetCategoryId,
@@ -567,13 +615,11 @@ export async function DELETE(request: Request) {
 
   try {
     if (action === 'reset') {
-      // Erase ALL budgets for user
       await db.delete(budgets).where(eq(budgets.userId, dataUserId));
       return NextResponse.json({ success: true, message: 'All budgets reset' });
     }
 
     if (action === 'purge_history') {
-      // Erase prior period budgets and reset effectiveFrom to current period
       await db
         .delete(budgets)
         .where(
