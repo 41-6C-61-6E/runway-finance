@@ -260,16 +260,21 @@ export async function GET(request: Request) {
       const amount = parseFloat(decrypted);
       if (isNaN(amount)) continue;
 
-      const absAmount = Math.abs(amount);
+      const catInfo = categoryByIdMap.get(row.categoryId);
+      const isIncomeCat = catInfo?.isIncome ?? false;
+
+      // Net spending/income calculation:
+      // For expense categories: expense purchases are negative in DB (-amount is spending), returns are positive (+amount reduces spending).
+      // For income categories: income deposits are positive in DB (+amount is income), refunds are negative (-amount reduces income).
+      const netVal = isIncomeCat ? amount : -amount;
       const targetBudgetCatId = getClosestBudgetedCategory(row.categoryId);
 
       if (targetBudgetCatId) {
         // Transaction is covered by a budget item (direct or ancestor)
         const prev = budgetActualsMap.get(targetBudgetCatId) || 0;
-        budgetActualsMap.set(targetBudgetCatId, prev + absAmount);
+        budgetActualsMap.set(targetBudgetCatId, prev + netVal);
       } else {
         // Transaction is UNBUDGETED - evaluate for Everything Else bucket
-        const catInfo = categoryByIdMap.get(row.categoryId);
         if (
           catInfo &&
           !catInfo.isIncome &&
@@ -278,7 +283,7 @@ export async function GET(request: Request) {
           catInfo.name.toLowerCase() !== 'everything else'
         ) {
           const prev = unbudgetedActualsMap.get(row.categoryId) || 0;
-          unbudgetedActualsMap.set(row.categoryId, prev + absAmount);
+          unbudgetedActualsMap.set(row.categoryId, prev + netVal);
         }
       }
     }
