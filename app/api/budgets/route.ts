@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions, userSettings } from '@/lib/db/schema';
+import { accounts, budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions, userSettings } from '@/lib/db/schema';
 import { eq, and, or, isNull, sql, inArray, gte, lt } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -177,6 +177,19 @@ export async function GET(request: Request) {
 
       const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
 
+      const userAccounts = await db
+        .select({
+          id: accounts.id,
+          isHidden: accounts.isHidden,
+          isExcludedFromNetWorth: accounts.isExcludedFromNetWorth,
+        })
+        .from(accounts)
+        .where(eq(accounts.userId, dataUserId));
+
+      const excludedAccountIds = new Set(
+        userAccounts.filter((a) => a.isHidden || a.isExcludedFromNetWorth).map((a) => a.id)
+      );
+
       const txConditions = [
         eq(transactions.userId, dataUserId),
         inArray(transactions.categoryId, allSearchIds),
@@ -194,6 +207,7 @@ export async function GET(request: Request) {
         .select({
           categoryId: transactions.categoryId,
           amount: transactions.amount,
+          accountId: transactions.accountId,
         })
         .from(transactions)
         .where(and(...txConditions));
@@ -202,6 +216,7 @@ export async function GET(request: Request) {
       const totals = new Map<string, number>();
       for (const row of txRows) {
         if (!row.categoryId) continue;
+        if (row.accountId && excludedAccountIds.has(row.accountId)) continue;
         const decrypted = await decryptField(String(row.amount), dek);
         const amount = parseFloat(decrypted);
         if (isNaN(amount)) continue;
