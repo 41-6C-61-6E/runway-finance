@@ -1,9 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
 interface CollapsibleCardHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title' | 'onToggle'> {
   isCollapsed?: boolean;
   onToggle?: (collapsed: boolean) => void;
@@ -11,11 +10,31 @@ interface CollapsibleCardHeaderProps extends Omit<React.HTMLAttributes<HTMLDivEl
   description?: React.ReactNode;
   icon?: React.ElementType;
   actions?: React.ReactNode;
+  collapseDirection?: 'vertical' | 'horizontal';
 }
 
 const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHeaderProps>(
-  ({ isCollapsed = false, onToggle, title, description, icon: Icon, actions, className, children, ...props }, ref) => {
+  ({ isCollapsed = false, onToggle, title, description, icon: Icon, actions, collapseDirection = 'vertical', className, children, ...props }, ref) => {
     const showActions = actions && !isCollapsed;
+
+    const renderToggleIcon = (isDesktop: boolean) => {
+      if (collapseDirection === 'horizontal' && isDesktop) {
+        return isCollapsed ? (
+          <ChevronLeft size={20} className="transition-transform duration-200" />
+        ) : (
+          <ChevronRight size={20} className="transition-transform duration-200" />
+        );
+      }
+      return (
+        <ChevronDown
+          size={20}
+          className={cn(
+            'transition-transform duration-200',
+            !isCollapsed && 'rotate-180'
+          )}
+        />
+      );
+    };
 
     return (
       <div
@@ -50,13 +69,7 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
             aria-label={isCollapsed ? 'Expand card' : 'Collapse card'}
             type="button"
           >
-            <ChevronDown
-              size={20}
-              className={cn(
-                'transition-transform duration-200',
-                !isCollapsed && 'rotate-180'
-              )}
-            />
+            {renderToggleIcon(false)}
           </button>
         </div>
 
@@ -77,13 +90,7 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
             aria-label={isCollapsed ? 'Expand card' : 'Collapse card'}
             type="button"
           >
-            <ChevronDown
-              size={20}
-              className={cn(
-                'transition-transform duration-200',
-                !isCollapsed && 'rotate-180'
-              )}
-            />
+            {renderToggleIcon(true)}
           </button>
         </div>
       </div>

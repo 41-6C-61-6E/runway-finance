@@ -154,11 +154,11 @@ export function GoalsSidePanel() {
 
   if (loading) {
     return (
-      <Card className="animate-pulse shadow-sm border border-border">
+      <Card className="shadow-sm border border-sidebar-border bg-sidebar rounded-2xl animate-pulse">
         <CardContent className="p-5 space-y-4">
-          <div className="h-5 bg-muted rounded w-36" />
-          <div className="h-36 bg-muted/40 rounded-full w-36 mx-auto" />
-          <div className="h-20 bg-muted/30 rounded-xl" />
+          <div className="h-5 bg-muted/60 rounded w-36 mb-2" />
+          <div className="h-36 bg-card rounded-full w-36 mx-auto" />
+          <div className="h-20 bg-card rounded-xl" />
         </CardContent>
       </Card>
     );
@@ -166,7 +166,7 @@ export function GoalsSidePanel() {
 
   if (!data || data.totalGoals === 0) {
     return (
-      <Card className="shadow-sm border border-border">
+      <Card className="shadow-sm border border-sidebar-border bg-sidebar rounded-2xl">
         <CardContent className="p-6 text-center">
           <div className="text-3xl mb-2">🎯</div>
           <p className="text-sm font-bold text-foreground mb-1">No goals set yet</p>
@@ -192,107 +192,109 @@ export function GoalsSidePanel() {
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
   return (
-    <div className="space-y-5">
-      <Card className="shadow-sm border border-border overflow-hidden">
-        <CollapsibleCardHeader
-          isCollapsed={collapsed}
-          onToggle={setCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-primary shrink-0" />
-              <span className="font-bold text-foreground">Goals Overview</span>
-            </div>
-          }
-          actions={
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-chart-2 font-semibold">{data.activeGoals} active</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-chart-1 font-semibold">{data.completedGoals} done</span>
-            </div>
-          }
-        />
+    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+      <CollapsibleCardHeader
+        isCollapsed={collapsed}
+        onToggle={setCollapsed}
+        collapseDirection="horizontal"
+        title={
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-primary shrink-0" />
+            <span className="font-bold text-foreground">Overview</span>
+          </div>
+        }
+        actions={
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-chart-2 font-semibold">{data.activeGoals} active</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-chart-1 font-semibold">{data.completedGoals} done</span>
+          </div>
+        }
+        className="border-b border-sidebar-border/60 bg-sidebar"
+      />
 
-        {!collapsed && (
-          <CardContent className="p-4 sm:p-5 space-y-5">
-            {/* SVG Circular Progress Gauge */}
-            <div className="bg-muted/30 border border-border/60 rounded-xl p-5 flex flex-col items-center justify-center space-y-3 relative">
-              <div className="relative w-36 h-36 flex items-center justify-center">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                  {/* Track Circle */}
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    className="stroke-muted/40"
-                    strokeWidth="10"
-                    fill="transparent"
-                  />
-                  {/* Progress Circle */}
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    className="stroke-primary transition-all duration-1000 ease-out"
-                    strokeWidth="10"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                    fill="transparent"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-2xl font-extrabold text-foreground font-mono blur-number">
-                    {progressPercent.toFixed(1)}%
-                  </span>
-                  <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
-                    Funded
-                  </span>
-                </div>
-              </div>
-
-              {/* Goal Count Chips */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 font-mono">
-                  {data.totalGoals} Total Goals
+      {!collapsed && (
+        <div className="p-4 sm:p-5 space-y-4 divide-y divide-sidebar-border/50">
+          {/* Section 1: Circular Progress Gauge */}
+          <div className="pb-1 flex flex-col items-center justify-center space-y-3 relative">
+            <div className="relative w-36 h-36 flex items-center justify-center">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                {/* Track Circle */}
+                <circle
+                  cx="60"
+                  cy="60"
+                  r={radius}
+                  className="stroke-muted/40"
+                  strokeWidth="10"
+                  fill="transparent"
+                />
+                {/* Progress Circle */}
+                <circle
+                  cx="60"
+                  cy="60"
+                  r={radius}
+                  className="stroke-primary transition-all duration-1000 ease-out"
+                  strokeWidth="10"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                  fill="transparent"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-2xl font-extrabold text-foreground font-mono blur-number">
+                  {progressPercent.toFixed(1)}%
+                </span>
+                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                  Funded
                 </span>
               </div>
             </div>
 
-            {/* Vertical Summary Financial Stat Blocks */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/50">
-                <div className="flex items-center gap-2">
-                  <Coins className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground">Total Target</span>
-                </div>
-                <span className="text-sm font-bold text-foreground font-mono blur-number">
-                  {formatCurrency(data.totalTarget)}
-                </span>
-              </div>
+            {/* Goal Count Chips */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 font-mono">
+                {data.totalGoals} Total Goals
+              </span>
+            </div>
+          </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-chart-1/5 border border-chart-1/20">
-                <div className="flex items-center gap-2">
-                  <PiggyBank className="w-4 h-4 text-chart-1" />
-                  <span className="text-xs font-semibold text-chart-1">Total Saved</span>
-                </div>
-                <span className="text-sm font-extrabold text-chart-1 font-mono blur-number">
-                  {formatCurrency(data.totalCurrent)}
-                </span>
+          {/* Section 2: Summary Financial Stat Rows */}
+          <div className="pt-4 space-y-2">
+            <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center gap-2">
+                <Coins className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Total Target</span>
               </div>
-
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/50">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground">Remaining</span>
-                </div>
-                <span className="text-sm font-bold text-foreground font-mono blur-number">
-                  {formatCurrency(remaining)}
-                </span>
-              </div>
+              <span className="text-sm font-bold text-foreground font-mono blur-number">
+                {formatCurrency(data.totalTarget)}
+              </span>
             </div>
 
-            {/* Metric 2.2: Next Goal Spotlight Card */}
-            {data.spotlightGoal && (
+            <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center gap-2">
+                <Coins className="w-4 h-4 text-chart-1" />
+                <span className="text-xs font-medium text-muted-foreground">Total Saved</span>
+              </div>
+              <span className="text-sm font-bold text-foreground font-mono blur-number">
+                {formatCurrency(data.totalCurrent)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Remaining</span>
+              </div>
+              <span className="text-sm font-bold text-foreground font-mono blur-number">
+                {formatCurrency(remaining)}
+              </span>
+            </div>
+          </div>
+
+          {/* Section 3: Next Goal Spotlight */}
+          {data.spotlightGoal && (
+            <div className="pt-4">
               <ChartHoverTooltip
                 content={
                   <>
@@ -308,7 +310,7 @@ export function GoalsSidePanel() {
                   </>
                 }
               >
-                <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
+                <div className="space-y-2.5 cursor-help">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -336,52 +338,52 @@ export function GoalsSidePanel() {
                   </div>
                 </div>
               </ChartHoverTooltip>
-            )}
+            </div>
+          )}
 
-            {/* Projection Pacing Indicator */}
-            {data.activeGoals > 0 && (
-              <div className="border-t border-border pt-4">
-                <ProjectionPacingCard />
-              </div>
-            )}
+          {/* Section 4: Projection Pacing Indicator */}
+          {data.activeGoals > 0 && (
+            <div className="pt-4">
+              <ProjectionPacingCard />
+            </div>
+          )}
 
-            {/* Breakdown by Goal Type */}
-            {Object.keys(data.byType).length > 0 && (
-              <div className="border-t border-border pt-4 space-y-2">
-                <span className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-2">
-                  <PieChart className="w-3.5 h-3.5 text-primary" />
-                  Breakdown by Type
-                </span>
-                <div className="space-y-2">
-                  {Object.entries(data.byType).map(([type, td]) => (
-                    <div key={type} className="p-2.5 rounded-lg bg-muted/20 border border-border/50 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-foreground capitalize flex items-center gap-1">
-                          <span>{typeIcons[type] || '🎯'}</span>
-                          {type}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground font-mono">
-                          {td.count} {td.count === 1 ? 'goal' : 'goals'}
-                        </span>
-                      </div>
-                      <div className="w-full bg-muted/40 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all duration-500"
-                          style={{ width: `${td.progress}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                        <span className="blur-number">{formatCurrency(td.current)}</span>
-                        <span className="blur-number">{formatCurrency(td.target)}</span>
-                      </div>
+          {/* Section 5: Breakdown by Goal Type */}
+          {Object.keys(data.byType).length > 0 && (
+            <div className="pt-4 space-y-2">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-2">
+                <PieChart className="w-3.5 h-3.5 text-primary" />
+                Breakdown by Type
+              </span>
+              <div className="space-y-2.5">
+                {Object.entries(data.byType).map(([type, td]) => (
+                  <div key={type} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-foreground capitalize flex items-center gap-1">
+                        <span>{typeIcons[type] || '🎯'}</span>
+                        {type}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        {td.count} {td.count === 1 ? 'goal' : 'goals'}
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <div className="w-full bg-muted/40 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{ width: `${td.progress}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                      <span className="blur-number">{formatCurrency(td.current)}</span>
+                      <span className="blur-number">{formatCurrency(td.target)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

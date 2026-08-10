@@ -1235,6 +1235,7 @@ export function ProjectionTab({
         summary={summaryContent}
         mainLabel="Projections"
         summaryLabel="Scorecard"
+        summaryCardId="fireProjectionsSidePanel"
       />
 
       {/* Year Detail Interactive Audit Modal */}

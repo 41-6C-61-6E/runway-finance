@@ -144,42 +144,44 @@ export function FireProjectionsSidePanel({
   const strokeDashoffset = circumference - (clampedProgress / 100) * circumference;
 
   return (
-    <div className="space-y-5">
-      <Card className="shadow-sm border border-border overflow-hidden">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Flame className="w-4 h-4 text-primary shrink-0" />
-              <span className="font-bold text-foreground">Scorecard</span>
-            </div>
-          }
-        />
+    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        collapseDirection="horizontal"
+        title={
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-primary shrink-0" />
+            <span className="font-bold text-foreground">Scorecard</span>
+          </div>
+        }
+        className="border-b border-sidebar-border/60 bg-sidebar"
+      />
 
-        {!isCollapsed && (
-          <CardContent className="p-4 sm:p-5 space-y-5">
-            {/* Plan Health Scorecard Hero Card */}
-            <div className="bg-muted/30 border border-border/60 rounded-xl p-4 flex items-center justify-between gap-3">
-              <div className="space-y-1 min-w-0">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                  Plan Sustainability
-                </span>
-                <span className="text-sm font-extrabold text-foreground block truncate">
-                  {planHealth.status}
-                </span>
-                <p className="text-[11px] text-muted-foreground leading-tight line-clamp-2">
-                  {planHealth.desc}
-                </p>
-              </div>
-              <div className="flex flex-col items-center justify-center shrink-0 w-14 h-14 rounded-2xl bg-card border border-border shadow-xs">
-                <span className="text-xs text-muted-foreground font-semibold">Grade</span>
-                <span className="text-xl font-black text-primary font-mono">{planHealth.score}</span>
-              </div>
+      {!isCollapsed && (
+        <div className="p-4 sm:p-5 space-y-4 divide-y divide-sidebar-border/50">
+          {/* Section 1: Plan Sustainability Grade */}
+          <div className="pb-1 flex items-center justify-between gap-3">
+            <div className="space-y-1 min-w-0">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Plan Sustainability
+              </span>
+              <span className="text-sm font-extrabold text-foreground block truncate">
+                {planHealth.status}
+              </span>
+              <p className="text-[11px] text-muted-foreground leading-tight line-clamp-2">
+                {planHealth.desc}
+              </p>
             </div>
+            <div className="flex flex-col items-center justify-center shrink-0 w-14 h-14 rounded-2xl bg-card border border-border shadow-xs">
+              <span className="text-xs text-muted-foreground font-semibold">Grade</span>
+              <span className="text-xl font-black text-primary font-mono">{planHealth.score}</span>
+            </div>
+          </div>
 
-            {/* FIRE Target Semi-Circle Arc Gauge */}
-            <div className="bg-muted/20 border border-border/50 rounded-xl p-4 flex flex-col items-center justify-center space-y-2">
+          {/* Section 2: FIRE Target Arc Gauge & Key Indicators */}
+          <div className="pt-4 space-y-4">
+            <div className="flex flex-col items-center justify-center space-y-2">
               <div className="relative w-36 h-20 flex items-start justify-center overflow-hidden">
                 <svg className="w-36 h-36" viewBox="0 0 120 120">
                   {/* Gauge Arc Track */}
@@ -232,7 +234,7 @@ export function FireProjectionsSidePanel({
                 {/* Nest Egg at Retirement */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors cursor-help">
+                    <div className="flex items-center justify-between py-1.5 cursor-help">
                       <div className="flex items-center gap-2">
                         <Palmtree className="w-4 h-4 text-emerald-500 shrink-0" />
                         <span className="text-xs font-semibold text-foreground">Nest Egg at {localRetirementAge}</span>
@@ -250,7 +252,7 @@ export function FireProjectionsSidePanel({
                 {/* Peak Withdrawal Rate */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors cursor-help">
+                    <div className="flex items-center justify-between py-1.5 cursor-help">
                       <div className="flex items-center gap-2">
                         <Activity className="w-4 h-4 text-amber-500 shrink-0" />
                         <span className="text-xs font-semibold text-foreground">Peak Drawdown Rate</span>
@@ -277,7 +279,7 @@ export function FireProjectionsSidePanel({
                 {/* Years to FIRE */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors cursor-help">
+                    <div className="flex items-center justify-between py-1.5 cursor-help">
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-cyan-500 shrink-0" />
                         <span className="text-xs font-semibold text-foreground">Years to FI</span>
@@ -293,9 +295,11 @@ export function FireProjectionsSidePanel({
                 </Tooltip>
               </div>
             </TooltipProvider>
+          </div>
 
-            {/* Metric 3.1: Coast FIRE Progress Tracker Card */}
-            {coastFireInfo.coastTarget > 0 && (
+          {/* Section 3: Coast FIRE & Glidepath Asset Mix */}
+          {coastFireInfo.coastTarget > 0 && (
+            <div className="pt-4">
               <ChartHoverTooltip
                 content={
                   <>
@@ -309,7 +313,7 @@ export function FireProjectionsSidePanel({
                   </>
                 }
               >
-                <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
+                <div className="space-y-2.5 cursor-help">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Compass className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
@@ -348,9 +352,11 @@ export function FireProjectionsSidePanel({
                   </div>
                 </div>
               </ChartHoverTooltip>
-            )}
+            </div>
+          )}
 
-            {/* Metric 3.3: Asset Allocation & Glidepath Preview Card */}
+          {/* Glidepath Asset Mix Section */}
+          <div className="pt-4">
             <ChartHoverTooltip
               content={
                 <>
@@ -367,7 +373,7 @@ export function FireProjectionsSidePanel({
                 </>
               }
             >
-              <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
+              <div className="space-y-2.5 cursor-help">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-foreground flex items-center gap-1">
                     <PieChart className="w-3.5 h-3.5 text-primary" />
@@ -402,75 +408,75 @@ export function FireProjectionsSidePanel({
                 </div>
               </div>
             </ChartHoverTooltip>
+          </div>
 
-            {/* Upcoming Milestones Vertical Stepper */}
-            {milestoneCallouts.length > 0 && (
-              <div className="border-t border-border pt-4 space-y-2.5">
-                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <Landmark className="w-3.5 h-3.5 text-primary" />
-                  Upcoming Key Milestones
-                </span>
-                <div className="relative pl-4 space-y-2.5 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
-                  <TooltipProvider delayDuration={100}>
-                    {milestoneCallouts.slice(0, showAllMilestones ? milestoneCallouts.length : 4).map((m, idx) => {
-                      return (
-                        <Tooltip key={idx}>
-                          <TooltipTrigger asChild>
-                            <div className="relative flex items-center justify-between gap-2 text-xs py-0.5 cursor-help hover:bg-muted/20 rounded px-1 -mx-1 transition-colors">
-                              <div className="absolute -left-4 top-1 w-3.5 h-3.5 rounded-full bg-card border-2 border-primary flex items-center justify-center text-[8px]">
-                                {m.emoji}
-                              </div>
-                              <span className="font-bold text-foreground truncate min-w-0">{m.title}</span>
-                              <span className="text-[10px] font-mono text-muted-foreground shrink-0">
-                                Age {m.age} ({m.year})
-                              </span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="left" className="max-w-xs text-xs space-y-1">
-                            <div className="font-bold">{m.title} (Age {m.age}, {m.year})</div>
-                            {m.note && <div className="text-muted-foreground">{m.note}</div>}
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
-                  </TooltipProvider>
-                </div>
-
-                {milestoneCallouts.length > 4 && (
-                  <button
-                    onClick={() => setShowAllMilestones((v) => !v)}
-                    className="flex items-center gap-1 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors cursor-pointer"
-                    type="button"
-                  >
-                    <ChevronRight className={cn('w-3 h-3 transition-transform duration-200', showAllMilestones && 'rotate-90')} />
-                    {showAllMilestones ? 'Show less' : `Show all (${milestoneCallouts.length})`}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Withdrawal Strategy Strategy Pill */}
-            <div className="border-t border-border pt-4 space-y-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                Active Drawdown Strategy
+          {/* Section 4: Upcoming Key Milestones */}
+          {milestoneCallouts.length > 0 && (
+            <div className="pt-4 space-y-2.5">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Landmark className="w-3.5 h-3.5 text-primary" />
+                Upcoming Key Milestones
               </span>
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20 text-xs font-medium text-primary flex items-center gap-2 cursor-help hover:bg-primary/15 transition-colors">
-                      <Zap className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">{activeStrategyLabel}</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                    {strategyDescription}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <div className="relative pl-4 space-y-2.5 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-sidebar-border">
+                <TooltipProvider delayDuration={100}>
+                  {milestoneCallouts.slice(0, showAllMilestones ? milestoneCallouts.length : 4).map((m, idx) => {
+                    return (
+                      <Tooltip key={idx}>
+                        <TooltipTrigger asChild>
+                          <div className="relative flex items-center justify-between gap-2 text-xs py-0.5 cursor-help hover:bg-sidebar-accent/50 rounded px-1 -mx-1 transition-colors">
+                            <div className="absolute -left-4 top-1 w-3.5 h-3.5 rounded-full bg-sidebar border-2 border-primary flex items-center justify-center text-[8px]">
+                              {m.emoji}
+                            </div>
+                            <span className="font-bold text-foreground truncate min-w-0">{m.title}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                              Age {m.age} ({m.year})
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-xs text-xs space-y-1">
+                          <div className="font-bold">{m.title} (Age {m.age}, {m.year})</div>
+                          {m.note && <div className="text-muted-foreground">{m.note}</div>}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </TooltipProvider>
+              </div>
+
+              {milestoneCallouts.length > 4 && (
+                <button
+                  onClick={() => setShowAllMilestones((v) => !v)}
+                  className="flex items-center gap-1 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors cursor-pointer"
+                  type="button"
+                >
+                  <ChevronRight className={cn('w-3 h-3 transition-transform duration-200', showAllMilestones && 'rotate-90')} />
+                  {showAllMilestones ? 'Show less' : `Show all (${milestoneCallouts.length})`}
+                </button>
+              )}
             </div>
-          </CardContent>
-        )}
-      </Card>
+          )}
+
+          {/* Active Drawdown Strategy Pill */}
+          <div className="pt-4 space-y-1.5">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+              Active Drawdown Strategy
+            </span>
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20 text-xs font-medium text-primary flex items-center gap-2 cursor-help hover:bg-primary/15 transition-colors">
+                    <Zap className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{activeStrategyLabel}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                  {strategyDescription}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

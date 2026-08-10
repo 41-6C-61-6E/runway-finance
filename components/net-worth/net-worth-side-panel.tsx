@@ -270,12 +270,12 @@ export function NetWorthSidePanel() {
 
   if (loading) {
     return (
-      <Card className="shadow-sm border border-border animate-pulse">
+      <Card className="shadow-sm border border-sidebar-border bg-sidebar rounded-2xl animate-pulse">
         <CardContent className="p-5 space-y-4">
-          <div className="h-5 bg-muted rounded w-40" />
-          <div className="h-16 bg-muted/60 rounded-xl" />
-          <div className="h-32 bg-muted/40 rounded-xl" />
-          <div className="h-24 bg-muted/40 rounded-xl" />
+          <div className="h-5 bg-muted/60 rounded w-40" />
+          <div className="h-16 bg-card rounded-xl" />
+          <div className="h-32 bg-card rounded-xl" />
+          <div className="h-24 bg-card rounded-xl" />
         </CardContent>
       </Card>
     );
@@ -283,7 +283,7 @@ export function NetWorthSidePanel() {
 
   if (error) {
     return (
-      <Card className="shadow-sm border border-border">
+      <Card className="shadow-sm border border-sidebar-border bg-sidebar rounded-2xl">
         <CardContent className="p-5 text-sm text-destructive">
           Failed to load Net Worth summary: {error}
         </CardContent>
@@ -292,272 +292,272 @@ export function NetWorthSidePanel() {
   }
 
   return (
-    <div className="space-y-5">
-        <Card className="shadow-sm border border-border overflow-hidden">
-          <CollapsibleCardHeader
-            isCollapsed={isCollapsed}
-            onToggle={setIsCollapsed}
-            title={
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-primary shrink-0" />
-                <span className="font-bold text-foreground">Overview</span>
-              </div>
+    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        collapseDirection="horizontal"
+        title={
+          <div className="flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-primary shrink-0" />
+            <span className="font-bold text-foreground">Overview</span>
+          </div>
+        }
+        actions={hasEstimated ? <EstimatePill /> : null}
+        className="border-b border-sidebar-border/60 bg-sidebar"
+      />
+      {!isCollapsed && (
+        <div className="p-4 sm:p-5 space-y-4 divide-y divide-sidebar-border/50">
+          {/* Section 1: Hero Net Worth */}
+          <ChartHoverTooltip
+            content={
+              <>
+                <TooltipHeader>Total Net Worth Calculation</TooltipHeader>
+                <TooltipRow label="Total Assets" value={formatCurrency(totals.totalAssets)} color="var(--color-chart-1)" />
+                <TooltipRow label="Total Liabilities" value={formatCurrency(totals.totalLiabilities)} color="var(--color-destructive)" />
+                <div className="mt-2 border-t border-border/40 pt-1.5">
+                  <TooltipRow
+                    label="1-Year Growth"
+                    value={`${deltas.netWorth >= 0 ? '+' : ''}${formatCurrency(deltas.netWorth)} (${deltas.pctNetWorth.toFixed(1)}%)`}
+                    color={deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+                  />
+                </div>
+              </>
             }
-            actions={hasEstimated ? <EstimatePill /> : null}
-          />
-          {!isCollapsed && (
-            <CardContent className="p-4 sm:p-5 space-y-5">
-              {/* Hero Net Worth Card with Tooltip */}
-              <ChartHoverTooltip
-                content={
-                  <>
-                    <TooltipHeader>Total Net Worth Calculation</TooltipHeader>
-                    <TooltipRow label="Total Assets" value={formatCurrency(totals.totalAssets)} color="var(--color-chart-1)" />
-                    <TooltipRow label="Total Liabilities" value={formatCurrency(totals.totalLiabilities)} color="var(--color-destructive)" />
-                    <div className="mt-2 border-t border-border/40 pt-1.5">
-                      <TooltipRow
-                        label="1-Year Growth"
-                        value={`${deltas.netWorth >= 0 ? '+' : ''}${formatCurrency(deltas.netWorth)} (${deltas.pctNetWorth.toFixed(1)}%)`}
-                        color={deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
-                      />
-                    </div>
-                  </>
-                }
-              >
-                <div className="bg-muted/30 border border-border/60 rounded-xl p-4 space-y-3 cursor-help transition-colors hover:bg-muted/40">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    Total Net Worth
+          >
+            <div className="space-y-2 cursor-help pb-1">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                Total Net Worth
+                <Info className="w-3 h-3 text-muted-foreground/60" />
+              </span>
+              <div className="flex flex-col">
+                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
+                  {formatCurrency(totals.netWorth)}
+                </span>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div
+                    className={cn(
+                      'inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-md border font-mono',
+                      deltas.netWorth >= 0
+                        ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
+                        : 'bg-destructive/10 text-destructive border-destructive/20'
+                    )}
+                  >
+                    {deltas.netWorth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                    <span className="blur-number">{formatCurrency(Math.abs(deltas.netWorth))}</span>
+                    <span className="opacity-80">({deltas.pctNetWorth >= 0 ? '+' : ''}{deltas.pctNetWorth.toFixed(1)}%)</span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">past 1 year</span>
+                </div>
+              </div>
+            </div>
+          </ChartHoverTooltip>
+
+          {/* Section 2: Assets vs Liabilities */}
+          <div className="pt-4">
+            <ChartHoverTooltip
+              content={
+                <>
+                  <TooltipHeader>Assets vs. Liabilities</TooltipHeader>
+                  <TooltipRow label="Total Assets" value={`${formatCurrency(totals.totalAssets)} (${assetRatio.assetPct.toFixed(1)}%)`} color="var(--color-chart-1)" />
+                  <TooltipRow label="Total Liabilities" value={`${formatCurrency(totals.totalLiabilities)} (${assetRatio.liabilityPct.toFixed(1)}%)`} color="var(--color-destructive)" />
+                  <div className="mt-2 border-t border-border/40 pt-1.5">
+                    <TooltipRow label="Net Worth" value={formatCurrency(totals.netWorth)} color="var(--color-chart-1)" />
+                  </div>
+                </>
+              }
+            >
+              <div className="space-y-2 cursor-help">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-chart-1" />
+                    Assets vs. Liabilities
+                    <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                  </span>
+                  <span className="text-muted-foreground font-mono text-[11px]">
+                    {assetRatio.assetPct.toFixed(1)}% / {assetRatio.liabilityPct.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                  <div
+                    className="h-full bg-chart-1 transition-all duration-500 rounded-l-full"
+                    style={{ width: `${assetRatio.assetPct}%` }}
+                  />
+                  <div
+                    className="h-full bg-destructive transition-all duration-500 rounded-r-full"
+                    style={{ width: `${assetRatio.liabilityPct}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
+                  <span>Assets: {assetRatio.assetPct.toFixed(1)}%</span>
+                  <span>Liabilities: {assetRatio.liabilityPct.toFixed(1)}%</span>
+                </div>
+              </div>
+            </ChartHoverTooltip>
+          </div>
+
+          {/* Section 3: Debt to Asset Ratio Rating Card */}
+          <div className="pt-4">
+            <ChartHoverTooltip
+              content={
+                <>
+                  <TooltipHeader>Debt-to-Asset Ratio</TooltipHeader>
+                  <TooltipRow label="Liabilities" value={formatCurrency(totals.totalLiabilities)} color="var(--color-destructive)" />
+                  <TooltipRow label="Assets" value={formatCurrency(totals.totalAssets)} color="var(--color-chart-1)" />
+                  <TooltipRow label="Ratio" value={`${debtPct.toFixed(1)}%`} color="var(--color-primary)" />
+                  <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
+                    <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</div>
+                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />Excellent: &lt;35%</span><span>Healthy</span></div>
+                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />Good: 35% - 45%</span><span>Moderate</span></div>
+                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500" />Fair: 45% - 55%</span><span>Elevated</span></div>
+                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500" />Poor: 55% - 75%</span><span>High Risk</span></div>
+                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" />Critical: &gt;75%</span><span>Very High</span></div>
+                  </div>
+                </>
+              }
+            >
+              <div className="space-y-2.5 cursor-help">
+                <div className="flex items-center gap-1.5">
+                  <Percent className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1">
+                    Debt-to-Asset Ratio
                     <Info className="w-3 h-3 text-muted-foreground/60" />
                   </span>
-                  <div className="flex flex-col">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
-                      {formatCurrency(totals.netWorth)}
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-black text-foreground font-mono blur-number">
+                      {debtPct.toFixed(0)}%
                     </span>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <div
-                        className={cn(
-                          'inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-md border font-mono',
-                          deltas.netWorth >= 0
-                            ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
-                            : 'bg-destructive/10 text-destructive border-destructive/20'
-                        )}
-                      >
-                        {deltas.netWorth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        <span className="blur-number">{formatCurrency(Math.abs(deltas.netWorth))}</span>
-                        <span className="opacity-80">({deltas.pctNetWorth >= 0 ? '+' : ''}{deltas.pctNetWorth.toFixed(1)}%)</span>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground">past 1 year</span>
-                    </div>
+                    <span className={cn('text-xs font-extrabold px-2.5 py-0.5 rounded-full border font-sans', rating.badgeClass)}>
+                      {rating.label}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    Liabilities / Assets
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
+                    <div
+                      className={cn('h-full transition-all duration-500 rounded-full', rating.barClass)}
+                      style={{ width: `${Math.min(debtPct, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                    <span>0%</span>
+                    <span>50%</span>
+                    <span>100%</span>
                   </div>
                 </div>
-              </ChartHoverTooltip>
+              </div>
+            </ChartHoverTooltip>
+          </div>
 
-              {/* Assets vs Liabilities Visual Proportion Bar (h-2.5 w-full bg-muted/60) */}
+          {/* Section 4: Liquid vs Illiquid Assets */}
+          {liquidity.total > 0 && (
+            <div className="pt-4">
               <ChartHoverTooltip
                 content={
                   <>
-                    <TooltipHeader>Assets vs. Liabilities</TooltipHeader>
-                    <TooltipRow label="Total Assets" value={`${formatCurrency(totals.totalAssets)} (${assetRatio.assetPct.toFixed(1)}%)`} color="var(--color-chart-1)" />
-                    <TooltipRow label="Total Liabilities" value={`${formatCurrency(totals.totalLiabilities)} (${assetRatio.liabilityPct.toFixed(1)}%)`} color="var(--color-destructive)" />
-                    <div className="mt-2 border-t border-border/40 pt-1.5">
-                      <TooltipRow label="Net Worth" value={formatCurrency(totals.netWorth)} color="var(--color-chart-1)" />
+                    <TooltipHeader>Liquid vs. Illiquid Assets</TooltipHeader>
+                    <TooltipRow label="Liquid" value={`${formatCurrency(liquidity.liquid)} (${liquidity.liquidPct.toFixed(1)}%)`} color="var(--color-chart-2)" />
+                    <TooltipRow label="Illiquid" value={`${formatCurrency(liquidity.illiquid)} (${liquidity.illiquidPct.toFixed(1)}%)`} color="var(--color-chart-4)" />
+                    <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
+                      <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Classification</div>
+                      <div className="text-[10px] text-muted-foreground">Liquid: Checking, savings, brokerage, crypto, metals</div>
+                      <div className="text-[10px] text-muted-foreground">Illiquid: Retirement, real estate, vehicles, HSA, 529</div>
                     </div>
                   </>
                 }
               >
-                <div className="space-y-2 cursor-help p-3.5 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors">
+                <div className="space-y-2 cursor-help">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-foreground flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-chart-1" />
-                      Assets vs. Liabilities
+                      <Droplets className="w-3.5 h-3.5 text-chart-2" />
+                      Liquid vs. Illiquid
                       <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
                     </span>
                     <span className="text-muted-foreground font-mono text-[11px]">
-                      {assetRatio.assetPct.toFixed(1)}% / {assetRatio.liabilityPct.toFixed(1)}%
+                      {liquidity.liquidPct.toFixed(1)}% / {liquidity.illiquidPct.toFixed(1)}%
                     </span>
                   </div>
-                  {/* Consistent h-2.5 w-full bg-muted/60 rounded-full */}
                   <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
                     <div
-                      className="h-full bg-chart-1 transition-all duration-500 rounded-l-full"
-                      style={{ width: `${assetRatio.assetPct}%` }}
+                      className="h-full bg-chart-2 transition-all duration-500 rounded-l-full"
+                      style={{ width: `${liquidity.liquidPct}%` }}
                     />
                     <div
-                      className="h-full bg-destructive transition-all duration-500 rounded-r-full"
-                      style={{ width: `${assetRatio.liabilityPct}%` }}
+                      className="h-full bg-chart-4 transition-all duration-500 rounded-r-full"
+                      style={{ width: `${liquidity.illiquidPct}%` }}
                     />
                   </div>
-                  {/* Showing percentages rather than currency values */}
                   <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
-                    <span>
-                      Assets: {assetRatio.assetPct.toFixed(1)}%
-                    </span>
-                    <span>
-                      Liabilities: {assetRatio.liabilityPct.toFixed(1)}%
-                    </span>
+                    <span>Liquid: {liquidity.liquidPct.toFixed(1)}%</span>
+                    <span>Illiquid: {liquidity.illiquidPct.toFixed(1)}%</span>
                   </div>
                 </div>
               </ChartHoverTooltip>
-
-              {/* Debt to Asset Ratio Rating Card (h-2.5 w-full bg-muted/60) */}
-              <ChartHoverTooltip
-                content={
-                  <>
-                    <TooltipHeader>Debt-to-Asset Ratio</TooltipHeader>
-                    <TooltipRow label="Liabilities" value={formatCurrency(totals.totalLiabilities)} color="var(--color-destructive)" />
-                    <TooltipRow label="Assets" value={formatCurrency(totals.totalAssets)} color="var(--color-chart-1)" />
-                    <TooltipRow label="Ratio" value={`${debtPct.toFixed(1)}%`} color="var(--color-primary)" />
-                    <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
-                      <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</div>
-                      <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />Excellent: &lt;35%</span><span>Healthy</span></div>
-                      <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />Good: 35% - 45%</span><span>Moderate</span></div>
-                      <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500" />Fair: 45% - 55%</span><span>Elevated</span></div>
-                      <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500" />Poor: 55% - 75%</span><span>High Risk</span></div>
-                      <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" />Critical: &gt;75%</span><span>Very High</span></div>
-                    </div>
-                  </>
-                }
-              >
-                <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-1.5">
-                    <Percent className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span className="text-xs font-bold text-foreground flex items-center gap-1">
-                      Debt-to-Asset Ratio
-                      <Info className="w-3 h-3 text-muted-foreground/60" />
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-black text-foreground font-mono blur-number">
-                        {debtPct.toFixed(0)}%
-                      </span>
-                      <span className={cn('text-xs font-extrabold px-2.5 py-0.5 rounded-full border font-sans', rating.badgeClass)}>
-                        {rating.label}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-mono text-muted-foreground">
-                      Liabilities / Assets
-                    </span>
-                  </div>
-                  {/* Consistent h-2.5 w-full bg-muted/60 rounded-full */}
-                  <div className="space-y-1">
-                    <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
-                      <div
-                        className={cn('h-full transition-all duration-500 rounded-full', rating.barClass)}
-                        style={{ width: `${Math.min(debtPct, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                      <span>0%</span>
-                      <span>50%</span>
-                      <span>100%</span>
-                    </div>
-                  </div>
-                </div>
-              </ChartHoverTooltip>
-
-              {/* Liquid vs Illiquid Assets */}
-              {liquidity.total > 0 && (
-                <ChartHoverTooltip
-                  content={
-                    <>
-                      <TooltipHeader>Liquid vs. Illiquid Assets</TooltipHeader>
-                      <TooltipRow label="Liquid" value={`${formatCurrency(liquidity.liquid)} (${liquidity.liquidPct.toFixed(1)}%)`} color="var(--color-chart-2)" />
-                      <TooltipRow label="Illiquid" value={`${formatCurrency(liquidity.illiquid)} (${liquidity.illiquidPct.toFixed(1)}%)`} color="var(--color-chart-4)" />
-                      <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
-                        <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Classification</div>
-                        <div className="text-[10px] text-muted-foreground">Liquid: Checking, savings, brokerage, crypto, metals</div>
-                        <div className="text-[10px] text-muted-foreground">Illiquid: Retirement, real estate, vehicles, HSA, 529</div>
-                      </div>
-                    </>
-                  }
-                >
-                  <div className="space-y-2 cursor-help p-3.5 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-foreground flex items-center gap-1">
-                        <Droplets className="w-3.5 h-3.5 text-chart-2" />
-                        Liquid vs. Illiquid
-                        <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
-                      </span>
-                      <span className="text-muted-foreground font-mono text-[11px]">
-                        {liquidity.liquidPct.toFixed(1)}% / {liquidity.illiquidPct.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
-                      <div
-                        className="h-full bg-chart-2 transition-all duration-500 rounded-l-full"
-                        style={{ width: `${liquidity.liquidPct}%` }}
-                      />
-                      <div
-                        className="h-full bg-chart-4 transition-all duration-500 rounded-r-full"
-                        style={{ width: `${liquidity.illiquidPct}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
-                      <span>Liquid: {liquidity.liquidPct.toFixed(1)}%</span>
-                      <span>Illiquid: {liquidity.illiquidPct.toFixed(1)}%</span>
-                    </div>
-                  </div>
-                </ChartHoverTooltip>
-              )}
-
-
-              {/* Net Worth Milestone Tracker */}
-              <ChartHoverTooltip
-                content={
-                  <>
-                    <TooltipHeader>Net Worth Milestone</TooltipHeader>
-                    <TooltipRow label="Current Net Worth" value={formatCurrency(milestone.netWorth)} color="var(--color-chart-1)" />
-                    <TooltipRow label="Previous Milestone" value={milestone.previousLabel} color="var(--color-muted-foreground)" />
-                    <TooltipRow label="Next Milestone" value={milestone.label} color="var(--color-primary)" />
-                    <div className="mt-2 border-t border-border/40 pt-1.5">
-                      <TooltipRow label="Remaining" value={formatCurrency(milestone.remaining)} color="var(--color-chart-5)" />
-                      <TooltipRow label="Progress" value={`${milestone.progress.toFixed(1)}%`} color="var(--color-primary)" />
-                    </div>
-                  </>
-                }
-              >
-                <div className="bg-muted/20 border border-border/50 rounded-xl p-3.5 space-y-2.5 cursor-help hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-1.5">
-                    <Flag className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span className="text-xs font-bold text-foreground flex items-center gap-1">
-                      Next Milestone
-                      <Info className="w-3 h-3 text-muted-foreground/60" />
-                    </span>
-                  </div>
-                  <div className="flex items-baseline justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-black text-foreground font-mono">
-                        {milestone.label}
-                      </span>
-                      <span className={cn(
-                        'inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full border font-mono',
-                        'bg-primary/10 text-primary border-primary/20'
-                      )}>
-                        {milestone.progress.toFixed(0)}%
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-mono text-muted-foreground blur-number">
-                      {formatCurrency(milestone.remaining)} to go
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-500 rounded-full"
-                        style={{ width: `${milestone.progress}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                      <span>{milestone.previousLabel}</span>
-                      <span>{milestone.label}</span>
-                    </div>
-                  </div>
-                </div>
-              </ChartHoverTooltip>
-            </CardContent>
+            </div>
           )}
-        </Card>
-      </div>
+
+          {/* Section 5: Net Worth Milestone Tracker */}
+          <div className="pt-4">
+            <ChartHoverTooltip
+              content={
+                <>
+                  <TooltipHeader>Net Worth Milestone</TooltipHeader>
+                  <TooltipRow label="Current Net Worth" value={formatCurrency(milestone.netWorth)} color="var(--color-chart-1)" />
+                  <TooltipRow label="Previous Milestone" value={milestone.previousLabel} color="var(--color-muted-foreground)" />
+                  <TooltipRow label="Next Milestone" value={milestone.label} color="var(--color-primary)" />
+                  <div className="mt-2 border-t border-border/40 pt-1.5">
+                    <TooltipRow label="Remaining" value={formatCurrency(milestone.remaining)} color="var(--color-chart-5)" />
+                    <TooltipRow label="Progress" value={`${milestone.progress.toFixed(1)}%`} color="var(--color-primary)" />
+                  </div>
+                </>
+              }
+            >
+              <div className="space-y-2.5 cursor-help">
+                <div className="flex items-center gap-1.5">
+                  <Flag className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1">
+                    Next Milestone
+                    <Info className="w-3 h-3 text-muted-foreground/60" />
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-black text-foreground font-mono">
+                      {milestone.label}
+                    </span>
+                    <span className={cn(
+                      'inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full border font-mono',
+                      'bg-primary/10 text-primary border-primary/20'
+                    )}>
+                      {milestone.progress.toFixed(0)}%
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-muted-foreground blur-number">
+                    {formatCurrency(milestone.remaining)} to go
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-500 rounded-full"
+                      style={{ width: `${milestone.progress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+                    <span>{milestone.previousLabel}</span>
+                    <span>{milestone.label}</span>
+                  </div>
+                </div>
+              </div>
+            </ChartHoverTooltip>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
