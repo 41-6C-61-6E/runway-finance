@@ -542,7 +542,12 @@ export function MobileNav() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <span className="text-sm font-semibold tracking-wide text-sidebar-foreground/80">Menu Settings</span>
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="text-xs font-semibold px-2.5 py-0.5 rounded-full transition-all bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20 active:scale-95 flex items-center gap-1 shadow-sm"
+          >
+            {isEditing ? 'Done' : 'Edit Layout'}
+          </button>
           <button 
             onClick={() => setIsOpen(false)}
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -551,242 +556,161 @@ export function MobileNav() {
           </button>
         </div>
 
-        {/* HOME Section at the top */}
-        <div className="flex items-center justify-between mb-3 px-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-            Home (Bottom Nav)
-          </div>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="text-xs font-semibold px-2.5 py-0.5 rounded-full transition-all bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20 active:scale-95 flex items-center gap-1 shadow-sm"
-          >
-            {isEditing ? 'Done' : 'Edit Layout'}
-          </button>
-        </div>
-        <div className="grid grid-cols-4 gap-y-3 gap-x-2 mb-4 border border-sidebar-border/20 bg-sidebar-foreground/3 rounded-3xl p-3">
-          {[0, 1, 2, 3].map((index) => {
-            const item = activeHomeNavItems[index];
-            const isHoveredSlot = hoveredSlotIndex === index;
-
-            if (item) {
-              const Icon = item.icon;
-              const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
-              const isCurrentlyDragged = draggedItem?.id === item.id;
-
-              return (
-                <div
-                  key={`home-slot-${index}`}
-                  data-slot-index={index}
-                  className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-200 ${
-                    isHoveredSlot
-                      ? 'bg-primary/10 border border-primary/30 scale-105 shadow-[0_0_8px_rgba(var(--primary-rgb),0.15)]'
-                      : 'border border-transparent'
-                  } ${getWiggleClass(index)}`}
-                  style={{
-                    opacity: isCurrentlyDragged ? 0.3 : 1,
-                  }}
-                >
-                  <div
-                    onPointerDown={handleItemPointerDown(item)}
-                    onPointerMove={handleItemPointerMove}
-                    onPointerUp={handleItemPointerUp}
-                    onPointerCancel={handleItemPointerCancel}
-                    onClick={handleItemClick}
-                    className={`p-3 rounded-2xl relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
-                      active 
-                        ? 'bg-primary/20 text-primary' 
-                        : 'bg-sidebar-foreground/8 text-sidebar-foreground/65'
-                    }`}
-                    style={{
-                      touchAction: 'none'
-                    }}
-                  >
-                    <Icon className="h-5 w-5 flex-shrink-0" />
-                  </div>
-                  
-                  {isEditing && (
-                    <button
-                      type="button"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        haptic.medium();
-                        handleRemoveSlot(index);
-                      }}
-                      className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1.5 shadow-md active:scale-90 z-20 cursor-pointer min-touch-target-inline"
-                    >
-                      <Minus className="h-3 w-3" />
-                    </button>
-                  )}
-
-                  <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors select-none ${
-                    active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65'
-                  }`}>{item.label}</span>
-                </div>
-              );
-            } else {
-              return (
-                <div
-                  key={`home-slot-empty-${index}`}
-                  data-slot-index={index}
-                  className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl border border-dashed transition-all duration-200 ${
-                    isHoveredSlot
-                      ? 'border-primary/50 bg-primary/10 scale-105'
-                      : 'border-muted-foreground/20 bg-transparent'
-                  }`}
-                  style={{
-                    touchAction: 'none'
-                  }}
-                >
-                  <div
-                    className="p-3 rounded-2xl flex items-center justify-center text-muted-foreground/30"
-                    style={{
-                      width: 46,
-                      height: 46,
-                    }}
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                  <span className="text-[10px] tracking-wide text-center text-muted-foreground/30 select-none">
-                    Empty
-                  </span>
-                </div>
-              );
-            }
-          })}
-        </div>
-
-        {/* Separator */}
-        <div className="my-3 border-t border-border/60" />
-
-        {/* Finances Section */}
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-3 px-1">
-          Finances
-        </div>
-        <div className="grid grid-cols-4 gap-y-3 gap-x-2">
-          {ALL_NAV_ITEMS.filter(item => item.category === 'finances' && isItemVisible(item)).map((item) => {
-            const Icon = item.icon;
-            const active = pendingHref ? pendingHref === item.href : isActive(item.href);
-            const globalIndex = ALL_NAV_ITEMS.findIndex(i => i.id === item.id);
-            const isCurrentlyDragged = draggedItem?.id === item.id;
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                draggable="false"
-                onClick={(e) => {
-                  if (isEditing) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return;
-                  }
-                  setPendingHref(item.href);
-                  setIsOpen(false);
-                }}
-                onPointerDown={handleItemPointerDown(item)}
-                onPointerMove={handleItemPointerMove}
-                onPointerUp={handleItemPointerUp}
-                onPointerCancel={handleItemPointerCancel}
-                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none cursor-grab ${
-                  isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-                } ${getWiggleClass(globalIndex)}`}
-                style={{
-                  opacity: isCurrentlyDragged ? 0.3 : 1,
-                  touchAction: isEditing ? 'none' : 'pan-y'
-                }}
-              >
-                <div className={`p-3 rounded-2xl transition-colors ${
-                  active ? 'bg-primary/20 text-primary' : 'bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
-                }`}>
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                </div>
-                <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${
-                  active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
-                }`}>{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Separator */}
-        <div className="my-3 border-t border-border/60" />
-
-        {/* Planning Section */}
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-3 px-1">
-          Planning
-        </div>
-        <div className="grid grid-cols-4 gap-y-3 gap-x-2">
-          {ALL_NAV_ITEMS.filter(item => item.category === 'planning' && isItemVisible(item)).map((item) => {
-            const Icon = item.icon;
-            const active = pendingHref ? pendingHref === item.href : isActive(item.href);
-            const globalIndex = ALL_NAV_ITEMS.findIndex(i => i.id === item.id);
-            const isCurrentlyDragged = draggedItem?.id === item.id;
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                draggable="false"
-                onClick={(e) => {
-                  if (isEditing) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return;
-                  }
-                  setPendingHref(item.href);
-                  setIsOpen(false);
-                }}
-                onPointerDown={handleItemPointerDown(item)}
-                onPointerMove={handleItemPointerMove}
-                onPointerUp={handleItemPointerUp}
-                onPointerCancel={handleItemPointerCancel}
-                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none cursor-grab ${
-                  isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-                } ${getWiggleClass(globalIndex)}`}
-                style={{
-                  opacity: isCurrentlyDragged ? 0.3 : 1,
-                  touchAction: isEditing ? 'none' : 'pan-y'
-                }}
-              >
-                <div className={`p-3 rounded-2xl transition-colors ${
-                  active ? 'bg-primary/20 text-primary' : 'bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
-                }`}>
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                </div>
-                <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${
-                  active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
-                }`}>{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Separator */}
-        <div className="my-3 border-t border-border/60" />
-
-        {/* Quick Access: Settings & Bug Report */}
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-3 px-1">
-          Quick Access
-        </div>
-        <div className="grid grid-cols-4 gap-y-3 gap-x-2">
-          <Link
-            href="/settings"
-            onClick={() => {
-              setPendingHref('/settings');
-              setIsOpen(false);
-            }}
-            className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none"
-          >
-            <div className="p-3 rounded-2xl bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground transition-colors">
-              <Settings className="h-5 w-5 flex-shrink-0" />
+        {/* HOME Section at the top (Only shown when Edit Layout is active) */}
+        {isEditing && (
+          <>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                Home (Bottom Nav)
+              </div>
             </div>
-            <span className="text-[10px] tracking-wide text-center truncate w-full text-sidebar-foreground/65 group-hover:text-sidebar-foreground transition-colors">Settings</span>
-          </Link>
+            <div className="grid grid-cols-4 gap-y-3 gap-x-2 mb-4 border border-sidebar-border/20 bg-sidebar-foreground/3 rounded-3xl p-3">
+              {[0, 1, 2, 3].map((index) => {
+                const item = activeHomeNavItems[index];
+                const isHoveredSlot = hoveredSlotIndex === index;
+
+                if (item) {
+                  const Icon = item.icon;
+                  const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
+                  const isCurrentlyDragged = draggedItem?.id === item.id;
+
+                  return (
+                    <div
+                      key={`home-slot-${index}`}
+                      data-slot-index={index}
+                      className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-200 ${
+                        isHoveredSlot
+                          ? 'bg-primary/10 border border-primary/30 scale-105 shadow-[0_0_8px_rgba(var(--primary-rgb),0.15)]'
+                          : 'border border-transparent'
+                      } ${getWiggleClass(index)}`}
+                      style={{
+                        opacity: isCurrentlyDragged ? 0.3 : 1,
+                      }}
+                    >
+                      <div
+                        onPointerDown={handleItemPointerDown(item)}
+                        onPointerMove={handleItemPointerMove}
+                        onPointerUp={handleItemPointerUp}
+                        onPointerCancel={handleItemPointerCancel}
+                        onClick={handleItemClick}
+                        className={`p-3 rounded-2xl relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
+                          active 
+                            ? 'bg-primary/20 text-primary' 
+                            : 'bg-sidebar-foreground/8 text-sidebar-foreground/65'
+                        }`}
+                        style={{
+                          touchAction: 'none'
+                        }}
+                      >
+                        <Icon className="h-5 w-5 flex-shrink-0" />
+                      </div>
+                      
+                      {isEditing && (
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            haptic.medium();
+                            handleRemoveSlot(index);
+                          }}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1.5 shadow-md active:scale-90 z-20 cursor-pointer min-touch-target-inline"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                      )}
+
+                      <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors select-none ${
+                        active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65'
+                      }`}>{item.label}</span>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div
+                      key={`home-slot-empty-${index}`}
+                      data-slot-index={index}
+                      className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl border border-dashed transition-all duration-200 ${
+                        isHoveredSlot
+                          ? 'border-primary/50 bg-primary/10 scale-105'
+                          : 'border-muted-foreground/20 bg-transparent'
+                      }`}
+                      style={{
+                        touchAction: 'none'
+                      }}
+                    >
+                      <div
+                        className="p-3 rounded-2xl flex items-center justify-center text-muted-foreground/30"
+                        style={{
+                          width: 46,
+                          height: 46,
+                        }}
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                      </div>
+                      <span className="text-[10px] tracking-wide text-center text-muted-foreground/30 select-none">
+                        Empty
+                      </span>
+                    </div>
+                  );
+                }
+              })}
+            </div>
+
+            {/* Separator */}
+            <div className="my-3 border-t border-border/60" />
+          </>
+        )}
+
+        {/* Main Section (Includes all visible nav items: Net Worth, Accounts, Transactions, Flows, Spending, Budgets, Real Estate, Investments, Goals, Logic, Data, FIRE) */}
+        <div className="grid grid-cols-4 gap-y-3 gap-x-2">
+          {ALL_NAV_ITEMS.filter(item => isItemVisible(item)).map((item) => {
+            const Icon = item.icon;
+            const active = pendingHref ? pendingHref === item.href : isActive(item.href);
+            const globalIndex = ALL_NAV_ITEMS.findIndex(i => i.id === item.id);
+            const isCurrentlyDragged = draggedItem?.id === item.id;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                draggable="false"
+                onClick={(e) => {
+                  if (isEditing) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                  }
+                  setPendingHref(item.href);
+                  setIsOpen(false);
+                }}
+                onPointerDown={handleItemPointerDown(item)}
+                onPointerMove={handleItemPointerMove}
+                onPointerUp={handleItemPointerUp}
+                onPointerCancel={handleItemPointerCancel}
+                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none cursor-grab ${
+                  isEditing ? 'cursor-grab active:cursor-grabbing' : ''
+                } ${getWiggleClass(globalIndex)}`}
+                style={{
+                  opacity: isCurrentlyDragged ? 0.3 : 1,
+                  touchAction: isEditing ? 'none' : 'pan-y'
+                }}
+              >
+                <div className={`p-3 rounded-2xl transition-colors ${
+                  active ? 'bg-primary/20 text-primary' : 'bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
+                }`}>
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                </div>
+                <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${
+                  active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
+                }`}>{item.label}</span>
+              </Link>
+            );
+          })}
         </div>
       </div>
 
