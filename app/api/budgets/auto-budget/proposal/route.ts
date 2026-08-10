@@ -61,19 +61,43 @@ export async function POST(request: Request) {
 
     const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
 
-    // Fetch virtual accounts if excludeVirtualAccounts is enabled
-    let virtualAccountIds = new Set<string>();
-    if (excludeVirtualAccounts) {
-      const userAccounts = await db
-        .select({ id: accounts.id, externalId: accounts.externalId, type: accounts.type })
-        .from(accounts)
-        .where(eq(accounts.userId, dataUserId));
+    // Fetch accounts to build excluded account IDs set (hidden, excluded from reports/net worth, or virtual accounts)
+    const userAccounts = await db
+      .select({
+        id: accounts.id,
+        externalId: accounts.externalId,
+        type: accounts.type,
+        isHidden: accounts.isHidden,
+        isExcludedFromNetWorth: accounts.isExcludedFromNetWorth,
+      })
+      .from(accounts)
+      .where(eq(accounts.userId, dataUserId));
 
-      virtualAccountIds = new Set(
-        userAccounts
-          .filter((a) => a.type === 'paystub' || (a.externalId && a.externalId.startsWith('virtual-')))
-          .map((a) => a.id)
-      );
+    const BANKING_AND_CREDIT_TYPES = new Set([
+      'checking',
+      'savings',
+      'depository',
+      'credit',
+      'credit card',
+      'creditcard',
+      'credit_card',
+      'cash',
+      'hsachecking',
+    ]);
+
+    const excludedAccountIds = new Set<string>();
+    for (const a of userAccounts) {
+      const typeLower = (a.type || '').toLowerCase();
+      const isBankingOrCredit = BANKING_AND_CREDIT_TYPES.has(typeLower);
+
+      if (a.isHidden || a.isExcludedFromNetWorth || !isBankingOrCredit) {
+        excludedAccountIds.add(a.id);
+      } else if (
+        excludeVirtualAccounts &&
+        (a.type === 'paystub' || (a.externalId && a.externalId.startsWith('virtual-')))
+      ) {
+        excludedAccountIds.add(a.id);
+      }
     }
 
     // 2. Determine earliest transaction date across all user transactions
@@ -206,15 +230,12 @@ export async function POST(request: Request) {
     for (const row of txRows) {
       if (!row.categoryId || !categoryMap.has(row.categoryId)) continue;
       
-      // Virtual account filtering
-      if (excludeVirtualAccounts) {
-        if (
-          row.source === 'paystub' ||
-          row.paystubId ||
-          (row.accountId && virtualAccountIds.has(row.accountId))
-        ) {
-          continue;
-        }
+      // Account exclusion check (hidden accounts, accounts excluded from reports/net worth, or virtual accounts)
+      if (row.accountId && excludedAccountIds.has(row.accountId)) {
+        continue;
+      }
+      if (excludeVirtualAccounts && (row.source === 'paystub' || row.paystubId)) {
+        continue;
       }
 
       const decryptedAmt = parseFloat(await decryptField(row.amount, dek));
@@ -226,7 +247,7 @@ export async function POST(request: Request) {
       const isCompound = cat.categoryType === 'compound';
       if (cat.isIncome && !isCompound && !includeIncome) continue;
 
-      const signedAmount = decryptedAmt;
+      const signedAmount = cat.isIncome ? decryptedAmt : -decryptedAmt;
 
       if (!categoryMonthlyTotals.has(row.categoryId)) {
         categoryMonthlyTotals.set(row.categoryId, new Map());
