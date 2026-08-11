@@ -55,12 +55,28 @@ export function BudgetTable() {
   const { periodType, periodKey } = useBudgetPeriod();
   const { startDate, endDate } = useMemo(() => getPeriodDateRange(periodType, periodKey), [periodType, periodKey]);
   const [isMobile, setIsMobile] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(1000);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const target = containerRef.current.parentElement || containerRef.current;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
   }, []);
 
   const { data: budgetData, isLoading: budgetsLoading, error: queryError } = useQuery({
@@ -520,209 +536,228 @@ export function BudgetTable() {
             })}
           </div>
         ) : (
-          <div className="w-full overflow-hidden">
-            <table className="w-full text-xs sm:text-sm border-collapse">
-              <thead>
-                <tr className="border-t border-border">
-                  <th className="text-left px-2.5 sm:px-3.5 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
-                  <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
-                  <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
-                  <th className="hidden sm:table-cell text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('variance', 'Variance', 'right')}</th>
-                  <th className="hidden sm:table-cell text-left px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('progress', 'Progress', 'left')}</th>
-                  {hasAnyAccount && (
-                    <th className="hidden md:table-cell text-left px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('account', 'Account', 'left')}</th>
-                  )}
-                  <th className="text-right px-1.5 sm:px-2 py-2.5 text-xs font-medium text-muted-foreground relative whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Actions</span>
-                      <div className="relative inline-block text-left" ref={gearMenuRef}>
-                        <button
-                          onClick={() => setShowGearMenu(!showGearMenu)}
-                          title="Budget actions & history settings"
-                          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
-                        >
-                          <Settings className="w-3.5 h-3.5" />
-                        </button>
-                        {showGearMenu && (
-                          <div className="absolute right-0 mt-1 w-56 rounded-xl bg-popover border border-border shadow-lg z-50 py-1.5 text-left animate-in fade-in-50 zoom-in-95">
-                            <button
-                              onClick={() => { setShowGearMenu(false); setConfirmPurgeHistoryOpen(true); }}
-                              title="Erase historical budgets prior to current period while keeping active recurring amounts"
-                              className="w-full px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2 transition-colors"
-                            >
-                              <History className="w-3.5 h-3.5 text-primary shrink-0" />
-                              <span>Remove Budget History</span>
-                            </button>
-                            <button
-                              onClick={() => { setShowGearMenu(false); setConfirmResetOpen(true); }}
-                              title="Permanently erase all budget items"
-                              className="w-full px-3 py-2 text-xs text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-destructive shrink-0" />
-                              <span>Reset All Budgets</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="border-t border-border">
-                {incomeBudgets.length > 0 && (
-                  <tr className="bg-accent/40 border-y border-border/50">
-                    <td colSpan={hasAnyAccount ? 7 : 6} className="px-3 sm:px-4 py-2 text-xs font-semibold text-foreground uppercase tracking-wider">
-                      <div className="flex items-center gap-1.5">
-                        <ArrowUpCircle className="w-3.5 h-3.5 text-primary" />
-                        <span>Income</span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                {incomeBudgets.map((b) => {
-                  const isTargetMet = b.remaining >= 0;
-                  return (
-                    <tr key={b.id} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
-                      <td className="px-2.5 sm:px-3.5 py-2.5 min-w-0 max-w-[140px] sm:max-w-[220px] md:max-w-[320px]">
-                        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-                          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
-                          <Link
-                            href={`/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`}
-                            className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[110px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
-                          >
-                            {b.categoryName}
-                          </Link>
-                          <BudgetItemTransactionsIcon
-                            categoryId={b.categoryId}
-                            categoryName={b.categoryName}
-                            periodType={periodType}
-                            periodKey={periodKey}
-                          />
-                        </div>
-                      </td>
-                      <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
-                      <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground font-medium blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
-                      <td className={`hidden sm:table-cell px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
-                        {b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}
-                      </td>
-                      <td className="hidden sm:table-cell px-1.5 sm:px-2.5 py-2.5 whitespace-nowrap overflow-hidden">
-                        <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                          <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
-                            <div className={`h-full ${isTargetMet ? 'bg-primary' : 'bg-amber-500'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
-                          </div>
-                          <span className={`text-[10px] font-mono shrink-0 ${isTargetMet ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-                            {(b.percentUsed || 0).toFixed(0)}%
-                          </span>
-                        </div>
-                      </td>
-                      {hasAnyAccount && (
-                        <td className="hidden md:table-cell px-1.5 sm:px-2.5 py-2.5 text-xs text-muted-foreground/50 truncate">
-                          &mdash;
-                        </td>
+          <div ref={containerRef} className="w-full overflow-x-auto min-w-0 border-collapse">
+            {(() => {
+              const showProgressCol = containerWidth >= 850;
+              const showVarianceCol = containerWidth >= 650;
+              const showAccountCol = containerWidth >= 1050 && hasAnyAccount;
+              const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
+
+              return (
+                <table className="w-full text-xs sm:text-sm border-collapse min-w-[360px]">
+                  <thead>
+                    <tr className="border-t border-border">
+                      <th className="text-left px-2.5 sm:px-3.5 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
+                      <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
+                      <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
+                      {showVarianceCol && (
+                        <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('variance', 'Variance', 'right')}</th>
                       )}
-                      <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                          <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {expenseBudgets.length > 0 && (
-                  <tr className="bg-accent/40 border-y border-border/50">
-                    <td colSpan={hasAnyAccount ? 7 : 6} className="px-3 sm:px-4 py-2 text-xs font-semibold text-foreground uppercase tracking-wider">
-                      <div className="flex items-center gap-1.5">
-                        <TrendingDown className="w-3.5 h-3.5 text-primary" />
-                        <span>Expenses</span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                {expenseBudgets.map((b) => {
-                  const isOver = b.remaining < 0;
-                  const isEE = b.isEverythingElse || b.isCatchAll || (b.categoryName || '').toLowerCase() === 'everything else';
-                  const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
-                  return (
-                    <Fragment key={b.id}>
-                      <tr className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
-                        <td className="px-2.5 sm:px-3.5 py-2.5 min-w-0 max-w-[140px] sm:max-w-[220px] md:max-w-[320px]">
-                          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-wrap">
-                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
-                            <Link
-                              href={
-                                isEE && b.groupedBreakout && b.groupedBreakout.length > 0
-                                  ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
-                                  : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
-                              }
-                              className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[110px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
+                      {showProgressCol && (
+                        <th className="text-left px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('progress', 'Progress', 'left')}</th>
+                      )}
+                      {showAccountCol && (
+                        <th className="text-left px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('account', 'Account', 'left')}</th>
+                      )}
+                      <th className="text-right px-1.5 sm:px-2 py-2.5 text-xs font-medium text-muted-foreground relative whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Actions</span>
+                          <div className="relative inline-block text-left" ref={gearMenuRef}>
+                            <button
+                              onClick={() => setShowGearMenu(!showGearMenu)}
+                              title="Budget actions & history settings"
+                              className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
                             >
-                              {b.categoryName}
-                            </Link>
-                            <BudgetItemTransactionsIcon
-                              categoryId={isEE ? undefined : b.categoryId}
-                              categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : undefined}
-                              categoryName={b.categoryName}
-                              periodType={periodType}
-                              periodKey={periodKey}
-                            />
-
-                            {/* Redesigned compact Everything Else breakout dropdown pill */}
-                            {isEE && (
-                              <button
-                                onClick={() => setExpandedCatchAll(!expandedCatchAll)}
-                                title="Expand to see unbudgeted category spending in this bucket"
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-accent hover:bg-accent/80 border border-border/80 rounded text-primary transition-all cursor-pointer shrink-0"
-                              >
-                                <Layers className="w-3 h-3 text-primary shrink-0" />
-                                <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} items</span>
-                                {expandedCatchAll ? <ChevronUp className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0" />}
-                              </button>
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            {showGearMenu && (
+                              <div className="absolute right-0 mt-1 w-56 rounded-xl bg-popover border border-border shadow-lg z-50 py-1.5 text-left animate-in fade-in-50 zoom-in-95">
+                                <button
+                                  onClick={() => { setShowGearMenu(false); setConfirmPurgeHistoryOpen(true); }}
+                                  title="Erase historical budgets prior to current period while keeping active recurring amounts"
+                                  className="w-full px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2 transition-colors"
+                                >
+                                  <History className="w-3.5 h-3.5 text-primary shrink-0" />
+                                  <span>Remove Budget History</span>
+                                </button>
+                                <button
+                                  onClick={() => { setShowGearMenu(false); setConfirmResetOpen(true); }}
+                                  title="Permanently erase all budget items"
+                                  className="w-full px-3 py-2 text-xs text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                  <span>Reset All Budgets</span>
+                                </button>
+                              </div>
                             )}
                           </div>
-                          {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
-                        </td>
-                        <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
-                        <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
-                        <td className={`hidden sm:table-cell px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
-                          {formatCurrency(b.remaining)}
-                        </td>
-                        <td className="hidden sm:table-cell px-1.5 sm:px-2.5 py-2.5 whitespace-nowrap overflow-hidden">
-                          <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                            <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
-                              <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
-                            </div>
-                            <span className={`text-[10px] font-mono shrink-0 ${isOver ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                              {(b.percentUsed || 0).toFixed(0)}%
-                            </span>
-                          </div>
-                        </td>
-                        {hasAnyAccount && (
-                          <td className="hidden md:table-cell px-1.5 sm:px-2.5 py-2.5 text-xs text-muted-foreground/50 truncate">
-                            &mdash;
-                          </td>
-                        )}
-                        <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                            <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="border-t border-border">
+                    {incomeBudgets.length > 0 && (
+                      <tr className="bg-accent/40 border-y border-border/50">
+                        <td colSpan={activeColCount} className="px-3 sm:px-4 py-2 text-xs font-semibold text-foreground uppercase tracking-wider">
+                          <div className="flex items-center gap-1.5">
+                            <ArrowUpCircle className="w-3.5 h-3.5 text-primary" />
+                            <span>Income</span>
                           </div>
                         </td>
                       </tr>
+                    )}
+                    {incomeBudgets.map((b) => {
+                      const isTargetMet = b.remaining >= 0;
+                      return (
+                        <tr key={b.id} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
+                          <td className="px-2.5 sm:px-3.5 py-2.5 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
+                              <Link
+                                href={`/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`}
+                                className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
+                              >
+                                {b.categoryName}
+                              </Link>
+                              <BudgetItemTransactionsIcon
+                                categoryId={b.categoryId}
+                                categoryName={b.categoryName}
+                                periodType={periodType}
+                                periodKey={periodKey}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
+                          <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground font-medium blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
+                          {showVarianceCol && (
+                            <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
+                              {b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}
+                            </td>
+                          )}
+                          {showProgressCol && (
+                            <td className="px-1.5 sm:px-2.5 py-2.5 whitespace-nowrap overflow-hidden">
+                              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                                <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
+                                  <div className={`h-full ${isTargetMet ? 'bg-primary' : 'bg-amber-500'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                </div>
+                                <span className={`text-[10px] font-mono shrink-0 ${isTargetMet ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                                  {(b.percentUsed || 0).toFixed(0)}%
+                                </span>
+                              </div>
+                            </td>
+                          )}
+                          {showAccountCol && (
+                            <td className="px-1.5 sm:px-2.5 py-2.5 text-xs text-muted-foreground/50 truncate">
+                              &mdash;
+                            </td>
+                          )}
+                          <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+                              <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
 
-                      {/* Everything Else Desktop Catch-All Breakout expandable sub-row */}
-                      {isEE && expandedCatchAll && b.groupedBreakout && (
-                        <tr className="bg-muted/30 border-b border-border/80">
-                          <td colSpan={hasAnyAccount ? 7 : 6} className="px-6 py-3">
+                    {expenseBudgets.length > 0 && (
+                      <tr className="bg-accent/40 border-y border-border/50">
+                        <td colSpan={activeColCount} className="px-3 sm:px-4 py-2 text-xs font-semibold text-foreground uppercase tracking-wider">
+                          <div className="flex items-center gap-1.5">
+                            <TrendingDown className="w-3.5 h-3.5 text-primary" />
+                            <span>Expenses</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {expenseBudgets.map((b) => {
+                      const isOver = b.remaining < 0;
+                      const isEE = b.isEverythingElse || b.isCatchAll || (b.categoryName || '').toLowerCase() === 'everything else';
+                      const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
+                      return (
+                        <Fragment key={b.id}>
+                          <tr className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
+                            <td className="px-2.5 sm:px-3.5 py-2.5 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-wrap">
+                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
+                                <Link
+                                  href={
+                                    isEE && b.groupedBreakout && b.groupedBreakout.length > 0
+                                      ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
+                                      : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
+                                  }
+                                  className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
+                                >
+                                  {b.categoryName}
+                                </Link>
+                                <BudgetItemTransactionsIcon
+                                  categoryId={isEE ? undefined : b.categoryId}
+                                  categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : undefined}
+                                  categoryName={b.categoryName}
+                                  periodType={periodType}
+                                  periodKey={periodKey}
+                                />
+
+                                {/* Redesigned compact Everything Else breakout dropdown pill */}
+                                {isEE && (
+                                  <button
+                                    onClick={() => setExpandedCatchAll(!expandedCatchAll)}
+                                    title="Expand to see unbudgeted category spending in this bucket"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-accent hover:bg-accent/80 border border-border/80 rounded text-primary transition-all cursor-pointer shrink-0"
+                                  >
+                                    <Layers className="w-3 h-3 text-primary shrink-0" />
+                                    <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} items</span>
+                                    {expandedCatchAll ? <ChevronUp className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0" />}
+                                  </button>
+                                )}
+                              </div>
+                              {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
+                            </td>
+                            <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
+                            <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
+                            {showVarianceCol && (
+                              <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
+                                {formatCurrency(b.remaining)}
+                              </td>
+                            )}
+                            {showProgressCol && (
+                              <td className="px-1.5 sm:px-2.5 py-2.5 whitespace-nowrap overflow-hidden">
+                                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                                  <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
+                                    <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                  </div>
+                                  <span className={`text-[10px] font-mono shrink-0 ${isOver ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                                    {(b.percentUsed || 0).toFixed(0)}%
+                                  </span>
+                                </div>
+                              </td>
+                            )}
+                            {showAccountCol && (
+                              <td className="px-1.5 sm:px-2.5 py-2.5 text-xs text-muted-foreground/50 truncate">
+                                &mdash;
+                              </td>
+                            )}
+                            <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+                                <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Everything Else Desktop Catch-All Breakout expandable sub-row */}
+                          {isEE && expandedCatchAll && b.groupedBreakout && (
+                            <tr className="bg-muted/30 border-b border-border/80">
+                              <td colSpan={activeColCount} className="px-6 py-3">
                             <div className="space-y-2.5">
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -781,6 +816,8 @@ export function BudgetTable() {
                 })}
               </tbody>
             </table>
+          );
+        })()}
           </div>
         )}
       </div>
