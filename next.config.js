@@ -9,6 +9,19 @@ const getBuildNumber = () => {
   return `${yy}.${mm}.${isProd ? 'local' : 'dev'}`;
 };
 
+const getLocalIPs = () => {
+  const os = require('os');
+  const ips = [];
+  for (const infos of Object.values(os.networkInterfaces())) {
+    for (const info of infos || []) {
+      if (info.family === 'IPv4' && !info.internal && !ips.includes(info.address)) {
+        ips.push(info.address);
+      }
+    }
+  }
+  return ips;
+};
+
 const getCommitHash = () => {
   if (process.env.COMMIT_HASH) return process.env.COMMIT_HASH;
   if (process.env.NEXT_PUBLIC_COMMIT_HASH) return process.env.NEXT_PUBLIC_COMMIT_HASH;
@@ -38,6 +51,7 @@ const nextConfig = {
   turbopack: {
     root: "./",
   },
+  allowedDevOrigins: getLocalIPs(),
   output: "standalone",
   serverExternalPackages: ['pg', 'pg-pool', 'pg-hstore', 'pg-types', 'pg-int8', 'pg-connection-string', 'pgpass'],
   images: {
@@ -83,7 +97,7 @@ const nextConfig = {
               "base-uri 'self';",
               "form-action 'self';",
               ...(process.env.NODE_ENV === "production" ? ["frame-ancestors 'none';"] : []),
-              "upgrade-insecure-requests;",
+              ...(process.env.NODE_ENV === "production" ? ["upgrade-insecure-requests;"] : []),
             ].join(" "),
           },
           ...(process.env.NODE_ENV === "production" ? [{ key: "X-Frame-Options", value: "DENY" }] : []),

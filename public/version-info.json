@@ -1,9 +1,19 @@
 {
-  "buildNumber": "26.08.1786394380479",
-  "buildTime": "2026-08-10T20:39:40.479Z",
-  "hash": "c248b89",
-  "fullHash": "c248b89c6e52ca622df0c662bca2e3e6c2b28f1c",
+  "buildNumber": "26.08.1786572035891",
+  "buildTime": "2026-08-12T22:00:35.891Z",
+  "hash": "06d9cf4",
+  "fullHash": "06d9cf41a3126de9188406a6aab0c146156d8f37",
   "commits": [
+    "refactor: implement ResizeObserver in budget table to dynamically manage column visibility based on container width",
+    "feat: implement time-based budget pacing and improved health status projections for monthly, quarterly, and yearly periods",
+    "feat: implement net value calculation to correctly handle income versus expense logic in budget actuals",
+    "refactor: improve budget status health logic and update transaction tooltip interaction behavior",
+    "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component",
+    "feat: implement collapsible sidebar UI for desktop dashboards and update side panel styling",
+    "ui: redesign Everything Else breakout pill for improved compactness and text truncation in budget table",
+    "refactor: simplify budget actuals calculation by implementing ancestor-based transaction attribution",
+    "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses",
+    "refactor: implement server-side budget filtering with effective date bounds and dynamic catch-all category breakout",
     "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
     "refactor: centralize account exclusion logic and apply consistently across budget proposals and transactions summaries",
     "feat: add functionality to exclude individual transactions from auto-budget proposals and recalculate totals accordingly",
@@ -193,27 +203,97 @@
     "goals bugs",
     "goals improvement",
     "alert improvements",
-    "db fix",
-    "db fix",
-    "db fix",
-    "db fix",
-    "alerts logging",
-    "db fix",
-    "multi condition alerts",
-    "notificaiton csp fix",
-    "custom alerts",
-    "custom alerts",
-    "notifications improvements"
+    "db fix"
   ],
   "history": [
+    {
+      "hash": "06d9cf4",
+      "fullHash": "06d9cf41a3126de9188406a6aab0c146156d8f37",
+      "author": "Alan Racek",
+      "date": "2026-08-10T17:39:52-07:00",
+      "message": "refactor: implement ResizeObserver in budget table to dynamically manage column visibility based on container width",
+      "type": "refactor",
+      "buildNumber": "26.08.1786572035891"
+    },
+    {
+      "hash": "dbd9a08",
+      "fullHash": "dbd9a08067b262e0acae964164f7d652adf6f495",
+      "author": "Alan Racek",
+      "date": "2026-08-10T16:39:16-07:00",
+      "message": "feat: implement time-based budget pacing and improved health status projections for monthly, quarterly, and yearly periods",
+      "type": "feat"
+    },
+    {
+      "hash": "d52eca8",
+      "fullHash": "d52eca88781b0d49dbacc9e3a6f4ee39f0a01ceb",
+      "author": "Alan Racek",
+      "date": "2026-08-10T16:06:39-07:00",
+      "message": "feat: implement net value calculation to correctly handle income versus expense logic in budget actuals",
+      "type": "feat"
+    },
+    {
+      "hash": "149ecb8",
+      "fullHash": "149ecb86b48b712b2559b088d1c82dc07494f096",
+      "author": "Alan Racek",
+      "date": "2026-08-10T15:50:44-07:00",
+      "message": "refactor: improve budget status health logic and update transaction tooltip interaction behavior",
+      "type": "refactor"
+    },
+    {
+      "hash": "0799145",
+      "fullHash": "0799145cf434dfd1e969793383d4a1c291b8109b",
+      "author": "Alan Racek",
+      "date": "2026-08-10T15:17:16-07:00",
+      "message": "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component",
+      "type": "feat"
+    },
+    {
+      "hash": "a90c9bf",
+      "fullHash": "a90c9bf620d892ecde6e8cb2d1a53cfda2c69777",
+      "author": "Alan Racek",
+      "date": "2026-08-10T15:03:26-07:00",
+      "message": "feat: implement collapsible sidebar UI for desktop dashboards and update side panel styling",
+      "type": "feat"
+    },
+    {
+      "hash": "d492d67",
+      "fullHash": "d492d67e58f0fb6aa526a4417e0b1e6ac01323d1",
+      "author": "Alan Racek",
+      "date": "2026-08-10T14:50:58-07:00",
+      "message": "ui: redesign Everything Else breakout pill for improved compactness and text truncation in budget table",
+      "type": "ui"
+    },
+    {
+      "hash": "4f4b671",
+      "fullHash": "4f4b67136e1bee6212e5b66ff84c44405a98bae4",
+      "author": "Alan Racek",
+      "date": "2026-08-10T14:43:30-07:00",
+      "message": "refactor: simplify budget actuals calculation by implementing ancestor-based transaction attribution",
+      "type": "refactor"
+    },
+    {
+      "hash": "b8449f1",
+      "fullHash": "b8449f1dd1271d4b5ff14340779c7c1ed814af4e",
+      "author": "Alan Racek",
+      "date": "2026-08-10T14:14:53-07:00",
+      "message": "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses",
+      "type": "refactor"
+    },
+    {
+      "hash": "cc4bb26",
+      "fullHash": "cc4bb26e3a173bb5427120f6e16d6b63983215e8",
+      "author": "Alan Racek",
+      "date": "2026-08-10T13:46:47-07:00",
+      "message": "refactor: implement server-side budget filtering with effective date bounds and dynamic catch-all category breakout",
+      "type": "refactor"
+    },
     {
       "hash": "c248b89",
       "fullHash": "c248b89c6e52ca622df0c662bca2e3e6c2b28f1c",
       "author": "Alan Racek",
       "date": "2026-08-10T11:04:49-07:00",
       "message": "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
-      "type": "feat",
-      "buildNumber": "26.08.1786394380479"
+      "type": "feat"
     },
     {
       "hash": "89272f7",
@@ -1725,86 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-25T13:02:11-07:00",
       "message": "db fix",
-      "type": "other"
-    },
-    {
-      "hash": "6cbc3ac",
-      "fullHash": "6cbc3ac3df139d8c1d7c23504f2553abc54c8316",
-      "author": "Alan Racek",
-      "date": "2026-06-25T12:56:48-07:00",
-      "message": "db fix",
-      "type": "other"
-    },
-    {
-      "hash": "ee0ac28",
-      "fullHash": "ee0ac28f700a068b50a6792c77ba62e11b4f6297",
-      "author": "Alan Racek",
-      "date": "2026-06-25T12:49:43-07:00",
-      "message": "db fix",
-      "type": "other"
-    },
-    {
-      "hash": "8cb6c6a",
-      "fullHash": "8cb6c6a2dfa67ad01a0911b965577c4180a7a8e5",
-      "author": "Alan Racek",
-      "date": "2026-06-25T12:37:08-07:00",
-      "message": "db fix",
-      "type": "other"
-    },
-    {
-      "hash": "ca30dec",
-      "fullHash": "ca30dec1c6a199499ae051ab721c5adc6ad46c06",
-      "author": "Alan Racek",
-      "date": "2026-06-25T12:24:25-07:00",
-      "message": "alerts logging",
-      "type": "other"
-    },
-    {
-      "hash": "6a8d02e",
-      "fullHash": "6a8d02e0843152341c29cf8608d963e73600c086",
-      "author": "Alan Racek",
-      "date": "2026-06-25T12:12:48-07:00",
-      "message": "db fix",
-      "type": "other"
-    },
-    {
-      "hash": "3c13a07",
-      "fullHash": "3c13a07575aaaae9277e1bcf2aaa5a1f07e9b934",
-      "author": "Alan Racek",
-      "date": "2026-06-25T11:56:03-07:00",
-      "message": "multi condition alerts",
-      "type": "other"
-    },
-    {
-      "hash": "38c06b3",
-      "fullHash": "38c06b3ecc23adbd0c2d3fe221ea471c17c1b75e",
-      "author": "Alan Racek",
-      "date": "2026-06-25T11:46:44-07:00",
-      "message": "notificaiton csp fix",
-      "type": "other"
-    },
-    {
-      "hash": "e6f70cb",
-      "fullHash": "e6f70cb3ebffbf20cac390216e605d46c8e7f71c",
-      "author": "Alan Racek",
-      "date": "2026-06-25T11:21:45-07:00",
-      "message": "custom alerts",
-      "type": "other"
-    },
-    {
-      "hash": "f6b912c",
-      "fullHash": "f6b912c3d26bc1b767cf616d05c5c2506ac96461",
-      "author": "Alan Racek",
-      "date": "2026-06-25T11:10:17-07:00",
-      "message": "custom alerts",
-      "type": "other"
-    },
-    {
-      "hash": "ca2e4d8",
-      "fullHash": "ca2e4d889367624052fcb9f0dca03bfd5169f06c",
-      "author": "Alan Racek",
-      "date": "2026-06-25T10:39:37-07:00",
-      "message": "notifications improvements",
       "type": "other"
     }
   ]
