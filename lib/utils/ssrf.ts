@@ -84,10 +84,7 @@ export async function validateEndpointUrl(
   }
 
   if (isIP(hostname)) {
-    if (isPrivateIP(hostname)) {
-      return { ok: false, error: 'Requests to private IP ranges are not allowed' };
-    }
-    return { ok: true, url };
+    return { ok: false, error: 'IP literals are not allowed' };
   }
 
   try {
@@ -98,7 +95,7 @@ export async function validateEndpointUrl(
       }
     }
   } catch {
-    /* DNS resolution failed — let it fail naturally at fetch time */
+    return { ok: false, error: 'DNS resolution failed' };
   }
 
   return { ok: true, url };

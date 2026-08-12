@@ -45,6 +45,8 @@ export async function POST(request: Request) {
     const res = await fetch(targetUrl, {
       method: 'GET',
       headers,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!res.ok) {

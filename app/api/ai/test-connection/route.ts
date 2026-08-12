@@ -59,6 +59,8 @@ export async function POST(request: Request) {
         ],
         chat_id: 'test-connection',
       }),
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10_000),
     });
     const elapsed = Date.now() - startTime;
 
