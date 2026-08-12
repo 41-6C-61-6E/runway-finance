@@ -4,10 +4,10 @@
 
 **Self-hosted personal finance dashboard for tracking net worth, managing transactions, analyzing cash flow, and planning for financial independence.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENCE)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169e1?logo=postgresql)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)](https://www.docker.com/)
 [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D9-8CBEFF?logo=pnpm)](https://pnpm.io/)
@@ -24,7 +24,7 @@ All screenshots show the dashboard with the **Accounts Sidebar** expanded on the
 
 ### 🎨 Themes & Customization
 
-The app features a gorgeous, dark-by-default interface with customizable themes and accent colors (like Moonlight or Sapphire) and complete theme flexibility.
+The app features a gorgeous, dark-by-default interface with customizable themes (Moonlight, Daylight, Starlight) and accent colors (like Violet or Sapphire) and complete theme flexibility.
 
 <table>
   <tr>
@@ -57,7 +57,8 @@ Visualize wealth movements with interactive Sankey diagrams and track investment
     </td>
     <td width="50%">
       <p align="center"><b>Investments & Holdings</b></p>
-      <a href="public/screenshots/investments.png" alt="Investments Tracker" width="100%">
+      <a href="public/screenshots/investments.png">
+        <img src="public/screenshots/investments.png" alt="Investments Tracker" width="100%">
       </a>
     </td>
   </tr>
@@ -77,7 +78,8 @@ Track property portfolios with Redfin/FRED integrations and manage monthly budge
     </td>
     <td width="50%">
       <p align="center"><b>Budgets & Projections</b></p>
-      <a href="public/screenshots/budgets.png" alt="Budgets & Projections" width="100%">
+      <a href="public/screenshots/budgets.png">
+        <img src="public/screenshots/budgets.png" alt="Budgets & Projections" width="100%">
       </a>
     </td>
   </tr>
@@ -175,9 +177,9 @@ Manage your personal finance on the go with a fully optimized mobile responsive 
 
 | Category | Technology |
 |---|---|
-| **Framework** | Next.js 16 (App Router, Turbopack), React 19, TypeScript 5.9 |
+| **Framework** | Next.js 16 (App Router, Turbopack), React 19, TypeScript 5.7 |
 | **Styling** | Tailwind CSS 4, shadcn/ui (Radix UI primitives) |
-| **Authentication** | NextAuth v5 (beta.30), bcryptjs |
+| **Authentication** | NextAuth v5 (beta.32), bcryptjs |
 | **Database** | PostgreSQL, Drizzle ORM, drizzle-kit |
 | **State & Data** | TanStack Query, TanStack Table |
 | **Forms & Validation** | React Hook Form, Zod 4 |
@@ -205,8 +207,8 @@ Manage your personal finance on the go with a fully optimized mobile responsive 
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/personal-finance.git
-cd personal-finance
+git clone https://github.com/41-6C-61-6E/runway-finance.git
+cd runway-finance
 
 # Install dependencies
 pnpm install
@@ -257,7 +259,7 @@ The application will be available at [http://localhost:3001](http://localhost:30
 
 ## 🔑 Environment Variables
 
-All variables are defined in `.env.example`. Copy it to `.env.local` and configure:
+All variables are defined in `.env.example`. For local development copy it to `.env.local`; Docker Compose uses `.env`.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
@@ -327,7 +329,7 @@ Build and deploy the full stack with Docker Compose:
 
 ```bash
 # Build the Docker image
-docker build -t personal-finance:latest .
+docker build -t alanracek/personal-finance:latest .
 
 # Start the full stack (PostgreSQL + app)
 docker compose up -d
@@ -525,7 +527,7 @@ Issues, pull requests, and suggestions are welcome. Feel free to fork and adapt 
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENCE).
 
 ```
 Copyright (c) 2025–2026 Alan Racek
@@ -535,7 +537,7 @@ of this software and associated documentation files, to deal in the Software
 without restriction...
 ```
 
-See the [LICENSE](LICENSE) file for full terms.
+See the [LICENCE](LICENCE) file for full terms.
 
 ---
 
