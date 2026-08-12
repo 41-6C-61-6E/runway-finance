@@ -39,7 +39,7 @@ export function CollapsibleFilterPanel({
           <button
             type="button"
             onClick={onToggle}
-            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 bg-background hover:bg-muted border border-border/80 rounded-lg text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm select-none shrink-0 min-touch-target-inline"
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 h-8 py-2 bg-background hover:bg-muted border border-border/80 rounded-lg text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm select-none shrink-0 min-touch-target-inline"
           >
             <Filter size={12} className="text-primary shrink-0" />
             <span className="hidden sm:inline">Options</span>
