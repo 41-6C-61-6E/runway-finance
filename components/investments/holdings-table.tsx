@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import {
   Search,
@@ -12,6 +12,10 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
+  Download,
+  Filter,
+  X,
+  Check,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
@@ -44,10 +48,12 @@ interface HoldingsTableProps {
   holdings: Holding[];
   accounts: Account[];
   quotes?: QuoteData[];
+  onSelectHolding?: (holding: Holding) => void;
 }
 
 type SortField = 'security' | 'account' | 'value' | 'gainLoss' | 'weight' | 'dayChange';
 type SortDirection = 'asc' | 'desc';
+type AssetTypeFilter = 'all' | 'Stock' | 'ETF' | 'Mutual Fund' | 'Cash' | 'Other';
 
 // Ticker heuristics for Asset Class/Type
 function getAssetType(ticker: string | null, name: string): 'Stock' | 'ETF' | 'Mutual Fund' | 'Cash' | 'Other' {
@@ -120,9 +126,14 @@ function formatRelativeTime(dateStr?: string) {
   }
 }
 
-export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTableProps) {
+export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding }: HoldingsTableProps) {
   const [search, setSearch] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState('all');
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set()); // empty Set means all
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const [accountSearch, setAccountSearch] = useState('');
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [selectedAssetType, setSelectedAssetType] = useState<AssetTypeFilter>('all');
   const [sortField, setSortField] = useState<SortField>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showSector, setShowSector] = useState(false);
@@ -131,6 +142,21 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
   const toggleRow = (id: string) => {
     setExpandedRow(expandedRow === id ? null : id);
   };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(event.target as Node)) {
+        setAccountDropdownOpen(false);
+      }
+    }
+    if (accountDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [accountDropdownOpen]);
 
   // Map quotes for easy lookup
   const quotesMap = useMemo(() => {
@@ -143,32 +169,118 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
     return map;
   }, [quotes]);
 
+  // Total portfolio value recalculated with live quotes
+  const totalLivePortfolioValue = useMemo(() => {
+    return holdings.reduce((sum, h) => {
+      const q = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+      const val = q?.price ? q.price * h.quantity : h.value;
+      return sum + val;
+    }, 0);
+  }, [holdings, quotesMap]);
+
   // Filter accounts that actually have holdings to keep the filter clean
   const accountsWithHoldings = useMemo(() => {
     const activeIds = new Set(holdings.map((h) => h.accountId));
     return accounts.filter((acc) => activeIds.has(acc.id));
   }, [accounts, holdings]);
 
-  // Apply search and account filters
+  // Stats per account for the dropdown summary
+  const accountHoldingStats = useMemo(() => {
+    const map: Record<string, { count: number; value: number }> = {};
+    for (const h of holdings) {
+      const q = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+      const val = q?.price ? q.price * h.quantity : h.value;
+      if (!map[h.accountId]) {
+        map[h.accountId] = { count: 0, value: 0 };
+      }
+      map[h.accountId].count += 1;
+      map[h.accountId].value += val;
+    }
+    return map;
+  }, [holdings, quotesMap]);
+
+  // Filtered accounts list inside the dropdown search
+  const filteredAccountsList = useMemo(() => {
+    if (!accountSearch.trim()) return accountsWithHoldings;
+    const q = accountSearch.toLowerCase();
+    return accountsWithHoldings.filter(
+      (a) => a.name.toLowerCase().includes(q) || (a.institution && a.institution.toLowerCase().includes(q))
+    );
+  }, [accountsWithHoldings, accountSearch]);
+
+  // Toggle single account selection
+  const toggleAccount = (id: string) => {
+    setSelectedAccountIds((prev) => {
+      const allIds = accountsWithHoldings.map((a) => a.id);
+      if (prev.size === 0) {
+        const next = new Set(allIds);
+        next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        if (next.size === 0) {
+          return new Set(['__none__']);
+        }
+      } else {
+        next.delete('__none__');
+        next.add(id);
+        if (next.size === allIds.length) {
+          return new Set(); // Reset to "all"
+        }
+      }
+      return next;
+    });
+  };
+
+  // Label for account dropdown trigger button
+  const selectedAccountLabel = useMemo(() => {
+    if (selectedAccountIds.size === 0 || selectedAccountIds.size === accountsWithHoldings.length) {
+      return `All Accounts (${accountsWithHoldings.length})`;
+    }
+    if (selectedAccountIds.size === 1 && !selectedAccountIds.has('__none__')) {
+      const singleId = Array.from(selectedAccountIds)[0];
+      const acc = accountsWithHoldings.find((a) => a.id === singleId);
+      if (acc) {
+        return acc.institution ? `${acc.institution} - ${acc.name}` : acc.name;
+      }
+    }
+    if (selectedAccountIds.has('__none__')) {
+      return 'No Accounts Selected';
+    }
+    return `${selectedAccountIds.size} of ${accountsWithHoldings.length} Accounts`;
+  }, [selectedAccountIds, accountsWithHoldings]);
+
+  // Apply search, account, and asset type filters
   const filteredHoldings = useMemo(() => {
     return holdings.filter((h) => {
       const matchesSearch =
         (h.ticker?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
         h.name.toLowerCase().includes(search.toLowerCase());
       
-      const matchesAccount =
-        selectedAccountId === 'all' || h.accountId === selectedAccountId;
+      const isAccountMatch =
+        selectedAccountIds.size === 0 || selectedAccountIds.has(h.accountId);
 
-      return matchesSearch && matchesAccount;
+      const assetType = getAssetType(h.ticker, h.name);
+      const matchesAssetType =
+        selectedAssetType === 'all' || assetType === selectedAssetType;
+
+      return matchesSearch && isAccountMatch && matchesAssetType;
     });
-  }, [holdings, search, selectedAccountId]);
+  }, [holdings, search, selectedAccountIds, selectedAssetType]);
 
-  // Apply sorting
+  // Apply dynamic live sorting
   const sortedHoldings = useMemo(() => {
     const sorted = [...filteredHoldings];
     sorted.sort((a, b) => {
       let valA: any = 0;
       let valB: any = 0;
+
+      const qA = a.ticker ? quotesMap.get(a.ticker.toUpperCase()) : null;
+      const qB = b.ticker ? quotesMap.get(b.ticker.toUpperCase()) : null;
+      const liveValA = qA?.price ? qA.price * a.quantity : a.value;
+      const liveValB = qB?.price ? qB.price * b.quantity : b.value;
 
       switch (sortField) {
         case 'security':
@@ -184,20 +296,21 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
             ? valA.localeCompare(valB)
             : valB.localeCompare(valA);
         case 'value':
-          valA = a.value;
-          valB = b.value;
+          valA = liveValA;
+          valB = liveValB;
           break;
         case 'weight':
-          valA = a.portfolioWeight;
-          valB = b.portfolioWeight;
+          valA = totalLivePortfolioValue > 0 ? (liveValA / totalLivePortfolioValue) * 100 : a.portfolioWeight;
+          valB = totalLivePortfolioValue > 0 ? (liveValB / totalLivePortfolioValue) * 100 : b.portfolioWeight;
           break;
-        case 'gainLoss':
-          valA = a.unrealizedGainLoss !== null ? a.unrealizedGainLoss : -Infinity;
-          valB = b.unrealizedGainLoss !== null ? b.unrealizedGainLoss : -Infinity;
+        case 'gainLoss': {
+          const costA = a.costBasis;
+          const costB = b.costBasis;
+          valA = costA != null && costA > 0 ? liveValA - costA : (a.unrealizedGainLoss ?? -Infinity);
+          valB = costB != null && costB > 0 ? liveValB - costB : (b.unrealizedGainLoss ?? -Infinity);
           break;
+        }
         case 'dayChange': {
-          const qA = a.ticker ? quotesMap.get(a.ticker.toUpperCase()) : null;
-          const qB = b.ticker ? quotesMap.get(b.ticker.toUpperCase()) : null;
           valA = qA?.changePercent !== undefined && qA?.changePercent !== null ? qA.changePercent : -9999;
           valB = qB?.changePercent !== undefined && qB?.changePercent !== null ? qB.changePercent : -9999;
           break;
@@ -209,7 +322,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
       return 0;
     });
     return sorted;
-  }, [filteredHoldings, sortField, sortDirection, quotesMap]);
+  }, [filteredHoldings, sortField, sortDirection, quotesMap, totalLivePortfolioValue]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -218,6 +331,59 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
       setSortField(field);
       setSortDirection('desc'); // Default to desc
     }
+  };
+
+  const exportToCsv = () => {
+    const headers = [
+      'Ticker',
+      'Security Name',
+      'Asset Type',
+      'Sector',
+      'Brokerage Account',
+      'Quantity',
+      'Price',
+      'Day Change %',
+      'Total Value',
+      'Cost Basis',
+      'Unrealized Gain/Loss',
+      'Return %',
+      'Portfolio Weight %',
+    ];
+    const rows = sortedHoldings.map((h) => {
+      const q = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+      const price = q?.price ?? h.price;
+      const val = q?.price ? q.price * h.quantity : h.value;
+      const cost = h.costBasis;
+      const gain = cost != null && cost > 0 ? val - cost : '';
+      const retPct = cost != null && cost > 0 ? ((val - cost) / cost) * 100 : '';
+      const weight = totalLivePortfolioValue > 0 ? ((val / totalLivePortfolioValue) * 100).toFixed(2) : h.portfolioWeight.toFixed(2);
+
+      return [
+        h.ticker || '',
+        `"${h.name.replace(/"/g, '""')}"`,
+        getAssetType(h.ticker, h.name),
+        getSector(h.ticker),
+        `"${h.institutionName} - ${h.accountName}"`,
+        h.quantity,
+        price,
+        q?.changePercent != null ? q.changePercent.toFixed(2) : '',
+        val.toFixed(2),
+        cost != null ? cost.toFixed(2) : '',
+        typeof gain === 'number' ? gain.toFixed(2) : '',
+        retPct !== '' ? Number(retPct).toFixed(2) : '',
+        weight,
+      ];
+    });
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Holdings-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const SortHeader = ({ field, label, align = 'left' }: { field: SortField; label: string; align?: 'left' | 'right' }) => {
@@ -243,61 +409,194 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
     );
   };
 
+  const assetTypeOptions: { value: AssetTypeFilter; label: string }[] = [
+    { value: 'all', label: 'All Assets' },
+    { value: 'Stock', label: 'Stocks' },
+    { value: 'ETF', label: 'ETFs' },
+    { value: 'Mutual Fund', label: 'Mutual Funds' },
+    { value: 'Cash', label: 'Cash' },
+  ];
+
   return (
     <div className="@container space-y-4">
-      {/* Filters Bar */}
-      <div className="flex flex-col @md:flex-row gap-3 items-center justify-between">
-        {/* Search */}
-        <div className="relative w-full @md:max-w-xs">
-          <Search className="w-4 h-4 text-muted-foreground/60 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search by ticker or name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 text-xs bg-muted/40 border border-border rounded-lg placeholder-muted-foreground/60 focus:outline-none focus:border-primary transition-colors"
-          />
-        </div>
+      {/* Filters & Actions Bar */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col @lg:flex-row gap-2.5 items-stretch @lg:items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 min-w-0">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64 shrink-0">
+              <Search className="w-4 h-4 text-muted-foreground/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by ticker or name..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-1.5 text-xs bg-muted/40 border border-border rounded-lg placeholder-muted-foreground/60 focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
 
-        {/* Account Tabs and Sector Toggle */}
-        <div className="flex flex-wrap items-center gap-4 w-full @md:w-auto justify-between @md:justify-end">
-          {/* Segmented Account Filter */}
-          {accountsWithHoldings.length > 0 && (
-            <div className="flex border-b border-border/60 gap-5 max-w-full overflow-x-auto scrollbar-none pb-0.5 -mb-px">
-              <button
-                onClick={() => setSelectedAccountId('all')}
-                className={`pb-1.5 px-1 text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all border-b-2 cursor-pointer ${
-                  selectedAccountId === 'all'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                All Accounts
-              </button>
-              {accountsWithHoldings.map((acc) => (
+            {/* Account Checkbox Dropdown Selector */}
+            {accountsWithHoldings.length > 0 && (
+              <div className="relative shrink-0" ref={accountDropdownRef}>
                 <button
-                  key={acc.id}
-                  onClick={() => setSelectedAccountId(acc.id)}
-                  className={`pb-1.5 px-1 text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-all border-b-2 cursor-pointer ${
-                    selectedAccountId === acc.id
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  type="button"
+                  onClick={() => {
+                    setAccountDropdownOpen(!accountDropdownOpen);
+                    setAccountSearch('');
+                  }}
+                  className={`flex items-center justify-between sm:justify-start gap-2 px-3 py-1.5 text-xs border rounded-lg transition-all font-medium cursor-pointer select-none w-full sm:w-auto ${
+                    selectedAccountIds.size > 0 && selectedAccountIds.size < accountsWithHoldings.length
+                      ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/15'
+                      : 'bg-muted/40 hover:bg-muted/70 border-border text-foreground'
                   }`}
                 >
-                  {acc.institution ? `${acc.institution} - ${acc.name}` : acc.name}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Landmark className="w-3.5 h-3.5 opacity-70 shrink-0" />
+                    <span className="truncate max-w-[150px] sm:max-w-[180px] text-left">
+                      {selectedAccountLabel}
+                    </span>
+                  </div>
+                  <ChevronDown className={`w-3.5 h-3.5 opacity-60 transition-transform duration-200 shrink-0 ${accountDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
-              ))}
-            </div>
-          )}
 
-          {/* Toggle Sector Column Button */}
-          <button
-            onClick={() => setShowSector(!showSector)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-muted/40 hover:bg-muted/75 border border-border rounded-lg transition-colors text-muted-foreground hover:text-foreground font-medium"
-          >
-            {showSector ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            <span>{showSector ? 'Hide Sector' : 'Show Sector'}</span>
-          </button>
+                {accountDropdownOpen && (
+                  <div className="absolute left-0 top-full mt-1.5 w-full sm:w-80 bg-card border border-border rounded-xl shadow-xl z-50 p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                    {/* Search inside dropdown */}
+                    <div className="relative flex items-center bg-muted/40 border border-border rounded-lg px-2.5 py-1">
+                      <Search className="w-3.5 h-3.5 text-muted-foreground/70 mr-1.5 shrink-0 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search accounts..."
+                        value={accountSearch}
+                        onChange={(e) => setAccountSearch(e.target.value)}
+                        className="bg-transparent border-none text-xs text-foreground placeholder-muted-foreground/60 focus:outline-none w-full"
+                        autoFocus
+                      />
+                      {accountSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setAccountSearch('')}
+                          className="text-muted-foreground hover:text-foreground text-xs p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quick Select Actions */}
+                    <div className="flex items-center justify-between text-[11px] px-1 text-muted-foreground border-b border-border/30 pb-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAccountIds(new Set())}
+                        className="font-semibold text-primary hover:underline cursor-pointer"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAccountIds(new Set(['__none__']))}
+                        className="font-medium hover:text-destructive cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+
+                    {/* Account Items List with Checkboxes */}
+                    <div className="max-h-60 overflow-y-auto space-y-0.5 pr-0.5 scrollbar-thin">
+                      {filteredAccountsList.length === 0 ? (
+                        <div className="p-3 text-xs text-muted-foreground text-center italic">
+                          No accounts match "{accountSearch}"
+                        </div>
+                      ) : (
+                        filteredAccountsList.map((acc) => {
+                          const isChecked = selectedAccountIds.size === 0 || selectedAccountIds.has(acc.id);
+                          const count = accountHoldingStats[acc.id]?.count ?? 0;
+                          const value = accountHoldingStats[acc.id]?.value ?? 0;
+
+                          return (
+                            <div
+                              key={acc.id}
+                              onClick={() => toggleAccount(acc.id)}
+                              className="group flex items-center justify-between gap-2 p-2 hover:bg-muted/50 rounded-lg cursor-pointer transition-colors text-xs select-none"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {}} // Click handled by parent div
+                                  className="w-3.5 h-3.5 rounded border-border text-primary accent-primary cursor-pointer shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-semibold text-foreground truncate" title={acc.name}>
+                                    {acc.name}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground truncate">
+                                    {acc.institution || 'Brokerage'} · {count} {count === 1 ? 'asset' : 'assets'} ({formatCurrency(value)})
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Quick 'Only' button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAccountIds(new Set([acc.id]));
+                                }}
+                                className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 text-[9px] font-semibold bg-muted hover:bg-primary hover:text-primary-foreground text-muted-foreground rounded transition-all shrink-0 cursor-pointer"
+                                title="Show only this account"
+                              >
+                                Only
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons (Right) */}
+          <div className="flex items-center gap-2 shrink-0 justify-end">
+            {/* Toggle Sector Column Button */}
+            <button
+              onClick={() => setShowSector(!showSector)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-muted/40 hover:bg-muted/75 border border-border rounded-lg transition-colors text-muted-foreground hover:text-foreground font-medium"
+            >
+              {showSector ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              <span>{showSector ? 'Hide Sector' : 'Show Sector'}</span>
+            </button>
+
+            {/* Export CSV Button */}
+            <button
+              onClick={exportToCsv}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-muted/40 hover:bg-muted/75 border border-border rounded-lg transition-colors text-muted-foreground hover:text-foreground font-medium"
+              title="Export holdings to CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Asset Class Filter Chips Bar */}
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-1 border-t border-border/40">
+          {assetTypeOptions.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setSelectedAssetType(opt.value)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all shrink-0 ${
+                selectedAssetType === opt.value
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -338,21 +637,28 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
           <tbody className="divide-y divide-border/30">
             {sortedHoldings.length > 0 ? (
               sortedHoldings.map((h, idx) => {
-                const hasReturn = h.unrealizedGainLoss !== null && h.costBasis !== null && h.costBasis > 0;
-                const isReturnPositive = h.unrealizedGainLoss ? h.unrealizedGainLoss >= 0 : false;
                 const assetType = getAssetType(h.ticker, h.name);
                 const sector = getSector(h.ticker);
 
-                // Fetch live quote day change and 52-week stats
+                // Fetch live quote stats and calculate live value and live returns
                 const quote = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
                 const price = quote?.price ?? h.price;
                 const value = quote?.price ? quote.price * h.quantity : h.value;
+                const cost = h.costBasis;
+                const hasReturn = cost !== null && cost > 0;
+                const gainLoss = hasReturn ? value - cost : h.unrealizedGainLoss;
+                const returnPct = hasReturn && cost > 0 ? (gainLoss! / cost) * 100 : h.unrealizedReturnPct;
+                const isReturnPositive = gainLoss != null ? gainLoss >= 0 : false;
+
                 const dayChangePct = quote?.changePercent;
                 const dayChangeVal = quote?.change;
                 const high52 = quote?.high52;
                 const low52 = quote?.low52;
-
                 const isDayChangePositive = dayChangePct != null ? dayChangePct >= 0 : null;
+
+                const weight = totalLivePortfolioValue > 0
+                  ? (value / totalLivePortfolioValue) * 100
+                  : h.portfolioWeight;
 
                 // Find corresponding account for sync time
                 const acc = accounts.find((a) => a.id === h.accountId);
@@ -366,7 +672,11 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                 }
 
                 return (
-                  <tr key={`${h.accountId}-${h.securityId}-${idx}`} className="hover:bg-muted/10 transition-colors">
+                  <tr
+                    key={`${h.accountId}-${h.securityId}-${idx}`}
+                    onClick={() => onSelectHolding?.(h)}
+                    className="hover:bg-muted/15 transition-colors cursor-pointer group"
+                  >
                     {/* Ticker / Name */}
                     <td className="p-3">
                       <div className="flex flex-col gap-1">
@@ -376,7 +686,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                               {h.ticker}
                             </span>
                           )}
-                          <span className="font-semibold text-foreground truncate max-w-[130px] sm:max-w-[160px]" title={h.name}>
+                          <span className="font-semibold text-foreground group-hover:text-primary transition-colors truncate max-w-[130px] sm:max-w-[160px]" title={h.name}>
                             {h.name}
                           </span>
                         </div>
@@ -406,7 +716,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                         </div>
                         {relativeSync && (
                           <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60">
-                            <RefreshCw className="w-2.5 h-2.5 opacity-70 shrink-0 animate-none" />
+                            <RefreshCw className="w-2.5 h-2.5 opacity-70 shrink-0" />
                             <span>Synced {relativeSync}</span>
                           </div>
                         )}
@@ -445,7 +755,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                         <div className="flex flex-col items-center justify-center gap-1 min-w-[80px]">
                           <div className="relative w-full h-1 bg-muted rounded-full">
                             <div
-                              className="absolute w-2 h-2 -top-0.5 rounded-full bg-primary border border-background shadow-sm"
+                              className="absolute w-2 h-2 -top-0.5 rounded-full bg-primary border border-background shadow-xs"
                               style={{ left: `calc(${rangePct}% - 4px)` }}
                             />
                           </div>
@@ -466,15 +776,15 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
 
                     {/* Return */}
                     <td className="p-3 text-right font-mono">
-                      {hasReturn ? (
+                      {hasReturn && gainLoss != null && returnPct != null ? (
                         <div className="flex flex-col items-end">
                           <span className={`font-semibold text-[11px] blur-number ${isReturnPositive ? 'text-chart-1' : 'text-destructive'}`}>
                             {isReturnPositive ? '+' : ''}
-                            {formatCurrency(h.unrealizedGainLoss!)}
+                            {formatCurrency(gainLoss)}
                           </span>
                           <span className={`text-[10px] font-semibold ${isReturnPositive ? 'text-chart-1' : 'text-destructive'}`}>
                             {isReturnPositive ? '↑' : '↓'}
-                            {h.unrealizedReturnPct!.toFixed(2)}%
+                            {returnPct.toFixed(2)}%
                           </span>
                         </div>
                       ) : (
@@ -483,7 +793,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <button className="focus:outline-none">
+                                <button className="focus:outline-none" onClick={(e) => e.stopPropagation()}>
                                   <Info className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-foreground cursor-pointer" />
                                 </button>
                               </TooltipTrigger>
@@ -498,7 +808,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
 
                     {/* Weight */}
                     <td className="p-3 text-right text-muted-foreground font-mono tabular-nums">
-                      {h.portfolioWeight.toFixed(1)}%
+                      {weight.toFixed(1)}%
                     </td>
                   </tr>
                 );
@@ -522,19 +832,27 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
           sortedHoldings.map((h, idx) => {
             const rowId = `${h.accountId}-${h.securityId}-${idx}`;
             const isExpanded = expandedRow === rowId;
-            const hasReturn = h.unrealizedGainLoss !== null && h.costBasis !== null && h.costBasis > 0;
-            const isReturnPositive = h.unrealizedGainLoss ? h.unrealizedGainLoss >= 0 : false;
             const assetType = getAssetType(h.ticker, h.name);
             const sector = getSector(h.ticker);
 
             const quote = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
             const price = quote?.price ?? h.price;
             const value = quote?.price ? quote.price * h.quantity : h.value;
+            const cost = h.costBasis;
+            const hasReturn = cost !== null && cost > 0;
+            const gainLoss = hasReturn ? value - cost : h.unrealizedGainLoss;
+            const returnPct = hasReturn && cost > 0 ? (gainLoss! / cost) * 100 : h.unrealizedReturnPct;
+            const isReturnPositive = gainLoss != null ? gainLoss >= 0 : false;
+
             const dayChangePct = quote?.changePercent;
             const dayChangeVal = quote?.change;
             const high52 = quote?.high52;
             const low52 = quote?.low52;
             const isDayChangePositive = dayChangePct != null ? dayChangePct >= 0 : null;
+
+            const weight = totalLivePortfolioValue > 0
+              ? (value / totalLivePortfolioValue) * 100
+              : h.portfolioWeight;
 
             const acc = accounts.find((a) => a.id === h.accountId);
             const relativeSync = acc?.updatedAt ? formatRelativeTime(acc.updatedAt) : '';
@@ -549,7 +867,13 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
               <div
                 key={rowId}
                 className="bg-card border border-border rounded-xl p-3.5 flex flex-col gap-2 hover:border-primary/20 transition-all duration-200 cursor-pointer active:bg-muted/10"
-                onClick={() => toggleRow(rowId)}
+                onClick={() => {
+                  if (onSelectHolding) {
+                    onSelectHolding(h);
+                  } else {
+                    toggleRow(rowId);
+                  }
+                }}
               >
                 {/* Header Row */}
                 <div className="flex items-start justify-between gap-2">
@@ -576,10 +900,10 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                   {/* Value & Return Right-aligned */}
                   <div className="text-right shrink-0">
                     <div className="font-bold text-foreground blur-number text-sm">{formatCurrency(value)}</div>
-                    {hasReturn ? (
+                    {hasReturn && returnPct != null ? (
                       <span className={`text-[10px] font-semibold flex items-center justify-end gap-0.5 ${isReturnPositive ? 'text-chart-1' : 'text-destructive'}`}>
                         {isReturnPositive ? '▲' : '▼'}
-                        {h.unrealizedReturnPct!.toFixed(1)}%
+                        {returnPct.toFixed(1)}%
                       </span>
                     ) : (
                       <span className="text-[10px] text-muted-foreground/50">No return data</span>
@@ -599,7 +923,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                     <div className="text-right">
                       <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Portfolio Weight</span>
                       <span className="font-mono text-foreground font-semibold">
-                        {h.portfolioWeight.toFixed(1)}% of total
+                        {weight.toFixed(1)}% of total
                       </span>
                     </div>
 
@@ -627,7 +951,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [] }: HoldingsTable
                           <span className="font-mono blur-number">${low52.toFixed(0)}</span>
                           <div className="flex-1 h-1 bg-muted rounded-full relative">
                             <div
-                              className="absolute w-2 h-2 -top-0.5 rounded-full bg-primary border border-background shadow-sm"
+                              className="absolute w-2 h-2 -top-0.5 rounded-full bg-primary border border-background shadow-xs"
                               style={{ left: `calc(${rangePct}% - 4px)` }}
                             />
                           </div>

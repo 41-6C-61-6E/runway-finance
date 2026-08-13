@@ -307,54 +307,56 @@ export function NetWorthSidePanel() {
         className="border-b border-sidebar-border/60 bg-sidebar"
       />
       {!isCollapsed && (
-        <div className="p-4 sm:p-5 space-y-4 divide-y divide-sidebar-border/50">
+        <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
           {/* Section 1: Hero Net Worth */}
-          <ChartHoverTooltip
-            content={
-              <>
-                <TooltipHeader>Total Net Worth Calculation</TooltipHeader>
-                <TooltipRow label="Total Assets" value={formatCurrency(totals.totalAssets)} color="var(--color-chart-1)" />
-                <TooltipRow label="Total Liabilities" value={formatCurrency(totals.totalLiabilities)} color="var(--color-destructive)" />
-                <div className="mt-2 border-t border-border/40 pt-1.5">
-                  <TooltipRow
-                    label="1-Year Growth"
-                    value={`${deltas.netWorth >= 0 ? '+' : ''}${formatCurrency(deltas.netWorth)} (${deltas.pctNetWorth.toFixed(1)}%)`}
-                    color={deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
-                  />
-                </div>
-              </>
-            }
-          >
-            <div className="space-y-2 cursor-help pb-1">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                Total Net Worth
-                <Info className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
-              </span>
-              <div className="flex flex-col">
-                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
-                  {formatCurrency(totals.netWorth)}
-                </span>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <div
-                    className={cn(
-                      'inline-flex items-center gap-0.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border font-mono',
-                      deltas.netWorth >= 0
-                        ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
-                        : 'bg-destructive/10 text-destructive border-destructive/20'
-                    )}
-                  >
-                    {deltas.netWorth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                    <span className="blur-number">{formatCurrency(Math.abs(deltas.netWorth))}</span>
-                    <span className="opacity-80">({deltas.pctNetWorth >= 0 ? '+' : ''}{deltas.pctNetWorth.toFixed(1)}%)</span>
+          <div className="py-4 first:pt-0 last:pb-0">
+            <ChartHoverTooltip
+              content={
+                <>
+                  <TooltipHeader>Total Net Worth Calculation</TooltipHeader>
+                  <TooltipRow label="Total Assets" value={formatCurrency(totals.totalAssets)} color="var(--color-chart-1)" />
+                  <TooltipRow label="Total Liabilities" value={formatCurrency(totals.totalLiabilities)} color="var(--color-destructive)" />
+                  <div className="mt-2 border-t border-border/40 pt-1.5">
+                    <TooltipRow
+                      label="1-Year Growth"
+                      value={`${deltas.netWorth >= 0 ? '+' : ''}${formatCurrency(deltas.netWorth)} (${deltas.pctNetWorth.toFixed(1)}%)`}
+                      color={deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+                    />
                   </div>
-                  <span className="text-[11px] text-muted-foreground">past 1 year</span>
+                </>
+              }
+            >
+              <div className="space-y-2 cursor-help">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  Total Net Worth
+                  <Info className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
+                </span>
+                <div className="flex flex-col">
+                  <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
+                    {formatCurrency(totals.netWorth)}
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <div
+                      className={cn(
+                        'inline-flex items-center gap-0.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border font-mono',
+                        deltas.netWorth >= 0
+                          ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
+                          : 'bg-destructive/10 text-destructive border-destructive/20'
+                      )}
+                    >
+                      {deltas.netWorth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                      <span className="blur-number">{formatCurrency(Math.abs(deltas.netWorth))}</span>
+                      <span className="opacity-80">({deltas.pctNetWorth >= 0 ? '+' : ''}{deltas.pctNetWorth.toFixed(1)}%)</span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">past 1 year</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </ChartHoverTooltip>
+            </ChartHoverTooltip>
+          </div>
 
           {/* Section 2: Assets vs Liabilities */}
-          <div className="pt-4">
+          <div className="py-4 first:pt-0 last:pb-0">
             <ChartHoverTooltip
               content={
                 <>
@@ -393,7 +395,7 @@ export function NetWorthSidePanel() {
           </div>
 
           {/* Section 3: Debt to Asset Ratio Rating Card */}
-          <div className="pt-4">
+          <div className="py-4 first:pt-0 last:pb-0">
             <ChartHoverTooltip
               content={
                 <>
@@ -440,7 +442,7 @@ export function NetWorthSidePanel() {
 
           {/* Section 4: Liquid vs Illiquid Assets */}
           {liquidity.total > 0 && (
-            <div className="pt-4">
+            <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip
                 content={
                   <>
@@ -482,7 +484,7 @@ export function NetWorthSidePanel() {
           )}
 
           {/* Section 5: Net Worth Milestone Tracker */}
-          <div className="pt-4">
+          <div className="py-4 first:pt-0 last:pb-0">
             <ChartHoverTooltip
               content={
                 <>

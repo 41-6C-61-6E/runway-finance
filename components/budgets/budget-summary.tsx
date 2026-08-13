@@ -280,9 +280,9 @@ export function BudgetSummary() {
         className="border-b border-sidebar-border/60 bg-sidebar"
       />
       {!collapsed && (
-        <div className="p-4 sm:p-5 space-y-4 divide-y divide-sidebar-border/50">
+        <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
           {/* Section 1: Header Status & Net Position */}
-          <div className="flex items-center justify-between pb-3">
+          <div className="py-4 first:pt-0 last:pb-0 flex items-center justify-between">
             <div className="space-y-0.5">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</span>
               <div className="flex items-center gap-1.5 pt-0.5">
@@ -381,7 +381,7 @@ export function BudgetSummary() {
           </div>
 
           {/* Section 2: Donut Chart & Progress Section */}
-          <div className="pt-4 space-y-4">
+          <div className="py-4 first:pt-0 last:pb-0 space-y-4">
             {hasExpenses && (
               <div className="flex items-center justify-center relative py-1">
                 <div className="w-36 h-36 relative flex items-center justify-center">
@@ -468,7 +468,7 @@ export function BudgetSummary() {
 
           {/* Section 3: Fixed vs Discretionary Allocation */}
           {hasExpenses && totalExpBud > 0 && (
-            <div className="pt-4">
+            <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip
                 content={
                   <>
@@ -510,7 +510,7 @@ export function BudgetSummary() {
 
           {/* Section 4: Category Risk / Variance Distribution */}
           {hasExpenses && totalCatCount > 0 && (
-            <div className="pt-4">
+            <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip
                 content={
                   <>
