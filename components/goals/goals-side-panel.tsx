@@ -245,7 +245,7 @@ export function GoalsSidePanel() {
                 <span className="text-2xl font-extrabold text-foreground font-mono blur-number">
                   {progressPercent.toFixed(1)}%
                 </span>
-                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mt-0.5">
                   Funded
                 </span>
               </div>
@@ -253,7 +253,7 @@ export function GoalsSidePanel() {
 
             {/* Goal Count Chips */}
             <div className="flex items-center gap-2 text-xs">
-              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 font-mono">
+              <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 font-mono text-[11px]">
                 {data.totalGoals} Total Goals
               </span>
             </div>
@@ -261,9 +261,9 @@ export function GoalsSidePanel() {
 
           {/* Section 2: Summary Financial Stat Rows */}
           <div className="pt-4 space-y-2">
-            <div className="flex items-center justify-between py-1.5">
+            <div className="flex items-center justify-between py-1">
               <div className="flex items-center gap-2">
-                <Coins className="w-4 h-4 text-muted-foreground" />
+                <Coins className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <span className="text-xs font-medium text-muted-foreground">Total Target</span>
               </div>
               <span className="text-sm font-bold text-foreground font-mono blur-number">
@@ -271,19 +271,19 @@ export function GoalsSidePanel() {
               </span>
             </div>
 
-            <div className="flex items-center justify-between py-1.5">
+            <div className="flex items-center justify-between py-1">
               <div className="flex items-center gap-2">
-                <Coins className="w-4 h-4 text-chart-1" />
+                <Coins className="w-3.5 h-3.5 text-chart-1 shrink-0" />
                 <span className="text-xs font-medium text-muted-foreground">Total Saved</span>
               </div>
-              <span className="text-sm font-bold text-foreground font-mono blur-number">
+              <span className="text-sm font-bold text-chart-1 font-mono blur-number">
                 {formatCurrency(data.totalCurrent)}
               </span>
             </div>
 
-            <div className="flex items-center justify-between py-1.5">
+            <div className="flex items-center justify-between py-1">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                <TrendingUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <span className="text-xs font-medium text-muted-foreground">Remaining</span>
               </div>
               <span className="text-sm font-bold text-foreground font-mono blur-number">
@@ -310,27 +310,27 @@ export function GoalsSidePanel() {
                   </>
                 }
               >
-                <div className="space-y-2.5 cursor-help">
+                <div className="space-y-2 cursor-help">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
-                      <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
+                      <span className="text-xs font-bold text-foreground truncate max-w-[160px]">
                         {data.spotlightGoal.name}
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-mono">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-mono">
                       {data.spotlightGoal.progress.toFixed(0)}%
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between text-xs font-mono">
-                    <span className="text-muted-foreground blur-number">
-                      {formatCurrency(data.spotlightGoal.current)} / {formatCurrency(data.spotlightGoal.target)}
-                    </span>
                     <span className="text-foreground font-semibold blur-number">
+                      {formatCurrency(data.spotlightGoal.current)} <span className="text-muted-foreground font-normal">/ {formatCurrency(data.spotlightGoal.target)}</span>
+                    </span>
+                    <span className="text-muted-foreground text-[11px] blur-number">
                       {formatCurrency(data.spotlightGoal.remaining)} to go
                     </span>
                   </div>
-                  <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden">
+                  <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-primary transition-all duration-500 rounded-full"
                       style={{ width: `${data.spotlightGoal.progress}%` }}
@@ -350,9 +350,9 @@ export function GoalsSidePanel() {
 
           {/* Section 5: Breakdown by Goal Type */}
           {Object.keys(data.byType).length > 0 && (
-            <div className="pt-4 space-y-2">
-              <span className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-2">
-                <PieChart className="w-3.5 h-3.5 text-primary" />
+            <div className="pt-4 space-y-2.5">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <PieChart className="w-3.5 h-3.5 text-primary shrink-0" />
                 Breakdown by Type
               </span>
               <div className="space-y-2.5">

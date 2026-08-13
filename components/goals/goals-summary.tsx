@@ -163,31 +163,28 @@ export function GoalsSummary() {
             {/* 3-column metrics */}
             <div className="grid grid-cols-3 divide-x divide-border">
               <div className="pr-3 sm:pr-4">
-                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                  <Coins className="w-3 h-3" /> Total Target
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <Coins className="w-3.5 h-3.5" /> Total Target
                 </p>
-                <p className="text-lg sm:text-2xl font-bold text-foreground truncate blur-number">
+                <p className="text-lg sm:text-2xl font-bold text-foreground truncate font-mono blur-number">
                   {formatCurrency(data.totalTarget)}
                 </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Across all goals</p>
               </div>
               <div className="px-3 sm:px-4">
-                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                  <PiggyBank className="w-3 h-3" /> Total Saved
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <PiggyBank className="w-3.5 h-3.5 text-chart-1" /> Total Saved
                 </p>
-                <p className="text-lg sm:text-2xl font-bold text-chart-1 truncate blur-number">
+                <p className="text-lg sm:text-2xl font-bold text-chart-1 truncate font-mono blur-number">
                   {formatCurrency(data.totalCurrent)}
                 </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Saved so far</p>
               </div>
               <div className="pl-3 sm:pl-4">
-                <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                  <TrendingUp className="w-3 h-3" /> Remaining
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <TrendingUp className="w-3.5 h-3.5" /> Remaining
                 </p>
-                <p className="text-lg sm:text-2xl font-bold text-foreground truncate blur-number">
+                <p className="text-lg sm:text-2xl font-bold text-foreground truncate font-mono blur-number">
                   {formatCurrency(remaining)}
                 </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Still needed</p>
               </div>
             </div>
 

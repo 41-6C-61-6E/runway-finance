@@ -172,30 +172,29 @@ export function DebtToAssetRatio() {
         }
       />
       {!isCollapsed && (
-        <div className="flex-1 flex flex-col justify-center p-3 sm:p-5">
+        <div className="flex-1 flex flex-col justify-center p-4 sm:p-5">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 shrink-0">
-              <span className="text-4xl font-bold text-foreground financial-value">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
                 {pct.toFixed(0)}%
               </span>
               <span
-                className="goal-pill inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full"
-                style={{ '--goal-color': rating.colorVar } as React.CSSProperties}
+                className="inline-flex items-center px-2.5 py-0.5 text-[11px] font-bold rounded-full border font-mono"
+                style={{
+                  color: rating.colorVar,
+                  borderColor: `color-mix(in srgb, ${rating.colorVar} 30%, transparent)`,
+                  backgroundColor: `color-mix(in srgb, ${rating.colorVar} 10%, transparent)`,
+                }}
               >
                 {rating.label}
               </span>
             </div>
-            <div className="flex-1 space-y-1.5">
-              <div className="w-full bg-muted rounded-full overflow-hidden" style={{ height: '12px' }}>
+            <div className="flex-1">
+              <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden">
                 <div
-                  className={`h-full ${RATING_PROGRESS_COLORS[rating.label]} transition-all duration-500`}
+                  className={`h-full ${RATING_PROGRESS_COLORS[rating.label]} transition-all duration-500 rounded-full`}
                   style={{ width: `${Math.min(pct, 100)}%` }}
                 />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
               </div>
             </div>
           </div>
