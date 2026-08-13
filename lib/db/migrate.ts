@@ -433,6 +433,35 @@ async function runSelfHealingChecks(client: any): Promise<void> {
     await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_fkey`);
     await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_user_id_fk`);
     await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_fkey`);
+
+    // 11. Ensure recurring_streams table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS recurring_streams (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id TEXT NOT NULL,
+        account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
+        category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+        name TEXT NOT NULL,
+        payee TEXT,
+        amount TEXT NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'USD',
+        type TEXT NOT NULL DEFAULT 'subscription',
+        frequency TEXT NOT NULL DEFAULT 'monthly',
+        interval_days INTEGER,
+        anchor_date DATE NOT NULL,
+        next_expected_date DATE NOT NULL,
+        is_auto_detected BOOLEAN NOT NULL DEFAULT true,
+        is_confirmed BOOLEAN NOT NULL DEFAULT false,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        confidence INTEGER NOT NULL DEFAULT 100,
+        is_variable_amount BOOLEAN NOT NULL DEFAULT false,
+        average_amount TEXT,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_recurring_streams_user_id ON recurring_streams (user_id);
+    `);
   } catch (err) {
     logger.error('[migrate] Self-healing checks failed', { error: err instanceof Error ? err.message : String(err) });
     // Don't crash startup on self-healing check failure, but log it
