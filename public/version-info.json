@@ -1,9 +1,16 @@
 {
-  "buildNumber": "26.08.1786650775016",
-  "buildTime": "2026-08-13T19:52:55.016Z",
-  "hash": "1140957",
-  "fullHash": "1140957c76d187cce54c52bd8f6c6541c3abfd7f",
+  "buildNumber": "26.08.1786657824206",
+  "buildTime": "2026-08-13T21:50:24.206Z",
+  "hash": "a54ebda",
+  "fullHash": "a54ebda301c48778f0f3768e933ef69bef973997",
   "commits": [
+    "refactor: implement tax wrapper logic with metadata support and update sparkline coloring to a cycling palette",
+    "feat: enhance investment tracking with expanded transaction classification, annualized income metrics, discrete timeframe support, and a new holding detail modal.",
+    "feat: implement recurring revenue and expense management system with database schema, engine, and CRUD API endpoints",
+    "feat/refactor:  account management UI features, extend database schema migrations, and update authentication context handling",
+    "refactor: update budget overrun thresholds and implement responsive mobile header padding variables",
+    "style: refine typography, spacing, and color utility patterns across dashboard components",
+    "feat: implement time-based budget pacing and date-range logic for rollup calculations in budget API.",
     "docs: update project metadata, dependencies, installation instructions, and license file references in README",
     "style: update collapsible filter panel button height and padding for better alignment",
     "feat: add 10s request timeout and manual redirects to AI API routes, and restrict SSRF to block all IP literals",
@@ -196,24 +203,73 @@
     "UI consistency",
     "notification settings",
     "sync button",
-    "notification improvements",
-    "UI notifications",
-    "goals tooltip",
-    "goals horizon",
-    "goals save button",
-    "migraiton fix",
-    "goals improvement",
-    "goals bugs"
+    "notification improvements"
   ],
   "history": [
+    {
+      "hash": "a54ebda",
+      "fullHash": "a54ebda301c48778f0f3768e933ef69bef973997",
+      "author": "Alan Racek",
+      "date": "2026-08-13T14:42:07-07:00",
+      "message": "refactor: implement tax wrapper logic with metadata support and update sparkline coloring to a cycling palette",
+      "type": "refactor",
+      "buildNumber": "26.08.1786657824206"
+    },
+    {
+      "hash": "8742411",
+      "fullHash": "87424118c75cf74e78095787bdfedd86c6db3785",
+      "author": "Alan Racek",
+      "date": "2026-08-13T14:24:40-07:00",
+      "message": "feat: enhance investment tracking with expanded transaction classification, annualized income metrics, discrete timeframe support, and a new holding detail modal.",
+      "type": "feat"
+    },
+    {
+      "hash": "09a65c0",
+      "fullHash": "09a65c086b5e06571324a89db9924d4bc4ccd5fd",
+      "author": "Alan Racek",
+      "date": "2026-08-13T14:07:19-07:00",
+      "message": "feat: implement recurring revenue and expense management system with database schema, engine, and CRUD API endpoints",
+      "type": "feat"
+    },
+    {
+      "hash": "64fa67f",
+      "fullHash": "64fa67fcd4f17d682ab674a17762bbb1a190b767",
+      "author": "Alan Racek",
+      "date": "2026-08-13T13:41:10-07:00",
+      "message": "feat/refactor:  account management UI features, extend database schema migrations, and update authentication context handling",
+      "type": "other"
+    },
+    {
+      "hash": "f33388a",
+      "fullHash": "f33388ab8a35b73ec988925436b7f58b8d0f16b9",
+      "author": "Alan Racek",
+      "date": "2026-08-13T13:13:17-07:00",
+      "message": "refactor: update budget overrun thresholds and implement responsive mobile header padding variables",
+      "type": "refactor"
+    },
+    {
+      "hash": "42f3544",
+      "fullHash": "42f35445756f37ce48e4cc8970ed01fae3836a59",
+      "author": "Alan Racek",
+      "date": "2026-08-13T13:03:10-07:00",
+      "message": "style: refine typography, spacing, and color utility patterns across dashboard components",
+      "type": "style"
+    },
+    {
+      "hash": "7f97124",
+      "fullHash": "7f97124d5ecbd8f016db0fd72eb4a117aa3dfff5",
+      "author": "Alan Racek",
+      "date": "2026-08-13T12:56:03-07:00",
+      "message": "feat: implement time-based budget pacing and date-range logic for rollup calculations in budget API.",
+      "type": "feat"
+    },
     {
       "hash": "1140957",
       "fullHash": "1140957c76d187cce54c52bd8f6c6541c3abfd7f",
       "author": "Alan Racek",
       "date": "2026-08-12T16:08:13-07:00",
       "message": "docs: update project metadata, dependencies, installation instructions, and license file references in README",
-      "type": "docs",
-      "buildNumber": "26.08.1786650775016"
+      "type": "docs"
     },
     {
       "hash": "61d839c",
@@ -1749,62 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-26T20:46:07-07:00",
       "message": "notification improvements",
-      "type": "other"
-    },
-    {
-      "hash": "e71a4c3",
-      "fullHash": "e71a4c386730cf1ec7ff21e20f216153380dd22c",
-      "author": "Alan Racek",
-      "date": "2026-06-26T19:05:23-07:00",
-      "message": "UI notifications",
-      "type": "other"
-    },
-    {
-      "hash": "7d7b22a",
-      "fullHash": "7d7b22a8c151c47e81b4a635db0d65bacec85ca9",
-      "author": "Alan Racek",
-      "date": "2026-06-25T19:26:37-07:00",
-      "message": "goals tooltip",
-      "type": "other"
-    },
-    {
-      "hash": "7e0b959",
-      "fullHash": "7e0b9593c1a207f6b603a7cd7d89ba3a258f0786",
-      "author": "Alan Racek",
-      "date": "2026-06-25T16:15:25-07:00",
-      "message": "goals horizon",
-      "type": "other"
-    },
-    {
-      "hash": "7d4a00f",
-      "fullHash": "7d4a00f5885c80596b7b2b447cf5af9cd4f9cc92",
-      "author": "Alan Racek",
-      "date": "2026-06-25T16:10:15-07:00",
-      "message": "goals save button",
-      "type": "other"
-    },
-    {
-      "hash": "719473e",
-      "fullHash": "719473eebaf33f70e14a29cf5aaa649014900777",
-      "author": "Alan Racek",
-      "date": "2026-06-25T15:54:21-07:00",
-      "message": "migraiton fix",
-      "type": "other"
-    },
-    {
-      "hash": "73e3198",
-      "fullHash": "73e31984995a72becd03aa6ee6b4fbe985980096",
-      "author": "Alan Racek",
-      "date": "2026-06-25T15:41:51-07:00",
-      "message": "goals improvement",
-      "type": "other"
-    },
-    {
-      "hash": "0649a1e",
-      "fullHash": "0649a1e4df67836b6539166ee839246c2c838cf1",
-      "author": "Alan Racek",
-      "date": "2026-06-25T14:37:20-07:00",
-      "message": "goals bugs",
       "type": "other"
     }
   ]

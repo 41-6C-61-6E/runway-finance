@@ -13,9 +13,8 @@ import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import type { Account, TagItem } from '@/components/features/accounts/account-types';
 import AccountHistoryChart from '@/components/features/accounts/AccountHistoryChart';
 import AccountHierarchyTree from '@/components/features/accounts/AccountHierarchyTree';
-import { AccountForecastTab } from '@/components/features/accounts/forecast/AccountForecastTab';
 
-type Tab = 'history' | 'list' | 'forecast';
+type Tab = 'history' | 'list';
 
 function AccountsContent() {
   const { data: session } = useSession();
@@ -28,7 +27,6 @@ function AccountsContent() {
   const availableTabs = [
     { id: 'list', label: 'List' },
     { id: 'history', label: 'History' },
-    { id: 'forecast', label: 'Forecast' },
   ] as { id: Tab; label: string }[];
 
   useEffect(() => {
@@ -43,7 +41,7 @@ function AccountsContent() {
   const tabParam = searchParams.get('tab');
 
   useEffect(() => {
-    if (tabParam === 'list' || tabParam === 'history' || tabParam === 'forecast') {
+    if (tabParam === 'list' || tabParam === 'history') {
       setActiveTab(tabParam as Tab);
     } else if (targetAccountId) {
       setActiveTab('list');
@@ -141,16 +139,6 @@ function AccountsContent() {
               historyData={historyData}
               reportableAccounts={reportableAccounts}
               historyLoading={historyLoading}
-              isMobile={isMobile}
-            />
-          )}
-
-          {activeTab === 'forecast' && (
-            <AccountForecastTab
-              filteredAllAccounts={filteredAllAccounts}
-              allTags={allTags}
-              historyData={historyData}
-              reportableAccounts={reportableAccounts}
               isMobile={isMobile}
             />
           )}
