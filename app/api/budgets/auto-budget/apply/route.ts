@@ -9,34 +9,41 @@ import { encryptRow, decryptField } from '@/lib/crypto';
 import { formatToCents } from '@/lib/services/account-history';
 
 export async function POST(request: Request) {
-  const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
-  if (!session?.user || !dataUserId) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
-
-  const dek = await getSessionDEK();
-  let body: Record<string, any>;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
-  }
+    const session = await auth();
+    const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+    if (!session?.user || !dataUserId) {
+      return NextResponse.json({ error: 'unauthorized', message: 'User is not authenticated' }, { status: 401 });
+    }
 
-  const items = Array.isArray(body.items) ? body.items : [];
-  const overwriteExisting = body.overwriteExisting !== false;
-  const targetPeriodType = (body.periodType as string) || 'monthly';
-  const targetPeriodKey = (body.periodKey as string) || null;
-  const isRecurring = body.isRecurring !== false;
-  const effectiveFrom = targetPeriodKey || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    let dek: Uint8Array;
+    try {
+      dek = await getSessionDEK();
+    } catch (err) {
+      logger.error('Failed to get session DEK for auto-budget apply', { error: err });
+      return NextResponse.json({ error: 'encryption_error', message: 'Encryption session key is unavailable. Please re-authenticate.' }, { status: 500 });
+    }
 
-  if (items.length === 0) {
-    return NextResponse.json({ error: 'no_items', message: 'No items selected to publish' }, { status: 400 });
-  }
+    let body: Record<string, any>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'invalid_body', message: 'Invalid JSON request body' }, { status: 400 });
+    }
 
-  const db = getDb();
+    const items = Array.isArray(body.items) ? body.items : [];
+    const overwriteExisting = body.overwriteExisting !== false;
+    const targetPeriodType = (body.periodType as string) || 'monthly';
+    const targetPeriodKey = (body.periodKey as string) || null;
+    const isRecurring = body.isRecurring !== false;
+    const effectiveFrom = targetPeriodKey || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
-  try {
+    if (items.length === 0) {
+      return NextResponse.json({ error: 'no_items', message: 'No items selected to publish' }, { status: 400 });
+    }
+
+    const db = getDb();
+
     const userCategories = await db
       .select()
       .from(categories)
@@ -45,19 +52,21 @@ export async function POST(request: Request) {
     const decryptedCategories = await Promise.all(
       userCategories.map(async (c) => ({
         ...c,
-        name: c.name ? await decryptField(c.name, dek) : '',
+        name: c.name ? await decryptField(c.name, dek).catch(() => c.name) : '',
       }))
     );
 
     let catchAllCategory = decryptedCategories.find(
-      (c) => c.name.toLowerCase().includes('everything else') || c.name.toLowerCase().includes('other') || c.name.toLowerCase().includes('misc')
+      (c) => !c.isIncome && (c.name.toLowerCase() === 'everything else' || c.name.toLowerCase().includes('everything else'))
     );
 
     let appliedCount = 0;
 
     for (const item of items) {
       let catId = item.categoryId;
-      if (catId === 'all-other-grouped' || !catId) {
+      const isEEItem = item.isEverythingElse || item.categoryId === 'all-other-grouped' || (item.categoryName && item.categoryName.toLowerCase() === 'everything else');
+
+      if (isEEItem || !catId || catId === 'all-other-grouped') {
         if (!catchAllCategory) {
           const encryptedCat = await encryptRow(
             'categories',
@@ -66,16 +75,16 @@ export async function POST(request: Request) {
               name: 'Everything Else',
               color: '#64748b',
               isIncome: false,
-              categoryType: 'expense',
+              categoryType: 'standard',
               excludeFromReports: false,
               isDiscretionary: true,
             },
             dek
           );
           const [newCat] = await db.insert(categories).values(encryptedCat).returning({ id: categories.id });
-          catchAllCategory = { id: newCat.id, name: 'Everything Else' } as any;
+          catchAllCategory = { id: newCat.id, name: 'Everything Else', isIncome: false } as any;
         }
-        catId = catchAllCategory?.id;
+        catId = catchAllCategory.id;
       }
       if (!catId) continue;
 
@@ -150,7 +159,11 @@ export async function POST(request: Request) {
       count: appliedCount,
     });
   } catch (error) {
-    logger.error('Error applying auto budget proposal', { error });
-    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+    logger.error('Error applying auto budget proposal', { error: error instanceof Error ? error.stack : error });
+    return NextResponse.json({
+      error: 'internal_error',
+      message: error instanceof Error ? error.message : 'An error occurred while applying the budget proposal'
+    }, { status: 500 });
   }
 }
+

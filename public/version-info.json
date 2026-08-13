@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1786657824206",
-  "buildTime": "2026-08-13T21:50:24.206Z",
-  "hash": "a54ebda",
-  "fullHash": "a54ebda301c48778f0f3768e933ef69bef973997",
+  "buildNumber": "26.08.1786658257890",
+  "buildTime": "2026-08-13T21:57:37.890Z",
+  "hash": "c7108b8",
+  "fullHash": "c7108b835493b6200a60b9824b9d7d93eb3904ff",
   "commits": [
+    "refactor: remove all recurring transaction management features and associated database schema",
     "refactor: implement tax wrapper logic with metadata support and update sparkline coloring to a cycling palette",
     "feat: enhance investment tracking with expanded transaction classification, annualized income metrics, discrete timeframe support, and a new holding detail modal.",
     "feat: implement recurring revenue and expense management system with database schema, engine, and CRUD API endpoints",
@@ -202,18 +203,25 @@
     "more acccurate re",
     "UI consistency",
     "notification settings",
-    "sync button",
-    "notification improvements"
+    "sync button"
   ],
   "history": [
+    {
+      "hash": "c7108b8",
+      "fullHash": "c7108b835493b6200a60b9824b9d7d93eb3904ff",
+      "author": "Alan Racek",
+      "date": "2026-08-13T14:50:57-07:00",
+      "message": "refactor: remove all recurring transaction management features and associated database schema",
+      "type": "refactor",
+      "buildNumber": "26.08.1786658257890"
+    },
     {
       "hash": "a54ebda",
       "fullHash": "a54ebda301c48778f0f3768e933ef69bef973997",
       "author": "Alan Racek",
       "date": "2026-08-13T14:42:07-07:00",
       "message": "refactor: implement tax wrapper logic with metadata support and update sparkline coloring to a cycling palette",
-      "type": "refactor",
-      "buildNumber": "26.08.1786657824206"
+      "type": "refactor"
     },
     {
       "hash": "8742411",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-26T21:12:40-07:00",
       "message": "sync button",
-      "type": "other"
-    },
-    {
-      "hash": "17a2ee8",
-      "fullHash": "17a2ee8c2db8ca63867514179b9d67dfac1aa74e",
-      "author": "Alan Racek",
-      "date": "2026-06-26T20:46:07-07:00",
-      "message": "notification improvements",
       "type": "other"
     }
   ]
