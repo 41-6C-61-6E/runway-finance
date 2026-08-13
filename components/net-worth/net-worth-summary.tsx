@@ -187,18 +187,18 @@ export function NetWorthSummary() {
   const section = (title: string, value: number, delta: number, pct: number, history: number[], trendPositive: boolean) => (
     <div className="p-4 sm:p-5">
       <div className="flex items-center justify-between sm:justify-start gap-0 sm:gap-3 mb-2 sm:mb-3">
-        <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</h3>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</h3>
         <Sparkline data={history} width={80} height={20} isPositive={trendPositive} />
       </div>
       <div className="flex flex-col gap-1">
-        <div className="text-xl sm:text-2xl font-bold text-foreground financial-value">{formatCurrency(value)}</div>
+        <div className="text-xl sm:text-2xl font-bold text-foreground font-mono blur-number">{formatCurrency(value)}</div>
         <div>
-          <div className={`flex items-center gap-1 text-xs font-medium ${delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+          <div className={`flex items-center gap-1 text-xs font-medium font-mono ${delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
             <span>{delta >= 0 ? '↑' : '↓'}</span>
-            <span className="financial-value">{formatCurrency(Math.abs(delta))}</span>
-            <span className="opacity-80 financial-value">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
+            <span className="blur-number">{formatCurrency(Math.abs(delta))}</span>
+            <span className="opacity-80">({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">in the last 1 year</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">past 1 year</div>
         </div>
       </div>
     </div>

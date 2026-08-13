@@ -163,7 +163,7 @@ export function FireProjectionsSidePanel({
           {/* Section 1: Plan Sustainability Grade */}
           <div className="pb-1 flex items-center justify-between gap-3">
             <div className="space-y-1 min-w-0">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                 Plan Sustainability
               </span>
               <span className="text-sm font-extrabold text-foreground block truncate">
@@ -208,7 +208,7 @@ export function FireProjectionsSidePanel({
                   <span className="text-2xl font-extrabold text-foreground font-mono blur-number">
                     {fireProgress.toFixed(0)}%
                   </span>
-                  <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider">
+                  <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
                     FIRE Goal
                   </span>
                 </div>
@@ -259,7 +259,7 @@ export function FireProjectionsSidePanel({
                       </div>
                       <span
                         className={cn(
-                          'text-xs font-bold font-mono px-2 py-0.5 rounded border',
+                          'text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full border',
                           peakWithdrawalRate <= 4
                             ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                             : peakWithdrawalRate <= 5.5
@@ -313,35 +313,35 @@ export function FireProjectionsSidePanel({
                   </>
                 }
               >
-                <div className="space-y-2.5 cursor-help">
+                <div className="space-y-2 cursor-help">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Compass className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
                       <span className="text-xs font-bold text-foreground flex items-center gap-1">
                         Coast FIRE Goal
-                        <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                        <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                       </span>
                     </div>
                     <span
                       className={cn(
-                        'text-[10px] font-bold px-2 py-0.5 rounded-full border font-mono',
+                        'text-[11px] font-bold px-2.5 py-0.5 rounded-full border font-mono',
                         coastFireInfo.isReached
                           ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                           : 'bg-primary/10 text-primary border-primary/20'
                       )}
                     >
-                      {coastFireInfo.isReached ? 'Coast FI Reached!' : `${coastFireInfo.progress.toFixed(0)}%`}
+                      {coastFireInfo.isReached ? 'Reached' : `${coastFireInfo.progress.toFixed(0)}%`}
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between text-xs font-mono">
-                    <span className="text-muted-foreground blur-number font-medium">
-                      Target Today: {formatCurrency(coastFireInfo.coastTarget)}
+                    <span className="text-foreground font-semibold blur-number">
+                      {formatCurrency(currentNetWorth)} <span className="text-muted-foreground font-normal">/ {formatCurrency(coastFireInfo.coastTarget)}</span>
                     </span>
-                    <span className="text-muted-foreground text-[10px]">
+                    <span className="text-muted-foreground text-[11px]">
                       Age {coastFireInfo.currentAge} → {localRetirementAge}
                     </span>
                   </div>
-                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
+                  <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden">
                     <div
                       className={cn(
                         'h-full transition-all duration-500 rounded-full',
@@ -376,30 +376,30 @@ export function FireProjectionsSidePanel({
               <div className="space-y-2.5 cursor-help">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-foreground flex items-center gap-1">
-                    <PieChart className="w-3.5 h-3.5 text-primary" />
+                    <PieChart className="w-3.5 h-3.5 text-primary shrink-0" />
                     Glidepath Asset Mix
-                    <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                    <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                   </span>
-                  <span className="text-muted-foreground font-mono text-[10px]">
-                    Now vs. Retirement
+                  <span className="text-muted-foreground font-mono text-[11px]">
+                    Now vs. Target
                   </span>
                 </div>
-                <div className="space-y-1.5">
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                      <span>Current ({glidepathInfo.current.equity}% / {glidepathInfo.current.fixed}% / {glidepathInfo.current.cash}%)</span>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-muted-foreground font-medium">
+                      <span>Current Allocation</span>
                     </div>
-                    <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                    <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden flex">
                       <div className="h-full bg-chart-1" style={{ width: `${glidepathInfo.current.equity}%` }} />
                       <div className="h-full bg-chart-2" style={{ width: `${glidepathInfo.current.fixed}%` }} />
                       <div className="h-full bg-chart-5" style={{ width: `${glidepathInfo.current.cash}%` }} />
                     </div>
                   </div>
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                      <span>Target ({glidepathInfo.target.equity}% / {glidepathInfo.target.fixed}% / {glidepathInfo.target.cash}%)</span>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-muted-foreground font-medium">
+                      <span>Retirement Target</span>
                     </div>
-                    <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                    <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden flex">
                       <div className="h-full bg-chart-1 opacity-70" style={{ width: `${glidepathInfo.target.equity}%` }} />
                       <div className="h-full bg-chart-2 opacity-70" style={{ width: `${glidepathInfo.target.fixed}%` }} />
                       <div className="h-full bg-chart-5 opacity-70" style={{ width: `${glidepathInfo.target.cash}%` }} />
@@ -414,7 +414,7 @@ export function FireProjectionsSidePanel({
           {milestoneCallouts.length > 0 && (
             <div className="pt-4 space-y-2.5">
               <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                <Landmark className="w-3.5 h-3.5 text-primary" />
+                <Landmark className="w-3.5 h-3.5 text-primary shrink-0" />
                 Upcoming Key Milestones
               </span>
               <div className="relative pl-4 space-y-2.5 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-sidebar-border">

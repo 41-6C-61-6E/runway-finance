@@ -292,13 +292,13 @@ export function BudgetSummary() {
           {/* Section 1: Header Status & Net Position */}
           <div className="flex items-center justify-between pb-3">
             <div className="space-y-0.5">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Status</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</span>
               <div className="flex items-center gap-1.5 pt-0.5">
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button type="button" className="focus:outline-none select-none text-left">
-                        <span className={cn('px-2.5 py-0.5 rounded-full text-[11px] font-semibold border flex items-center gap-1 cursor-help transition-all hover:opacity-90', healthStatus.badgeClass)}>
+                        <span className={cn('px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1 cursor-help transition-all hover:opacity-90 font-mono', healthStatus.badgeClass)}>
                           <healthStatus.icon className="w-3 h-3" />
                           {healthStatus.label}
                         </span>
@@ -310,7 +310,7 @@ export function BudgetSummary() {
                           <healthStatus.icon className={cn("w-3.5 h-3.5", healthStatus.badgeClass.split(' ')[1])} />
                           Budget Status Analysis
                         </span>
-                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", healthStatus.badgeClass)}>
+                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border font-mono", healthStatus.badgeClass)}>
                           {healthStatus.label}
                         </span>
                       </div>
@@ -381,8 +381,8 @@ export function BudgetSummary() {
               </div>
             </div>
             <div className="text-right">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Net Position</span>
-              <p className={cn('text-base font-bold font-mono blur-number', isSurplus ? 'text-constructive' : 'text-destructive')}>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Net Position</span>
+              <p className={cn('text-lg font-bold font-mono blur-number', isSurplus ? 'text-constructive' : 'text-destructive')}>
                 {isSurplus ? '+' : ''}{formatCurrency(netActual)}
               </p>
             </div>
@@ -413,10 +413,10 @@ export function BudgetSummary() {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                    <span className="text-xl font-bold font-mono text-foreground leading-none">
+                    <span className="text-2xl font-extrabold font-mono text-foreground leading-none blur-number">
                       {expensePercent.toFixed(0)}%
                     </span>
-                    <span className="text-[10px] text-muted-foreground font-medium mt-0.5">used</span>
+                    <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mt-1">used</span>
                   </div>
                 </div>
               </div>
@@ -427,15 +427,15 @@ export function BudgetSummary() {
               {hasExpenses && (
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-1 text-foreground/90 font-semibold text-[11px]">
-                      <TrendingDown className="w-3.5 h-3.5 text-primary" />
+                    <span className="flex items-center gap-1 text-foreground font-semibold">
+                      <TrendingDown className="w-3.5 h-3.5 text-primary shrink-0" />
                       Expenses
                     </span>
                     <span className="font-mono text-xs text-foreground">
-                      <span className="blur-number">{formatCurrency(totalExpenseActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalExpenseBudgeted)}</span>
+                      <span className="blur-number font-bold">{formatCurrency(totalExpenseActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalExpenseBudgeted)}</span>
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
                     <div
                       className={cn(
                         'h-full transition-all duration-500 rounded-full',
@@ -444,26 +444,28 @@ export function BudgetSummary() {
                       style={{ width: `${Math.min(expensePercent, 100)}%` }}
                     />
                   </div>
-                  <p className={cn('text-[11px] text-right font-mono blur-number', expenseRemaining < 0 ? 'text-destructive font-medium' : 'text-muted-foreground')}>
-                    {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over limit`}
-                  </p>
+                  <div className="flex justify-end">
+                    <span className={cn('text-[11px] font-mono blur-number font-medium', expenseRemaining < 0 ? 'text-destructive' : 'text-muted-foreground')}>
+                      {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over limit`}
+                    </span>
+                  </div>
                 </div>
               )}
 
               {hasIncome && (
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between text-xs font-medium">
-                    <span className="flex items-center gap-1 text-primary font-semibold text-[11px]">
-                      <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                    <span className="flex items-center gap-1 text-foreground font-semibold">
+                      <TrendingUp className="w-3.5 h-3.5 text-chart-1 shrink-0" />
                       Income Target
                     </span>
                     <span className="font-mono text-xs text-foreground">
-                      <span className="blur-number">{formatCurrency(totalIncomeActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalIncomeBudgeted)}</span>
+                      <span className="blur-number font-bold">{formatCurrency(totalIncomeActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalIncomeBudgeted)}</span>
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary transition-all duration-500 rounded-full"
+                      className="h-full bg-chart-1 transition-all duration-500 rounded-full"
                       style={{ width: `${Math.min(incomePercent, 100)}%` }}
                     />
                   </div>
@@ -491,15 +493,15 @@ export function BudgetSummary() {
                 <div className="space-y-2 cursor-help">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-foreground flex items-center gap-1">
-                      <Layers className="w-3.5 h-3.5 text-chart-1" />
+                      <Layers className="w-3.5 h-3.5 text-chart-1 shrink-0" />
                       Fixed vs. Discretionary
-                      <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                      <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                     </span>
                     <span className="text-muted-foreground font-mono text-[11px]">
                       {fixedPct.toFixed(0)}% / {discretionaryPct.toFixed(0)}%
                     </span>
                   </div>
-                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                  <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
                     <div
                       className="h-full bg-chart-1 transition-all duration-500 rounded-l-full"
                       style={{ width: `${fixedPct}%` }}
@@ -508,10 +510,6 @@ export function BudgetSummary() {
                       className="h-full bg-chart-4 transition-all duration-500 rounded-r-full"
                       style={{ width: `${discretionaryPct}%` }}
                     />
-                  </div>
-                  <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
-                    <span>Fixed: {fixedPct.toFixed(0)}%</span>
-                    <span>Discretionary: {discretionaryPct.toFixed(0)}%</span>
                   </div>
                 </div>
               </ChartHoverTooltip>
@@ -534,15 +532,15 @@ export function BudgetSummary() {
                 <div className="space-y-2 cursor-help">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-foreground flex items-center gap-1">
-                      <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                      <BarChart3 className="w-3.5 h-3.5 text-primary shrink-0" />
                       Budget Compliance
-                      <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                      <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                     </span>
                     <span className="text-muted-foreground font-mono text-[11px]">
                       {totalCatCount} categories
                     </span>
                   </div>
-                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                  <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
                     {underPct > 0 && (
                       <div
                         className="h-full bg-emerald-500 transition-all duration-500"
@@ -562,10 +560,10 @@ export function BudgetSummary() {
                       />
                     )}
                   </div>
-                  <div className="flex justify-between text-[10px] font-mono font-semibold text-muted-foreground">
-                    <span className="text-emerald-500">{underBudgetCount} On Track</span>
-                    {nearLimitCount > 0 && <span className="text-amber-500">{nearLimitCount} Near</span>}
-                    {overBudgetCount > 0 && <span className="text-destructive">{overBudgetCount} Over</span>}
+                  <div className="flex justify-between text-[11px] font-mono font-medium text-muted-foreground">
+                    <span className="text-emerald-500 font-semibold">{underBudgetCount} On Track</span>
+                    {nearLimitCount > 0 && <span className="text-amber-500 font-semibold">{nearLimitCount} Near</span>}
+                    {overBudgetCount > 0 && <span className="text-destructive font-semibold">{overBudgetCount} Over</span>}
                   </div>
                 </div>
               </ChartHoverTooltip>

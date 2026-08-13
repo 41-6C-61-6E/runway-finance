@@ -328,7 +328,7 @@ export function NetWorthSidePanel() {
             <div className="space-y-2 cursor-help pb-1">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                 Total Net Worth
-                <Info className="w-3 h-3 text-muted-foreground/60" />
+                <Info className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
               </span>
               <div className="flex flex-col">
                 <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
@@ -337,7 +337,7 @@ export function NetWorthSidePanel() {
                 <div className="flex items-center gap-1.5 mt-1">
                   <div
                     className={cn(
-                      'inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-md border font-mono',
+                      'inline-flex items-center gap-0.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border font-mono',
                       deltas.netWorth >= 0
                         ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
                         : 'bg-destructive/10 text-destructive border-destructive/20'
@@ -370,15 +370,15 @@ export function NetWorthSidePanel() {
               <div className="space-y-2 cursor-help">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="text-foreground flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-chart-1" />
+                    <ShieldCheck className="w-3.5 h-3.5 text-chart-1 shrink-0" />
                     Assets vs. Liabilities
-                    <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                    <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                   </span>
                   <span className="text-muted-foreground font-mono text-[11px]">
                     {assetRatio.assetPct.toFixed(1)}% / {assetRatio.liabilityPct.toFixed(1)}%
                   </span>
                 </div>
-                <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
                   <div
                     className="h-full bg-chart-1 transition-all duration-500 rounded-l-full"
                     style={{ width: `${assetRatio.assetPct}%` }}
@@ -387,10 +387,6 @@ export function NetWorthSidePanel() {
                     className="h-full bg-destructive transition-all duration-500 rounded-r-full"
                     style={{ width: `${assetRatio.liabilityPct}%` }}
                   />
-                </div>
-                <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
-                  <span>Assets: {assetRatio.assetPct.toFixed(1)}%</span>
-                  <span>Liabilities: {assetRatio.liabilityPct.toFixed(1)}%</span>
                 </div>
               </div>
             </ChartHoverTooltip>
@@ -416,39 +412,27 @@ export function NetWorthSidePanel() {
                 </>
               }
             >
-              <div className="space-y-2.5 cursor-help">
-                <div className="flex items-center gap-1.5">
-                  <Percent className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span className="text-xs font-bold text-foreground flex items-center gap-1">
+              <div className="space-y-2 cursor-help">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground flex items-center gap-1">
+                    <Percent className="w-3.5 h-3.5 text-primary shrink-0" />
                     Debt-to-Asset Ratio
-                    <Info className="w-3 h-3 text-muted-foreground/60" />
+                    <Info className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                   </span>
-                </div>
-                <div className="flex items-baseline justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-black text-foreground font-mono blur-number">
+                    <span className="text-base font-extrabold text-foreground font-mono blur-number">
                       {debtPct.toFixed(0)}%
                     </span>
-                    <span className={cn('text-xs font-extrabold px-2.5 py-0.5 rounded-full border font-sans', rating.badgeClass)}>
+                    <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded-full border font-mono', rating.badgeClass)}>
                       {rating.label}
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    Liabilities / Assets
-                  </span>
                 </div>
-                <div className="space-y-1">
-                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
-                    <div
-                      className={cn('h-full transition-all duration-500 rounded-full', rating.barClass)}
-                      style={{ width: `${Math.min(debtPct, 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                    <span>0%</span>
-                    <span>50%</span>
-                    <span>100%</span>
-                  </div>
+                <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden">
+                  <div
+                    className={cn('h-full transition-all duration-500 rounded-full', rating.barClass)}
+                    style={{ width: `${Math.min(debtPct, 100)}%` }}
+                  />
                 </div>
               </div>
             </ChartHoverTooltip>
@@ -474,15 +458,15 @@ export function NetWorthSidePanel() {
                 <div className="space-y-2 cursor-help">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-foreground flex items-center gap-1">
-                      <Droplets className="w-3.5 h-3.5 text-chart-2" />
+                      <Droplets className="w-3.5 h-3.5 text-chart-2 shrink-0" />
                       Liquid vs. Illiquid
-                      <HelpCircle className="w-3 h-3 text-muted-foreground/60" />
+                      <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                     </span>
                     <span className="text-muted-foreground font-mono text-[11px]">
                       {liquidity.liquidPct.toFixed(1)}% / {liquidity.illiquidPct.toFixed(1)}%
                     </span>
                   </div>
-                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden flex">
+                  <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
                     <div
                       className="h-full bg-chart-2 transition-all duration-500 rounded-l-full"
                       style={{ width: `${liquidity.liquidPct}%` }}
@@ -491,10 +475,6 @@ export function NetWorthSidePanel() {
                       className="h-full bg-chart-4 transition-all duration-500 rounded-r-full"
                       style={{ width: `${liquidity.illiquidPct}%` }}
                     />
-                  </div>
-                  <div className="flex justify-between text-[11px] font-mono font-semibold text-muted-foreground">
-                    <span>Liquid: {liquidity.liquidPct.toFixed(1)}%</span>
-                    <span>Illiquid: {liquidity.illiquidPct.toFixed(1)}%</span>
                   </div>
                 </div>
               </ChartHoverTooltip>
@@ -517,41 +497,30 @@ export function NetWorthSidePanel() {
                 </>
               }
             >
-              <div className="space-y-2.5 cursor-help">
-                <div className="flex items-center gap-1.5">
-                  <Flag className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span className="text-xs font-bold text-foreground flex items-center gap-1">
+              <div className="space-y-2 cursor-help">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-foreground flex items-center gap-1">
+                    <Flag className="w-3.5 h-3.5 text-primary shrink-0" />
                     Next Milestone
-                    <Info className="w-3 h-3 text-muted-foreground/60" />
+                    <Info className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                   </span>
-                </div>
-                <div className="flex items-baseline justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl font-black text-foreground font-mono">
-                      {milestone.label}
-                    </span>
-                    <span className={cn(
-                      'inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full border font-mono',
-                      'bg-primary/10 text-primary border-primary/20'
-                    )}>
-                      {milestone.progress.toFixed(0)}%
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-muted-foreground blur-number">
+                  <span className="text-muted-foreground font-mono text-[11px] blur-number">
                     {formatCurrency(milestone.remaining)} to go
                   </span>
                 </div>
-                <div className="space-y-1">
-                  <div className="h-2.5 w-full bg-muted/60 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500 rounded-full"
-                      style={{ width: `${milestone.progress}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                    <span>{milestone.previousLabel}</span>
-                    <span>{milestone.label}</span>
-                  </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xl font-bold text-foreground font-mono">
+                    {milestone.label}
+                  </span>
+                  <span className="inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full border font-mono bg-primary/10 text-primary border-primary/20">
+                    {milestone.progress.toFixed(0)}%
+                  </span>
+                </div>
+                <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500 rounded-full"
+                    style={{ width: `${milestone.progress}%` }}
+                  />
                 </div>
               </div>
             </ChartHoverTooltip>
