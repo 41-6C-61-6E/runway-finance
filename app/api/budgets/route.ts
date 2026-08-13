@@ -60,6 +60,37 @@ function getPeriodBounds(periodType: string, periodKey: string | null, now: Date
   };
 }
 
+function parsePeriodRange(keyOrDate: string | null | undefined): { start: string; end: string } {
+  if (!keyOrDate) {
+    return { start: '1970-01-01', end: '9999-12-31' };
+  }
+  const s = keyOrDate.trim();
+  if (s.includes('-Q')) {
+    const [y, q] = s.split('-Q').map(Number);
+    const startMonth = (q - 1) * 3 + 1;
+    const endMonth = q * 3;
+    const start = `${y}-${String(startMonth).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(y, endMonth, 0)).getUTCDate();
+    const end = `${y}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { start, end };
+  }
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    const [y, m] = s.split('-').map(Number);
+    const start = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { start, end };
+  }
+  if (/^\d{4}$/.test(s)) {
+    const y = Number(s);
+    return { start: `${y}-01-01`, end: `${y}-12-31` };
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return { start: s, end: s };
+  }
+  return { start: '1970-01-01', end: '9999-12-31' };
+}
+
 function getPreviousPeriodKey(periodType: string, periodKey: string): string {
   if (periodType === 'monthly') {
     const [y, m] = periodKey.split('-').map(Number);
@@ -92,6 +123,7 @@ export async function GET(request: Request) {
     await ensureCategoryDiscretionaryColumn();
     const bounds = periodKey ? getPeriodBounds(periodType, periodKey, now) : getPeriodBounds(periodType, null, now);
     const targetPeriodKey = bounds.yearMonth;
+    const targetRange = parsePeriodRange(targetPeriodKey);
 
     const allUserBudgets = await db
       .select({
@@ -131,34 +163,132 @@ export async function GET(request: Request) {
       notes: row.notes ? await decryptField(row.notes, dek).catch(() => row.notes) : null,
     })));
 
-    // Filter budget rows for current periodKey respecting effectiveFrom / effectiveTo date bounds
-    const categoryMap = new Map<string, typeof decryptedBudgetRows[0]>();
-
+    // Group budgets by categoryId and timeframe
+    const categoryBudgetsMap = new Map<string, typeof decryptedBudgetRows>();
     for (const b of decryptedBudgetRows) {
-      let matches = false;
-      if (!b.isRecurring) {
-        matches = b.yearMonth === targetPeriodKey || b.periodKey === targetPeriodKey || b.effectiveFrom === targetPeriodKey;
+      // Check if budget is active in target period
+      let isActive = false;
+      if (b.isRecurring) {
+        const fromDate = b.effectiveFrom ? parsePeriodRange(b.effectiveFrom).start : '1970-01-01';
+        const toDate = b.effectiveTo ? parsePeriodRange(b.effectiveTo).end : '9999-12-31';
+        isActive = fromDate <= targetRange.end && toDate >= targetRange.start;
       } else {
-        const fromOk = !b.effectiveFrom || b.effectiveFrom <= targetPeriodKey;
-        const toOk = !b.effectiveTo || b.effectiveTo >= targetPeriodKey;
-        matches = fromOk && toOk;
+        const oneOffKey = b.yearMonth || b.periodKey || b.effectiveFrom;
+        if (oneOffKey) {
+          const oneOffRange = parsePeriodRange(oneOffKey);
+          isActive = oneOffRange.start <= targetRange.end && oneOffRange.end >= targetRange.start;
+        }
       }
 
-      if (matches) {
-        const existing = categoryMap.get(b.categoryId);
-        if (!existing) {
-          categoryMap.set(b.categoryId, b);
-        } else {
-          const curFrom = b.effectiveFrom || '';
-          const exFrom = existing.effectiveFrom || '';
-          if (curFrom >= exFrom) {
-            categoryMap.set(b.categoryId, b);
-          }
-        }
+      if (isActive) {
+        const existingList = categoryBudgetsMap.get(b.categoryId) || [];
+        existingList.push(b);
+        categoryBudgetsMap.set(b.categoryId, existingList);
       }
     }
 
-    const activeBudgetRows = Array.from(categoryMap.values());
+    interface ResolvedBudgetItem {
+      id: string;
+      categoryId: string;
+      categoryName: string;
+      categoryColor: string;
+      periodType: string;
+      nativePeriodType: 'monthly' | 'quarterly' | 'yearly';
+      nativeAmount: number;
+      budgeted: number;
+      periodKey?: string | null;
+      yearMonth?: string | null;
+      effectiveFrom?: string | null;
+      effectiveTo?: string | null;
+      isRecurring: boolean;
+      fundingAccountId: string | null;
+      rollover: boolean;
+      notes: string | null;
+      isIncome: boolean | null;
+      categoryType: string | null;
+      isDiscretionary: boolean | null;
+    }
+
+    const activeBudgetRows: ResolvedBudgetItem[] = [];
+
+    for (const [catId, bList] of categoryBudgetsMap.entries()) {
+      // Sort candidates by effectiveFrom descending so the newest configured budget takes precedence
+      const sortedCandidates = [...bList].sort((a, b) => (b.effectiveFrom || '').localeCompare(a.effectiveFrom || ''));
+
+      let chosen: typeof decryptedBudgetRows[0] | null = null;
+      let nativePeriodType: 'monthly' | 'quarterly' | 'yearly' = 'monthly';
+      let budgetedMultiplier = 1;
+
+      if (periodType === 'monthly') {
+        chosen = sortedCandidates.find((c) => (c.periodType || 'monthly') === 'monthly') || null;
+        if (chosen) {
+          nativePeriodType = 'monthly';
+          budgetedMultiplier = 1;
+        }
+      } else if (periodType === 'quarterly') {
+        // Priority: Direct quarterly budget > Monthly rollup
+        const directQuarterly = sortedCandidates.find((c) => c.periodType === 'quarterly');
+        if (directQuarterly) {
+          chosen = directQuarterly;
+          nativePeriodType = 'quarterly';
+          budgetedMultiplier = 1;
+        } else {
+          const monthlyCandidate = sortedCandidates.find((c) => (c.periodType || 'monthly') === 'monthly');
+          if (monthlyCandidate) {
+            chosen = monthlyCandidate;
+            nativePeriodType = 'monthly';
+            budgetedMultiplier = 3;
+          }
+        }
+      } else {
+        // Yearly: Priority: Direct yearly > Quarterly rollup > Monthly rollup
+        const directYearly = sortedCandidates.find((c) => c.periodType === 'yearly');
+        if (directYearly) {
+          chosen = directYearly;
+          nativePeriodType = 'yearly';
+          budgetedMultiplier = 1;
+        } else {
+          const quarterlyCandidate = sortedCandidates.find((c) => c.periodType === 'quarterly');
+          if (quarterlyCandidate) {
+            chosen = quarterlyCandidate;
+            nativePeriodType = 'quarterly';
+            budgetedMultiplier = 4;
+          } else {
+            const monthlyCandidate = sortedCandidates.find((c) => (c.periodType || 'monthly') === 'monthly');
+            if (monthlyCandidate) {
+              chosen = monthlyCandidate;
+              nativePeriodType = 'monthly';
+              budgetedMultiplier = 12;
+            }
+          }
+        }
+      }
+
+      if (chosen) {
+        const nativeAmount = parseFloat(chosen.amount) || 0;
+        activeBudgetRows.push({
+          id: chosen.id,
+          categoryId: chosen.categoryId,
+          categoryName: chosen.categoryName,
+          categoryColor: chosen.categoryColor || '#6366f1',
+          periodType: periodType,
+          nativePeriodType,
+          nativeAmount,
+          budgeted: nativeAmount * budgetedMultiplier,
+          periodKey: chosen.periodKey || chosen.yearMonth || null,
+          yearMonth: chosen.yearMonth || null,
+          effectiveFrom: chosen.effectiveFrom || null,
+          effectiveTo: chosen.effectiveTo || null,
+          isRecurring: chosen.isRecurring,
+          fundingAccountId: chosen.fundingAccountId,
+          rollover: chosen.rollover,
+          notes: chosen.notes,
+          isIncome: chosen.isIncome,
+          categoryType: chosen.categoryType,
+          isDiscretionary: chosen.isDiscretionary,
+        });
+      }
+    }
 
     // Fetch all categories for hierarchy mapping
     const allCategories = await db
@@ -304,12 +434,8 @@ export async function GET(request: Request) {
 
     // Map active budget rows with exact calculated actuals and Everything Else breakout
     const data = activeBudgetRows.map((row) => {
-      const nativeAmount = parseFloat(row.amount);
-      let budgeted = nativeAmount;
-      if (row.isRecurring && row.periodType === 'monthly') {
-        if (periodType === 'quarterly') budgeted *= 3;
-        else if (periodType === 'yearly') budgeted *= 12;
-      }
+      const nativeAmount = row.nativeAmount;
+      const budgeted = row.budgeted;
 
       const isIncome = row.isIncome ?? false;
       const isCompound = row.categoryType === 'compound';
@@ -336,6 +462,8 @@ export async function GET(request: Request) {
         categoryName: isEverythingElse ? 'Everything Else' : row.categoryName,
         categoryColor: isEverythingElse ? '#64748b' : (row.categoryColor || '#6366f1'),
         periodType: row.periodType,
+        nativePeriodType: row.nativePeriodType,
+        nativeAmount: nativeAmount,
         periodKey: row.periodKey || row.yearMonth || null,
         yearMonth: row.yearMonth || null,
         effectiveFrom: row.effectiveFrom || null,
@@ -344,7 +472,9 @@ export async function GET(request: Request) {
         fundingAccountId: row.fundingAccountId,
         rollover: row.rollover,
         notes: row.notes,
-        monthlyAmount: nativeAmount,
+        monthlyAmount: row.nativePeriodType === 'monthly'
+          ? nativeAmount
+          : (row.nativePeriodType === 'quarterly' ? nativeAmount / 3 : nativeAmount / 12),
         budgeted,
         actual,
         remaining,
@@ -407,7 +537,13 @@ export async function POST(request: Request) {
     const targetPeriodKey = (body.periodKey as string) ?? null;
     const targetPeriodType = (body.periodType as string) || 'monthly';
     let targetCategoryId = body.categoryId as string;
-    const effectiveFrom = targetPeriodKey || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const effectiveFrom = targetPeriodKey || (
+      targetPeriodType === 'yearly'
+        ? String(new Date().getFullYear())
+        : targetPeriodType === 'quarterly'
+        ? `${new Date().getFullYear()}-Q${Math.floor(new Date().getMonth() / 3) + 1}`
+        : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+    );
 
     // Handle synthetic or named 'Everything Else' category creation
     if (targetCategoryId === 'everything-else-special' || !targetCategoryId) {

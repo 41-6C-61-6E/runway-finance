@@ -24,6 +24,8 @@ interface BudgetData {
   categoryName: string;
   categoryColor: string;
   periodType: string;
+  nativePeriodType?: 'monthly' | 'quarterly' | 'yearly';
+  nativeAmount?: number;
   periodKey?: string | null;
   yearMonth?: string | null;
   isRecurring: boolean;
@@ -411,6 +413,14 @@ export function BudgetTable() {
                         periodType={periodType}
                         periodKey={periodKey}
                       />
+                      {b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                        <span
+                          title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
+                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
+                        >
+                          {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
                       <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
@@ -461,6 +471,14 @@ export function BudgetTable() {
                         periodType={periodType}
                         periodKey={periodKey}
                       />
+                      {!isEE && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                        <span
+                          title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
+                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
+                        >
+                          {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
+                        </span>
+                      )}
                       {isEE && (
                         <button
                           onClick={() => setExpandedCatchAll(!expandedCatchAll)}
@@ -625,6 +643,14 @@ export function BudgetTable() {
                                 periodType={periodType}
                                 periodKey={periodKey}
                               />
+                              {b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                                <span
+                                  title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
+                                  className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
+                                >
+                                  {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
@@ -702,6 +728,14 @@ export function BudgetTable() {
                                   periodType={periodType}
                                   periodKey={periodKey}
                                 />
+                                {!isEE && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                                  <span
+                                    title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
+                                    className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
+                                  >
+                                    {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
+                                  </span>
+                                )}
 
                                 {/* Redesigned compact Everything Else breakout dropdown pill */}
                                 {isEE && (
@@ -830,9 +864,9 @@ export function BudgetTable() {
         editBudget={editBudget ? {
           id: editBudget.id,
           categoryId: editBudget.categoryId,
-          periodType: editBudget.periodType,
+          periodType: editBudget.nativePeriodType || editBudget.periodType,
           periodKey: editBudget.periodKey || editBudget.yearMonth || null,
-          amount: String(editBudget.budgeted),
+          amount: String(editBudget.nativeAmount !== undefined ? editBudget.nativeAmount : (editBudget.monthlyAmount ?? editBudget.budgeted)),
           isRecurring: editBudget.isRecurring,
           fundingAccountId: editBudget.fundingAccountId,
           rollover: editBudget.rollover,
