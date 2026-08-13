@@ -193,22 +193,26 @@ export function PerformanceChart() {
 
     return smoothedChartData.map((d) => {
       const portfolioPct = baseValue > 0 ? ((d.value - baseValue) / baseValue) * 100 : 0;
-      const benchmark = benchMap.get(d.date);
+      const benchmarkPct = benchMap.get(d.date);
+      // In dollar mode, map benchmark to equivalent indexed dollar value: baseValue * (1 + benchmarkPct / 100)
+      const benchmarkVal = benchmarkPct !== undefined ? baseValue * (1 + benchmarkPct / 100) : undefined;
+      const benchmark = displayMode === 'percent' ? benchmarkPct : benchmarkVal;
+
       return {
         date: d.date,
         value: d.value,
         portfolioPct,
-        ...(benchmark !== undefined ? { benchmark } : {}),
-      };
+        ...(benchmark !== undefined ? { benchmark, benchmarkPct } : {}),
+      } as HistoryPoint & { benchmarkPct?: number };
     });
-  }, [smoothedChartData, benchmarkData]);
+  }, [smoothedChartData, benchmarkData, displayMode]);
 
   const yDomain = useMemo((): [number, number] => {
     if (mergedData.length === 0) return [0, 1000];
 
     if (displayMode === 'percent') {
       const pcts = mergedData.map((d) => d.portfolioPct ?? 0);
-      const benchPcts = showBenchmark ? mergedData.map((d) => d.benchmark ?? 0) : [];
+      const benchPcts = showBenchmark ? mergedData.map((d: any) => d.benchmarkPct ?? 0) : [];
       const all = [...pcts, ...benchPcts];
       const rawMin = Math.min(...all);
       const rawMax = Math.max(...all);
@@ -217,8 +221,10 @@ export function PerformanceChart() {
     }
 
     const values = mergedData.map((d) => d.value);
-    const rawMax = Math.max(...values);
-    const rawMin = Math.min(...values);
+    const benchVals = showBenchmark ? mergedData.map((d) => d.benchmark ?? d.value) : [];
+    const all = [...values, ...benchVals];
+    const rawMax = Math.max(...all);
+    const rawMin = Math.min(...all);
     const range = rawMax - rawMin;
     const pad = range === 0 ? 1000 : Math.max(range * 0.08, 1000);
     const lowerBound = rawMin - pad < 0 ? 0 : rawMin - pad;
@@ -231,8 +237,6 @@ export function PerformanceChart() {
     return formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' });
   }, [timeframe]);
 
-
-
   const formatYTick = useCallback((v: number) => {
     if (displayMode === 'percent') return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
     return formatChartYAxisCurrency(v, yDomain[0], yDomain[1]);
@@ -240,7 +244,7 @@ export function PerformanceChart() {
 
   const CustomTooltip = useCallback(({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
-    const point = payload[0]?.payload as HistoryPoint;
+    const point = payload[0]?.payload as HistoryPoint & { benchmarkPct?: number };
     return (
       <ChartTooltip>
         <TooltipHeader>{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</TooltipHeader>
@@ -251,10 +255,12 @@ export function PerformanceChart() {
             : formatCurrency(point.value)}
           color="var(--color-chart-1)"
         />
-        {showBenchmark && point.benchmark !== undefined && (
+        {showBenchmark && point.benchmarkPct !== undefined && (
           <TooltipRow
             label="SPY (Benchmark)"
-            value={`${point.benchmark >= 0 ? '+' : ''}${point.benchmark.toFixed(2)}%`}
+            value={displayMode === 'percent'
+              ? `${point.benchmarkPct >= 0 ? '+' : ''}${point.benchmarkPct.toFixed(2)}%`
+              : `${formatCurrency(point.benchmark!)} (${point.benchmarkPct >= 0 ? '+' : ''}${point.benchmarkPct.toFixed(2)}%)`}
             color="var(--color-chart-3)"
           />
         )}

@@ -14,6 +14,7 @@ import { HoldingsAllocation } from '@/components/investments/holdings-allocation
 import { IncomeDividendsPanel } from '@/components/investments/income-dividends-panel';
 import { RecentActivity } from '@/components/investments/recent-activity';
 import { HoldingsTable } from '@/components/investments/holdings-table';
+import { HoldingDetailSheet } from '@/components/investments/holding-detail-modal';
 import { CandlestickChart, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 import { useQuery } from '@tanstack/react-query';
@@ -34,6 +35,13 @@ interface InvestmentsData {
 export default function InvestmentsPage() {
   const { isVisible } = useChartVisibility();
   const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'income'>('overview');
+  const [selectedHolding, setSelectedHolding] = useState<any | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  const handleSelectHolding = (h: any) => {
+    setSelectedHolding(h);
+    setIsDetailOpen(true);
+  };
 
   // 1. Fetch main investments data
   const { data, isLoading: dataLoading, error: dataError } = useQuery<InvestmentsData>({
@@ -73,8 +81,8 @@ export default function InvestmentsPage() {
     .filter((t): t is string => !!t && typeof t === 'string' && t.trim().length > 0) || [];
   const uniqueTickers = Array.from(new Set(tickers));
 
-  // 4. Fetch live stock quotes
-  const { data: quotesRes, isLoading: quotesLoading } = useQuery<{ quotes: QuoteData[] }>({
+  // 4. Fetch live stock quotes (progressive / non-blocking)
+  const { data: quotesRes } = useQuery<{ quotes: QuoteData[] }>({
     queryKey: ['investments-quotes', uniqueTickers.join(',')],
     queryFn: async () => {
       const res = await fetch(`/api/investments/quotes?tickers=${uniqueTickers.join(',')}`, {
@@ -90,7 +98,8 @@ export default function InvestmentsPage() {
 
   const quotes = quotesRes?.quotes || [];
 
-  const loading = dataLoading || incomeLoading || historyLoading || (uniqueTickers.length > 0 && quotesLoading);
+  // Non-blocking loading check
+  const loading = dataLoading || incomeLoading || historyLoading;
   const error = dataError ? (dataError instanceof Error ? dataError.message : String(dataError)) : null;
 
   if (loading) {
@@ -119,6 +128,10 @@ export default function InvestmentsPage() {
   }
 
   const hasAccounts = data && data.accounts && data.accounts.length > 0;
+
+  const selectedQuote = selectedHolding?.ticker
+    ? quotes.find((q) => q.ticker?.toUpperCase() === selectedHolding.ticker?.toUpperCase())
+    : undefined;
 
   return (
     <div className="min-h-screen w-full">
@@ -184,7 +197,11 @@ export default function InvestmentsPage() {
               <div className="space-y-5 sm:space-y-6">
                 {isVisible('topHoldings') && (
                   <div>
-                    <HoldingSparklineCards holdings={data.holdings} quotes={quotes} />
+                    <HoldingSparklineCards
+                      holdings={data.holdings}
+                      quotes={quotes}
+                      onSelectHolding={handleSelectHolding}
+                    />
                   </div>
                 )}
 
@@ -194,10 +211,15 @@ export default function InvestmentsPage() {
                       <div className="mb-4 border-b border-border/60 pb-2">
                         <h3 className="text-sm sm:text-base font-semibold text-foreground">Holdings Portfolio</h3>
                         <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                          A list of all securities and cash assets currently held across your linked accounts.
+                          A list of all securities and cash assets currently held across your linked accounts. Click any holding to view historical performance and position details.
                         </p>
                       </div>
-                      <HoldingsTable holdings={data.holdings} accounts={data.accounts} quotes={quotes} />
+                      <HoldingsTable
+                        holdings={data.holdings}
+                        accounts={data.accounts}
+                        quotes={quotes}
+                        onSelectHolding={handleSelectHolding}
+                      />
                     </div>
                   </div>
                 )}
@@ -223,6 +245,17 @@ export default function InvestmentsPage() {
                 )}
               </div>
             )}
+
+            {/* ── Holding Detail Slide-Out Sheet ── */}
+            <HoldingDetailSheet
+              open={isDetailOpen}
+              onOpenChange={setIsDetailOpen}
+              holding={selectedHolding}
+              allHoldings={data.holdings}
+              accounts={data.accounts}
+              quote={selectedQuote}
+              recentTransactions={incomeData?.transactions || []}
+            />
           </div>
         ) : (
           /* Onboarding/Empty State */

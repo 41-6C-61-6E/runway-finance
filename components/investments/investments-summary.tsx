@@ -17,6 +17,7 @@ import {
   AreaChart,
   Area,
   ResponsiveContainer,
+  YAxis,
 } from 'recharts';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 
@@ -24,6 +25,8 @@ interface Holding {
   accountId: string;
   ticker: string | null;
   name: string;
+  quantity?: number;
+  price?: number;
   value: number;
   costBasis: number | null;
   unrealizedGainLoss: number | null;
@@ -68,6 +71,13 @@ function MiniSparkline({ data, isPositive }: { data: number[]; isPositive: boole
   const chartData = data.map((v, i) => ({ i, v }));
   const color = isPositive ? 'var(--color-chart-1)' : 'var(--color-destructive)';
   const gradId = `sparklineGrad-${isPositive ? 'pos' : 'neg'}`;
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const delta = max - min;
+  const pad = delta === 0 ? min * 0.05 : delta * 0.15;
+  const yDomain: [number, number] = [Math.max(0, min - pad), max + pad];
+
   return (
     <div className="h-10 w-full mt-1.5">
       <ResponsiveContainer width="100%" height="100%">
@@ -78,6 +88,7 @@ function MiniSparkline({ data, isPositive }: { data: number[]; isPositive: boole
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
+          <YAxis domain={yDomain} hide />
           <Area
             type="monotone"
             dataKey="v"
@@ -157,19 +168,44 @@ export function InvestmentsSummary({
   // 30-day sparkline from portfolio history
   const sparkData = useMemo(() => {
     if (!portfolioHistory || portfolioHistory.length < 2) return undefined;
-    // Take last 30 points
     const slice = portfolioHistory.slice(-30);
     return slice.map((p) => p.value);
   }, [portfolioHistory]);
 
-  // Compute today's change (last point vs second-to-last in portfolio history)
+  // Compute today's change: use live quotes aggregation if available, fallback to last 2 historical points
   const todayChange = useMemo(() => {
+    if (quotes && quotes.length > 0) {
+      const qMap = new Map(quotes.map((q) => [q.ticker?.toUpperCase(), q]));
+      let liveChangeSum = 0;
+      let hasValidLiveChange = false;
+
+      for (const h of holdings) {
+        if (h.ticker) {
+          const q = qMap.get(h.ticker.toUpperCase());
+          if (q && q.change != null) {
+            const qty = h.quantity != null ? h.quantity : (h.price > 0 ? h.value / h.price : 0);
+            liveChangeSum += q.change * qty;
+            hasValidLiveChange = true;
+          }
+        }
+      }
+
+      if (hasValidLiveChange && totalBalance > 0) {
+        const startDayBalance = totalBalance - liveChangeSum;
+        const livePct = startDayBalance > 0 ? (liveChangeSum / startDayBalance) * 100 : 0;
+        return { amount: liveChangeSum, pct: livePct };
+      }
+    }
+
     if (!portfolioHistory || portfolioHistory.length < 2) return null;
     const last = portfolioHistory[portfolioHistory.length - 1];
     const prev = portfolioHistory[portfolioHistory.length - 2];
     if (!last || !prev) return null;
-    return { amount: last.value - prev.value, pct: prev.value > 0 ? ((last.value - prev.value) / prev.value) * 100 : 0 };
-  }, [portfolioHistory]);
+    return {
+      amount: last.value - prev.value,
+      pct: prev.value > 0 ? ((last.value - prev.value) / prev.value) * 100 : 0,
+    };
+  }, [quotes, holdings, totalBalance, portfolioHistory]);
 
   // Estimated dividend yield
   const divYield = useMemo(() => {

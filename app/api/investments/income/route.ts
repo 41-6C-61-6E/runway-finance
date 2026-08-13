@@ -13,15 +13,15 @@ const LOG_TAG = '[api-investments-income]';
 export type TransactionType = 'dividend' | 'interest' | 'buy' | 'sell' | 'fee' | 'deposit' | 'withdrawal' | 'reinvestment' | 'transfer' | 'other';
 
 const KEYWORD_MAP: { keywords: string[]; type: TransactionType }[] = [
-  { keywords: ['dividend', 'div ', 'div.', 'dividnd'], type: 'dividend' },
-  { keywords: ['interest', 'int ', 'int.', 'accrued interest', 'yield'], type: 'interest' },
+  { keywords: ['dividend', 'div ', 'div.', 'dividnd', 'qualified div', 'ordinary div', 'cap gain dst', 'capital gain distribution', 'short term cap gain', 'long term cap gain'], type: 'dividend' },
+  { keywords: ['interest', 'int ', 'int.', 'accrued interest', 'yield', 'sec yield', 'fed mmkt div', 'interest payment', 'credit interest'], type: 'interest' },
   { keywords: ['reinvest', 'reinvestment', 'drip'], type: 'reinvestment' },
-  { keywords: ['buy', 'bought', 'purchase', 'acquired', 'investment purchase'], type: 'buy' },
-  { keywords: ['sell', 'sold', 'sale', 'proceeds'], type: 'sell' },
-  { keywords: ['fee', 'commission', 'expense ratio', 'management fee', 'advisory fee', 'service charge'], type: 'fee' },
-  { keywords: ['deposit', 'contribution', 'transfer in', 'funding', 'rollover in', 'journal entry in'], type: 'deposit' },
-  { keywords: ['withdrawal', 'distribution', 'transfer out', 'journal entry out', 'rollover out'], type: 'withdrawal' },
-  { keywords: ['transfer'], type: 'transfer' },
+  { keywords: ['buy', 'bought', 'purchase', 'acquired', 'investment purchase', 'market buy', 'limit buy'], type: 'buy' },
+  { keywords: ['sell', 'sold', 'sale', 'proceeds', 'redemption', 'market sell', 'limit sell'], type: 'sell' },
+  { keywords: ['fee', 'commission', 'expense ratio', 'management fee', 'advisory fee', 'service charge', 'margin interest', 'wire fee', 'foreign transaction fee', 'sec fee'], type: 'fee' },
+  { keywords: ['deposit', 'contribution', 'transfer in', 'funding', 'rollover in', 'journal entry in', 'direct deposit', 'ach deposit'], type: 'deposit' },
+  { keywords: ['withdrawal', 'distribution', 'transfer out', 'journal entry out', 'rollover out', 'ach withdrawal'], type: 'withdrawal' },
+  { keywords: ['transfer', 'journal', 'sweep'], type: 'transfer' },
 ];
 
 export function classifyTransaction(description: string, payee: string | null, amount: number): TransactionType {
@@ -124,18 +124,25 @@ export async function GET(request: Request) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, total]) => ({ month, total }));
 
-    // Total annual income (last 12 full months)
+    // Total annual income (last 12 full months or annualized if shorter history)
     const now = new Date();
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
     const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().slice(0, 7);
-    const totalAnnual = monthlyIncome
-      .filter(({ month }) => month >= twelveMonthsAgoStr)
-      .reduce((sum, { total }) => sum + total, 0);
+    
+    const trailing12Months = monthlyIncome.filter(({ month }) => month >= twelveMonthsAgoStr);
+    const rawTotal = trailing12Months.reduce((sum, { total }) => sum + total, 0);
+
+    // If fewer than 12 months present, annualize based on available months (minimum 1 month)
+    const activeMonthCount = trailing12Months.length;
+    const totalAnnual = activeMonthCount > 0 && activeMonthCount < 12
+      ? Number(((rawTotal / activeMonthCount) * 12).toFixed(2))
+      : Number(rawTotal.toFixed(2));
 
     return NextResponse.json({
       monthlyIncome,
       totalAnnual,
+      rawTotalAnnual: rawTotal,
       transactions: classified,
     });
   } catch (error) {

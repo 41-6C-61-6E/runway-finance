@@ -159,9 +159,9 @@ export function FireProjectionsSidePanel({
       />
 
       {!isCollapsed && (
-        <div className="p-4 sm:p-5 space-y-4 divide-y divide-sidebar-border/50">
+        <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
           {/* Section 1: Plan Sustainability Grade */}
-          <div className="pb-1 flex items-center justify-between gap-3">
+          <div className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
             <div className="space-y-1 min-w-0">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                 Plan Sustainability
@@ -180,7 +180,7 @@ export function FireProjectionsSidePanel({
           </div>
 
           {/* Section 2: FIRE Target Arc Gauge & Key Indicators */}
-          <div className="pt-4 space-y-4">
+          <div className="py-4 first:pt-0 last:pb-0 space-y-4">
             <div className="flex flex-col items-center justify-center space-y-2">
               <div className="relative w-36 h-20 flex items-start justify-center overflow-hidden">
                 <svg className="w-36 h-36" viewBox="0 0 120 120">
@@ -214,7 +214,7 @@ export function FireProjectionsSidePanel({
                 </div>
               </div>
 
-              <div className="w-full flex justify-between text-xs pt-1 border-t border-border/50">
+              <div className="w-full flex justify-between text-xs pt-2.5 mt-1 border-t border-sidebar-border/50">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-muted-foreground">Current Net Worth</span>
                   <span className="font-bold text-foreground font-mono blur-number">{formatCurrency(currentNetWorth)}</span>
@@ -299,7 +299,7 @@ export function FireProjectionsSidePanel({
 
           {/* Section 3: Coast FIRE & Glidepath Asset Mix */}
           {coastFireInfo.coastTarget > 0 && (
-            <div className="pt-4">
+            <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip
                 content={
                   <>
@@ -356,7 +356,7 @@ export function FireProjectionsSidePanel({
           )}
 
           {/* Glidepath Asset Mix Section */}
-          <div className="pt-4">
+          <div className="py-4 first:pt-0 last:pb-0">
             <ChartHoverTooltip
               content={
                 <>
@@ -410,9 +410,9 @@ export function FireProjectionsSidePanel({
             </ChartHoverTooltip>
           </div>
 
-          {/* Section 4: Upcoming Key Milestones */}
+          {/* Section 5: Upcoming Key Milestones */}
           {milestoneCallouts.length > 0 && (
-            <div className="pt-4 space-y-2.5">
+            <div className="py-4 first:pt-0 last:pb-0 space-y-2.5">
               <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                 <Landmark className="w-3.5 h-3.5 text-primary shrink-0" />
                 Upcoming Key Milestones
@@ -457,7 +457,7 @@ export function FireProjectionsSidePanel({
           )}
 
           {/* Active Drawdown Strategy Pill */}
-          <div className="pt-4 space-y-1.5">
+          <div className="py-4 first:pt-0 last:pb-0 space-y-1.5">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
               Active Drawdown Strategy
             </span>

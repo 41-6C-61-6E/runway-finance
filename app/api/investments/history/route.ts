@@ -9,7 +9,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
 import { filterReportableAccounts, isInvestmentAccount } from '@/lib/utils/account-scope';
 
-type TimeFrame = '7d' | '30d' | '1m' | '3m' | '6m' | '1y' | '365d' | '5y' | 'ytd' | 'all';
+type TimeFrame = '1d' | '7d' | '30d' | '1m' | '3m' | '6m' | '1y' | '365d' | '5y' | 'ytd' | 'all' | '1d_discrete' | '7d_discrete';
 
 const LOG_TAG = '[api-investments-history]';
 
@@ -18,7 +18,12 @@ function getDateRange(timeframe: TimeFrame): [Date, Date] {
   const startDate = new Date();
 
   switch (timeframe) {
+    case '1d':
+    case '1d_discrete':
+      startDate.setDate(startDate.getDate() - 1);
+      break;
     case '7d':
+    case '7d_discrete':
       startDate.setDate(startDate.getDate() - 7);
       break;
     case '30d':
