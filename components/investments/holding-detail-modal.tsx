@@ -127,12 +127,23 @@ export function HoldingDetailSheet({
 
   const totalQuantity = useMemo(() => {
     return crossAccountPositions.length > 0
-      ? crossAccountPositions.reduce((sum, h) => sum + h.quantity, 0)
-      : holding?.quantity || 0;
+      ? crossAccountPositions.reduce((sum, h) => sum + (h.quantity || 0), 0)
+      : (holding?.quantity || 0);
   }, [crossAccountPositions, holding]);
 
-  const currentLivePrice = quote?.price ?? holding?.price ?? 0;
-  const totalValue = totalQuantity * currentLivePrice;
+  const currentLivePrice = useMemo(() => {
+    if (quote?.price != null && quote.price > 0) return quote.price;
+    if (holding?.price != null && holding.price > 0) return holding.price;
+    if (holding?.value && holding?.quantity && holding.quantity > 0) return holding.value / holding.quantity;
+    return 0;
+  }, [quote, holding]);
+
+  const totalValue = useMemo(() => {
+    if (totalQuantity > 0 && currentLivePrice > 0) {
+      return totalQuantity * currentLivePrice;
+    }
+    return holding?.value || 0;
+  }, [totalQuantity, currentLivePrice, holding]);
 
   const totalCostBasis = useMemo(() => {
     const sum = crossAccountPositions.reduce((s, h) => s + (h.costBasis || 0), 0);
@@ -151,17 +162,27 @@ export function HoldingDetailSheet({
   const matchingTransactions = useMemo(() => {
     if (!holding) return [];
     const t = holding.ticker?.toLowerCase();
-    const n = holding.name.toLowerCase();
+    const n = (holding.name || '').toLowerCase();
     return recentTransactions.filter((tx) => {
       const desc = `${tx.description || ''} ${tx.payee || ''}`.toLowerCase();
-      return (t && desc.includes(t)) || desc.includes(n.slice(0, 8));
+      return (t && desc.includes(t)) || (n.length >= 3 && desc.includes(n.slice(0, 8)));
     });
   }, [holding, recentTransactions]);
 
-  if (!holding) return null;
-
   const chartPoints = historyData?.points || [];
   const hasChart = chartPoints.length >= 2;
+
+  // Calculate dynamic Y-axis domain
+  const yDomain = useMemo((): [number, number] => {
+    if (!hasChart) return [0, 100];
+    const prices = chartPoints.map((p) => p.close).filter((p) => typeof p === 'number' && !isNaN(p) && p > 0);
+    if (prices.length === 0) return [0, 100];
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const delta = max - min;
+    const pad = delta === 0 ? min * 0.05 : delta * 0.12;
+    return [Math.max(0, min - pad), max + pad];
+  }, [chartPoints, hasChart]);
 
   // Range trend
   const firstPoint = chartPoints[0]?.close ?? 0;
@@ -171,17 +192,6 @@ export function HoldingDetailSheet({
   const rangeChangePct = firstPoint > 0 ? (rangeChange / firstPoint) * 100 : 0;
 
   const chartColor = isRangePositive ? 'var(--color-chart-1)' : 'var(--color-destructive)';
-
-  // Calculate dynamic Y-axis domain
-  const yDomain = useMemo((): [number, number] => {
-    if (!hasChart) return [0, 100];
-    const prices = chartPoints.map((p) => p.close);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const delta = max - min;
-    const pad = delta === 0 ? min * 0.05 : delta * 0.12;
-    return [Math.max(0, min - pad), max + pad];
-  }, [chartPoints, hasChart]);
 
   const rangeButtons: { label: string; value: RangeOption }[] = [
     { label: '1W', value: '1w' },
@@ -195,31 +205,32 @@ export function HoldingDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl p-0 overflow-y-auto bg-card">
-        <div className="p-5 sm:p-6 space-y-6">
-          {/* Header */}
-          <SheetHeader className="text-left space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {holding.ticker && (
-                  <span className="px-2.5 py-1 font-mono text-sm font-bold rounded-lg bg-primary/10 text-primary border border-primary/20">
-                    {holding.ticker}
+        {holding && (
+          <div className="p-5 sm:p-6 space-y-6">
+            {/* Header */}
+            <SheetHeader className="text-left space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  {holding.ticker && (
+                    <span className="px-2.5 py-1 font-mono text-sm font-bold rounded-lg bg-primary/10 text-primary border border-primary/20">
+                      {holding.ticker}
+                    </span>
+                  )}
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
+                    {quote?.shortName || holding.name}
                   </span>
-                )}
-                <span className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
-                  {quote?.shortName || holding.name}
-                </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Portfolio Weight</span>
+                  <span className="text-sm font-bold text-foreground blur-number">
+                    {(holding.portfolioWeight ?? 0).toFixed(1)}%
+                  </span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Portfolio Weight</span>
-                <span className="text-sm font-bold text-foreground blur-number">
-                  {holding.portfolioWeight.toFixed(1)}%
-                </span>
-              </div>
-            </div>
-            <SheetTitle className="text-lg sm:text-xl font-bold text-foreground leading-tight">
-              {holding.name}
-            </SheetTitle>
-          </SheetHeader>
+              <SheetTitle className="text-lg sm:text-xl font-bold text-foreground leading-tight">
+                {holding.name}
+              </SheetTitle>
+            </SheetHeader>
 
           {/* Price & Today's Change Hero */}
           <div className="p-4 rounded-xl bg-muted/20 border border-border/60 flex flex-wrap items-end justify-between gap-3">
@@ -256,7 +267,7 @@ export function HoldingDetailSheet({
                   <span className="font-semibold text-foreground">Price Performance</span>
                   {hasChart && (
                     <span className={`text-xs font-semibold ${isRangePositive ? 'text-chart-1' : 'text-destructive'}`}>
-                      ({isRangePositive ? '+' : ''}{rangeChangePct.toFixed(2)}%)
+                      ({isRangePositive ? '+' : ''}{(rangeChangePct ?? 0).toFixed(2)}%)
                     </span>
                   )}
                 </div>
@@ -361,7 +372,7 @@ export function HoldingDetailSheet({
               <div className="p-3 rounded-lg bg-muted/20 border border-border/50">
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Shares</span>
                 <span className="text-sm font-bold text-foreground font-mono blur-number">
-                  {totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                  {(totalQuantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}
                 </span>
               </div>
               <div className="p-3 rounded-lg bg-muted/20 border border-border/50">
@@ -372,7 +383,7 @@ export function HoldingDetailSheet({
               </div>
               <div className="p-3 rounded-lg bg-muted/20 border border-border/50">
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Total Return</span>
-                {totalGainLoss != null && totalReturnPct != null ? (
+                {totalGainLoss != null && totalReturnPct != null && !isNaN(totalReturnPct) ? (
                   <span className={`text-sm font-bold blur-number ${totalGainLoss >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
                     {totalGainLoss >= 0 ? '+' : ''}{totalReturnPct.toFixed(1)}%
                   </span>
@@ -393,7 +404,7 @@ export function HoldingDetailSheet({
               <div className="border border-border/60 rounded-xl overflow-hidden divide-y divide-border/40">
                 {crossAccountPositions.map((pos, idx) => {
                   const acc = accounts.find((a) => a.id === pos.accountId);
-                  const posValue = pos.quantity * currentLivePrice;
+                  const posValue = pos.quantity && currentLivePrice > 0 ? pos.quantity * currentLivePrice : pos.value;
                   return (
                     <div key={`${pos.accountId}-${idx}`} className="p-3 flex items-center justify-between text-xs hover:bg-muted/10">
                       <div className="flex items-center gap-2">
@@ -406,7 +417,7 @@ export function HoldingDetailSheet({
                       <div className="text-right">
                         <span className="font-bold text-foreground font-mono blur-number">{formatCurrency(posValue)}</span>
                         <span className="text-[10px] text-muted-foreground block font-mono">
-                          {pos.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} shares
+                          {(pos.quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} shares
                         </span>
                       </div>
                     </div>
@@ -425,7 +436,7 @@ export function HoldingDetailSheet({
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="blur-number">${historyData.fiftyTwoWeekLow?.toFixed(2) ?? '—'}</span>
                 <div className="flex-1 mx-4 h-1.5 bg-muted rounded-full relative">
-                  {historyData.fiftyTwoWeekHigh && historyData.fiftyTwoWeekLow && currentLivePrice ? (
+                  {historyData.fiftyTwoWeekHigh && historyData.fiftyTwoWeekLow && historyData.fiftyTwoWeekHigh > historyData.fiftyTwoWeekLow && currentLivePrice ? (
                     <div
                       className="absolute w-2.5 h-2.5 -top-0.5 rounded-full bg-primary border border-background shadow-xs"
                       style={{
@@ -463,6 +474,7 @@ export function HoldingDetailSheet({
             </div>
           )}
         </div>
+        )}
       </SheetContent>
     </Sheet>
   );

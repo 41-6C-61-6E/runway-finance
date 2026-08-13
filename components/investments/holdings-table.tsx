@@ -9,11 +9,8 @@ import {
   ChevronsUpDown,
   Info,
   Landmark,
-  Eye,
-  EyeOff,
   RefreshCw,
   Download,
-  Filter,
   X,
   Check,
 } from 'lucide-react';
@@ -75,39 +72,6 @@ function getAssetType(ticker: string | null, name: string): 'Stock' | 'ETF' | 'M
   return 'Stock';
 }
 
-// Ticker heuristics for Sector
-function getSector(ticker: string | null): string {
-  if (!ticker) return '—';
-  const t = ticker.toUpperCase();
-  
-  const tech = ['AAPL', 'MSFT', 'GOOG', 'GOOGL', 'NVDA', 'AMD', 'CRM', 'INTC', 'CSCO', 'ADBE', 'ORCL', 'QCOM', 'ASML', 'AVGO'];
-  const consumerCyc = ['AMZN', 'TSLA', 'HD', 'NKE', 'MCD', 'SBUX', 'LOW', 'TJX', 'F', 'GM'];
-  const financial = ['JPM', 'BAC', 'WFC', 'MS', 'GS', 'C', 'AXP', 'V', 'MA', 'BLK', 'BRK.B', 'BRK.A', 'SCHW'];
-  const health = ['JNJ', 'UNH', 'PFE', 'ABBV', 'MRK', 'LLY', 'TMO', 'ABT', 'DHR', 'BMY', 'GILD', 'AMGN'];
-  const energy = ['XOM', 'CVX', 'COP', 'SLB', 'EOG', 'MPC', 'PSX'];
-  const consumerDef = ['PG', 'KO', 'PEP', 'WMT', 'COST', 'PM', 'MO', 'TGT', 'EL', 'CL'];
-  const ind = ['CAT', 'HON', 'GE', 'UNP', 'UPS', 'FDX', 'LMT', 'RTX', 'BA', 'DE'];
-  const utilities = ['NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC'];
-  const realEstate = ['PLD', 'AMT', 'CCI', 'EQIX', 'O', 'WY'];
-  const telecom = ['T', 'VZ', 'TMUS', 'CMCSA'];
-  
-  if (tech.includes(t)) return 'Technology';
-  if (consumerCyc.includes(t)) return 'Consumer Cyclical';
-  if (financial.includes(t)) return 'Financial Services';
-  if (health.includes(t)) return 'Healthcare';
-  if (energy.includes(t)) return 'Energy';
-  if (consumerDef.includes(t)) return 'Consumer Defensive';
-  if (ind.includes(t)) return 'Industrials';
-  if (utilities.includes(t)) return 'Utilities';
-  if (realEstate.includes(t)) return 'Real Estate';
-  if (telecom.includes(t)) return 'Communication';
-  
-  const indexTickers = ['SPY', 'VOO', 'VTI', 'QQQ', 'IWM', 'VXUS', 'VEA', 'VWO', 'AGG', 'BND', 'SCHD', 'SCHF', 'IVV'];
-  if (indexTickers.includes(t)) return 'Broad Index';
-  
-  return '—';
-}
-
 function formatRelativeTime(dateStr?: string) {
   if (!dateStr) return '';
   try {
@@ -136,7 +100,6 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
   const [selectedAssetType, setSelectedAssetType] = useState<AssetTypeFilter>('all');
   const [sortField, setSortField] = useState<SortField>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [showSector, setShowSector] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const toggleRow = (id: string) => {
@@ -338,7 +301,6 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
       'Ticker',
       'Security Name',
       'Asset Type',
-      'Sector',
       'Brokerage Account',
       'Quantity',
       'Price',
@@ -362,7 +324,6 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
         h.ticker || '',
         `"${h.name.replace(/"/g, '""')}"`,
         getAssetType(h.ticker, h.name),
-        getSector(h.ticker),
         `"${h.institutionName} - ${h.accountName}"`,
         h.quantity,
         price,
@@ -434,7 +395,10 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                 className="w-full pl-9 pr-4 py-1.5 text-xs bg-muted/40 border border-border rounded-lg placeholder-muted-foreground/60 focus:outline-none focus:border-primary transition-colors"
               />
             </div>
+          </div>
 
+          {/* Action Controls (Right): Account Selector + Export CSV */}
+          <div className="flex items-center gap-2 shrink-0 justify-end flex-wrap sm:flex-nowrap">
             {/* Account Checkbox Dropdown Selector */}
             {accountsWithHoldings.length > 0 && (
               <div className="relative shrink-0" ref={accountDropdownRef}>
@@ -460,7 +424,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                 </button>
 
                 {accountDropdownOpen && (
-                  <div className="absolute left-0 top-full mt-1.5 w-full sm:w-80 bg-card border border-border rounded-xl shadow-xl z-50 p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="absolute right-0 top-full mt-1.5 w-full sm:w-80 bg-card border border-border rounded-xl shadow-xl z-50 p-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
                     {/* Search inside dropdown */}
                     <div className="relative flex items-center bg-muted/40 border border-border rounded-lg px-2.5 py-1">
                       <Search className="w-3.5 h-3.5 text-muted-foreground/70 mr-1.5 shrink-0 pointer-events-none" />
@@ -557,23 +521,11 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                 )}
               </div>
             )}
-          </div>
-
-          {/* Action Buttons (Right) */}
-          <div className="flex items-center gap-2 shrink-0 justify-end">
-            {/* Toggle Sector Column Button */}
-            <button
-              onClick={() => setShowSector(!showSector)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-muted/40 hover:bg-muted/75 border border-border rounded-lg transition-colors text-muted-foreground hover:text-foreground font-medium"
-            >
-              {showSector ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              <span>{showSector ? 'Hide Sector' : 'Show Sector'}</span>
-            </button>
 
             {/* Export CSV Button */}
             <button
               onClick={exportToCsv}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-muted/40 hover:bg-muted/75 border border-border rounded-lg transition-colors text-muted-foreground hover:text-foreground font-medium"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-muted/40 hover:bg-muted/75 border border-border rounded-lg transition-colors text-muted-foreground hover:text-foreground font-medium shrink-0"
               title="Export holdings to CSV"
             >
               <Download className="w-3.5 h-3.5" />
@@ -608,11 +560,6 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
               <th className="p-3 font-semibold min-w-[150px]">
                 <SortHeader field="security" label="Asset / Security" />
               </th>
-              {showSector && (
-                <th className="p-3 font-semibold text-left w-[12%]">
-                  <span className="text-muted-foreground font-semibold">Sector</span>
-                </th>
-              )}
               <th className="p-3 font-semibold min-w-[140px]">
                 <SortHeader field="account" label="Brokerage Account" />
               </th>
@@ -638,12 +585,11 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
             {sortedHoldings.length > 0 ? (
               sortedHoldings.map((h, idx) => {
                 const assetType = getAssetType(h.ticker, h.name);
-                const sector = getSector(h.ticker);
 
                 // Fetch live quote stats and calculate live value and live returns
                 const quote = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
                 const price = quote?.price ?? h.price;
-                const value = quote?.price ? quote.price * h.quantity : h.value;
+                const value = quote?.price && h.quantity ? quote.price * h.quantity : h.value;
                 const cost = h.costBasis;
                 const hasReturn = cost !== null && cost > 0;
                 const gainLoss = hasReturn ? value - cost : h.unrealizedGainLoss;
@@ -698,13 +644,6 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                       </div>
                     </td>
 
-                    {/* Sector */}
-                    {showSector && (
-                      <td className="p-3 text-muted-foreground font-medium text-[11px]">
-                        {sector}
-                      </td>
-                    )}
-
                     {/* Account */}
                     <td className="p-3 text-muted-foreground">
                       <div className="flex flex-col gap-0.5">
@@ -727,7 +666,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                     <td className="p-3 text-right text-muted-foreground font-mono">
                       <div className="flex flex-col">
                         <span className="text-foreground blur-number font-semibold">{formatCurrency(price)}</span>
-                        <span className="text-[10px] tabular-nums">× {h.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+                        <span className="text-[10px] tabular-nums">× {(h.quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
                       </div>
                     </td>
 
@@ -808,14 +747,14 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
 
                     {/* Weight */}
                     <td className="p-3 text-right text-muted-foreground font-mono tabular-nums">
-                      {weight.toFixed(1)}%
+                      {(weight ?? 0).toFixed(1)}%
                     </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={showSector ? 9 : 8} className="p-8 text-center text-muted-foreground/60 italic">
+                <td colSpan={8} className="p-8 text-center text-muted-foreground/60 italic">
                   {holdings.length === 0 
                     ? 'No holdings synced for these investment accounts.' 
                     : 'No holdings match the active search or filter criteria.'}
@@ -833,11 +772,10 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
             const rowId = `${h.accountId}-${h.securityId}-${idx}`;
             const isExpanded = expandedRow === rowId;
             const assetType = getAssetType(h.ticker, h.name);
-            const sector = getSector(h.ticker);
 
             const quote = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
             const price = quote?.price ?? h.price;
-            const value = quote?.price ? quote.price * h.quantity : h.value;
+            const value = quote?.price && h.quantity ? quote.price * h.quantity : h.value;
             const cost = h.costBasis;
             const hasReturn = cost !== null && cost > 0;
             const gainLoss = hasReturn ? value - cost : h.unrealizedGainLoss;
@@ -852,7 +790,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
 
             const weight = totalLivePortfolioValue > 0
               ? (value / totalLivePortfolioValue) * 100
-              : h.portfolioWeight;
+              : (h.portfolioWeight ?? 0);
 
             const acc = accounts.find((a) => a.id === h.accountId);
             const relativeSync = acc?.updatedAt ? formatRelativeTime(acc.updatedAt) : '';
@@ -892,9 +830,6 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                       <span className="px-1 py-0.5 bg-muted text-muted-foreground rounded border border-border/40 font-medium">
                         {assetType}
                       </span>
-                      {sector !== '—' && (
-                        <span className="text-[10px] opacity-80">{sector}</span>
-                      )}
                     </div>
                   </div>
                   {/* Value & Return Right-aligned */}
@@ -917,13 +852,13 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                     <div>
                       <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Quantity / Price</span>
                       <span className="font-mono text-foreground font-semibold blur-number">
-                        {h.quantity.toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {formatCurrency(price)}
+                        {(h.quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {formatCurrency(price)}
                       </span>
                     </div>
                     <div className="text-right">
                       <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Portfolio Weight</span>
                       <span className="font-mono text-foreground font-semibold">
-                        {weight.toFixed(1)}% of total
+                        {(weight ?? 0).toFixed(1)}% of total
                       </span>
                     </div>
 
