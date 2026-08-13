@@ -8,4 +8,5 @@ export * from './schema/scheduler-logs';
 export * from './schema/issues';
 export * from './schema/notifications';
 export * from './schema/retirement-planning';
+export * from './schema/recurring';
 

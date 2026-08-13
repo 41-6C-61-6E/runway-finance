@@ -13,8 +13,9 @@ import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import type { Account, TagItem } from '@/components/features/accounts/account-types';
 import AccountHistoryChart from '@/components/features/accounts/AccountHistoryChart';
 import AccountHierarchyTree from '@/components/features/accounts/AccountHierarchyTree';
+import { AccountForecastTab } from '@/components/features/accounts/forecast/AccountForecastTab';
 
-type Tab = 'history' | 'list';
+type Tab = 'history' | 'list' | 'forecast';
 
 function AccountsContent() {
   const { data: session } = useSession();
@@ -23,10 +24,11 @@ function AccountsContent() {
   const isRealEstateEnabled = isEnabled('realEstate');
 
   const [isMobile, setIsMobile] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('history');
+  const [activeTab, setActiveTab] = useState<Tab>('list');
   const availableTabs = [
-    { id: 'history', label: 'History' },
     { id: 'list', label: 'List' },
+    { id: 'history', label: 'History' },
+    { id: 'forecast', label: 'Forecast' },
   ] as { id: Tab; label: string }[];
 
   useEffect(() => {
@@ -41,7 +43,7 @@ function AccountsContent() {
   const tabParam = searchParams.get('tab');
 
   useEffect(() => {
-    if (tabParam === 'list' || tabParam === 'history') {
+    if (tabParam === 'list' || tabParam === 'history' || tabParam === 'forecast') {
       setActiveTab(tabParam as Tab);
     } else if (targetAccountId) {
       setActiveTab('list');
@@ -122,6 +124,16 @@ function AccountsContent() {
             />
           </div>
 
+          {activeTab === 'list' && (
+            <AccountHierarchyTree
+              filteredAllAccounts={filteredAllAccounts}
+              allTags={allTags}
+              historyData={historyData}
+              accountsLoading={accountsLoading}
+              targetAccountId={targetAccountId}
+            />
+          )}
+
           {activeTab === 'history' && (
             <AccountHistoryChart
               filteredAllAccounts={filteredAllAccounts}
@@ -133,13 +145,13 @@ function AccountsContent() {
             />
           )}
 
-          {activeTab === 'list' && (
-            <AccountHierarchyTree
+          {activeTab === 'forecast' && (
+            <AccountForecastTab
               filteredAllAccounts={filteredAllAccounts}
               allTags={allTags}
               historyData={historyData}
-              accountsLoading={accountsLoading}
-              targetAccountId={targetAccountId}
+              reportableAccounts={reportableAccounts}
+              isMobile={isMobile}
             />
           )}
         </MobileTabSwipeContainer>
