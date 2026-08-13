@@ -7,7 +7,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, Layers, BarChart3, HelpCircle, Target } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, Layers, BarChart3, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
@@ -170,17 +170,21 @@ export function BudgetSummary() {
   // Categories over budget
   const allOverBudgets = expenseBudgets.filter((b) => b.remaining < -0.01);
   const significantOverBudgets = expenseBudgets.filter(
-    (b) => b.remaining < -0.01 && (b.percentUsed > 125 || Math.abs(b.remaining) > 100)
+    (b) => b.remaining < -0.01 && (b.percentUsed > 200 || Math.abs(b.remaining) > 500)
   );
   const minorOverBudgets = expenseBudgets.filter(
     (b) => b.remaining < -0.01 && !significantOverBudgets.includes(b)
   );
 
+  const onTrackDescription = minorOverBudgets.length > 0 && totalExpenseCushion > 0
+    ? `${minorOverBudgets.length} minor category overrun${minorOverBudgets.length === 1 ? ' is' : 's are'} absorbed by remaining budget cushion. Projected finish: ${formatCurrency(projectedExpenseTotal)} (${projectedSurplusOrDeficit >= 0 ? `+${formatCurrency(projectedSurplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(projectedSurplusOrDeficit))} deficit`}).`
+    : `Overall budget is healthy. Projected month-end finish: ${formatCurrency(projectedExpenseTotal)} (${projectedSurplusOrDeficit >= 0 ? `+${formatCurrency(projectedSurplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(projectedSurplusOrDeficit))} deficit`}).`;
+
   let healthStatus = {
     label: 'On Track',
     badgeClass: 'bg-constructive/10 text-constructive border-constructive/20',
     icon: ShieldCheck,
-    description: `Overall budget is healthy. Projected month-end finish: ${formatCurrency(projectedExpenseTotal)} (${projectedSurplusOrDeficit >= 0 ? `+${formatCurrency(projectedSurplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(projectedSurplusOrDeficit))} deficit`}).`,
+    description: onTrackDescription,
   };
 
   // Rule 1: Critical Overrun (Red)
@@ -191,7 +195,7 @@ export function BudgetSummary() {
       icon: AlertTriangle,
       description: totalExpenseActual > totalExpenseBudgeted
         ? `Total actual spending (${formatCurrency(totalExpenseActual)}) has exceeded total expense budget (${formatCurrency(totalExpenseBudgeted)}).`
-        : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >25% or >$100 over budget.`,
+        : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >200% of budget or >$500 over budget.`,
     };
   }
   // Rule 2: Over Target (Orange)
@@ -210,18 +214,6 @@ export function BudgetSummary() {
       badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
       icon: AlertTriangle,
       description: `Discretionary spending is pacing ahead of schedule (${((variableActual / (variableBudgeted || 1)) * 100).toFixed(0)}% spent vs ${timePercent.toFixed(0)}% of month).`,
-    };
-  }
-  // Rule 4: At Budget (Blue) - when near 100% or small minor overruns absorbed by cushion
-  else if (expensePercent >= 95 || (minorOverBudgets.length > 0 && totalExpenseCushion > 0)) {
-    const reasonText = minorOverBudgets.length > 0
-      ? `${minorOverBudgets.length} minor category overrun is comfortably absorbed by remaining budget cushion (${formatCurrency(totalExpenseCushion)} remaining).`
-      : `Spending is approaching full budget capacity (${expensePercent.toFixed(0)}% used).`;
-    healthStatus = {
-      label: 'At Budget',
-      badgeClass: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-      icon: Target,
-      description: reasonText,
     };
   }
 
@@ -364,7 +356,7 @@ export function BudgetSummary() {
 
                       {significantOverBudgets.length > 0 && (
                         <div className="pt-1 space-y-1 text-[11px]">
-                          <span className="font-semibold text-destructive block">Major Overruns (&gt;25% or &gt;$100):</span>
+                          <span className="font-semibold text-destructive block">Major Overruns (&gt;200% or &gt;$500):</span>
                           <div className="max-h-20 overflow-y-auto space-y-1 pl-2 border-l-2 border-destructive/40">
                             {significantOverBudgets.map((b) => (
                               <div key={b.id} className="flex justify-between text-[10px]">
