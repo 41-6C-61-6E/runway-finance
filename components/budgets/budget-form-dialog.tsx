@@ -54,11 +54,11 @@ interface BudgetFormDialogProps {
 }
 
 export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBudget }: BudgetFormDialogProps) {
-  const { periodKey } = useBudgetPeriod();
+  const { periodType: activePeriodType, periodKey } = useBudgetPeriod();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [form, setForm] = useState<BudgetFormData>({
     categoryId: '',
-    periodType: 'monthly',
+    periodType: activePeriodType || 'monthly',
     amount: '',
     isRecurring: true,
     periodKey,
@@ -99,7 +99,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
     } else {
       setForm({
         categoryId: '',
-        periodType: 'monthly',
+        periodType: activePeriodType || 'monthly',
         amount: '',
         isRecurring: true,
         periodKey,
@@ -111,7 +111,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
       });
     }
     setError('');
-  }, [open, editBudget, periodKey, categories]);
+  }, [open, editBudget, periodKey, activePeriodType, categories]);
 
   const handleSave = async () => {
     if (!form.categoryId || !form.amount) {

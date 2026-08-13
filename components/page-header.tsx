@@ -69,7 +69,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       {/* Mobile-only fixed floating actions pill */}
       <div 
         style={{
-          top: 'calc(env(safe-area-inset-top) + 8px)',
+          top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
         } as React.CSSProperties}
         className={`fixed right-4 z-40 md:hidden flex items-center gap-0.5 py-1 px-1.5 rounded-full border border-sidebar-border/25 bg-sidebar/35 backdrop-blur-2xl shadow-md transition-all duration-300 ease-out ${
           isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
@@ -87,8 +87,8 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       </div>
 
       {/* Mobile-only scrolling title & children container */}
-      <div className="flex flex-col gap-3 px-4 pt-[calc(env(safe-area-inset-top)+20px)] pb-3 md:hidden w-full">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 px-4 pt-[calc(env(safe-area-inset-top,0px)+10px)] pb-3 md:hidden w-full">
+        <div className="flex items-center gap-3 min-h-[42px] pr-[155px]">
           <Icon className="w-6 h-6 text-primary flex-shrink-0" />
           <h1 className="text-xl font-normal tracking-tight text-foreground truncate">{title}</h1>
           {leftExtra}

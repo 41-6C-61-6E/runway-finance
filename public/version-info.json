@@ -1,9 +1,12 @@
 {
-  "buildNumber": "26.08.1786572035891",
-  "buildTime": "2026-08-12T22:00:35.891Z",
-  "hash": "06d9cf4",
-  "fullHash": "06d9cf41a3126de9188406a6aab0c146156d8f37",
+  "buildNumber": "26.08.1786650775016",
+  "buildTime": "2026-08-13T19:52:55.016Z",
+  "hash": "1140957",
+  "fullHash": "1140957c76d187cce54c52bd8f6c6541c3abfd7f",
   "commits": [
+    "docs: update project metadata, dependencies, installation instructions, and license file references in README",
+    "style: update collapsible filter panel button height and padding for better alignment",
+    "feat: add 10s request timeout and manual redirects to AI API routes, and restrict SSRF to block all IP literals",
     "refactor: implement ResizeObserver in budget table to dynamically manage column visibility based on container width",
     "feat: implement time-based budget pacing and improved health status projections for monthly, quarterly, and yearly periods",
     "feat: implement net value calculation to correctly handle income versus expense logic in budget actuals",
@@ -200,20 +203,41 @@
     "goals save button",
     "migraiton fix",
     "goals improvement",
-    "goals bugs",
-    "goals improvement",
-    "alert improvements",
-    "db fix"
+    "goals bugs"
   ],
   "history": [
+    {
+      "hash": "1140957",
+      "fullHash": "1140957c76d187cce54c52bd8f6c6541c3abfd7f",
+      "author": "Alan Racek",
+      "date": "2026-08-12T16:08:13-07:00",
+      "message": "docs: update project metadata, dependencies, installation instructions, and license file references in README",
+      "type": "docs",
+      "buildNumber": "26.08.1786650775016"
+    },
+    {
+      "hash": "61d839c",
+      "fullHash": "61d839c858bc31096cbdd991477d3a59e3428b96",
+      "author": "Alan Racek",
+      "date": "2026-08-12T15:39:26-07:00",
+      "message": "style: update collapsible filter panel button height and padding for better alignment",
+      "type": "style"
+    },
+    {
+      "hash": "f430b41",
+      "fullHash": "f430b41fd21573197d23f619ec5f105f26c97b76",
+      "author": "Alan Racek",
+      "date": "2026-08-12T15:29:19-07:00",
+      "message": "feat: add 10s request timeout and manual redirects to AI API routes, and restrict SSRF to block all IP literals",
+      "type": "feat"
+    },
     {
       "hash": "06d9cf4",
       "fullHash": "06d9cf41a3126de9188406a6aab0c146156d8f37",
       "author": "Alan Racek",
       "date": "2026-08-10T17:39:52-07:00",
       "message": "refactor: implement ResizeObserver in budget table to dynamically manage column visibility based on container width",
-      "type": "refactor",
-      "buildNumber": "26.08.1786572035891"
+      "type": "refactor"
     },
     {
       "hash": "dbd9a08",
@@ -1781,30 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-25T14:37:20-07:00",
       "message": "goals bugs",
-      "type": "other"
-    },
-    {
-      "hash": "9a3f61c",
-      "fullHash": "9a3f61c81bbb074ed836babff97936c7f45ec293",
-      "author": "Alan Racek",
-      "date": "2026-06-25T14:14:40-07:00",
-      "message": "goals improvement",
-      "type": "other"
-    },
-    {
-      "hash": "df01568",
-      "fullHash": "df015681ab2e0f8c09f3f51f23dec1c7930fd045",
-      "author": "Alan Racek",
-      "date": "2026-06-25T13:37:25-07:00",
-      "message": "alert improvements",
-      "type": "other"
-    },
-    {
-      "hash": "b6d33aa",
-      "fullHash": "b6d33aa86ffe233ee3f0f380fc63f95c717f7f6c",
-      "author": "Alan Racek",
-      "date": "2026-06-25T13:02:11-07:00",
-      "message": "db fix",
       "type": "other"
     }
   ]
