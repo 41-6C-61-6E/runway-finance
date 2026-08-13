@@ -151,7 +151,7 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(budgets.userId, dataUserId),
-          eq(categories.excludeFromReports, false),
+          or(eq(categories.excludeFromReports, false), isNull(categories.excludeFromReports)),
         )
       );
 

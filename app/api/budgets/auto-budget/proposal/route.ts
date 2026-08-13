@@ -9,40 +9,51 @@ import { decryptField } from '@/lib/crypto';
 import { ensureCategoryDiscretionaryColumn } from '@/lib/db/seed-categories';
 
 export async function POST(request: Request) {
-  const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
-  if (!session?.user || !dataUserId) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
-
-  const dek = await getSessionDEK();
-  let body: Record<string, any>;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
-  }
+    const session = await auth();
+    const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+    if (!session?.user || !dataUserId) {
+      return NextResponse.json({ error: 'unauthorized', message: 'User is not authenticated' }, { status: 401 });
+    }
 
-  const lookbackMonths = Math.max(1, Math.min(24, parseInt(String(body.lookbackMonths || 3), 10)));
-  const calculationMethod = ['average', 'median', 'max'].includes(body.calculationMethod)
-    ? body.calculationMethod
-    : 'average';
-  const bufferPercentage = Math.max(-50, Math.min(100, parseFloat(String(body.bufferPercentage || 0)) || 0));
-  const excludeOutliers = body.excludeOutliers === true;
-  const excludeVirtualAccounts = body.excludeVirtualAccounts !== false; // checked by default
-  const groupSmallCategories = body.groupSmallCategories !== false;
-  const smallCategoryThreshold = Math.max(0, parseFloat(String(body.smallCategoryThreshold ?? 50)) || 50);
-  const includeIncome = body.includeIncome === true;
-  const onlyUnbudgeted = body.onlyUnbudgeted === true;
-  const periodType = (body.periodType as string) || 'monthly';
-  const periodKey = (body.periodKey as string) || null;
+    let dek: Uint8Array;
+    try {
+      dek = await getSessionDEK();
+    } catch (err) {
+      logger.error('Failed to get session DEK for auto-budget proposal', { error: err });
+      return NextResponse.json({ error: 'encryption_error', message: 'Encryption session key is unavailable. Please re-authenticate.' }, { status: 500 });
+    }
 
-  const periodScale = periodType === 'quarterly' ? 3 : periodType === 'yearly' ? 12 : 1;
+    let body: Record<string, any>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'invalid_body', message: 'Invalid JSON request body' }, { status: 400 });
+    }
 
-  const db = getDb();
+    const lookbackMonths = Math.max(1, Math.min(24, parseInt(String(body.lookbackMonths || 3), 10)));
+    const calculationMethod = ['average', 'median', 'max'].includes(body.calculationMethod)
+      ? body.calculationMethod
+      : 'average';
+    const bufferPercentage = Math.max(-50, Math.min(100, parseFloat(String(body.bufferPercentage || 0)) || 0));
+    const excludeOutliers = body.excludeOutliers === true;
+    const excludeVirtualAccounts = body.excludeVirtualAccounts !== false; // checked by default
+    const groupSmallCategories = body.groupSmallCategories !== false;
+    const smallCategoryThreshold = Math.max(0, parseFloat(String(body.smallCategoryThreshold ?? 50)) || 50);
+    const includeIncome = body.includeIncome === true;
+    const onlyUnbudgeted = body.onlyUnbudgeted === true;
+    const periodType = (body.periodType as string) || 'monthly';
+    const periodKey = (body.periodKey as string) || null;
 
-  try {
-    await ensureCategoryDiscretionaryColumn();
+    const periodScale = periodType === 'quarterly' ? 3 : periodType === 'yearly' ? 12 : 1;
+
+    const db = getDb();
+
+    try {
+      await ensureCategoryDiscretionaryColumn();
+    } catch (e) {
+      logger.warn('Failed to ensure category discretionary column', { error: e });
+    }
 
     // 1. Fetch user settings for imported data
     const userSettingsList = await db
@@ -109,26 +120,34 @@ export async function POST(request: Request) {
       .from(transactions)
       .where(and(eq(transactions.userId, dataUserId), eq(transactions.deleted, false)));
 
-    const oldestTransactionDate = oldestTxRow?.oldestDate || null;
+    const oldestRaw: any = oldestTxRow?.oldestDate;
+    const oldestTransactionDate = oldestRaw
+      ? typeof oldestRaw === 'string'
+        ? oldestRaw
+        : oldestRaw instanceof Date
+        ? oldestRaw.toISOString().split('T')[0]
+        : String(oldestRaw)
+      : null;
+
     const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
 
     // Lookback operates on completed calendar months to avoid partial month skew
-    const completedMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-    const endIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const completedMonthEnd = new Date(Date.UTC(currentYear, currentMonth, 0));
+    const endIso = new Date(Date.UTC(currentYear, currentMonth, 1)).toISOString().split('T')[0];
 
-    const requestedStartDate = new Date(completedMonthEnd.getFullYear(), completedMonthEnd.getMonth() - lookbackMonths + 1, 1);
+    const requestedStartDate = new Date(Date.UTC(completedMonthEnd.getUTCFullYear(), completedMonthEnd.getUTCMonth() - lookbackMonths + 1, 1));
     const requestedStartIso = requestedStartDate.toISOString().split('T')[0];
 
-    let effectiveStartDate = requestedStartDate;
     let actualMonthsAvailable = lookbackMonths;
     let isInsufficientHistory = false;
     let warningMessage: string | null = null;
 
     if (oldestTransactionDate) {
       const oldestDateObj = new Date(oldestTransactionDate);
-      if (oldestDateObj > requestedStartDate) {
+      if (!isNaN(oldestDateObj.getTime()) && oldestDateObj > requestedStartDate) {
         isInsufficientHistory = true;
-        effectiveStartDate = oldestDateObj;
         
         const diffMs = Math.max(0, completedMonthEnd.getTime() - oldestDateObj.getTime());
         const daysAvailable = diffMs / (1000 * 60 * 60 * 24);
@@ -160,7 +179,7 @@ export async function POST(request: Request) {
     const decryptedCategories = await Promise.all(
       userCategories.map(async (c) => ({
         ...c,
-        name: c.name ? await decryptField(c.name, dek) : 'Uncategorized',
+        name: c.name ? await decryptField(c.name, dek).catch(() => c.name) : 'Uncategorized',
       }))
     );
 
@@ -182,10 +201,13 @@ export async function POST(request: Request) {
       .where(eq(budgets.userId, dataUserId));
 
     const decryptedExistingBudgets = await Promise.all(
-      existingBudgets.map(async (b) => ({
-        ...b,
-        amount: parseFloat(await decryptField(b.amount, dek)) || 0,
-      }))
+      existingBudgets.map(async (b) => {
+        const decryptedAmtStr = await decryptField(b.amount, dek).catch(() => String(b.amount));
+        return {
+          ...b,
+          amount: parseFloat(decryptedAmtStr) || 0,
+        };
+      })
     );
 
     const existingBudgetMap = new Map<string, number>();
@@ -238,10 +260,15 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const decryptedAmt = parseFloat(await decryptField(row.amount, dek));
+      const decryptedAmtStr = await decryptField(row.amount, dek).catch(() => String(row.amount));
+      const decryptedAmt = parseFloat(decryptedAmtStr);
       if (isNaN(decryptedAmt)) continue;
 
-      const ym = row.date.substring(0, 7);
+      const rawDate: any = row.date;
+      const dateStr = typeof rawDate === 'string' ? rawDate : rawDate instanceof Date ? rawDate.toISOString().split('T')[0] : String(rawDate || '');
+      if (!dateStr || dateStr.length < 7) continue;
+
+      const ym = dateStr.substring(0, 7);
       const cat = categoryMap.get(row.categoryId)!;
       
       const isCompound = cat.categoryType === 'compound';
@@ -268,7 +295,7 @@ export async function POST(request: Request) {
         const decryptedDesc = await decryptField(rawDesc, dek).catch(() => rawDesc);
         samples.push({
           id: row.id,
-          date: row.date,
+          date: dateStr,
           description: decryptedDesc,
           amount: Math.round(signedAmount * 100) / 100,
           source: row.source || 'bank',
@@ -413,7 +440,7 @@ export async function POST(request: Request) {
     // Add grouped "Everything Else" item if any small categories exist
     if (groupSmallCategories && smallCategoriesGroup.length > 0) {
       const otherCategory = validCategories.find(
-        (c) => c.name.toLowerCase().includes('everything else') || c.name.toLowerCase().includes('other') || c.name.toLowerCase().includes('misc')
+        (c) => !c.isIncome && (c.name.toLowerCase() === 'everything else' || c.name.toLowerCase().includes('everything else'))
       );
 
       proposalItems.push({
@@ -451,7 +478,10 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    logger.error('Error generating auto budget proposal', { error });
-    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+    logger.error('Error generating auto budget proposal', { error: error instanceof Error ? error.stack : error });
+    return NextResponse.json({
+      error: 'internal_error',
+      message: error instanceof Error ? error.message : 'An error occurred while generating the budget proposal'
+    }, { status: 500 });
   }
 }

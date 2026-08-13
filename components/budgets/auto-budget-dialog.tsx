@@ -114,9 +114,15 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
         body: JSON.stringify({ ignored: true }),
       });
 
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // non-JSON
+      }
+
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || data.error || 'Failed to exclude transaction');
+        throw new Error(data?.message || data?.error || `Failed to exclude transaction (${res.status})`);
       }
 
       const targetCatId = inspectItem.categoryId;
@@ -132,7 +138,8 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
 
           const monthlySumMap = new Map<string, number>();
           for (const t of activeTxList) {
-            const ym = t.date.substring(0, 7);
+            const dateStr = typeof t.date === 'string' ? t.date : String(t.date || '');
+            const ym = dateStr.substring(0, 7);
             const current = monthlySumMap.get(ym) || 0;
             monthlySumMap.set(ym, current + t.amount);
           }
@@ -208,12 +215,18 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
         }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || data.error || 'Failed to generate proposal');
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Failed to generate proposal (Server error ${res.status})`);
       }
 
-      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `Failed to generate proposal (${res.status})`);
+      }
+
       setProposalItems(data.proposal || []);
       setMeta(data.meta || null);
       setStep(2);
@@ -236,6 +249,8 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
     try {
       const payloadItems = selectedItems.map((item) => ({
         categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        isEverythingElse: Boolean(item.isSmallCategory || item.categoryId === 'all-other-grouped' || (item.categoryName && item.categoryName.toLowerCase() === 'everything else')),
         amount: item.proposedAmount,
         isDiscretionary: item.isDiscretionary,
         groupedCategories: item.groupedCategories,
@@ -254,12 +269,18 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
         }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || data.error || 'Failed to publish budgets');
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `Failed to publish budgets (Server error ${res.status})`);
       }
 
-      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `Failed to publish budgets (${res.status})`);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
       toast.success(`Successfully published ${data.count} budgets!`);
       onClose();
