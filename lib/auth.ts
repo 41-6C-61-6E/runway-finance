@@ -204,7 +204,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         session.user.id = token.sub;
-        (session.user as any).dek = token.dek;
         (session.user as any).dataUserId = currentDataUserId;
       }
       return session;

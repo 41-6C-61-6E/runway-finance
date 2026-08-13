@@ -8,18 +8,18 @@ function hexToBytes(hex: string): Uint8Array {
   return new Uint8Array(hex.match(/.{2}/g)!.map((c) => parseInt(c, 16)));
 }
 
-// Get the DEK for the current authenticated user (from JWT session)
+// Get the DEK for the current authenticated user
 export async function getSessionDEK(): Promise<Uint8Array> {
   if (process.env.TEST_DEK_HEX) {
     return hexToBytes(process.env.TEST_DEK_HEX);
   }
   const session = await auth();
-  const dekHex = (session?.user as unknown as Record<string, unknown> | undefined)?.dek;
+  const userId = session?.user?.id;
 
-  if (typeof dekHex !== 'string') {
+  if (!userId) {
     throw new Error('No encryption key available — user may not be authenticated');
   }
-  return hexToBytes(dekHex);
+  return getServerDEK(userId);
 }
 
 // Get a user's DEK via the server recovery key (for cron sync / admin operations)

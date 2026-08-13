@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { NextResponse } from "next/server";
 
-export default NextAuth(authConfig).auth(async (request) => {
+const authHandler = NextAuth(authConfig).auth(async (request) => {
   const { pathname } = request.nextUrl;
 
   // 1. Centralized CSRF check for state-changing operations on API routes.
@@ -98,6 +98,9 @@ export default NextAuth(authConfig).auth(async (request) => {
 
   return NextResponse.next();
 });
+
+export default authHandler;
+export const proxy = authHandler;
 
 export const config = {
   // Run on all paths except static files, but explicitly including api routes
