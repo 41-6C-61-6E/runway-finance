@@ -32,6 +32,7 @@ interface Account {
   balance: number;
   institution: string | null;
   type: string;
+  metadata?: any;
 }
 
 interface HoldingsAllocationProps {
@@ -69,19 +70,74 @@ interface ChartItem {
   color: string;
 }
 
-// Map account type to clean categories
-const getTaxCategory = (type: string): string => {
-  const t = type.toLowerCase();
-  if (['rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', 'retirement'].includes(t)) {
-    return 'Retirement (Tax-Advantaged)';
+export type TaxWrapper = 'Tax-Free' | 'Tax-Deferred' | 'Taxable' | 'Other';
+
+const TAX_WRAPPER_MAP: Record<string, TaxWrapper> = {
+  rothira: 'Tax-Free',
+  roth: 'Tax-Free',
+  roth_ira: 'Tax-Free',
+  hsa: 'Tax-Free',
+  health: 'Tax-Free',
+  '401k': 'Tax-Deferred',
+  '403b': 'Tax-Deferred',
+  '457b': 'Tax-Deferred',
+  traditionalira: 'Tax-Deferred',
+  traditional_ira: 'Tax-Deferred',
+  sepira: 'Tax-Deferred',
+  sep_ira: 'Tax-Deferred',
+  simpleira: 'Tax-Deferred',
+  simple_ira: 'Tax-Deferred',
+  pension: 'Tax-Deferred',
+  retirement: 'Tax-Deferred',
+  ira: 'Tax-Deferred',
+  investment: 'Taxable',
+  brokerage: 'Taxable',
+  individual: 'Taxable',
+  joint: 'Taxable',
+  '529': 'Other',
+  otherasset: 'Other',
+  otherinvestment: 'Other',
+};
+
+const WRAPPER_COLORS: Record<TaxWrapper, string> = {
+  'Tax-Free':     'var(--color-chart-1)',
+  'Tax-Deferred': 'var(--color-chart-2)',
+  'Taxable':      'var(--color-chart-4)',
+  'Other':        'var(--color-muted-foreground)',
+};
+
+const WRAPPER_DESCRIPTIONS: Record<string, string> = {
+  'Tax-Free':     'Roth IRA, HSA — contributions after-tax, growth & withdrawals tax-free',
+  'Tax-Deferred': '401(k), Traditional IRA — contributions pre-tax, taxed on withdrawal',
+  'Taxable':      'Brokerage — taxed on dividends and capital gains annually',
+  'Other':        '529, etc.',
+};
+
+const getTaxWrapper = (type: string, name: string = '', metadata?: any): TaxWrapper => {
+  const t = (type || '').toLowerCase();
+  const n = (name || '').toLowerCase();
+
+  // If metadata specifies isRoth or 100% Roth
+  if (metadata) {
+    try {
+      const meta = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+      if (meta?.isRoth === true || (typeof meta?.rothPercentage === 'number' && meta.rothPercentage >= 100)) {
+        return 'Tax-Free';
+      }
+    } catch {}
   }
-  if (['hsa', 'health'].includes(t)) {
-    return 'HSA / Health Savings';
+
+  // Name check for Roth
+  if (n.includes('roth')) {
+    return 'Tax-Free';
   }
-  if (['checking', 'savings', 'hsachecking'].includes(t)) {
-    return 'Cash / Money Market';
+
+  // Name check for 401k/IRA if type is generic retirement
+  if (n.includes('401k') || n.includes('401(k)') || n.includes('traditional') || n.includes('sep') || n.includes('simple')) {
+    return 'Tax-Deferred';
   }
-  return 'Taxable Brokerage';
+
+  return TAX_WRAPPER_MAP[t] ?? (t.includes('roth') ? 'Tax-Free' : 'Taxable');
 };
 
 type ViewMode = 'allocation' | 'rebalance';
@@ -113,10 +169,10 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
   const [activeModel, setActiveModel] = useState<string>('three-fund');
   const [customTargets, setCustomTargets] = useState<Record<string, number>>(PRESET_MODELS['three-fund'].targets);
 
-  const accountTypeMap = useMemo(() => {
-    const m = new Map<string, string>();
+  const accountMap = useMemo(() => {
+    const m = new Map<string, Account>();
     for (const acc of accounts) {
-      m.set(acc.id, acc.type);
+      m.set(acc.id, acc);
     }
     return m;
   }, [accounts]);
@@ -152,8 +208,35 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       } else if (groupBy === 'account') {
         key = `${h.institutionName} - ${h.accountName}`;
       } else if (groupBy === 'taxCategory') {
-        const type = accountTypeMap.get(h.accountId) || 'investment';
-        key = getTaxCategory(type);
+        const acc = accountMap.get(h.accountId);
+        const type = acc?.type || 'investment';
+        const name = acc?.name || h.accountName || '';
+
+        let rothPct: number | null = null;
+        if (acc?.metadata) {
+          try {
+            const meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata;
+            if (typeof meta?.rothPercentage === 'number') {
+              rothPct = meta.rothPercentage;
+            }
+          } catch {}
+        }
+
+        if (rothPct !== null) {
+          const rothVal = h.value * (rothPct / 100);
+          const nonRothVal = h.value * (1 - rothPct / 100);
+
+          groupedValues['Tax-Free'] = (groupedValues['Tax-Free'] ?? 0) + rothVal;
+
+          const defaultWrapper = TAX_WRAPPER_MAP[type.toLowerCase()] ?? (type.toLowerCase().includes('roth') ? 'Tax-Free' : 'Tax-Deferred');
+          const nonRothWrapper = defaultWrapper === 'Tax-Free' ? 'Tax-Deferred' : defaultWrapper;
+          groupedValues[nonRothWrapper] = (groupedValues[nonRothWrapper] ?? 0) + nonRothVal;
+          continue;
+        }
+
+        const wrapper = getTaxWrapper(type, name, acc?.metadata);
+        groupedValues[wrapper] = (groupedValues[wrapper] ?? 0) + h.value;
+        continue;
       } else if (groupBy === 'assetClass') {
         key = getAssetClass(h.ticker, h.name);
       }
@@ -189,11 +272,13 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
 
     return finalItems.map((item, idx) => ({
       ...item,
-      color: item.name === 'Other Assets' 
+      color: groupBy === 'taxCategory' && WRAPPER_COLORS[item.name as TaxWrapper]
+        ? WRAPPER_COLORS[item.name as TaxWrapper]
+        : item.name === 'Other Assets' 
         ? 'var(--color-muted-foreground)' 
         : `var(--color-chart-${(idx % 5) + 1})`,
     }));
-  }, [holdings, groupBy, accountTypeMap, totalValue, showAll]);
+  }, [holdings, groupBy, accountMap, totalValue, showAll]);
 
   if (holdings.length === 0) {
     return (
@@ -221,7 +306,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
     { value: 'security', label: 'By Asset' },
     { value: 'account', label: 'By Account' },
     { value: 'assetClass', label: 'By Asset Class' },
-    { value: 'taxCategory', label: 'By Tax Category' },
+    { value: 'taxCategory', label: 'By Tax Wrapper' },
   ];
 
   return (

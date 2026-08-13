@@ -86,8 +86,8 @@ function HoldingCard({ holding, history, quote, index, onClick }: HoldingCardPro
   // Live quote day change
   const dayChangePositive = quote?.changePercent != null ? quote.changePercent >= 0 : null;
 
-  // Line color is green for positive 30d trend, red for negative
-  const lineColor = is30dPositive ? 'var(--color-chart-1)' : 'var(--color-destructive)';
+  // Multi-color palette cycling per holding card index
+  const lineColor = `var(--color-chart-${(index % 5) + 1})`;
 
   // Calculate dynamic Y-axis domain so the curve contours realistically
   const yDomain = useMemo((): [number, number] => {
