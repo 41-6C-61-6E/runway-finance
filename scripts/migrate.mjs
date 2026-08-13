@@ -40,6 +40,8 @@ async function runSelfHealingChecks(client) {
       { name: 'notify_large_transactions', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'large_transaction_threshold', type: 'INTEGER NOT NULL DEFAULT 500' },
       { name: 'notify_monthly_summary', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'notify_weekly_net_worth_change', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'weekly_net_worth_alert_day', type: "TEXT NOT NULL DEFAULT 'sunday'" },
       { name: 'delete_pending_days', type: 'INTEGER NOT NULL DEFAULT 10' }
     ];
 
@@ -68,6 +70,21 @@ async function runSelfHealingChecks(client) {
         ALTER TABLE ai_providers
         ADD COLUMN IF NOT EXISTS json_mode BOOLEAN NOT NULL DEFAULT FALSE
       `);
+    }
+
+    // 3b. Check if effective_from and effective_to columns exist on budgets
+    const budgetColCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'budgets' AND column_name IN ('effective_from', 'effective_to')
+    `);
+    const budgetColsFound = new Set(budgetColCheck.rows.map(r => r.column_name));
+    if (!budgetColsFound.has('effective_from')) {
+      console.log('[migrate] [self-heal] Adding missing effective_from column to budgets...');
+      await client.query(`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS effective_from TEXT`);
+    }
+    if (!budgetColsFound.has('effective_to')) {
+      console.log('[migrate] [self-heal] Adding missing effective_to column to budgets...');
+      await client.query(`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS effective_to TEXT`);
     }
 
     // 4. Check if account_sharing_invitations table exists
@@ -196,6 +213,18 @@ async function runSelfHealingChecks(client) {
           ADD COLUMN IF NOT EXISTS conditions JSONB
         `);
       }
+
+      const colCheckTree = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'custom_alert_rules' AND column_name = 'condition_tree'
+      `);
+      if (colCheckTree.rows.length === 0) {
+        console.log('[migrate] [self-heal] Adding missing condition_tree column to custom_alert_rules...');
+        await client.query(`
+          ALTER TABLE custom_alert_rules
+          ADD COLUMN IF NOT EXISTS condition_tree JSONB
+        `);
+      }
     }
 
     // Ensure salary_source column exists on plan_flows
@@ -216,52 +245,134 @@ async function runSelfHealingChecks(client) {
       }
     }
 
-    // Mark unapplied migrations as applied if their artifacts already exist.
-    // The self-heal above may create tables/columns that later migrations expect
-    // to create, causing "already exists" failures that block subsequent migrations.
-    const pendingTags = await client.query(`SELECT tag FROM drizzle.__drizzle_migrations`);
-    const appliedTags = new Set(pendingTags.rows.map(r => r.tag));
-    const journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8'));
-    const migrationArtifacts = [
-      { tag: '0059_add_push_notifications_infrastructure', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'push_subscriptions'` },
-      { tag: '0060_add_notifications_limiter_and_milestones', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'budget_alert_threshold'` },
-      { tag: '0061_add_custom_alert_rules', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'custom_alert_rules'` },
-      { tag: '0062_lame_starjammers', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'custom_alert_rules' AND column_name = 'condition_operator'` },
-      { tag: '0069_kind_sabretooth', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_accounts'` },
-      { tag: '0070_regular_aqueduct', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'spouse_name'` },
-      { tag: '0071_famous_runaways', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_flows' AND column_name = 'salary_source'` },
-      { tag: '0072_account_contributions', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary'` },
-      { tag: '0073_loving_sinister_six', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary_year'` },
-      { tag: '0074_add_allow_penalty_withdrawals', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'` },
-      { tag: '0075_naive_secret_warriors', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'weekly_net_worth_alert_day'` },
-    ];
-    for (const { tag, check } of migrationArtifacts) {
-      if (appliedTags.has(tag)) continue;
-      const result = await client.query(check);
-      if (result.rows.length > 0) {
-        const entry = journal.entries.find(e => e.tag === tag);
-        if (!entry) continue;
-        const sqlPath = path.join(migrationsFolder, entry.tag + '.sql');
-        if (!fs.existsSync(sqlPath)) continue;
-        const sql = fs.readFileSync(sqlPath, 'utf-8');
-        const hash = crypto.createHash('sha256').update(sql).digest('hex');
-        await client.query(
-          'INSERT INTO drizzle.__drizzle_migrations (tag, hash, created_at) VALUES ($1, $2, $3)',
-          [tag, hash, entry.when || Date.now()]
-        );
-        console.log(`[migrate] [self-heal] Marked migration ${tag} as applied (artifacts already exist)`);
+    // 9e. Add salary progression columns to plans table
+    const plansTableCheck = await client.query(`
+      SELECT table_name FROM information_schema.tables WHERE table_name = 'plans'
+    `);
+    if (plansTableCheck.rows.length > 0) {
+      const salaryProgressionCols = [
+        { name: 'primary_salary_year', type: "INTEGER NOT NULL DEFAULT 2026" },
+        { name: 'primary_salary_raise_pct', type: "TEXT NOT NULL DEFAULT '0'" },
+        { name: 'primary_salary_overrides', type: 'JSONB' },
+        { name: 'spouse_salary_year', type: "INTEGER NOT NULL DEFAULT 2026" },
+        { name: 'spouse_salary_raise_pct', type: "TEXT NOT NULL DEFAULT '0'" },
+        { name: 'spouse_salary_overrides', type: 'JSONB' },
+      ];
+      for (const col of salaryProgressionCols) {
+        const colCheck = await client.query(`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_name = 'plans' AND column_name = '${col.name}'
+        `);
+        if (colCheck.rows.length === 0) {
+          console.log(`[migrate] [self-heal] Adding missing ${col.name} column to plans...`);
+          await client.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+        }
       }
     }
 
-    // 9. Drop FK constraints that reference the "user" table — the app uses
-    //    the "users" (plural) table with usernames and never populates "user".
-    //    These FKs were removed in migration 0063; self-heal as a safety net.
+    // 9f. Add allow_penalty_withdrawals column to plan_settings (migration 0074)
+    const planSettingsTableCheck = await client.query(`
+      SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_settings'
+    `);
+    if (planSettingsTableCheck.rows.length > 0) {
+      const colCheckPenalty = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'
+      `);
+      if (colCheckPenalty.rows.length === 0) {
+        console.log('[migrate] [self-heal] Adding missing allow_penalty_withdrawals column to plan_settings...');
+        await client.query(`ALTER TABLE plan_settings ADD COLUMN IF NOT EXISTS allow_penalty_withdrawals BOOLEAN NOT NULL DEFAULT TRUE`);
+      }
+    }
+
+    // Mark unapplied migrations as applied if their artifacts already exist.
+    const pendingTags = await client.query(`SELECT tag FROM drizzle.__drizzle_migrations`);
+    const appliedTags = new Set(pendingTags.rows.map(r => r.tag));
+    if (fs.existsSync(journalPath)) {
+      const journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8'));
+      const migrationArtifacts = [
+        { tag: '0059_add_push_notifications_infrastructure', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'push_subscriptions'` },
+        { tag: '0060_add_notifications_limiter_and_milestones', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'budget_alert_threshold'` },
+        { tag: '0061_add_custom_alert_rules', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'custom_alert_rules'` },
+        { tag: '0062_lame_starjammers', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'custom_alert_rules' AND column_name = 'condition_operator'` },
+        { tag: '0069_kind_sabretooth', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_accounts'` },
+        { tag: '0070_regular_aqueduct', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'spouse_name'` },
+        { tag: '0071_famous_runaways', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_flows' AND column_name = 'salary_source'` },
+        { tag: '0072_account_contributions', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary'` },
+        { tag: '0073_loving_sinister_six', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary_year'` },
+        { tag: '0074_add_allow_penalty_withdrawals', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'` },
+        { tag: '0075_naive_secret_warriors', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'weekly_net_worth_alert_day'` },
+      ];
+      for (const { tag, check } of migrationArtifacts) {
+        if (appliedTags.has(tag)) continue;
+        const result = await client.query(check);
+        if (result.rows.length > 0) {
+          const entry = journal.entries.find(e => e.tag === tag);
+          if (!entry) continue;
+          const sqlPath = path.join(migrationsFolder, entry.tag + '.sql');
+          if (!fs.existsSync(sqlPath)) continue;
+          const sql = fs.readFileSync(sqlPath, 'utf-8');
+          const hash = crypto.createHash('sha256').update(sql).digest('hex');
+          await client.query(
+            'INSERT INTO drizzle.__drizzle_migrations (tag, hash, created_at) VALUES ($1, $2, $3)',
+            [tag, hash, entry.when || Date.now()]
+          );
+          console.log(`[migrate] [self-heal] Marked migration ${tag} as applied (artifacts already exist)`);
+        }
+      }
+    }
+
+    // 9a. Add unique constraint on sent_notifications(user_id, key) for dedup safety
+    const uniqueKeyCheck = await client.query(`
+      SELECT constraint_name FROM information_schema.table_constraints
+      WHERE table_name = 'sent_notifications' AND constraint_type = 'UNIQUE'
+        AND constraint_name = 'sent_notifications_user_id_key_unique'
+    `);
+    if (uniqueKeyCheck.rows.length === 0) {
+      await client.query(`
+        DELETE FROM sent_notifications
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT id, row_number() OVER (PARTITION BY user_id, key ORDER BY sent_at DESC) AS rn
+            FROM sent_notifications
+          ) dup
+          WHERE dup.rn > 1
+        )
+      `);
+      await client.query(`
+        ALTER TABLE sent_notifications
+        ADD CONSTRAINT sent_notifications_user_id_key_unique UNIQUE (user_id, key)
+      `);
+      console.log('[migrate] [self-heal] Added unique constraint on sent_notifications(user_id, key)');
+    }
+
+    // 9b. Add index on sent_notifications(user_id, sent_at) for rate limiter
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sent_notifications_user_sent_at
+      ON sent_notifications (user_id, sent_at)
+    `);
+
+    // 9c. Add index on push_subscriptions(user_id) for subscription lookups
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id
+      ON push_subscriptions (user_id)
+    `);
+
+    // 9d. Add index on custom_alert_rules(user_id) to prevent full-table scans during sync
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS custom_alert_rules_user_id_idx
+      ON custom_alert_rules (user_id)
+    `);
+
+    // 10. Drop FK constraints that reference the "user" table
     await client.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_user_id_fk`);
+    await client.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_fkey`);
     await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_user_id_fk`);
+    await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_fkey`);
     await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_user_id_fk`);
+    await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_fkey`);
   } catch (err) {
     console.error('[migrate] Self-healing checks failed:', err.message);
-    // Don't crash startup on self-healing check failure, but log it
   }
 }
 
@@ -275,7 +386,6 @@ async function ensureMigrationsTable(client) {
     )
   `);
 
-  // Check if old-style table (no tag column) — upgrade it
   const colCheck = await client.query(`
     SELECT column_name FROM information_schema.columns
     WHERE table_schema = 'drizzle' AND table_name = '__drizzle_migrations' AND column_name = 'tag'
@@ -285,20 +395,20 @@ async function ensureMigrationsTable(client) {
     console.log('[migrate] Upgrading __drizzle_migrations table (adding tag column)...');
     await client.query('ALTER TABLE drizzle.__drizzle_migrations ADD COLUMN tag TEXT');
 
-    // Backfill tags by matching journal entry SQL SHA256 against stored hashes
-    const journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8'));
-    for (const entry of journal.entries) {
-      const sqlPath = path.join(migrationsFolder, entry.tag + '.sql');
-      if (!fs.existsSync(sqlPath)) continue;
-      const sql = fs.readFileSync(sqlPath, 'utf-8');
-      const hash = crypto.createHash('sha256').update(sql).digest('hex');
-      await client.query(
-        'UPDATE drizzle.__drizzle_migrations SET tag = $1 WHERE hash = $2 AND tag IS NULL',
-        [entry.tag, hash]
-      );
+    if (fs.existsSync(journalPath)) {
+      const journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8'));
+      for (const entry of journal.entries) {
+        const sqlPath = path.join(migrationsFolder, entry.tag + '.sql');
+        if (!fs.existsSync(sqlPath)) continue;
+        const sql = fs.readFileSync(sqlPath, 'utf-8');
+        const hash = crypto.createHash('sha256').update(sql).digest('hex');
+        await client.query(
+          'UPDATE drizzle.__drizzle_migrations SET tag = $1 WHERE hash = $2 AND tag IS NULL',
+          [entry.tag, hash]
+        );
+      }
     }
 
-    // Tag any remaining unmatched rows (shouldn't happen, but be safe)
     await client.query(
       "UPDATE drizzle.__drizzle_migrations SET tag = 'legacy_' || id WHERE tag IS NULL"
     );

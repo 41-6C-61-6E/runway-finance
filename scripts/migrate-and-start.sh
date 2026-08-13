@@ -3,11 +3,35 @@
 # Migrations are best-effort; failures don't block server startup
 
 echo "[init] Waiting for database to be ready..."
+
+DB_HOST="postgres"
+DB_PORT="5432"
+
+if [ -n "$DATABASE_URL" ]; then
+  URL_TAIL="${DATABASE_URL#*://}"
+  HOST_PORT_PATH="${URL_TAIL#*@}"
+  HOST_PORT="${HOST_PORT_PATH%%/*}"
+  HOST_PORT="${HOST_PORT%%\?*}"
+
+  case "$HOST_PORT" in
+    *:*)
+      DB_HOST="${HOST_PORT%%:*}"
+      DB_PORT="${HOST_PORT##*:}"
+      ;;
+    *)
+      if [ -n "$HOST_PORT" ]; then
+        DB_HOST="$HOST_PORT"
+      fi
+      ;;
+  esac
+fi
+
+echo "[init] Checking database connectivity on $DB_HOST:$DB_PORT..."
 max_attempts=30
 attempt=1
 while [ $attempt -le $max_attempts ]; do
   # nc -z checks TCP connectivity; Alpine sh does not support /dev/tcp
-  if nc -z postgres 5432 2>/dev/null; then
+  if nc -z "$DB_HOST" "$DB_PORT" 2>/dev/null; then
     echo "[init] Database is ready!"
     break
   fi

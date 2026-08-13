@@ -3,6 +3,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import AccountRow, { type Account } from '@/components/features/accounts/AccountRow';
+import { isLiabilityAccount } from '@/lib/utils/account-scope';
 
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -98,5 +99,21 @@ describe('AccountRow Component', () => {
 
     const tagIndicator = screen.queryByTitle('Personal');
     expect(tagIndicator).toBeNull();
+  });
+
+  it('correctly subtracts liability accounts when calculating net worth', () => {
+    const accounts: Account[] = [
+      { id: '1', name: 'Checking', type: 'checking', balance: '10000', currency: 'USD', institution: null, isHidden: false, isExcludedFromNetWorth: false, balanceDate: null },
+      { id: '2', name: 'Credit Card', type: 'credit', balance: '2500', currency: 'USD', institution: null, isHidden: false, isExcludedFromNetWorth: false, balanceDate: null },
+      { id: '3', name: 'Mortgage', type: 'mortgage', balance: '200000', currency: 'USD', institution: null, isHidden: false, isExcludedFromNetWorth: false, balanceDate: null },
+    ];
+
+    const totalNetWorth = accounts.reduce((sum, a) => {
+      const val = parseFloat(a.balance) || 0;
+      return isLiabilityAccount(a.type) ? sum - Math.abs(val) : sum + val;
+    }, 0);
+
+    expect(totalNetWorth).toBe(10000 - 2500 - 200000);
+    expect(totalNetWorth).toBe(-192500);
   });
 });

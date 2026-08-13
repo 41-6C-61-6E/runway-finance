@@ -8,7 +8,7 @@ import { useSidebar, ACCOUNTS_MIN_WIDTH, ACCOUNTS_MAX_WIDTH, COLLAPSED_WIDTH } f
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 import AccountRow, { type Account, formatCurrency } from '@/components/features/accounts/AccountRow';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
-import { filterReportableAccounts } from '@/lib/utils/account-scope';
+import { filterReportableAccounts, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY, GROUP_ORDER } from '@/lib/constants/account-types';
 
 const SUB_GROUP_TO_TYPES: Record<string, string[]> = {};
@@ -75,7 +75,10 @@ export default function AccountsSidebar() {
   }, [visibleAccounts]);
 
   const totalNetWorth = useMemo(() => {
-    return visibleAccounts.reduce((sum, a) => sum + parseFloat(a.balance), 0);
+    return visibleAccounts.reduce((sum, a) => {
+      const val = parseFloat(a.balance) || 0;
+      return isLiabilityAccount(a.type) ? sum - Math.abs(val) : sum + val;
+    }, 0);
   }, [visibleAccounts]);
 
   const getGroupTotal = useCallback(
