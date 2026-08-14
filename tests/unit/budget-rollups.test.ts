@@ -275,4 +275,165 @@ describe('Budget Timeframe Rollups', () => {
     expect(item.nativeAmount).toBe(7000);
     expect(item.budgeted).toBe(7000);
   });
+
+  it('quarterly budget rolls down into monthly view with 1/3 amount and nativePeriodType="quarterly"', async () => {
+    mockDbState.budgets = [
+      {
+        id: 'b-quarterly',
+        userId: 'test-user-id',
+        categoryId: 'cat-insurance',
+        amount: '1200.00',
+        periodType: 'quarterly',
+        isRecurring: true,
+        effectiveFrom: '2026-Q1',
+        effectiveTo: null,
+        categoryName: 'Insurance',
+        categoryColor: '#6366f1',
+        isIncome: false,
+        categoryType: 'expense',
+        isDiscretionary: false,
+      },
+    ];
+
+    const req = new Request('http://localhost:3000/api/budgets?periodType=monthly&periodKey=2026-08');
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.budgets).toHaveLength(1);
+    const item = data.budgets[0];
+    expect(item.categoryId).toBe('cat-insurance');
+    expect(item.nativePeriodType).toBe('quarterly');
+    expect(item.nativeAmount).toBe(1200);
+    expect(item.budgeted).toBe(400); // 1200 / 3
+  });
+
+  it('yearly budget rolls down into monthly view with 1/12 amount and nativePeriodType="yearly"', async () => {
+    mockDbState.budgets = [
+      {
+        id: 'b-yearly',
+        userId: 'test-user-id',
+        categoryId: 'cat-insurance',
+        amount: '1200.00',
+        periodType: 'yearly',
+        isRecurring: true,
+        effectiveFrom: '2026',
+        effectiveTo: null,
+        categoryName: 'Insurance',
+        categoryColor: '#6366f1',
+        isIncome: false,
+        categoryType: 'expense',
+        isDiscretionary: false,
+      },
+    ];
+
+    const req = new Request('http://localhost:3000/api/budgets?periodType=monthly&periodKey=2026-08');
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.budgets).toHaveLength(1);
+    const item = data.budgets[0];
+    expect(item.categoryId).toBe('cat-insurance');
+    expect(item.nativePeriodType).toBe('yearly');
+    expect(item.nativeAmount).toBe(1200);
+    expect(item.budgeted).toBe(100); // 1200 / 12
+  });
+
+  it('yearly budget rolls down into quarterly view with 1/4 amount and nativePeriodType="yearly"', async () => {
+    mockDbState.budgets = [
+      {
+        id: 'b-yearly',
+        userId: 'test-user-id',
+        categoryId: 'cat-insurance',
+        amount: '1200.00',
+        periodType: 'yearly',
+        isRecurring: true,
+        effectiveFrom: '2026',
+        effectiveTo: null,
+        categoryName: 'Insurance',
+        categoryColor: '#6366f1',
+        isIncome: false,
+        categoryType: 'expense',
+        isDiscretionary: false,
+      },
+    ];
+
+    const req = new Request('http://localhost:3000/api/budgets?periodType=quarterly&periodKey=2026-Q3');
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.budgets).toHaveLength(1);
+    const item = data.budgets[0];
+    expect(item.categoryId).toBe('cat-insurance');
+    expect(item.nativePeriodType).toBe('yearly');
+    expect(item.nativeAmount).toBe(1200);
+    expect(item.budgeted).toBe(300); // 1200 / 4
+  });
+
+  it('parent category covers unbudgeted child categories in coveredCategoryIds', async () => {
+    mockDbState.categories = [
+      {
+        id: 'cat-food',
+        name: 'Food & Dining',
+        color: '#10b981',
+        parentId: null,
+        isIncome: false,
+        categoryType: 'expense',
+        excludeFromReports: false,
+        isDiscretionary: true,
+      },
+      {
+        id: 'cat-groceries',
+        name: 'Groceries',
+        color: '#10b981',
+        parentId: 'cat-food',
+        isIncome: false,
+        categoryType: 'expense',
+        excludeFromReports: false,
+        isDiscretionary: true,
+      },
+      {
+        id: 'cat-restaurants',
+        name: 'Restaurants',
+        color: '#f59e0b',
+        parentId: 'cat-food',
+        isIncome: false,
+        categoryType: 'expense',
+        excludeFromReports: false,
+        isDiscretionary: true,
+      },
+    ];
+
+    mockDbState.budgets = [
+      {
+        id: 'b-food',
+        userId: 'test-user-id',
+        categoryId: 'cat-food',
+        amount: '800.00',
+        periodType: 'monthly',
+        isRecurring: true,
+        effectiveFrom: '2026-01',
+        effectiveTo: null,
+        categoryName: 'Food & Dining',
+        categoryColor: '#10b981',
+        isIncome: false,
+        categoryType: 'expense',
+        isDiscretionary: true,
+      },
+    ];
+
+    const req = new Request('http://localhost:3000/api/budgets?periodType=monthly&periodKey=2026-08');
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.budgets).toHaveLength(1);
+    const item = data.budgets[0];
+    expect(item.categoryId).toBe('cat-food');
+    expect(item.coveredCategoryIds).toContain('cat-food');
+    expect(item.coveredCategoryIds).toContain('cat-groceries');
+    expect(item.coveredCategoryIds).toContain('cat-restaurants');
+  });
 });

@@ -261,17 +261,13 @@ export async function GET(request: Request) {
             .filter((b: any) => b.fundingAccountId === acc.id && !b.isIncome)
             .reduce((sum: number, b: any) => sum + normalizeToMonthly(parseFloat(b.amount), b.periodType), 0);
 
-          const historicalPart = Array.from(historicalCats.entries())
-            .filter(([catId]) => !budgetedCats.has(catId))
-            .reduce((sum, [, avgAmt]) => sum + avgAmt, 0);
-
           const totalHistorical = avgMonthlyExpense.get(acc.id) || 0;
           const totalBudgetedHistorical = Array.from(historicalCats.entries())
             .filter(([catId]) => budgetedCats.has(catId))
             .reduce((sum, [, avgAmt]) => sum + avgAmt, 0);
-          const uncategorizedHistorical = Math.max(0, totalHistorical - totalBudgetedHistorical);
+          const unbudgetedHistorical = Math.max(0, totalHistorical - totalBudgetedHistorical);
 
-          budgetedOutflows = budgetedPart + historicalPart + uncategorizedHistorical;
+          budgetedOutflows = budgetedPart + unbudgetedHistorical;
         }
 
         return {

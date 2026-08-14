@@ -212,21 +212,41 @@ export async function GET(request: Request) {
     const activeBudgetRows: ResolvedBudgetItem[] = [];
 
     for (const [catId, bList] of categoryBudgetsMap.entries()) {
-      // Sort candidates by effectiveFrom descending so the newest configured budget takes precedence
-      const sortedCandidates = [...bList].sort((a, b) => (b.effectiveFrom || '').localeCompare(a.effectiveFrom || ''));
+      // Sort candidates by parsed start date descending so the newest configured budget takes precedence
+      const sortedCandidates = [...bList].sort((a, b) => {
+        const dateA = a.effectiveFrom ? parsePeriodRange(a.effectiveFrom).start : '1970-01-01';
+        const dateB = b.effectiveFrom ? parsePeriodRange(b.effectiveFrom).start : '1970-01-01';
+        return dateB.localeCompare(dateA);
+      });
 
       let chosen: typeof decryptedBudgetRows[0] | null = null;
       let nativePeriodType: 'monthly' | 'quarterly' | 'yearly' = 'monthly';
       let budgetedMultiplier = 1;
 
       if (periodType === 'monthly') {
-        chosen = sortedCandidates.find((c) => (c.periodType || 'monthly') === 'monthly') || null;
-        if (chosen) {
+        // Priority: Direct Monthly (x1) > Quarterly Roll-Down (/3) > Yearly Roll-Down (/12)
+        const directMonthly = sortedCandidates.find((c) => (c.periodType || 'monthly') === 'monthly');
+        if (directMonthly) {
+          chosen = directMonthly;
           nativePeriodType = 'monthly';
           budgetedMultiplier = 1;
+        } else {
+          const quarterlyCandidate = sortedCandidates.find((c) => c.periodType === 'quarterly');
+          if (quarterlyCandidate) {
+            chosen = quarterlyCandidate;
+            nativePeriodType = 'quarterly';
+            budgetedMultiplier = 1 / 3;
+          } else {
+            const yearlyCandidate = sortedCandidates.find((c) => c.periodType === 'yearly');
+            if (yearlyCandidate) {
+              chosen = yearlyCandidate;
+              nativePeriodType = 'yearly';
+              budgetedMultiplier = 1 / 12;
+            }
+          }
         }
       } else if (periodType === 'quarterly') {
-        // Priority: Direct quarterly budget > Monthly rollup
+        // Priority: Direct Quarterly (x1) > Monthly Rollup (x3) > Yearly Roll-Down (/4)
         const directQuarterly = sortedCandidates.find((c) => c.periodType === 'quarterly');
         if (directQuarterly) {
           chosen = directQuarterly;
@@ -238,10 +258,17 @@ export async function GET(request: Request) {
             chosen = monthlyCandidate;
             nativePeriodType = 'monthly';
             budgetedMultiplier = 3;
+          } else {
+            const yearlyCandidate = sortedCandidates.find((c) => c.periodType === 'yearly');
+            if (yearlyCandidate) {
+              chosen = yearlyCandidate;
+              nativePeriodType = 'yearly';
+              budgetedMultiplier = 1 / 4;
+            }
           }
         }
       } else {
-        // Yearly: Priority: Direct yearly > Quarterly rollup > Monthly rollup
+        // Yearly: Priority: Direct Yearly (x1) > Quarterly Rollup (x4) > Monthly Rollup (x12)
         const directYearly = sortedCandidates.find((c) => c.periodType === 'yearly');
         if (directYearly) {
           chosen = directYearly;
@@ -326,6 +353,22 @@ export async function GET(request: Request) {
       }
       return null;
     };
+
+    // Build coveredCategoryIds mapping: maps each budgeted category to itself + any unbudgeted descendants that roll into it
+    const coveredCategoriesMap = new Map<string, string[]>();
+    for (const catId of budgetedCategoryIds) {
+      coveredCategoriesMap.set(catId, [catId]);
+    }
+    for (const cat of decryptedAllCategories) {
+      const targetId = getClosestBudgetedCategory(cat.id);
+      if (targetId && targetId !== cat.id) {
+        const list = coveredCategoriesMap.get(targetId) || [targetId];
+        if (!list.includes(cat.id)) {
+          list.push(cat.id);
+        }
+        coveredCategoriesMap.set(targetId, list);
+      }
+    }
 
     // User settings & account exclusion configuration
     const userSettingsList = await db
@@ -433,6 +476,7 @@ export async function GET(request: Request) {
       .sort((a, b) => b.actual - a.actual);
 
     // Map active budget rows with exact calculated actuals and Everything Else breakout
+    let hasExplicitEverythingElse = false;
     const data = activeBudgetRows.map((row) => {
       const nativeAmount = row.nativeAmount;
       const budgeted = row.budgeted;
@@ -448,6 +492,7 @@ export async function GET(request: Request) {
       let groupedBreakout: typeof everythingElseBreakout | undefined = undefined;
 
       if (isEverythingElse) {
+        hasExplicitEverythingElse = true;
         groupedBreakout = everythingElseBreakout;
         const totalUnbudgetedActual = everythingElseBreakout.reduce((s, c) => s + c.actual, 0);
         actual = Math.max(actual, totalUnbudgetedActual);
@@ -455,6 +500,7 @@ export async function GET(request: Request) {
 
       const remaining = effectiveIsIncome ? actual - budgeted : budgeted - actual;
       const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0;
+      const coveredCategoryIds = coveredCategoriesMap.get(row.categoryId) || [row.categoryId];
 
       return {
         id: row.id,
@@ -482,9 +528,44 @@ export async function GET(request: Request) {
         type: effectiveIsIncome ? 'income' : 'expense',
         isDiscretionary: row.isDiscretionary ?? true,
         isEverythingElse,
+        isCatchAll: isEverythingElse,
         groupedBreakout,
+        coveredCategoryIds,
       };
     });
+
+    // If there is unbudgeted spending and no explicit Everything Else budget exists, add synthetic Everything Else item
+    if (!hasExplicitEverythingElse && everythingElseBreakout.length > 0) {
+      const totalUnbudgetedActual = everythingElseBreakout.reduce((s, c) => s + c.actual, 0);
+      data.push({
+        id: 'synthetic-everything-else',
+        categoryId: 'everything-else-special',
+        categoryName: 'Everything Else',
+        categoryColor: '#64748b',
+        periodType: periodType,
+        nativePeriodType: periodType as any,
+        nativeAmount: 0,
+        periodKey: null,
+        yearMonth: null,
+        effectiveFrom: null,
+        effectiveTo: null,
+        isRecurring: true,
+        fundingAccountId: null,
+        rollover: false,
+        notes: null,
+        monthlyAmount: 0,
+        budgeted: 0,
+        actual: totalUnbudgetedActual,
+        remaining: -totalUnbudgetedActual,
+        percentUsed: 0,
+        type: 'expense' as const,
+        isDiscretionary: true,
+        isEverythingElse: true,
+        isCatchAll: true,
+        groupedBreakout: everythingElseBreakout,
+        coveredCategoryIds: everythingElseBreakout.map((b) => b.categoryId),
+      });
+    }
 
     const result: Record<string, unknown> = { budgets: data, period: bounds };
 

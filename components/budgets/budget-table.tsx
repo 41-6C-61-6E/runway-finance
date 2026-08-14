@@ -8,7 +8,7 @@ import { BudgetFormDialog } from './budget-form-dialog';
 import { AutoBudgetDialog } from './auto-budget-dialog';
 import { BudgetItemTransactionsIcon, getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
-import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Settings, History, Layers, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Settings, History, Layers, Filter, Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
@@ -43,6 +43,7 @@ interface BudgetData {
   isEverythingElse?: boolean;
   isCatchAll?: boolean;
   groupedBreakout?: Array<{ categoryId: string; categoryName: string; categoryColor?: string; actual: number }>;
+  coveredCategoryIds?: string[];
 }
 
 interface Account {
@@ -60,6 +61,7 @@ export function BudgetTable() {
   const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1000);
+  const [showDirectOnly, setShowDirectOnly] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -175,7 +177,7 @@ export function BudgetTable() {
   const handlePurgeHistory = async () => {
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/budgets?action=purge_history&periodKey=${periodKey}`, { method: 'DELETE', credentials: 'include' });
+      const res = await fetch('/api/budgets?action=purge_history&periodKey=${periodKey}', { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error('Failed to remove budget history');
       toast.success('Budget history prior to current period removed');
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
@@ -210,7 +212,8 @@ export function BudgetTable() {
         throw new Error(data.message || 'Failed to create budget');
       }
 
-      toast.success(`Converted "${item.categoryName}" to standalone budget (${formatCurrency(amountToBudget)}/mo)`);
+      const periodSuffix = periodType === 'yearly' ? '/yr' : periodType === 'quarterly' ? '/quarter' : '/mo';
+      toast.success(`Converted "${item.categoryName}" to standalone budget (${formatCurrency(amountToBudget)}${periodSuffix})`);
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to convert category to budget item');
@@ -274,19 +277,27 @@ export function BudgetTable() {
     [sortField, sortDirection, accounts]
   );
 
+  const filterDirect = useCallback(
+    (items: BudgetData[]) => {
+      if (!showDirectOnly) return items;
+      return items.filter((b) => (b.nativePeriodType || b.periodType) === periodType || b.isEverythingElse);
+    },
+    [showDirectOnly, periodType]
+  );
+
   const incomeBudgets = useMemo(
-    () => sortBudgets((budgets as BudgetData[]).filter((b) => b.type === 'income')),
-    [budgets, sortBudgets]
+    () => sortBudgets(filterDirect((budgets as BudgetData[]).filter((b) => b.type === 'income'))),
+    [budgets, sortBudgets, filterDirect]
   );
 
   // Expense budgets sorted, with special "Everything Else" item pinned at the end
   const expenseBudgets = useMemo(() => {
-    const allExpense = (budgets as BudgetData[]).filter((b) => b.type === 'expense');
+    const allExpense = filterDirect((budgets as BudgetData[]).filter((b) => b.type === 'expense'));
     const isCatchAllItem = (b: BudgetData) => b.isEverythingElse || b.isCatchAll || (b.categoryName || '').toLowerCase() === 'everything else';
     const regular = allExpense.filter((b) => !isCatchAllItem(b));
     const catchAlls = allExpense.filter((b) => isCatchAllItem(b));
     return [...sortBudgets(regular), ...catchAlls];
-  }, [budgets, sortBudgets]);
+  }, [budgets, sortBudgets, filterDirect]);
 
   const hasAnyAccount = useMemo(
     () => (budgets as BudgetData[]).some((b) => !!b.fundingAccountId),
@@ -340,7 +351,37 @@ export function BudgetTable() {
     <>
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <div className="p-3 sm:p-5 pb-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
-          <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowDirectOnly(!showDirectOnly)}
+                    aria-label="Toggle all timeframe budgets vs direct period only"
+                    className={cn(
+                      "inline-flex items-center justify-center h-6 w-6 rounded-md border transition-all cursor-pointer",
+                      showDirectOnly
+                        ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent border-transparent"
+                    )}
+                  >
+                    <Filter className="w-3 h-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs max-w-xs p-2.5">
+                  <p className="font-semibold text-foreground mb-1">
+                    {showDirectOnly ? 'Direct Period Only' : 'All Timeframe Budgets'}
+                  </p>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    {showDirectOnly
+                      ? 'Currently showing only budget items defined directly for this timeframe. Click to show all rolled-up and rolled-down items.'
+                      : 'Currently showing all budget items (including monthly, quarterly, and yearly items rolled into this timeframe). Click to filter to direct items only.'}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap shrink-0">
             {isMobile && budgets.length > 0 && (
               <select
@@ -456,13 +497,18 @@ export function BudgetTable() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                       <Link
-                        href={`/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`}
+                        href={
+                          b.coveredCategoryIds && b.coveredCategoryIds.length > 1
+                            ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
+                            : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
+                        }
                         className="text-foreground font-medium text-sm truncate hover:text-primary hover:underline transition-colors"
                       >
                         {b.categoryName}
                       </Link>
                       <BudgetItemTransactionsIcon
-                        categoryId={b.categoryId}
+                        categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? undefined : b.categoryId}
+                        categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? b.coveredCategoryIds : undefined}
                         categoryName={b.categoryName}
                         periodType={periodType}
                         periodKey={periodKey}
@@ -512,6 +558,8 @@ export function BudgetTable() {
                         href={
                           isEE && b.groupedBreakout && b.groupedBreakout.length > 0
                             ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
+                            : b.coveredCategoryIds && b.coveredCategoryIds.length > 1
+                            ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
                             : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
                         }
                         className="text-foreground font-semibold text-sm truncate hover:text-primary hover:underline transition-colors"
@@ -519,8 +567,8 @@ export function BudgetTable() {
                         {b.categoryName}
                       </Link>
                       <BudgetItemTransactionsIcon
-                        categoryId={isEE ? undefined : b.categoryId}
-                        categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : undefined}
+                        categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 1) ? undefined : b.categoryId}
+                        categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? b.coveredCategoryIds : undefined)}
                         categoryName={b.categoryName}
                         periodType={periodType}
                         periodKey={periodKey}
@@ -681,13 +729,18 @@ export function BudgetTable() {
                             <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
                               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
                               <Link
-                                href={`/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`}
+                                href={
+                                  b.coveredCategoryIds && b.coveredCategoryIds.length > 1
+                                    ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
+                                    : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
+                                }
                                 className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
                               >
                                 {b.categoryName}
                               </Link>
                               <BudgetItemTransactionsIcon
-                                categoryId={b.categoryId}
+                                categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? undefined : b.categoryId}
+                                categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? b.coveredCategoryIds : undefined}
                                 categoryName={b.categoryName}
                                 periodType={periodType}
                                 periodKey={periodKey}
@@ -764,6 +817,8 @@ export function BudgetTable() {
                                   href={
                                     isEE && b.groupedBreakout && b.groupedBreakout.length > 0
                                       ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
+                                      : b.coveredCategoryIds && b.coveredCategoryIds.length > 1
+                                      ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
                                       : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
                                   }
                                   className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
@@ -771,8 +826,8 @@ export function BudgetTable() {
                                   {b.categoryName}
                                 </Link>
                                 <BudgetItemTransactionsIcon
-                                  categoryId={isEE ? undefined : b.categoryId}
-                                  categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : undefined}
+                                  categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 1) ? undefined : b.categoryId}
+                                  categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? b.coveredCategoryIds : undefined)}
                                   categoryName={b.categoryName}
                                   periodType={periodType}
                                   periodKey={periodKey}

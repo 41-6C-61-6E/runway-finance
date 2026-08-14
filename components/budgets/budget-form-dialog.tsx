@@ -53,6 +53,29 @@ interface BudgetFormDialogProps {
   };
 }
 
+function convertPeriodKeyForType(currentKey: string, targetType: PeriodType): string {
+  const parts = currentKey.split('-');
+  const y = parseInt(parts[0], 10) || new Date().getFullYear();
+  if (targetType === 'yearly') {
+    return String(y);
+  }
+  if (targetType === 'quarterly') {
+    if (currentKey.includes('-Q')) return currentKey;
+    const m = parseInt(parts[1], 10) || (new Date().getMonth() + 1);
+    const q = Math.floor((m - 1) / 3) + 1;
+    return `${y}-Q${q}`;
+  }
+  // monthly
+  if (/^\d{4}-\d{2}$/.test(currentKey)) return currentKey;
+  if (currentKey.includes('-Q')) {
+    const q = parseInt(currentKey.split('-Q')[1], 10) || 1;
+    const m = (q - 1) * 3 + 1;
+    return `${y}-${String(m).padStart(2, '0')}`;
+  }
+  const m = new Date().getMonth() + 1;
+  return `${y}-${String(m).padStart(2, '0')}`;
+}
+
 export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBudget }: BudgetFormDialogProps) {
   const { periodType: activePeriodType, periodKey } = useBudgetPeriod();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -61,7 +84,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
     periodType: activePeriodType || 'monthly',
     amount: '',
     isRecurring: true,
-    periodKey,
+    periodKey: convertPeriodKeyForType(periodKey, activePeriodType || 'monthly'),
     fundingAccountId: '',
     rollover: false,
     notes: '',
@@ -84,12 +107,13 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
 
     if (editBudget) {
       const cat = categories.find((c) => c.id === editBudget.categoryId);
+      const bPeriodType = (editBudget.periodType as PeriodType) || activePeriodType || 'monthly';
       setForm({
         categoryId: editBudget.categoryId,
-        periodType: editBudget.periodType as PeriodType,
+        periodType: bPeriodType,
         amount: editBudget.amount,
         isRecurring: editBudget.isRecurring,
-        periodKey: editBudget.periodKey ?? periodKey,
+        periodKey: convertPeriodKeyForType(editBudget.periodKey ?? periodKey, bPeriodType),
         fundingAccountId: editBudget.fundingAccountId ?? '',
         rollover: editBudget.rollover,
         notes: editBudget.notes ?? '',
@@ -102,7 +126,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
         periodType: activePeriodType || 'monthly',
         amount: '',
         isRecurring: true,
-        periodKey,
+        periodKey: convertPeriodKeyForType(periodKey, activePeriodType || 'monthly'),
         fundingAccountId: '',
         rollover: false,
         notes: '',
@@ -126,12 +150,13 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
     setSaving(true);
     setError('');
     try {
+      const resolvedPeriodKey = convertPeriodKeyForType(form.periodKey || periodKey, form.periodType);
       const body = {
         categoryId: form.categoryId,
         periodType: form.periodType,
         amount: parseFloat(form.amount),
         isRecurring: form.isRecurring,
-        periodKey: periodKey,
+        periodKey: resolvedPeriodKey,
         fundingAccountId: form.fundingAccountId || null,
         rollover: form.rollover,
         notes: form.notes || null,
@@ -228,7 +253,14 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
               <label className="block text-sm font-medium text-foreground mb-1">Period</label>
               <select
                 value={form.periodType}
-                onChange={(e) => setForm((f) => ({ ...f, periodType: e.target.value as PeriodType }))}
+                onChange={(e) => {
+                  const newType = e.target.value as PeriodType;
+                  setForm((f) => ({
+                    ...f,
+                    periodType: newType,
+                    periodKey: convertPeriodKeyForType(f.periodKey || periodKey, newType),
+                  }));
+                }}
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="monthly">Monthly</option>

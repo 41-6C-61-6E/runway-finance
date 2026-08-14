@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
+import { getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
@@ -276,17 +277,18 @@ export function BudgetSummary() {
     };
   }
 
+  const { startDate, endDate } = getPeriodDateRange(periodType, periodKey);
   let alertHref: string | null = null;
   let alertText: string | null = null;
   let alertClass = '';
 
   if (significantOverBudgets.length === 1) {
     alertText = `1 category over budget (${significantOverBudgets[0].categoryName})`;
-    alertHref = `/transactions?categoryId=${significantOverBudgets[0].categoryId}`;
+    alertHref = `/transactions?categoryId=${significantOverBudgets[0].categoryId}&startDate=${startDate}&endDate=${endDate}`;
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
   } else if (significantOverBudgets.length > 1) {
     alertText = `${significantOverBudgets.length} categories over budget`;
-    alertHref = `/transactions?categoryIds=${significantOverBudgets.map((b) => b.categoryId).join(',')}`;
+    alertHref = `/transactions?categoryIds=${significantOverBudgets.map((b) => b.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`;
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
   } else if (healthStatus.label === 'Over Target') {
     alertText = `Projected to exceed budget by end of ${periodConfig.noun}`;
