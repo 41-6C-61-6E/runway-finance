@@ -26,6 +26,34 @@ interface BudgetData {
   isDiscretionary?: boolean;
 }
 
+function getPeriodConfig(periodType: string) {
+  if (periodType === 'quarterly') {
+    return {
+      noun: 'quarter',
+      title: 'Quarter',
+      adjective: 'quarterly',
+      endNoun: 'quarter-end',
+      multiplier: 3,
+    };
+  }
+  if (periodType === 'yearly') {
+    return {
+      noun: 'year',
+      title: 'Year',
+      adjective: 'yearly',
+      endNoun: 'year-end',
+      multiplier: 12,
+    };
+  }
+  return {
+    noun: 'month',
+    title: 'Month',
+    adjective: 'monthly',
+    endNoun: 'month-end',
+    multiplier: 1,
+  };
+}
+
 function getPeriodPacingInfo(periodType: string, periodKey: string) {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -34,6 +62,8 @@ function getPeriodPacingInfo(periodType: string, periodKey: string) {
 
   let daysElapsed = 1;
   let totalDays = 30;
+  let isPast = false;
+  let isFuture = false;
 
   if (periodType === 'monthly') {
     const parts = periodKey.split('-').map(Number);
@@ -42,10 +72,12 @@ function getPeriodPacingInfo(periodType: string, periodKey: string) {
     totalDays = new Date(y, m, 0).getDate();
     if (y < currentYear || (y === currentYear && m < currentMonth)) {
       daysElapsed = totalDays;
+      isPast = true;
     } else if (y === currentYear && m === currentMonth) {
       daysElapsed = Math.min(Math.max(currentDay, 1), totalDays);
     } else {
-      daysElapsed = 1;
+      daysElapsed = 0;
+      isFuture = true;
     }
   } else if (periodType === 'quarterly') {
     const parts = periodKey.split('-Q').map(Number);
@@ -53,16 +85,24 @@ function getPeriodPacingInfo(periodType: string, periodKey: string) {
     const q = parts[1] || 1;
     const startMonth = (q - 1) * 3 + 1;
     const endMonth = q * 3;
-    const startDate = new Date(y, startMonth - 1, 1);
-    const endDate = new Date(y, endMonth, 0);
-    totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const startDate = new Date(y, startMonth - 1, 1, 0, 0, 0, 0);
+    const endDate = new Date(y, endMonth, 0, 23, 59, 59, 999);
+
+    // Exact days in the 3 months of the quarter
+    const m1Days = new Date(y, startMonth, 0).getDate();
+    const m2Days = new Date(y, startMonth + 1, 0).getDate();
+    const m3Days = new Date(y, startMonth + 2, 0).getDate();
+    totalDays = m1Days + m2Days + m3Days;
 
     if (now < startDate) {
-      daysElapsed = 1;
+      daysElapsed = 0;
+      isFuture = true;
     } else if (now > endDate) {
       daysElapsed = totalDays;
+      isPast = true;
     } else {
-      daysElapsed = Math.round((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const todayStart = new Date(currentYear, now.getMonth(), currentDay);
+      daysElapsed = Math.round((todayStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       daysElapsed = Math.min(Math.max(daysElapsed, 1), totalDays);
     }
   } else {
@@ -70,21 +110,24 @@ function getPeriodPacingInfo(periodType: string, periodKey: string) {
     const y = Number(periodKey) || currentYear;
     const isLeapYear = (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
     totalDays = isLeapYear ? 366 : 365;
-    const startDate = new Date(y, 0, 1);
-    const endDate = new Date(y, 11, 31);
+    const startDate = new Date(y, 0, 1, 0, 0, 0, 0);
+    const endDate = new Date(y, 11, 31, 23, 59, 59, 999);
 
     if (now < startDate) {
-      daysElapsed = 1;
+      daysElapsed = 0;
+      isFuture = true;
     } else if (now > endDate) {
       daysElapsed = totalDays;
+      isPast = true;
     } else {
-      daysElapsed = Math.round((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const todayStart = new Date(currentYear, now.getMonth(), currentDay);
+      daysElapsed = Math.round((todayStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       daysElapsed = Math.min(Math.max(daysElapsed, 1), totalDays);
     }
   }
 
-  const timePercent = (daysElapsed / totalDays) * 100;
-  return { daysElapsed, totalDays, timePercent };
+  const timePercent = totalDays > 0 ? (daysElapsed / totalDays) * 100 : 0;
+  return { daysElapsed, totalDays, timePercent, isPast, isFuture };
 }
 
 export function BudgetSummary() {
@@ -142,9 +185,10 @@ export function BudgetSummary() {
   const netActual = totalIncomeActual - totalExpenseActual;
   const isSurplus = netActual >= 0;
 
-  // Period Pacing & Days Elapsed
+  // Period Config & Pacing
+  const periodConfig = getPeriodConfig(periodType);
   const pacingInfo = getPeriodPacingInfo(periodType, periodKey);
-  const { daysElapsed, totalDays, timePercent } = pacingInfo;
+  const { daysElapsed, totalDays, timePercent, isPast, isFuture } = pacingInfo;
 
   // Fixed vs Variable expense splitting for smart pacing
   const fixedExpenseBudgets = expenseBudgets.filter((b) => b.isDiscretionary === false);
@@ -156,29 +200,43 @@ export function BudgetSummary() {
   const variableBudgeted = variableExpenseBudgets.reduce((s, b) => s + b.budgeted, 0);
   const variableActual = variableExpenseBudgets.reduce((s, b) => s + b.actual, 0);
 
-  // Variable daily rate & month-end projection
+  // Variable daily rate & period projection
   const variableDailyRate = daysElapsed > 0 ? variableActual / daysElapsed : 0;
-  const projectedVariableTotal = daysElapsed === totalDays ? variableActual : variableDailyRate * totalDays;
+  const projectedVariableTotal = daysElapsed === totalDays
+    ? variableActual
+    : isFuture
+      ? variableBudgeted
+      : variableDailyRate * totalDays;
 
-  // Fixed expenses (Mortgage etc) are lump-sum completed when paid.
+  // Fixed expenses (Rent, Mortgage, Utilities, Insurance, Subscriptions) are committed amounts
   const fixedEffectiveProjection = Math.max(fixedActual, fixedBudgeted);
   const projectedExpenseTotal = fixedEffectiveProjection + projectedVariableTotal;
 
   const totalExpenseCushion = Math.max(0, totalExpenseBudgeted - totalExpenseActual);
   const projectedSurplusOrDeficit = totalExpenseBudgeted - projectedExpenseTotal;
 
+  // Period-scaled thresholds
+  const overBudgetThreshold = 500 * periodConfig.multiplier;
+  const toleranceBuffer = 25 * periodConfig.multiplier;
+
   // Categories over budget
   const allOverBudgets = expenseBudgets.filter((b) => b.remaining < -0.01);
   const significantOverBudgets = expenseBudgets.filter(
-    (b) => b.remaining < -0.01 && (b.percentUsed > 200 || Math.abs(b.remaining) > 500)
+    (b) => b.remaining < -0.01 && (b.percentUsed > 200 || Math.abs(b.remaining) > overBudgetThreshold)
   );
   const minorOverBudgets = expenseBudgets.filter(
     (b) => b.remaining < -0.01 && !significantOverBudgets.includes(b)
   );
 
+  const finishLabel = isPast ? 'Final finish' : `Projected ${periodConfig.endNoun} finish`;
+  const finishTotal = isPast ? totalExpenseActual : projectedExpenseTotal;
+  const surplusOrDeficit = isPast ? (totalExpenseBudgeted - totalExpenseActual) : projectedSurplusOrDeficit;
+
   const onTrackDescription = minorOverBudgets.length > 0 && totalExpenseCushion > 0
-    ? `${minorOverBudgets.length} minor category overrun${minorOverBudgets.length === 1 ? ' is' : 's are'} absorbed by remaining budget cushion. Projected finish: ${formatCurrency(projectedExpenseTotal)} (${projectedSurplusOrDeficit >= 0 ? `+${formatCurrency(projectedSurplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(projectedSurplusOrDeficit))} deficit`}).`
-    : `Overall budget is healthy. Projected month-end finish: ${formatCurrency(projectedExpenseTotal)} (${projectedSurplusOrDeficit >= 0 ? `+${formatCurrency(projectedSurplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(projectedSurplusOrDeficit))} deficit`}).`;
+    ? `${minorOverBudgets.length} minor category overrun${minorOverBudgets.length === 1 ? ' is' : 's are'} absorbed by remaining budget cushion. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} deficit`}).`
+    : isFuture
+      ? `Overall budget is planned and on track for upcoming ${periodConfig.noun}.`
+      : `Overall budget is healthy. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} deficit`}).`;
 
   let healthStatus = {
     label: 'On Track',
@@ -195,25 +253,25 @@ export function BudgetSummary() {
       icon: AlertTriangle,
       description: totalExpenseActual > totalExpenseBudgeted
         ? `Total actual spending (${formatCurrency(totalExpenseActual)}) has exceeded total expense budget (${formatCurrency(totalExpenseBudgeted)}).`
-        : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >200% of budget or >$500 over budget.`,
+        : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >200% of budget or >${formatCurrency(overBudgetThreshold)} over budget.`,
     };
   }
   // Rule 2: Over Target (Orange)
-  else if (projectedExpenseTotal > totalExpenseBudgeted + 25) {
+  else if (!isPast && !isFuture && projectedExpenseTotal > totalExpenseBudgeted + toleranceBuffer) {
     healthStatus = {
       label: 'Over Target',
       badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
       icon: TrendingUp,
-      description: `Based on daily variable spending pace (${formatCurrency(variableDailyRate)}/day), projected month-end total (${formatCurrency(projectedExpenseTotal)}) exceeds overall budget target.`,
+      description: `Based on daily variable spending pace (${formatCurrency(variableDailyRate)}/day), projected ${periodConfig.endNoun} total (${formatCurrency(projectedExpenseTotal)}) exceeds overall budget target.`,
     };
   }
   // Rule 3: Watch Pacing (Amber)
-  else if (daysElapsed < totalDays && (variableBudgeted > 0 ? (variableActual / variableBudgeted) * 100 > timePercent + 15 : false)) {
+  else if (!isPast && !isFuture && daysElapsed < totalDays && (variableBudgeted > 0 ? (variableActual / variableBudgeted) * 100 > timePercent + 15 : false)) {
     healthStatus = {
       label: 'Watch Pacing',
       badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
       icon: AlertTriangle,
-      description: `Discretionary spending is pacing ahead of schedule (${((variableActual / (variableBudgeted || 1)) * 100).toFixed(0)}% spent vs ${timePercent.toFixed(0)}% of month).`,
+      description: `Discretionary spending is pacing ahead of schedule (${((variableActual / (variableBudgeted || 1)) * 100).toFixed(0)}% spent vs ${timePercent.toFixed(0)}% of ${periodConfig.noun}).`,
     };
   }
 
@@ -230,7 +288,7 @@ export function BudgetSummary() {
     alertHref = `/transactions?categoryIds=${significantOverBudgets.map((b) => b.categoryId).join(',')}`;
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
   } else if (healthStatus.label === 'Over Target') {
-    alertText = `Projected to exceed budget by end of month`;
+    alertText = `Projected to exceed budget by end of ${periodConfig.noun}`;
     alertHref = `/budgets`;
     alertClass = 'text-orange-500 bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15';
   } else if (healthStatus.label === 'Watch Pacing') {
@@ -314,13 +372,15 @@ export function BudgetSummary() {
                       {/* Smart Forecast Card */}
                       <div className="bg-muted/40 p-2 rounded-lg border border-border/50 space-y-1 text-[11px]">
                         <div className="flex justify-between items-center text-muted-foreground">
-                          <span>Month Pacing:</span>
+                          <span>{periodConfig.title} Pacing:</span>
                           <span className="font-medium text-foreground">
-                            Day {daysElapsed} of {totalDays} ({timePercent.toFixed(0)}% elapsed)
+                            {isFuture
+                              ? `Upcoming (0 of ${totalDays} days)`
+                              : `Day ${daysElapsed} of ${totalDays} (${timePercent.toFixed(0)}% elapsed)`}
                           </span>
                         </div>
                         <div className="flex justify-between items-center text-muted-foreground">
-                          <span>Fixed Expenses (Mortgage):</span>
+                          <span>Fixed Expenses (Essential):</span>
                           <span className="font-mono text-foreground">{formatCurrency(fixedActual)} paid</span>
                         </div>
                         <div className="flex justify-between items-center text-muted-foreground">
@@ -328,9 +388,9 @@ export function BudgetSummary() {
                           <span className="font-mono text-foreground">{formatCurrency(variableDailyRate)}/day</span>
                         </div>
                         <div className="flex justify-between items-center pt-1 border-t border-border/40 font-semibold">
-                          <span className="text-foreground">Projected Month Finish:</span>
-                          <span className={cn("font-mono", projectedSurplusOrDeficit >= 0 ? "text-constructive" : "text-destructive")}>
-                            {formatCurrency(projectedExpenseTotal)} ({projectedSurplusOrDeficit >= 0 ? `+${formatCurrency(projectedSurplusOrDeficit)}` : `-${formatCurrency(Math.abs(projectedSurplusOrDeficit))}`})
+                          <span className="text-foreground">{isPast ? 'Final Result:' : `Projected ${periodConfig.title} Finish:`}</span>
+                          <span className={cn("font-mono", surplusOrDeficit >= 0 ? "text-constructive" : "text-destructive")}>
+                            {formatCurrency(finishTotal)} ({surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)}` : `-${formatCurrency(Math.abs(surplusOrDeficit))}`})
                           </span>
                         </div>
                       </div>
@@ -356,7 +416,7 @@ export function BudgetSummary() {
 
                       {significantOverBudgets.length > 0 && (
                         <div className="pt-1 space-y-1 text-[11px]">
-                          <span className="font-semibold text-destructive block">Major Overruns (&gt;200% or &gt;$500):</span>
+                          <span className="font-semibold text-destructive block">Major Overruns (&gt;200% or &gt;{formatCurrency(overBudgetThreshold)}):</span>
                           <div className="max-h-20 overflow-y-auto space-y-1 pl-2 border-l-2 border-destructive/40">
                             {significantOverBudgets.map((b) => (
                               <div key={b.id} className="flex justify-between text-[10px]">
