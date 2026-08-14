@@ -60,6 +60,7 @@ export async function GET() {
       aiActiveProviderId: created?.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
       apiKeys: created?.apiKeys ?? {},
       accountTagVisibility: created?.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+      budgetExclusions: created?.budgetExclusions ?? DEFAULTS.budgetExclusions,
       notifySyncErrors: created?.notifySyncErrors ?? DEFAULTS.notifySyncErrors,
       notifyBudgetAlerts: created?.notifyBudgetAlerts ?? DEFAULTS.notifyBudgetAlerts,
       notifyLargeTransactions: created?.notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
@@ -117,6 +118,7 @@ export async function GET() {
     aiActiveProviderId: settings[0].aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
     apiKeys: apiKeys,
     accountTagVisibility: settings[0].accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+    budgetExclusions: settings[0].budgetExclusions ?? DEFAULTS.budgetExclusions,
     notifySyncErrors: settings[0].notifySyncErrors ?? DEFAULTS.notifySyncErrors,
     notifyBudgetAlerts: settings[0].notifyBudgetAlerts ?? DEFAULTS.notifyBudgetAlerts,
     notifyLargeTransactions: settings[0].notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
@@ -170,6 +172,7 @@ export async function PATCH(request: Request) {
 	const showImportedData = body.showImportedData;
 	const paystubEnabled = body.paystubEnabled;
 	const accountTagVisibility = body.accountTagVisibility;
+	const budgetExclusions = body.budgetExclusions;
 	const useMarketDataForSnapshots = body.useMarketDataForSnapshots;
 	const notifySyncErrors = body.notifySyncErrors;
 	const notifyBudgetAlerts = body.notifyBudgetAlerts;
@@ -299,6 +302,18 @@ export async function PATCH(request: Request) {
 		}
 	}
 
+	if (budgetExclusions !== undefined) {
+		if (typeof budgetExclusions !== 'object' || budgetExclusions === null || Array.isArray(budgetExclusions)) {
+			return Response.json({ error: 'Invalid budgetExclusions value' }, { status: 400 });
+		}
+		if (budgetExclusions.categoryIds !== undefined && !Array.isArray(budgetExclusions.categoryIds)) {
+			return Response.json({ error: 'Invalid budgetExclusions.categoryIds value' }, { status: 400 });
+		}
+		if (budgetExclusions.tagIds !== undefined && !Array.isArray(budgetExclusions.tagIds)) {
+			return Response.json({ error: 'Invalid budgetExclusions.tagIds value' }, { status: 400 });
+		}
+	}
+
 	if (aiSystemPrompt !== undefined && aiSystemPrompt !== null && typeof aiSystemPrompt !== 'string') {
 		return Response.json({ error: 'Invalid aiSystemPrompt value' }, { status: 400 });
 	}
@@ -393,6 +408,7 @@ export async function PATCH(request: Request) {
         accentColor: accentColor ?? DEFAULTS.accentColor,
         chartColorScheme: chartColorScheme ?? DEFAULTS.chartColorScheme,
         accountTagVisibility: accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+        budgetExclusions: budgetExclusions ?? DEFAULTS.budgetExclusions,
       })
       .returning();
 
@@ -472,6 +488,13 @@ export async function PATCH(request: Request) {
 		const existingVisibility = (settings[0].accountTagVisibility as Record<string, any>) || {};
 		updates.accountTagVisibility = { ...existingVisibility, ...accountTagVisibility };
 	}
+  if (budgetExclusions !== undefined) {
+    const existingEx = (settings[0].budgetExclusions as Record<string, any>) || { categoryIds: [], tagIds: [] };
+    updates.budgetExclusions = {
+      categoryIds: budgetExclusions.categoryIds ?? existingEx.categoryIds ?? [],
+      tagIds: budgetExclusions.tagIds ?? existingEx.tagIds ?? [],
+    };
+  }
 	if (notifySyncErrors !== undefined) updates.notifySyncErrors = notifySyncErrors;
 	if (notifyBudgetAlerts !== undefined) updates.notifyBudgetAlerts = notifyBudgetAlerts;
 	if (notifyLargeTransactions !== undefined) updates.notifyLargeTransactions = notifyLargeTransactions;
@@ -681,6 +704,7 @@ export async function PATCH(request: Request) {
     aiActiveProviderId: updated.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
     apiKeys: updatedApiKeys,
     accountTagVisibility: updated.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+    budgetExclusions: updated.budgetExclusions ?? DEFAULTS.budgetExclusions,
     notifySyncErrors: updated.notifySyncErrors,
     notifyBudgetAlerts: updated.notifyBudgetAlerts,
     notifyLargeTransactions: updated.notifyLargeTransactions,
