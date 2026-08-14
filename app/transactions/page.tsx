@@ -20,6 +20,7 @@ export type FilterState = {
   categoryId: string | null;
   categoryIds: string | null;
   excludeCategoryIds: string | null;
+  excludeTagIds: string | null;
   tagId: string | null;
   tagIds: string | null;
   accountTagIds: string | null;
@@ -58,6 +59,7 @@ function TransactionsContent() {
     categoryId: searchParams.get('categoryId') ?? null,
     categoryIds: searchParams.get('categoryIds') ?? null,
     excludeCategoryIds: searchParams.get('excludeCategoryIds') ?? null,
+    excludeTagIds: searchParams.get('excludeTagIds') ?? null,
     tagId: searchParams.get('tagId') ?? null,
     tagIds: searchParams.get('tagIds') ?? null,
     accountTagIds: searchParams.get('accountTagIds') ?? null,
@@ -117,6 +119,7 @@ function TransactionsContent() {
       categoryId: preset.filters.categoryId ?? null,
       categoryIds: preset.filters.categoryIds ?? null,
       excludeCategoryIds: preset.filters.excludeCategoryIds ?? null,
+      excludeTagIds: preset.filters.excludeTagIds ?? null,
       tagId: preset.filters.tagId ?? null,
       tagIds: preset.filters.tagIds ?? null,
       accountTagIds: preset.filters.accountTagIds ?? null,
@@ -182,6 +185,7 @@ function TransactionsContent() {
     if (filters.categoryId) params.set('categoryId', filters.categoryId);
     if (filters.categoryIds) params.set('categoryIds', filters.categoryIds);
     if (filters.excludeCategoryIds) params.set('excludeCategoryIds', filters.excludeCategoryIds);
+    if (filters.excludeTagIds) params.set('excludeTagIds', filters.excludeTagIds);
     if (filters.tagId) params.set('tagId', filters.tagId);
     if (filters.tagIds) params.set('tagIds', filters.tagIds);
     if (filters.accountTagIds) params.set('accountTagIds', filters.accountTagIds);

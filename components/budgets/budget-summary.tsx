@@ -14,6 +14,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
 import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { useUserSettings } from '@/components/user-settings-provider';
+import { useMemo } from 'react';
 
 interface BudgetData {
   id: string;
@@ -135,6 +137,10 @@ export function BudgetSummary() {
   const { periodType, periodKey } = useBudgetPeriod();
   const [collapsed, setCollapsed] = useCardCollapsed('budgetSummary');
   const [isPacingCollapsed, setIsPacingCollapsed] = useCardCollapsed('budgetPacingDetails', true);
+  const settingsContext = useUserSettings();
+  const budgetExclusions = settingsContext?.settings?.budgetExclusions || {};
+  const excludedTagIds = useMemo(() => (Array.isArray(budgetExclusions.tagIds) ? budgetExclusions.tagIds : []), [budgetExclusions.tagIds]);
+  const excludedCategoryIds = useMemo(() => (Array.isArray(budgetExclusions.categoryIds) ? budgetExclusions.categoryIds : []), [budgetExclusions.categoryIds]);
 
   const { data, isLoading: loading } = useQuery({
     queryKey: ['budgets', periodType, periodKey],
@@ -278,17 +284,35 @@ export function BudgetSummary() {
   }
 
   const { startDate, endDate } = getPeriodDateRange(periodType, periodKey);
+  const getTxUrl = (catIds?: string[], catId?: string) => {
+    const params = new URLSearchParams();
+    if (catIds && catIds.length > 0) {
+      params.set('categoryIds', catIds.join(','));
+    } else if (catId) {
+      params.set('categoryId', catId);
+    }
+    if (excludedTagIds.length > 0) {
+      params.set('excludeTagIds', excludedTagIds.join(','));
+    }
+    if (excludedCategoryIds.length > 0) {
+      params.set('excludeCategoryIds', excludedCategoryIds.join(','));
+    }
+    params.set('startDate', startDate);
+    params.set('endDate', endDate);
+    return `/transactions?${params.toString()}`;
+  };
+
   let alertHref: string | null = null;
   let alertText: string | null = null;
   let alertClass = '';
 
   if (significantOverBudgets.length === 1) {
     alertText = `1 category over budget (${significantOverBudgets[0].categoryName})`;
-    alertHref = `/transactions?categoryId=${significantOverBudgets[0].categoryId}&startDate=${startDate}&endDate=${endDate}`;
+    alertHref = getTxUrl(undefined, significantOverBudgets[0].categoryId);
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
   } else if (significantOverBudgets.length > 1) {
     alertText = `${significantOverBudgets.length} categories over budget`;
-    alertHref = `/transactions?categoryIds=${significantOverBudgets.map((b) => b.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`;
+    alertHref = getTxUrl(significantOverBudgets.map((b) => b.categoryId));
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
   } else if (healthStatus.label === 'Over Target') {
     alertText = `Projected to exceed budget by end of ${periodConfig.noun}`;

@@ -42,6 +42,8 @@ export const TransactionFilterSchema = z.object({
   ),
   tagId: z.string().uuid().optional(),
   tagIds: z.string().optional(),
+  excludeTagId: z.string().uuid().optional(),
+  excludeTagIds: z.string().optional(),
   accountTagIds: z.string().optional(),
   minAmount: z.coerce.number().optional(),
   maxAmount: z.coerce.number().optional(),

@@ -8,6 +8,7 @@ import { Receipt, ArrowRight, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 export function getPeriodDateRange(periodType: string, periodKey: string) {
   if (periodType === 'monthly') {
@@ -63,8 +64,17 @@ export function BudgetItemTransactionsIcon({
   className,
 }: BudgetItemTransactionsIconProps) {
   const router = useRouter();
+  const settingsContext = useUserSettings();
   const [open, setOpen] = useState(false);
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const budgetExclusions = settingsContext?.settings?.budgetExclusions || {};
+  const excludedTagIds = useMemo(() => {
+    return Array.isArray(budgetExclusions.tagIds) ? budgetExclusions.tagIds : [];
+  }, [budgetExclusions.tagIds]);
+  const excludedCategoryIds = useMemo(() => {
+    return Array.isArray(budgetExclusions.categoryIds) ? budgetExclusions.categoryIds : [];
+  }, [budgetExclusions.categoryIds]);
 
   useEffect(() => {
     return () => {
@@ -105,13 +115,27 @@ export function BudgetItemTransactionsIcon({
     } else if (categoryId) {
       params.set('categoryId', categoryId);
     }
+    if (excludedTagIds.length > 0) {
+      params.set('excludeTagIds', excludedTagIds.join(','));
+    }
+    if (excludedCategoryIds.length > 0) {
+      params.set('excludeCategoryIds', excludedCategoryIds.join(','));
+    }
     params.set('startDate', startDate);
     params.set('endDate', endDate);
     return `/transactions?${params.toString()}`;
-  }, [categoryId, categoryIds, startDate, endDate]);
+  }, [categoryId, categoryIds, startDate, endDate, excludedTagIds, excludedCategoryIds]);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['budget-top-transactions', categoryId, categoryIds?.join(','), startDate, endDate],
+    queryKey: [
+      'budget-top-transactions',
+      categoryId,
+      categoryIds?.join(','),
+      startDate,
+      endDate,
+      excludedTagIds.join(','),
+      excludedCategoryIds.join(','),
+    ],
     queryFn: async () => {
       if (!hasCategoryFilter) return { data: [], total: 0 };
       const params = new URLSearchParams();
@@ -119,6 +143,12 @@ export function BudgetItemTransactionsIcon({
         params.set('categoryIds', categoryIds.join(','));
       } else if (categoryId) {
         params.set('categoryId', categoryId);
+      }
+      if (excludedTagIds.length > 0) {
+        params.set('excludeTagIds', excludedTagIds.join(','));
+      }
+      if (excludedCategoryIds.length > 0) {
+        params.set('excludeCategoryIds', excludedCategoryIds.join(','));
       }
       params.set('startDate', startDate);
       params.set('endDate', endDate);

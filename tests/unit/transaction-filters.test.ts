@@ -41,4 +41,26 @@ describe('Transaction Account Groups and Type Mapping', () => {
     expect(getAccountGroupKey('realestate')).toBe('ASSETS');
     expect(getAccountGroupKey('vehicle')).toBe('ASSETS');
   });
+
+  it('validates excludeTagIds and excludeTagId in TransactionFilterSchema', async () => {
+    const { TransactionFilterSchema } = await import('@/lib/validations/transaction');
+    const validUuid1 = 'a0000000-0000-4000-8000-000000000001';
+    const validUuid2 = 'a0000000-0000-4000-8000-000000000002';
+    
+    const parsed1 = TransactionFilterSchema.safeParse({
+      excludeTagId: validUuid1,
+    });
+    expect(parsed1.success).toBe(true);
+    if (parsed1.success) {
+      expect(parsed1.data.excludeTagId).toBe(validUuid1);
+    }
+
+    const parsed2 = TransactionFilterSchema.safeParse({
+      excludeTagIds: `${validUuid1},${validUuid2}`,
+    });
+    expect(parsed2.success).toBe(true);
+    if (parsed2.success) {
+      expect(parsed2.data.excludeTagIds).toBe(`${validUuid1},${validUuid2}`);
+    }
+  });
 });

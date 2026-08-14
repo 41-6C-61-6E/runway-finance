@@ -261,6 +261,8 @@ export async function GET(request: Request) {
     excludeCategoryIds: searchParams.get("excludeCategoryIds") ?? undefined,
     tagId: searchParams.get("tagId") ?? undefined,
     tagIds: searchParams.get("tagIds") ?? undefined,
+    excludeTagId: searchParams.get("excludeTagId") ?? undefined,
+    excludeTagIds: searchParams.get("excludeTagIds") ?? undefined,
     accountTagIds: searchParams.get("accountTagIds") ?? undefined,
     search: searchParams.get("search") ?? undefined,
     type: searchParams.get("type") ?? undefined,
@@ -442,6 +444,33 @@ export async function GET(request: Request) {
       whereConditions.push(inArray(transactions.id, allMatchedIds));
     } else {
       whereConditions.push(sql`false`);
+    }
+  }
+
+  // Handle exclude tag filter — resolve to matching transaction IDs via join and exclude them
+  if (filters.excludeTagIds || filters.excludeTagId) {
+    const rawExclude = filters.excludeTagIds || filters.excludeTagId || '';
+    const excludeTagIdList = rawExclude.split(',').map((id) => id.trim()).filter(Boolean);
+    if (excludeTagIdList.length > 0) {
+      const taggedTxIds = await getDb()
+        .select({ transactionId: transactionTags.transactionId })
+        .from(transactionTags)
+        .where(inArray(transactionTags.tagId, excludeTagIdList));
+      const txIds = taggedTxIds.map((r) => r.transactionId);
+      if (txIds.length > 0) {
+        const childTxnsWithTags = await getDb()
+          .select({ parentId: transactions.parentId })
+          .from(transactions)
+          .where(and(inArray(transactions.id, txIds), isNotNull(transactions.parentId)));
+        const childTxnsOfParents = await getDb()
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(inArray(transactions.parentId, txIds));
+        const parentIds = childTxnsWithTags.map((c) => c.parentId).filter(Boolean) as string[];
+        const childIds = childTxnsOfParents.map((c) => c.id).filter(Boolean) as string[];
+        const allExcludedIds = Array.from(new Set([...txIds, ...parentIds, ...childIds]));
+        whereConditions.push(notInArray(transactions.id, allExcludedIds));
+      }
     }
   }
 
@@ -806,8 +835,12 @@ export async function GET(request: Request) {
       total: totalBeforeFilters,
       returned: txnsWithTags.length,
     });
+    const excludeTagIdsList = (filters.excludeTagIds || filters.excludeTagId)
+      ? (filters.excludeTagIds || filters.excludeTagId || '').split(',').map((id) => id.trim()).filter(Boolean)
+      : [];
+
     return NextResponse.json({
-      data: await attachSplits(txnsWithTags, dek),
+      data: await attachSplits(txnsWithTags, dek, excludeTagIdsList),
       total: totalBeforeFilters,
       totalAmount: null, // calculated lazily by client
       limit: filters.limit,
@@ -1020,8 +1053,12 @@ export async function GET(request: Request) {
     total,
     returned: slicedWithTags.length,
   });
+  const excludeTagIdsList = (filters.excludeTagIds || filters.excludeTagId)
+    ? (filters.excludeTagIds || filters.excludeTagId || '').split(',').map((id) => id.trim()).filter(Boolean)
+    : [];
+
   return NextResponse.json({
-    data: await attachSplits(slicedWithTags, dek),
+    data: await attachSplits(slicedWithTags, dek, excludeTagIdsList),
     total,
     totalAmount,
     limit: filters.limit,
@@ -1029,7 +1066,7 @@ export async function GET(request: Request) {
   });
 }
 
-async function attachSplits(txns: any[], dek: Uint8Array) {
+async function attachSplits(txns: any[], dek: Uint8Array, excludeTagIds: string[] = []) {
   if (txns.length === 0) return txns;
   const parentIds = txns.map((tx: any) => tx.id);
   const childTxns = await getDb()
@@ -1082,10 +1119,16 @@ async function attachSplits(txns: any[], dek: Uint8Array) {
     childTagsByTxId.set(row.transactionId, existing);
   }
 
-  const decryptedChildrenWithTags = decryptedChildren.map((c: any) => ({
-    ...c,
-    tags: childTagsByTxId.get(c.id) ?? [],
-  }));
+  const excludedTagSet = new Set(excludeTagIds);
+  const decryptedChildrenWithTags = decryptedChildren
+    .map((c: any) => ({
+      ...c,
+      tags: childTagsByTxId.get(c.id) ?? [],
+    }))
+    .filter((c: any) => {
+      if (excludedTagSet.size === 0) return true;
+      return !c.tags.some((t: any) => excludedTagSet.has(t.id));
+    });
 
   const finalSplitsByParentId = new Map<string, any[]>();
   for (const child of decryptedChildrenWithTags) {
