@@ -57,8 +57,31 @@ export function BudgetTable() {
   const queryClient = useQueryClient();
   const settingsContext = useUserSettings();
   const showBudgetTags = settingsContext?.settings?.accountTagVisibility?.budgets !== false;
+  const budgetExclusions = settingsContext?.settings?.budgetExclusions || {};
+  const excludedTagIds = useMemo(() => (Array.isArray(budgetExclusions.tagIds) ? budgetExclusions.tagIds : []), [budgetExclusions.tagIds]);
+  const excludedCategoryIds = useMemo(() => (Array.isArray(budgetExclusions.categoryIds) ? budgetExclusions.categoryIds : []), [budgetExclusions.categoryIds]);
+
   const { periodType, periodKey } = useBudgetPeriod();
   const { startDate, endDate } = useMemo(() => getPeriodDateRange(periodType, periodKey), [periodType, periodKey]);
+
+  const getTxUrl = useCallback((catIds?: string[], catId?: string) => {
+    const params = new URLSearchParams();
+    if (catIds && catIds.length > 0) {
+      params.set('categoryIds', catIds.join(','));
+    } else if (catId) {
+      params.set('categoryId', catId);
+    }
+    if (excludedTagIds.length > 0) {
+      params.set('excludeTagIds', excludedTagIds.join(','));
+    }
+    if (excludedCategoryIds.length > 0) {
+      params.set('excludeCategoryIds', excludedCategoryIds.join(','));
+    }
+    params.set('startDate', startDate);
+    params.set('endDate', endDate);
+    return `/transactions?${params.toString()}`;
+  }, [startDate, endDate, excludedTagIds, excludedCategoryIds]);
+
   const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1000);
@@ -507,11 +530,7 @@ export function BudgetTable() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                       <Link
-                        href={
-                          b.coveredCategoryIds && b.coveredCategoryIds.length > 0
-                            ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
-                            : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
-                        }
+                        href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
                         className="text-foreground font-medium text-sm truncate hover:text-primary hover:underline transition-colors"
                       >
                         {b.categoryName}
@@ -565,13 +584,12 @@ export function BudgetTable() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                       <Link
-                        href={
+                        href={getTxUrl(
                           isEE && b.groupedBreakout && b.groupedBreakout.length > 0
-                            ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
-                            : b.coveredCategoryIds && b.coveredCategoryIds.length > 0
-                            ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
-                            : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
-                        }
+                            ? b.groupedBreakout.map((i) => i.categoryId)
+                            : b.coveredCategoryIds,
+                          b.categoryId
+                        )}
                         className="text-foreground font-semibold text-sm truncate hover:text-primary hover:underline transition-colors"
                       >
                         {b.categoryName}
@@ -643,7 +661,7 @@ export function BudgetTable() {
                               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                 <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: item.categoryColor || '#6366f1' }} />
                                 <Link
-                                  href={`/transactions?categoryId=${item.categoryId}&startDate=${startDate}&endDate=${endDate}`}
+                                  href={getTxUrl(undefined, item.categoryId)}
                                   className="font-medium text-foreground text-sm truncate hover:text-primary hover:underline transition-colors min-w-0 block"
                                   title={item.categoryName}
                                 >
@@ -739,11 +757,7 @@ export function BudgetTable() {
                             <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
                               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
                               <Link
-                                href={
-                                  b.coveredCategoryIds && b.coveredCategoryIds.length > 0
-                                    ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
-                                    : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
-                                }
+                                href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
                                 className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
                               >
                                 {b.categoryName}
@@ -824,13 +838,12 @@ export function BudgetTable() {
                               <div className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-wrap">
                                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                                 <Link
-                                  href={
+                                  href={getTxUrl(
                                     isEE && b.groupedBreakout && b.groupedBreakout.length > 0
-                                      ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
-                                      : b.coveredCategoryIds && b.coveredCategoryIds.length > 0
-                                      ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
-                                      : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
-                                  }
+                                      ? b.groupedBreakout.map((i) => i.categoryId)
+                                      : b.coveredCategoryIds,
+                                    b.categoryId
+                                  )}
                                   className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
                                 >
                                   {b.categoryName}
@@ -936,7 +949,7 @@ export function BudgetTable() {
                                               style={{ backgroundColor: item.categoryColor || '#6366f1' }}
                                             />
                                             <Link
-                                              href={`/transactions?categoryId=${item.categoryId}&startDate=${startDate}&endDate=${endDate}`}
+                                              href={getTxUrl(undefined, item.categoryId)}
                                               className="font-medium text-foreground text-sm truncate hover:text-primary hover:underline transition-colors min-w-0 block"
                                               title={item.categoryName}
                                             >

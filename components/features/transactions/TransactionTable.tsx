@@ -1482,7 +1482,6 @@ export default function TransactionTable({
         header: 'Tags',
         enableSorting: false,
         cell: ({ row }) => {
-          if (!showAccountTags) return null;
           const txTags = row.original.tags ?? [];
           if (txTags.length === 0) return null;
           return (
@@ -1746,7 +1745,7 @@ export default function TransactionTable({
                             Split
                           </span>
                         )}
-                        {showAccountTags && txTags.length > 0 && (
+                        {txTags.length > 0 && (
                           <div className="flex items-center gap-1 min-w-0 overflow-hidden shrink-0">
                             {txTags.map((tag) => (
                               <span

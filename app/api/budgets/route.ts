@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions, transactionTags, userSettings } from '@/lib/db/schema';
-import { eq, and, or, isNull, sql, inArray, gte, lt, lte } from 'drizzle-orm';
+import { eq, and, or, isNull, isNotNull, sql, inArray, gte, lt, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows, encryptRow } from '@/lib/crypto';
@@ -399,7 +399,20 @@ export async function GET(request: Request) {
         .select({ transactionId: transactionTags.transactionId })
         .from(transactionTags)
         .where(inArray(transactionTags.tagId, Array.from(excludedTagIds)));
-      excludedTransactionIds = new Set(taggedRows.map((r) => r.transactionId));
+      const directTxIds = taggedRows.map((r) => r.transactionId);
+      if (directTxIds.length > 0) {
+        const childRows = await db
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(inArray(transactions.parentId, directTxIds));
+        const parentRows = await db
+          .select({ parentId: transactions.parentId })
+          .from(transactions)
+          .where(and(inArray(transactions.id, directTxIds), isNotNull(transactions.parentId)));
+        const childIds = childRows.map((c) => c.id);
+        const parentIds = parentRows.map((p) => p.parentId).filter(Boolean) as string[];
+        excludedTransactionIds = new Set([...directTxIds, ...childIds, ...parentIds]);
+      }
     }
 
     const userAccounts = await db

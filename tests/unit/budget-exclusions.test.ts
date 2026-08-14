@@ -34,7 +34,7 @@ const mockDbState = {
 
 vi.mock('@/lib/db', () => ({
   getDb: () => ({
-    select: vi.fn().mockImplementation(() => ({
+    select: vi.fn().mockImplementation((fields) => ({
       from: vi.fn().mockImplementation((table) => ({
         leftJoin: vi.fn().mockReturnThis(),
         where: vi.fn().mockImplementation(() => {
@@ -43,8 +43,21 @@ vi.mock('@/lib/db', () => ({
           else if (table === categories) res = mockDbState.categories;
           else if (table === userSettings) res = mockDbState.userSettings;
           else if (table === accounts) res = mockDbState.accounts;
-          else if (table === transactions) res = mockDbState.transactions;
           else if (table === transactionTags) res = mockDbState.transactionTags;
+          else if (table === transactions) {
+            const taggedIds = new Set(mockDbState.transactionTags.map((t) => t.transactionId));
+            if (fields && fields.id && !fields.amount && !fields.categoryId) {
+              res = mockDbState.transactions
+                .filter((t) => t.parentId && taggedIds.has(t.parentId))
+                .map((t) => ({ id: t.id, parentId: t.parentId }));
+            } else if (fields && fields.parentId && !fields.amount) {
+              res = mockDbState.transactions
+                .filter((t) => t.parentId && taggedIds.has(t.id))
+                .map((t) => ({ parentId: t.parentId }));
+            } else {
+              res = mockDbState.transactions;
+            }
+          }
 
           return {
             limit: vi.fn().mockResolvedValue(res),
@@ -246,5 +259,75 @@ describe('Budget Exclusions & Ignored Items', () => {
       const transferItem = catchAll.groupedBreakout.find((i: any) => i.categoryId === 'cat-transfer');
       expect(transferItem).toBeUndefined();
     }
+  });
+
+  it('omits child split transactions marked with excluded tags from budget actuals', async () => {
+    mockDbState.budgets = [
+      {
+        id: 'b-groceries',
+        userId: 'test-user-id',
+        categoryId: 'cat-groceries',
+        amount: '400.00',
+        periodType: 'monthly',
+        isRecurring: true,
+        effectiveFrom: '2026-01',
+        effectiveTo: null,
+        categoryName: 'Groceries',
+        categoryColor: '#10b981',
+        isIncome: false,
+        categoryType: 'standard',
+        isDiscretionary: true,
+      },
+    ];
+
+    mockDbState.transactions = [
+      {
+        id: 'tx-parent',
+        userId: 'test-user-id',
+        categoryId: null,
+        amount: '-200.00',
+        date: '2026-08-05',
+        deleted: false,
+        ignored: false,
+      },
+      {
+        id: 'tx-child-1',
+        parentId: 'tx-parent',
+        userId: 'test-user-id',
+        categoryId: 'cat-groceries',
+        amount: '-120.00',
+        date: '2026-08-05',
+        deleted: false,
+        ignored: false,
+      },
+      {
+        id: 'tx-child-2',
+        parentId: 'tx-parent',
+        userId: 'test-user-id',
+        categoryId: 'cat-groceries',
+        amount: '-80.00',
+        date: '2026-08-05',
+        deleted: false,
+        ignored: false,
+      },
+    ];
+
+    // tx-child-2 has excluded tag 'tag-split'
+    mockDbState.transactionTags = [
+      {
+        transactionId: 'tx-child-2',
+        tagId: 'tag-split',
+      },
+    ];
+
+    const req = new Request('http://localhost:3000/api/budgets?periodType=monthly&periodKey=2026-08');
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    const groceries = data.budgets.find((b: any) => b.categoryId === 'cat-groceries');
+    expect(groceries).toBeDefined();
+    // tx-child-1 (-120) counted, tx-child-2 (-80) was excluded via tag
+    expect(groceries.actual).toBe(120);
   });
 });
