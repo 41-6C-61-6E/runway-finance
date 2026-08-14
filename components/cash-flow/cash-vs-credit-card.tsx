@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   Area,
@@ -100,7 +101,6 @@ function StatBox({ label, value, change, changePercent, color, icon, className }
 }
 
 export function CashVsCreditCard() {
-  const [responseData, setResponseData] = useState<ResponseData | null>(null);
   const {
     timeframe, setTimeframe,
     windowEnd, setWindowEnd,
@@ -112,8 +112,6 @@ export function CashVsCreditCard() {
   } = useDateWindow('finance:cash-vs-credit:timeframe', 'finance:cash-vs-credit:windowEnd', '1y');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('cashVsCredit');
   const [showFilters, setShowFilters] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -152,23 +150,16 @@ export function CashVsCreditCard() {
     return `${base}&includeSavings=${includeSavings}`;
   }, [timeframe, dateRange.start, dateRange.end, includeSavings]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`/api/cash-flow/cash-vs-credit?${queryParams}`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch cash vs credit data');
-        const json: ResponseData = await res.json();
-        setResponseData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [queryParams]);
+  const { data: responseData = null, isLoading: loading, error: queryError } = useQuery<ResponseData>({
+    queryKey: ['cash-vs-credit', queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/cash-flow/cash-vs-credit?${queryParams}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch cash vs credit data');
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'Unknown error') : null;
 
   const chartData = useMemo(() => {
     if (!responseData?.history) return [];

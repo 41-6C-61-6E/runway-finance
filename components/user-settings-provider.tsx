@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, type ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type UserSettingsContextType = {
   settings: Record<string, any>;
@@ -12,30 +13,25 @@ type UserSettingsContextType = {
 const UserSettingsContext = createContext<UserSettingsContextType | null>(null);
 
 export function UserSettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchSettings = useCallback(async () => {
-    try {
-      const res = await fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data);
-      }
-    } catch (e) {
-      console.error('Failed to load user settings', e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: settings = {}, isLoading: loading, refetch } = useQuery<Record<string, any>>({
+    queryKey: ['user-settings'],
+    queryFn: async () => {
+      const res = await fetch('/api/user-settings', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load user settings');
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+  const refreshSettings = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   const updateSetting = useCallback(async (key: string, value: any) => {
-    // Optimistically update local state
-    setSettings((prev) => {
+    // Optimistically update local query cache
+    queryClient.setQueryData<Record<string, any>>(['user-settings'], (prev = {}) => {
       if (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility') {
         const existingData = prev[key] || {};
         const mergedData = { ...existingData, ...value };
@@ -46,7 +42,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
 
     try {
       const bodyPayload = (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility')
-        ? { [key]: value } // For these, value is just the delta key-value object
+        ? { [key]: value }
         : { [key]: value };
 
       const res = await fetch('/api/user-settings', {
@@ -59,16 +55,15 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       if (!res.ok) {
         throw new Error('Failed to update setting');
       }
-      // Re-fetch to pick up any changes made outside this provider (e.g. AdvancedTab)
-      await fetchSettings();
+      queryClient.invalidateQueries({ queryKey: ['user-settings'] });
     } catch (e) {
       console.error(`Failed to update setting ${key}`, e);
-      await fetchSettings();
+      queryClient.invalidateQueries({ queryKey: ['user-settings'] });
     }
-  }, [fetchSettings]);
+  }, [queryClient]);
 
   return (
-    <UserSettingsContext.Provider value={{ settings, updateSetting, loading, refreshSettings: fetchSettings }}>
+    <UserSettingsContext.Provider value={{ settings, updateSetting, loading, refreshSettings }}>
       {children}
     </UserSettingsContext.Provider>
   );

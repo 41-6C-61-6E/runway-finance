@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -59,6 +60,7 @@ export const accounts = pgTable(
   (t) => [
     unique().on(t.connectionId, t.externalId),
     unique().on(t.plaidConnectionId, t.externalId),
+    index('accounts_user_hidden_idx').on(t.userId, t.isHidden),
   ]
 );
 

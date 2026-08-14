@@ -4,26 +4,21 @@ import { Buffer } from 'node:buffer';
 export type EncryptedPayload = { ciphertext: string; iv: string; tag: string };
 
 function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return Buffer.from(bytes).toString('hex');
 }
 
 function hexToBytes(hex: string): Uint8Array {
-  return new Uint8Array(hex.match(/.{2}/g)!.map((c) => parseInt(c, 16)));
+  return new Uint8Array(Buffer.from(hex, 'hex'));
 }
 
 function base64FromBytes(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes));
+  return Buffer.from(bytes).toString('base64');
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
   if (!b64) return new Uint8Array(0);
   try {
-    // Normalize base64url to standard base64, strip whitespace and padding
-    let normalized = b64.trim().replace(/-/g, '+').replace(/_/g, '/');
-    while (normalized.length % 4 !== 0) {
-      normalized += '=';
-    }
-    return new Uint8Array(atob(normalized).split('').map((c) => c.charCodeAt(0)));
+    return new Uint8Array(Buffer.from(b64.trim(), 'base64'));
   } catch {
     return new Uint8Array(0);
   }
