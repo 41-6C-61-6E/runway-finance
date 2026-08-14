@@ -508,7 +508,7 @@ export function BudgetTable() {
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
                       <Link
                         href={
-                          b.coveredCategoryIds && b.coveredCategoryIds.length > 1
+                          b.coveredCategoryIds && b.coveredCategoryIds.length > 0
                             ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
                             : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
                         }
@@ -517,8 +517,8 @@ export function BudgetTable() {
                         {b.categoryName}
                       </Link>
                       <BudgetItemTransactionsIcon
-                        categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? undefined : b.categoryId}
-                        categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? b.coveredCategoryIds : undefined}
+                        categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? undefined : b.categoryId}
+                        categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId]}
                         categoryName={b.categoryName}
                         periodType={periodType}
                         periodKey={periodKey}
@@ -568,7 +568,7 @@ export function BudgetTable() {
                         href={
                           isEE && b.groupedBreakout && b.groupedBreakout.length > 0
                             ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
-                            : b.coveredCategoryIds && b.coveredCategoryIds.length > 1
+                            : b.coveredCategoryIds && b.coveredCategoryIds.length > 0
                             ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
                             : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
                         }
@@ -577,8 +577,8 @@ export function BudgetTable() {
                         {b.categoryName}
                       </Link>
                       <BudgetItemTransactionsIcon
-                        categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 1) ? undefined : b.categoryId}
-                        categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? b.coveredCategoryIds : undefined)}
+                        categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 0) ? undefined : b.categoryId}
+                        categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId])}
                         categoryName={b.categoryName}
                         periodType={periodType}
                         periodKey={periodKey}
@@ -740,7 +740,7 @@ export function BudgetTable() {
                               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
                               <Link
                                 href={
-                                  b.coveredCategoryIds && b.coveredCategoryIds.length > 1
+                                  b.coveredCategoryIds && b.coveredCategoryIds.length > 0
                                     ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
                                     : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
                                 }
@@ -749,8 +749,8 @@ export function BudgetTable() {
                                 {b.categoryName}
                               </Link>
                               <BudgetItemTransactionsIcon
-                                categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? undefined : b.categoryId}
-                                categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? b.coveredCategoryIds : undefined}
+                                categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? undefined : b.categoryId}
+                                categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId]}
                                 categoryName={b.categoryName}
                                 periodType={periodType}
                                 periodKey={periodKey}
@@ -827,7 +827,7 @@ export function BudgetTable() {
                                   href={
                                     isEE && b.groupedBreakout && b.groupedBreakout.length > 0
                                       ? `/transactions?categoryIds=${b.groupedBreakout.map((i) => i.categoryId).join(',')}&startDate=${startDate}&endDate=${endDate}`
-                                      : b.coveredCategoryIds && b.coveredCategoryIds.length > 1
+                                      : b.coveredCategoryIds && b.coveredCategoryIds.length > 0
                                       ? `/transactions?categoryIds=${b.coveredCategoryIds.join(',')}&startDate=${startDate}&endDate=${endDate}`
                                       : `/transactions?categoryId=${b.categoryId}&startDate=${startDate}&endDate=${endDate}`
                                   }
@@ -836,8 +836,8 @@ export function BudgetTable() {
                                   {b.categoryName}
                                 </Link>
                                 <BudgetItemTransactionsIcon
-                                  categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 1) ? undefined : b.categoryId}
-                                  categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 1 ? b.coveredCategoryIds : undefined)}
+                                  categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 0) ? undefined : b.categoryId}
+                                  categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId])}
                                   categoryName={b.categoryName}
                                   periodType={periodType}
                                   periodKey={periodKey}

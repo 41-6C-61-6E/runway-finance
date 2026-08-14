@@ -74,18 +74,35 @@ function buildCategoryConditions(
     const validCategoryIds = ids.filter((id) => UUID_PATTERN.test(id));
 
     if (includesUncategorized && validCategoryIds.length > 0) {
+      const db = getDb();
       return [
         or(
           isNull(transactions.categoryId),
           inArray(transactions.categoryId, validCategoryIds),
           inArray(
+            transactions.categoryId,
+            db
+              .select({ id: categories.id })
+              .from(categories)
+              .where(inArray(categories.parentId, validCategoryIds))
+          ),
+          inArray(
             transactions.id,
-            getDb()
+            db
               .select({ parentId: transactions.parentId })
               .from(transactions)
               .where(
                 and(
-                  inArray(transactions.categoryId, validCategoryIds),
+                  or(
+                    inArray(transactions.categoryId, validCategoryIds),
+                    inArray(
+                      transactions.categoryId,
+                      db
+                        .select({ id: categories.id })
+                        .from(categories)
+                        .where(inArray(categories.parentId, validCategoryIds))
+                    )
+                  ),
                   isNotNull(transactions.parentId)
                 )
               )
@@ -99,17 +116,34 @@ function buildCategoryConditions(
     }
 
     if (validCategoryIds.length > 0) {
+      const db = getDb();
       return [
         or(
           inArray(transactions.categoryId, validCategoryIds),
           inArray(
+            transactions.categoryId,
+            db
+              .select({ id: categories.id })
+              .from(categories)
+              .where(inArray(categories.parentId, validCategoryIds))
+          ),
+          inArray(
             transactions.id,
-            getDb()
+            db
               .select({ parentId: transactions.parentId })
               .from(transactions)
               .where(
                 and(
-                  inArray(transactions.categoryId, validCategoryIds),
+                  or(
+                    inArray(transactions.categoryId, validCategoryIds),
+                    inArray(
+                      transactions.categoryId,
+                      db
+                        .select({ id: categories.id })
+                        .from(categories)
+                        .where(inArray(categories.parentId, validCategoryIds))
+                    )
+                  ),
                   isNotNull(transactions.parentId)
                 )
               )
@@ -127,17 +161,34 @@ function buildCategoryConditions(
     }
 
     if (UUID_PATTERN.test(categoryId)) {
+      const db = getDb();
       return [
         or(
           eq(transactions.categoryId, categoryId),
           inArray(
+            transactions.categoryId,
+            db
+              .select({ id: categories.id })
+              .from(categories)
+              .where(eq(categories.parentId, categoryId))
+          ),
+          inArray(
             transactions.id,
-            getDb()
+            db
               .select({ parentId: transactions.parentId })
               .from(transactions)
               .where(
                 and(
-                  eq(transactions.categoryId, categoryId),
+                  or(
+                    eq(transactions.categoryId, categoryId),
+                    inArray(
+                      transactions.categoryId,
+                      db
+                        .select({ id: categories.id })
+                        .from(categories)
+                        .where(eq(categories.parentId, categoryId))
+                    )
+                  ),
                   isNotNull(transactions.parentId)
                 )
               )

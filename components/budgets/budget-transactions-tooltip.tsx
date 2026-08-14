@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Receipt, ArrowRight, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -61,6 +62,7 @@ export function BudgetItemTransactionsIcon({
   periodKey,
   className,
 }: BudgetItemTransactionsIconProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -135,19 +137,22 @@ export function BudgetItemTransactionsIcon({
   const txList: TransactionItem[] = data?.data ?? [];
   const totalCount: number = data?.total ?? txList.length;
 
+  const handleLinkClick = (e: React.MouseEvent) => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768 && !open) {
+      e.preventDefault();
+      setOpen(true);
+      return;
+    }
+    setOpen(false);
+  };
+
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip open={open} onOpenChange={setOpen}>
         <TooltipTrigger asChild>
           <Link
             href={targetUrl}
-            onClick={(e) => {
-              // On mobile touch screens, first tap opens tooltip preview
-              if (typeof window !== 'undefined' && window.innerWidth < 768 && !open) {
-                e.preventDefault();
-                setOpen(true);
-              }
-            }}
+            onClick={handleLinkClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             aria-label={`View transactions for ${categoryName}`}

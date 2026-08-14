@@ -403,23 +403,42 @@ export default function FilterBar({
   const parents = categories.filter((c) => !c.parentId);
   const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
 
-  const selectedAccountIds = (filters.accountIds ?? '').split(',').filter(Boolean);
-  const selectedCategoryIds = (filters.categoryIds ?? '').split(',').filter(Boolean);
+  const selectedAccountIds = useMemo(() => {
+    return (filters.accountIds ? filters.accountIds.split(',') : filters.accountId ? [filters.accountId] : []).filter(Boolean);
+  }, [filters.accountIds, filters.accountId]);
+
+  const selectedCategoryIds = useMemo(() => {
+    return (filters.categoryIds ? filters.categoryIds.split(',') : filters.categoryId ? [filters.categoryId] : []).filter(Boolean);
+  }, [filters.categoryIds, filters.categoryId]);
+
   const selectedAccountTypes = (filters.accountTypes ?? '').split(',').filter(Boolean);
-  const selectedTagIds = (filters.tagIds ?? '').split(',').filter(Boolean);
+
+  const selectedTagIds = useMemo(() => {
+    return (filters.tagIds ? filters.tagIds.split(',') : filters.tagId ? [filters.tagId] : []).filter(Boolean);
+  }, [filters.tagIds, filters.tagId]);
+
   const selectedAccountTagIds = (filters.accountTagIds ?? '').split(',').filter(Boolean);
 
   const handleAccountIdsChange = useCallback((values: string[]) => {
     onChange('accountIds', values.length > 0 ? values.join(',') : null);
-  }, [onChange]);
+    if (filters.accountId) {
+      onChange('accountId', null);
+    }
+  }, [onChange, filters.accountId]);
 
   const handleCategoryIdsChange = useCallback((values: string[]) => {
     onChange('categoryIds', values.length > 0 ? values.join(',') : null);
-  }, [onChange]);
+    if (filters.categoryId) {
+      onChange('categoryId', null);
+    }
+  }, [onChange, filters.categoryId]);
 
   const handleTagIdsChange = useCallback((values: string[]) => {
     onChange('tagIds', values.length > 0 ? values.join(',') : null);
-  }, [onChange]);
+    if (filters.tagId) {
+      onChange('tagId', null);
+    }
+  }, [onChange, filters.tagId]);
 
   const handleAccountTagIdsChange = useCallback((values: string[]) => {
     onChange('accountTagIds', values.length > 0 ? values.join(',') : null);
