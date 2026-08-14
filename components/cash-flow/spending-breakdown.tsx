@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
@@ -79,10 +80,6 @@ export function SpendingBreakdown() {
   const { theme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('spendingBreakdown');
   const [showFilters, setShowFilters] = useState(false);
-  
-  const [allCategories, setAllCategories] = useState<CategoryData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -119,25 +116,16 @@ export function SpendingBreakdown() {
     return `startDate=${dateRange.start}&endDate=${dateRange.end}`;
   }, [dateRange.start, dateRange.end]);
 
-
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`/api/cash-flow/categories?${queryParams}`);
-        if (!res.ok) throw new Error('Failed to fetch categories');
-        const json = await res.json();
-        setAllCategories(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [queryParams]);
+  const { data: allCategories = [], isLoading: loading, error: queryError } = useQuery<CategoryData[]>({
+    queryKey: ['cash-flow-categories', queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/cash-flow/categories?${queryParams}`);
+      if (!res.ok) throw new Error('Failed to fetch categories');
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'Unknown error') : null;
 
   const expenseCategories = useMemo(() => {
     return allCategories.filter((c) => !c.isIncome && c.amount > 0);

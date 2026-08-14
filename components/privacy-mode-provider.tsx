@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { applyAccent } from '@/lib/utils/apply-accent';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 // Apply saved accent immediately at module scope, before React renders,
 // so there is no flash of the default violet on page navigation.
@@ -24,8 +25,10 @@ type PrivacyModeContextType = {
 const PrivacyModeContext = createContext<PrivacyModeContextType | null>(null);
 
 export function PrivacyModeProvider({ children }: { children: React.ReactNode }) {
-  const [privacyMode, setPrivacyMode] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const userSettingsCtx = useUserSettings();
+  const settings = userSettingsCtx?.settings;
+  const loading = userSettingsCtx?.loading ?? false;
+  const privacyMode = settings?.privacyMode ?? false;
   const [shortcutLabel, setShortcutLabel] = useState('Ctrl+Shift+P');
 
   useEffect(() => {
@@ -33,26 +36,11 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
     setShortcutLabel(isMac ? 'Cmd+Shift+P' : 'Ctrl+Shift+P');
   }, []);
 
-  const fetchPrivacyMode = useCallback(async () => {
-    try {
-      const res = await fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setPrivacyMode(data.privacyMode || false);
-        if (data.accentColor) {
-          applyAccent(data.accentColor);
-        }
-      }
-    } catch {
-      setPrivacyMode(false);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchPrivacyMode();
-  }, [fetchPrivacyMode]);
+    if (settings?.accentColor) {
+      applyAccent(settings.accentColor);
+    }
+  }, [settings?.accentColor]);
 
   useEffect(() => {
     if (loading) return;
@@ -275,18 +263,10 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
 
   const togglePrivacyMode = useCallback(async () => {
     const newMode = !privacyMode;
-    setPrivacyMode(newMode);
-    try {
-      await fetch('/api/user-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ privacyMode: newMode }),
-      });
-    } catch {
-      setPrivacyMode(privacyMode);
+    if (userSettingsCtx?.updateSetting) {
+      await userSettingsCtx.updateSetting('privacyMode', newMode);
     }
-  }, [privacyMode]);
+  }, [privacyMode, userSettingsCtx]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

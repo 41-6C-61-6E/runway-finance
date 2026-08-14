@@ -7,7 +7,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, Layers, BarChart3, HelpCircle } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
@@ -133,6 +133,7 @@ function getPeriodPacingInfo(periodType: string, periodKey: string) {
 export function BudgetSummary() {
   const { periodType, periodKey } = useBudgetPeriod();
   const [collapsed, setCollapsed] = useCardCollapsed('budgetSummary');
+  const [isPacingCollapsed, setIsPacingCollapsed] = useCardCollapsed('budgetPacingDetails', true);
 
   const { data, isLoading: loading } = useQuery({
     queryKey: ['budgets', periodType, periodKey],
@@ -323,6 +324,104 @@ export function BudgetSummary() {
   const nearPct = totalCatCount > 0 ? (nearLimitCount / totalCatCount) * 100 : 0;
   const overPct = totalCatCount > 0 ? (overBudgetCount / totalCatCount) * 100 : 0;
 
+  const isPacingExpanded = !isPacingCollapsed;
+  const togglePacingExpanded = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIsPacingCollapsed(!isPacingCollapsed);
+  };
+
+  const pacingDetailsContent = (
+    <>
+      <div className="flex items-center justify-between border-b border-border/60 pb-1.5">
+        <span className="font-bold text-foreground flex items-center gap-1.5">
+          <healthStatus.icon className={cn("w-3.5 h-3.5", healthStatus.badgeClass.split(' ')[1])} />
+          Budget Status Analysis
+        </span>
+        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border font-mono", healthStatus.badgeClass)}>
+          {healthStatus.label}
+        </span>
+      </div>
+
+      <p className="text-muted-foreground text-[11px] leading-relaxed">
+        {healthStatus.description}
+      </p>
+
+      {/* Smart Forecast Card */}
+      <div className="bg-muted/40 p-2.5 rounded-lg border border-border/50 space-y-1 text-[11px]">
+        <div className="flex justify-between items-center text-muted-foreground">
+          <span>{periodConfig.title} Pacing:</span>
+          <span className="font-medium text-foreground">
+            {isFuture
+              ? `Upcoming (0 of ${totalDays} days)`
+              : `Day ${daysElapsed} of ${totalDays} (${timePercent.toFixed(0)}% elapsed)`}
+          </span>
+        </div>
+        <div className="flex justify-between items-center text-muted-foreground">
+          <span>Fixed Expenses (Essential):</span>
+          <span className="font-mono text-foreground">{formatCurrency(fixedActual)} paid</span>
+        </div>
+        <div className="flex justify-between items-center text-muted-foreground">
+          <span>Variable Pace:</span>
+          <span className="font-mono text-foreground">{formatCurrency(variableDailyRate)}/day</span>
+        </div>
+        <div className="flex justify-between items-center pt-1 border-t border-border/40 font-semibold">
+          <span className="text-foreground">{isPast ? 'Final Result:' : `Projected ${periodConfig.title} Finish:`}</span>
+          <span className={cn("font-mono", surplusOrDeficit >= 0 ? "text-constructive" : "text-destructive")}>
+            {formatCurrency(finishTotal)} ({surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)}` : `-${formatCurrency(Math.abs(surplusOrDeficit))}`})
+          </span>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center text-[11px] font-mono pt-0.5">
+        <span className="text-muted-foreground">Remaining Budget Cushion:</span>
+        <span className="font-bold text-constructive">{formatCurrency(totalExpenseCushion)}</span>
+      </div>
+
+      {minorOverBudgets.length > 0 && (
+        <div className="pt-1 space-y-1 text-[11px]">
+          <span className="font-semibold text-amber-500 block">Absorbed Minor Overruns:</span>
+          <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-amber-500/40">
+            {minorOverBudgets.map((b) => (
+              <div key={b.id} className="flex justify-between text-[10px]">
+                <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
+                <span className="font-mono text-amber-500 font-semibold">+{formatCurrency(Math.abs(b.remaining))}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {significantOverBudgets.length > 0 && (
+        <div className="pt-1 space-y-1 text-[11px]">
+          <span className="font-semibold text-destructive block">Major Overruns (&gt;200% or &gt;{formatCurrency(overBudgetThreshold)}):</span>
+          <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-destructive/40">
+            {significantOverBudgets.map((b) => (
+              <div key={b.id} className="flex justify-between text-[10px]">
+                <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
+                <span className="font-mono text-destructive font-semibold">+{formatCurrency(Math.abs(b.remaining))}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {alertHref && alertText && (
+        <div className="pt-1">
+          <Link
+            href={alertHref}
+            className={cn(
+              "flex items-center justify-between p-2 rounded-lg text-[11px] font-medium border transition-colors group",
+              alertClass
+            )}
+          >
+            <span className="truncate">{alertText}</span>
+            <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
       <CollapsibleCardHeader
@@ -340,104 +439,68 @@ export function BudgetSummary() {
       {!collapsed && (
         <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
           {/* Section 1: Header Status & Net Position */}
-          <div className="py-4 first:pt-0 last:pb-0 flex items-center justify-between">
-            <div className="space-y-0.5">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</span>
-              <div className="flex items-center gap-1.5 pt-0.5">
-                <TooltipProvider delayDuration={100}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="focus:outline-none select-none text-left">
-                        <span className={cn('px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1 cursor-help transition-all hover:opacity-90 font-mono', healthStatus.badgeClass)}>
-                          <healthStatus.icon className="w-3 h-3" />
-                          {healthStatus.label}
-                        </span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" align="start" className="w-72 sm:w-84 p-3.5 bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl space-y-2.5 text-xs">
-                      <div className="flex items-center justify-between border-b border-border pb-1.5">
-                        <span className="font-bold text-foreground flex items-center gap-1.5">
-                          <healthStatus.icon className={cn("w-3.5 h-3.5", healthStatus.badgeClass.split(' ')[1])} />
-                          Budget Status Analysis
-                        </span>
-                        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border font-mono", healthStatus.badgeClass)}>
-                          {healthStatus.label}
-                        </span>
-                      </div>
-
-                      <p className="text-muted-foreground text-[11px] leading-relaxed">
-                        {healthStatus.description}
-                      </p>
-
-                      {/* Smart Forecast Card */}
-                      <div className="bg-muted/40 p-2 rounded-lg border border-border/50 space-y-1 text-[11px]">
-                        <div className="flex justify-between items-center text-muted-foreground">
-                          <span>{periodConfig.title} Pacing:</span>
-                          <span className="font-medium text-foreground">
-                            {isFuture
-                              ? `Upcoming (0 of ${totalDays} days)`
-                              : `Day ${daysElapsed} of ${totalDays} (${timePercent.toFixed(0)}% elapsed)`}
+          <div className="py-4 first:pt-0 last:pb-0 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</span>
+                <div className="flex items-center gap-1.5 pt-0.5">
+                  <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={togglePacingExpanded}
+                          className="focus:outline-none select-none text-left cursor-pointer group"
+                          aria-expanded={isPacingExpanded}
+                          aria-label={isPacingExpanded ? 'Collapse budget pacing details' : 'Expand budget pacing details'}
+                        >
+                          <span
+                            className={cn(
+                              'px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1.5 transition-all hover:opacity-90 font-mono select-none',
+                              healthStatus.badgeClass,
+                              isPacingExpanded && 'ring-1 ring-primary/30 shadow-sm'
+                            )}
+                          >
+                            <healthStatus.icon className="w-3 h-3 shrink-0" />
+                            <span>{healthStatus.label}</span>
+                            <ChevronDown
+                              className={cn(
+                                'w-3 h-3 shrink-0 transition-transform duration-200 opacity-75 group-hover:opacity-100',
+                                isPacingExpanded && 'rotate-180'
+                              )}
+                            />
                           </span>
-                        </div>
-                        <div className="flex justify-between items-center text-muted-foreground">
-                          <span>Fixed Expenses (Essential):</span>
-                          <span className="font-mono text-foreground">{formatCurrency(fixedActual)} paid</span>
-                        </div>
-                        <div className="flex justify-between items-center text-muted-foreground">
-                          <span>Variable Pace:</span>
-                          <span className="font-mono text-foreground">{formatCurrency(variableDailyRate)}/day</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-1 border-t border-border/40 font-semibold">
-                          <span className="text-foreground">{isPast ? 'Final Result:' : `Projected ${periodConfig.title} Finish:`}</span>
-                          <span className={cn("font-mono", surplusOrDeficit >= 0 ? "text-constructive" : "text-destructive")}>
-                            {formatCurrency(finishTotal)} ({surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)}` : `-${formatCurrency(Math.abs(surplusOrDeficit))}`})
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center text-[11px] font-mono pt-0.5">
-                        <span className="text-muted-foreground">Remaining Budget Cushion:</span>
-                        <span className="font-bold text-constructive">{formatCurrency(totalExpenseCushion)}</span>
-                      </div>
-
-                      {minorOverBudgets.length > 0 && (
-                        <div className="pt-1 space-y-1 text-[11px]">
-                          <span className="font-semibold text-amber-500 block">Absorbed Minor Overruns:</span>
-                          <div className="max-h-20 overflow-y-auto space-y-1 pl-2 border-l-2 border-amber-500/40">
-                            {minorOverBudgets.map((b) => (
-                              <div key={b.id} className="flex justify-between text-[10px]">
-                                <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
-                                <span className="font-mono text-amber-500 font-semibold">+{formatCurrency(Math.abs(b.remaining))}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                        </button>
+                      </TooltipTrigger>
+                      {!isPacingExpanded && (
+                        <TooltipContent
+                          side="bottom"
+                          align="start"
+                          className="w-72 sm:w-84 p-3.5 bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl space-y-2.5 text-xs z-50"
+                        >
+                          {pacingDetailsContent}
+                        </TooltipContent>
                       )}
-
-                      {significantOverBudgets.length > 0 && (
-                        <div className="pt-1 space-y-1 text-[11px]">
-                          <span className="font-semibold text-destructive block">Major Overruns (&gt;200% or &gt;{formatCurrency(overBudgetThreshold)}):</span>
-                          <div className="max-h-20 overflow-y-auto space-y-1 pl-2 border-l-2 border-destructive/40">
-                            {significantOverBudgets.map((b) => (
-                              <div key={b.id} className="flex justify-between text-[10px]">
-                                <span className="truncate max-w-[170px] text-foreground font-medium">{b.categoryName}</span>
-                                <span className="font-mono text-destructive font-semibold">+{formatCurrency(Math.abs(b.remaining))}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Net Position</span>
+                <p className={cn('text-lg font-bold font-mono blur-number', isSurplus ? 'text-constructive' : 'text-destructive')}>
+                  {isSurplus ? '+' : ''}{formatCurrency(netActual)}
+                </p>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Net Position</span>
-              <p className={cn('text-lg font-bold font-mono blur-number', isSurplus ? 'text-constructive' : 'text-destructive')}>
-                {isSurplus ? '+' : ''}{formatCurrency(netActual)}
-              </p>
-            </div>
+
+            {/* Persistent Expanded Pacing Details in Sidebar */}
+            {isPacingExpanded && (
+              <div className="animate-in fade-in-50 slide-in-from-top-1 duration-200 pt-1">
+                <div className="p-3.5 bg-muted/20 border border-sidebar-border/80 rounded-xl space-y-2.5 text-xs shadow-sm">
+                  {pacingDetailsContent}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 2: Donut Chart & Progress Section */}

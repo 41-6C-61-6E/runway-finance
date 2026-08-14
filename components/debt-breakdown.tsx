@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
@@ -83,19 +84,19 @@ export function DebtBreakdown() {
   const router = useRouter();
   const { privacyMode } = usePrivacyMode();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('debtBreakdown');
-  const [accounts, setAccounts] = useState<AccountData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [unit, setUnit] = useState<'$' | '%'>('$');
   const [activeTab, setActiveTab] = useState<'assets' | 'debt'>('assets');
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/accounts', { credentials: 'include' })
-      .then((res) => res.json())
-      .then((data) => setAccounts(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: accounts = [], isLoading: loading } = useQuery<AccountData[]>({
+    queryKey: ['accounts-all'],
+    queryFn: async () => {
+      const res = await fetch('/api/accounts?includeHidden=true&includeVirtual=true', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch accounts');
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { totalAssets, totalLiabilities, assetCategories, debtCategories } = useMemo(() => {
     let assets = 0;

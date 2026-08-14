@@ -1,12 +1,14 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ChartSpline, Receipt, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark, ChevronDown, ChevronRight, LayoutDashboard, CandlestickChart, ArrowLeftRight, Flame } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
@@ -31,23 +33,56 @@ const planningItems: { href: string; label: string; icon: React.ComponentType<{ 
 export default function ResizableSidebar() {
   const pathname = usePathname()
   const { sidebarWidth, isHovering, handleNavResizeDown, handleMouseEnter, handleMouseLeave } = useSidebar()
+  const queryClient = useQueryClient()
   const [isResizing, setIsResizing] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   const { isHidden } = useHiddenPages()
   const { reduceTransparency } = useReduceTransparency()
-  const [devMode, setDevMode] = useState<boolean | null>(null)
+
+  const { data: devModeData } = useQuery<{ devMode: boolean }>({
+    queryKey: ['dev-mode'],
+    queryFn: async () => {
+      const res = await fetch('/api/dev-mode', { credentials: 'include' })
+      if (!res.ok) return { devMode: false }
+      return res.json()
+    },
+    staleTime: 10 * 60 * 1000,
+  })
+  const devMode = devModeData?.devMode ?? null
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  useEffect(() => {
-    fetch('/api/dev-mode', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => setDevMode(data.devMode))
-      .catch(() => setDevMode(false))
-  }, [])
+  const handlePrefetch = useCallback((href: string) => {
+    if (href === '/spending') {
+      const now = new Date()
+      const currentYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      const startDate = `${currentYm}-01`
+      const endDate = `${currentYm}-${String(lastDay).padStart(2, '0')}`
+      queryClient.prefetchQuery({
+        queryKey: ['cash-flow-categories', `startDate=${startDate}&endDate=${endDate}`],
+        queryFn: async () => {
+          const res = await fetch(`/api/cash-flow/categories?startDate=${startDate}&endDate=${endDate}`)
+          if (!res.ok) throw new Error('Failed to fetch categories')
+          return res.json()
+        },
+        staleTime: 5 * 60 * 1000,
+      })
+    } else if (href === '/accounts') {
+      queryClient.prefetchQuery({
+        queryKey: ['accounts-all'],
+        queryFn: async () => {
+          const res = await fetch('/api/accounts?includeHidden=true&includeVirtual=true')
+          if (!res.ok) throw new Error('Failed to fetch accounts')
+          return res.json()
+        },
+        staleTime: 5 * 60 * 1000,
+      })
+    }
+  }, [queryClient])
 
   const isActive = (href: string) => pathname === href
   const isCollapsed = sidebarWidth === COLLAPSED_WIDTH
@@ -61,8 +96,9 @@ export default function ResizableSidebar() {
     active: boolean,
     showLabel: boolean,
   ) => (
-    <a
+    <Link
       href={href}
+      onMouseEnter={() => handlePrefetch(href)}
       className={`flex items-center rounded-lg transition-all duration-150 ${
         !showLabel
           ? 'justify-center py-2'
@@ -75,7 +111,7 @@ export default function ResizableSidebar() {
     >
       <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-primary' : ''}`} />
       {showLabel && <span className="text-sm truncate">{label}</span>}
-    </a>
+    </Link>
   )
 
   return (

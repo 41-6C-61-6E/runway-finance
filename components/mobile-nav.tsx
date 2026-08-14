@@ -29,6 +29,7 @@ import {
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { haptic } from '@/lib/haptics';
 import { useMobileSubNav } from '@/components/mobile-subnav-context';
+import { useQuery } from '@tanstack/react-query';
 
 interface NavItem {
   id: string;
@@ -58,7 +59,16 @@ export function MobileNav() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [devMode, setDevMode] = useState<boolean | null>(null);
+  const { data: devModeData } = useQuery<{ devMode: boolean }>({
+    queryKey: ['dev-mode'],
+    queryFn: async () => {
+      const res = await fetch('/api/dev-mode', { credentials: 'include' });
+      if (!res.ok) return { devMode: false };
+      return res.json();
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+  const devMode = devModeData?.devMode ?? null;
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isHidden } = useHiddenPages();
 
@@ -175,10 +185,6 @@ export function MobileNav() {
 
   useEffect(() => {
     setMounted(true);
-    fetch('/api/dev-mode', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => setDevMode(data.devMode))
-      .catch(() => setDevMode(false));
 
     // Load custom bottom nav items
     const saved = localStorage.getItem('mobile-home-nav-items');

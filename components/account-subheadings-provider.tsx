@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, type ReactNode } from 'react';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 type AccountSubheadingsContextType = {
   hideSubheadings: boolean;
@@ -11,40 +12,15 @@ type AccountSubheadingsContextType = {
 const AccountSubheadingsContext = createContext<AccountSubheadingsContextType | null>(null);
 
 export function AccountSubheadingsProvider({ children }: { children: ReactNode }) {
-  const [hideSubheadings, setHideSubheadings] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const fetchSetting = useCallback(async () => {
-    try {
-      const res = await fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setHideSubheadings(data.hideAccountSubheadings === true);
-      }
-    } catch {
-      setHideSubheadings(false);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSetting();
-  }, [fetchSetting]);
+  const userSettingsCtx = useUserSettings();
+  const hideSubheadings = userSettingsCtx?.settings?.hideAccountSubheadings === true;
+  const loading = userSettingsCtx?.loading ?? false;
 
   const updateHideSubheadings = useCallback(async (val: boolean) => {
-    setHideSubheadings(val);
-    try {
-      await fetch('/api/user-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ hideAccountSubheadings: val }),
-      });
-    } catch {
-      setHideSubheadings(!val);
+    if (userSettingsCtx?.updateSetting) {
+      await userSettingsCtx.updateSetting('hideAccountSubheadings', val);
     }
-  }, []);
+  }, [userSettingsCtx]);
 
   return (
     <AccountSubheadingsContext.Provider value={{ hideSubheadings, updateHideSubheadings, loading }}>

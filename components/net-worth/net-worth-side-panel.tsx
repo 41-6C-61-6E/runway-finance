@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { formatCurrency } from '@/lib/utils/format';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -107,49 +108,45 @@ function getDebtRatioRating(rawRatio: number) {
 }
 
 export function NetWorthSidePanel() {
-  const [accounts, setAccounts] = useState<AccountData[]>([]);
-  const [chartData, setChartData] = useState<ChartPoint[]>([]);
-  const [investmentData, setInvestmentData] = useState<InvestmentHistoryPoint[]>([]);
-  const [investmentSummary, setInvestmentSummary] = useState<InvestmentHistoryResponse['summary'] | null>(null);
-  const [hasEstimated, setHasEstimated] = useState(false);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthSidePanel');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [accountsRes, chartRes, investRes] = await Promise.all([
-          fetch('/api/accounts'),
-          fetch('/api/net-worth/chart?timeframe=1y'),
-          fetch('/api/investments/history?timeframe=1y'),
-        ]);
-        if (!accountsRes.ok || !chartRes.ok) throw new Error('Failed to fetch net worth data');
-        const [accountsData, chartResponse]: [AccountData[], ChartResponse] = await Promise.all([
-          accountsRes.json(),
-          chartRes.json(),
-        ]);
-        setAccounts(accountsData);
-        setChartData(chartResponse.data || []);
-        setHasEstimated((chartResponse.data ?? []).some((d: ChartPoint) => d.isSynthetic));
-        if (investRes.ok) {
-          const investResponse: InvestmentHistoryResponse = await investRes.json();
-          setInvestmentData(investResponse.data || []);
-          setInvestmentSummary(investResponse.summary || null);
-        }
+  const { data: accounts = [], isLoading: accountsLoading, error: accountsError } = useQuery<AccountData[]>({
+    queryKey: ['accounts-all'],
+    queryFn: async () => {
+      const res = await fetch('/api/accounts?includeHidden=true&includeVirtual=true', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch accounts');
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  const { data: chartResponse, isLoading: chartLoading, error: chartError } = useQuery<ChartResponse>({
+    queryKey: ['net-worth-chart', '1y'],
+    queryFn: async () => {
+      const res = await fetch('/api/net-worth/chart?timeframe=1y', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch net worth chart');
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: investResponse, isLoading: investLoading } = useQuery<InvestmentHistoryResponse>({
+    queryKey: ['investments-history', '1y'],
+    queryFn: async () => {
+      const res = await fetch('/api/investments/history?timeframe=1y', { credentials: 'include' });
+      if (!res.ok) return { data: [], summary: { current: 0, previous: 0, change: 0, percentChange: 0 } };
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const chartData = chartResponse?.data || [];
+  const investmentData = investResponse?.data || [];
+  const investmentSummary = investResponse?.summary || null;
+  const hasEstimated = chartData.some((d: ChartPoint) => d.isSynthetic);
+
+  const loading = accountsLoading || chartLoading;
+  const error = (accountsError || chartError) ? 'Failed to fetch net worth data' : null;
 
   const totals = useMemo(() => {
     let totalAssets = 0;

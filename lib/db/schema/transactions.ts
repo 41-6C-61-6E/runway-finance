@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -62,7 +63,13 @@ export const transactions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.accountId, t.externalId)]
+  (t) => [
+    unique().on(t.accountId, t.externalId),
+    index('transactions_user_date_idx').on(t.userId, t.date),
+    index('transactions_user_account_idx').on(t.userId, t.accountId),
+    index('transactions_user_category_idx').on(t.userId, t.categoryId),
+    index('transactions_user_deleted_idx').on(t.userId, t.deleted),
+  ]
 );
 
 // ── Tags ─────────────────────────────────────────────────────────────────────

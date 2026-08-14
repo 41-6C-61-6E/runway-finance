@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
@@ -66,7 +67,6 @@ interface ChartResponse {
 export function NetWorthChart() {
   const router = useRouter();
   const { privacyMode } = usePrivacyMode();
-  const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const {
     timeframe, setTimeframe,
     windowEnd, setWindowEnd,
@@ -78,8 +78,6 @@ export function NetWorthChart() {
   } = useDateWindow('finance:net-worth-chart:timeframe', 'finance:net-worth-chart:windowEnd', '1y');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthChart');
   const [showFilters, setShowFilters] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showPercent, setShowPercent] = useState(false);
 
@@ -106,25 +104,20 @@ export function NetWorthChart() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const startDate = dateRange.start;
-        const endDate = dateRange.end;
-        const res = await fetch(`/api/net-worth/chart?timeframe=${timeframe}&startDate=${startDate}&endDate=${endDate}`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch net worth history data');
-        const json: ChartResponse = await res.json();
-        setChartData(json.data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [timeframe, dateRange.start, dateRange.end]);
+  const { data: chartResponse, isLoading: loading, error: queryError } = useQuery<ChartResponse>({
+    queryKey: ['net-worth-chart', timeframe, dateRange.start, dateRange.end],
+    queryFn: async () => {
+      const startDate = dateRange.start;
+      const endDate = dateRange.end;
+      const res = await fetch(`/api/net-worth/chart?timeframe=${timeframe}&startDate=${startDate}&endDate=${endDate}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch net worth history data');
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  
+  const chartData = chartResponse?.data || [];
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'Unknown error') : null;
 
   const processedData = useMemo(() => {
     if (chartData.length === 0) return [];
