@@ -6,9 +6,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { BudgetFormDialog } from './budget-form-dialog';
 import { AutoBudgetDialog } from './auto-budget-dialog';
+import { BudgetExclusionsDialog } from './budget-exclusions-dialog';
 import { BudgetItemTransactionsIcon, getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
-import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Settings, History, Layers, Filter, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Settings, History, Layers, Filter, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
@@ -110,6 +111,7 @@ export function BudgetTable() {
 
   const [showForm, setShowForm] = useState(false);
   const [showAutoBudget, setShowAutoBudget] = useState(false);
+  const [showExclusionsDialog, setShowExclusionsDialog] = useState(false);
   const [editBudget, setEditBudget] = useState<BudgetData | null>(null);
   const [deleteBudget, setDeleteBudget] = useState<BudgetData | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -453,7 +455,15 @@ export function BudgetTable() {
                   </TooltipContent>
                 </Tooltip>
                 {showGearMenu && (
-                  <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-popover border border-border shadow-lg z-50 py-1.5 text-left animate-in fade-in-50 zoom-in-95">
+                  <div className="absolute right-0 mt-1.5 w-60 rounded-xl bg-popover border border-border shadow-lg z-50 py-1.5 text-left animate-in fade-in-50 zoom-in-95">
+                    <button
+                      onClick={() => { setShowGearMenu(false); setShowExclusionsDialog(true); }}
+                      title="Configure custom categories and tags to ignore from budget tracking"
+                      className="w-full px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span>Budget Exclusions</span>
+                    </button>
                     <button
                       onClick={() => { setShowGearMenu(false); setConfirmPurgeHistoryOpen(true); }}
                       title="Erase historical budgets prior to current period while keeping active recurring amounts"
@@ -1078,6 +1088,11 @@ export function BudgetTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BudgetExclusionsDialog
+        open={showExclusionsDialog}
+        onClose={() => setShowExclusionsDialog(false)}
+      />
     </>
   );
 }

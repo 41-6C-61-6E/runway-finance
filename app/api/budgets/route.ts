@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions, userSettings } from '@/lib/db/schema';
+import { accounts, budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions, transactionTags, userSettings } from '@/lib/db/schema';
 import { eq, and, or, isNull, sql, inArray, gte, lt, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -389,6 +389,19 @@ export async function GET(request: Request) {
 
     const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
 
+    const budgetExclusions = (userSetting?.budgetExclusions as { categoryIds?: string[]; tagIds?: string[] }) || {};
+    const excludedCategoryIds = new Set(budgetExclusions.categoryIds || []);
+    const excludedTagIds = new Set(budgetExclusions.tagIds || []);
+
+    let excludedTransactionIds = new Set<string>();
+    if (excludedTagIds.size > 0) {
+      const taggedRows = await db
+        .select({ transactionId: transactionTags.transactionId })
+        .from(transactionTags)
+        .where(inArray(transactionTags.tagId, Array.from(excludedTagIds)));
+      excludedTransactionIds = new Set(taggedRows.map((r) => r.transactionId));
+    }
+
     const userAccounts = await db
       .select({
         id: accounts.id,
@@ -407,7 +420,8 @@ export async function GET(request: Request) {
       eq(transactions.userId, dataUserId),
       gte(transactions.date, bounds.startDate),
       lt(transactions.date, bounds.endDate),
-      eq(transactions.deleted, false)
+      eq(transactions.deleted, false),
+      eq(transactions.ignored, false),
     ];
     if (!isImportTransactionsEnabled) {
       txConditions.push(eq(transactions.isImported, false));
@@ -415,9 +429,11 @@ export async function GET(request: Request) {
 
     const txRows = await db
       .select({
+        id: transactions.id,
         categoryId: transactions.categoryId,
         amount: transactions.amount,
         accountId: transactions.accountId,
+        ignored: transactions.ignored,
       })
       .from(transactions)
       .where(and(...txConditions));
@@ -427,7 +443,10 @@ export async function GET(request: Request) {
 
     for (const row of txRows) {
       if (!row.categoryId) continue;
+      if (row.ignored) continue;
       if (row.accountId && excludedAccountIds.has(row.accountId)) continue;
+      if (excludedTransactionIds.has(row.id)) continue;
+      if (excludedCategoryIds.has(row.categoryId)) continue;
 
       const decrypted = await decryptField(String(row.amount), dek);
       const amount = parseFloat(decrypted);
@@ -453,7 +472,8 @@ export async function GET(request: Request) {
           !catInfo.isIncome &&
           catInfo.categoryType !== 'compound' &&
           catInfo.categoryType !== 'transfer' &&
-          catInfo.name.toLowerCase() !== 'everything else'
+          catInfo.name.toLowerCase() !== 'everything else' &&
+          !excludedCategoryIds.has(row.categoryId)
         ) {
           const prev = unbudgetedActualsMap.get(row.categoryId) || 0;
           unbudgetedActualsMap.set(row.categoryId, prev + netVal);

@@ -24,6 +24,10 @@ export const GENERAL_DEFAULTS = {
     forecast: true,
     suggestions: true,
   },
+  budgetExclusions: {
+    categoryIds: [],
+    tagIds: [],
+  },
   deletePendingOlderThan30Days: true,
   deletePendingDays: 10,
 } as const;
@@ -202,6 +206,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'hiddenPages', label: 'Hidden Pages', description: 'Pages hidden from navigation sidebar (JSON object of page key → boolean)', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.hiddenPages },
   { key: 'paystubEnabled', label: 'Paystub Enabled', description: 'Enable paystub parsing and forecasting features', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.paystubEnabled },
   { key: 'accountTagVisibility', label: 'Account Tag Visibility', description: 'Control visibility of account tag indicators (JSON object: {sidebar, transactions, legend, budgets, forecast, suggestions})', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.accountTagVisibility },
+  { key: 'budgetExclusions', label: 'Budget Exclusions', description: 'Categories and tags to exclude from budget tracking (JSON: {categoryIds, tagIds})', type: 'json', group: 'General', defaultValue: GENERAL_DEFAULTS.budgetExclusions },
   { key: 'deletePendingOlderThan30Days', label: 'Delete Old Pending Transactions', description: 'Automatically delete pending bank transactions older than configured days during account syncs.', type: 'boolean', group: 'General', defaultValue: GENERAL_DEFAULTS.deletePendingOlderThan30Days },
   { key: 'deletePendingDays', label: 'Delete Pending Days', description: 'Number of days to keep pending bank transactions (defaults to 10).', type: 'number', group: 'General', defaultValue: GENERAL_DEFAULTS.deletePendingDays },
 

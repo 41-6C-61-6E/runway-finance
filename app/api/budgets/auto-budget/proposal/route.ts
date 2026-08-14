@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, budgets, categories, transactions, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, lt, min, count } from 'drizzle-orm';
+import { accounts, budgets, categories, transactions, transactionTags, userSettings } from '@/lib/db/schema';
+import { eq, and, gte, lt, min, count, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
@@ -183,8 +183,21 @@ export async function POST(request: Request) {
       }))
     );
 
+    const budgetExclusions = (userSetting?.budgetExclusions as { categoryIds?: string[]; tagIds?: string[] }) || {};
+    const excludedCategoryIds = new Set(budgetExclusions.categoryIds || []);
+    const excludedTagIds = new Set(budgetExclusions.tagIds || []);
+
+    let excludedTransactionIds = new Set<string>();
+    if (excludedTagIds.size > 0) {
+      const taggedRows = await db
+        .select({ transactionId: transactionTags.transactionId })
+        .from(transactionTags)
+        .where(inArray(transactionTags.tagId, Array.from(excludedTagIds)));
+      excludedTransactionIds = new Set(taggedRows.map((r) => r.transactionId));
+    }
+
     const validCategories = decryptedCategories.filter(
-      (c) => !c.excludeFromReports && c.categoryType !== 'transfer' && c.categoryType !== 'compound'
+      (c) => !c.excludeFromReports && c.categoryType !== 'transfer' && c.categoryType !== 'compound' && !excludedCategoryIds.has(c.id)
     );
     const categoryMap = new Map(validCategories.map((c) => [c.id, c]));
 
@@ -251,6 +264,7 @@ export async function POST(request: Request) {
 
     for (const row of txRows) {
       if (!row.categoryId || !categoryMap.has(row.categoryId)) continue;
+      if (excludedTransactionIds.has(row.id)) continue;
       
       // Account exclusion check (hidden accounts, accounts excluded from reports/net worth, or virtual accounts)
       if (row.accountId && excludedAccountIds.has(row.accountId)) {

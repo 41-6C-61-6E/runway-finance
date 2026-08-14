@@ -155,6 +155,10 @@ export const userSettings = pgTable('user_settings', {
     forecast: true,
     suggestions: true,
   }),
+  budgetExclusions: jsonb('budget_exclusions').default({
+    categoryIds: [],
+    tagIds: [],
+  }),
   notifySyncErrors: boolean('notify_sync_errors').notNull().default(true),
   notifyBudgetAlerts: boolean('notify_budget_alerts').notNull().default(true),
   notifyLargeTransactions: boolean('notify_large_transactions').notNull().default(true),

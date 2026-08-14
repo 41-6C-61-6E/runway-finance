@@ -32,7 +32,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
   const updateSetting = useCallback(async (key: string, value: any) => {
     // Optimistically update local query cache
     queryClient.setQueryData<Record<string, any>>(['user-settings'], (prev = {}) => {
-      if (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility') {
+      if (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility' || key === 'budgetExclusions') {
         const existingData = prev[key] || {};
         const mergedData = { ...existingData, ...value };
         return { ...prev, [key]: mergedData };
@@ -41,7 +41,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     });
 
     try {
-      const bodyPayload = (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility')
+      const bodyPayload = (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility' || key === 'budgetExclusions')
         ? { [key]: value }
         : { [key]: value };
 
