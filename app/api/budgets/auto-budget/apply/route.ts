@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { budgets, categories } from '@/lib/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, ne } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptRow, decryptField } from '@/lib/crypto';
@@ -111,6 +111,19 @@ export async function POST(request: Request) {
 
       if (existing && !overwriteExisting) {
         continue;
+      }
+
+      if (overwriteExisting) {
+        // Remove or deactivate any conflicting budgets with different periodType for this category
+        await db
+          .delete(budgets)
+          .where(
+            and(
+              eq(budgets.userId, dataUserId),
+              eq(budgets.categoryId, catId),
+              ne(budgets.periodType, targetPeriodType)
+            )
+          );
       }
 
       const encryptedData = await encryptRow(
