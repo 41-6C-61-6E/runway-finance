@@ -227,6 +227,51 @@ async function runSelfHealingChecks(client) {
       }
     }
 
+    // Check if system_tax_rules table exists (migration 0079)
+    const tableCheckTaxRules = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'system_tax_rules'
+    `);
+    if (tableCheckTaxRules.rows.length === 0) {
+      console.log('[migrate] [self-heal] Creating missing system_tax_rules table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS system_tax_rules (
+          id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tax_year                        INTEGER NOT NULL DEFAULT 2026,
+          country                         TEXT NOT NULL DEFAULT 'US',
+          standard_deduction_single       TEXT NOT NULL DEFAULT '15000',
+          standard_deduction_mfj          TEXT NOT NULL DEFAULT '30000',
+          standard_deduction_hoh          TEXT NOT NULL DEFAULT '22500',
+          standard_deduction_mfs          TEXT NOT NULL DEFAULT '15000',
+          standard_deduction              TEXT NOT NULL DEFAULT '15000',
+          additional_std_deduction_65_plus JSONB NOT NULL,
+          ordinary_tax_brackets           JSONB NOT NULL,
+          head_of_household_brackets      JSONB NOT NULL,
+          capital_gains_brackets          JSONB NOT NULL,
+          fica_rules                      JSONB NOT NULL,
+          social_security_rules           JSONB NOT NULL,
+          early_penalty_rules             JSONB NOT NULL,
+          niit_rules                      JSONB NOT NULL,
+          aca_rules                       JSONB NOT NULL,
+          niit_threshold                  TEXT NOT NULL DEFAULT '200000',
+          irmaa_thresholds                JSONB NOT NULL,
+          ss_taxation_thresholds          JSONB NOT NULL,
+          contribution_limits             JSONB NOT NULL,
+          gift_estate_exemptions          JSONB NOT NULL,
+          aca_subsidy_table               JSONB NOT NULL,
+          fpl_amount                      TEXT NOT NULL DEFAULT '15060',
+          secure_act_rules                JSONB NOT NULL,
+          rmd_uniform_lifetime_table      JSONB NOT NULL,
+          created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS system_tax_rules_tax_year_idx
+        ON system_tax_rules (tax_year)
+      `);
+    }
+
     // Ensure salary_source column exists on plan_flows
     const planFlowsCheck = await client.query(`
       SELECT table_name FROM information_schema.tables WHERE table_name = 'plan_flows'

@@ -93,8 +93,8 @@ function normalizeSinglePaycheckContainer(json: any): any[] {
     let payPeriodEnd = paycheck.checkDate || '';
     if (paycheck.earnings && paycheck.earnings.length > 0) {
       const firstEarning = paycheck.earnings[0];
-      payPeriodStart = firstEarning.beginDate || firstEarning.payPeriodEndDate || paycheck.checkDate || '';
-      payPeriodEnd = firstEarning.endDate || firstEarning.payPeriodEndDate || paycheck.checkDate || '';
+      payPeriodStart = firstEarning.beginDate || firstEarning.payPeriodStartDate || paycheck.payPeriodStartDate || paycheck.checkDate || '';
+      payPeriodEnd = firstEarning.endDate || firstEarning.payPeriodEndDate || paycheck.payPeriodEndDate || paycheck.checkDate || '';
     }
 
     const grossCurrent = paycheck.totals?.earningsAmount ?? 0;

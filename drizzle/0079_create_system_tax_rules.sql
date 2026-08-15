@@ -1,0 +1,32 @@
+CREATE TABLE IF NOT EXISTS "system_tax_rules" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"tax_year" integer DEFAULT 2026 NOT NULL,
+	"country" text DEFAULT 'US' NOT NULL,
+	"standard_deduction_single" text DEFAULT '15000' NOT NULL,
+	"standard_deduction_mfj" text DEFAULT '30000' NOT NULL,
+	"standard_deduction_hoh" text DEFAULT '22500' NOT NULL,
+	"standard_deduction_mfs" text DEFAULT '15000' NOT NULL,
+	"standard_deduction" text DEFAULT '15000' NOT NULL,
+	"additional_std_deduction_65_plus" jsonb NOT NULL,
+	"ordinary_tax_brackets" jsonb NOT NULL,
+	"head_of_household_brackets" jsonb NOT NULL,
+	"capital_gains_brackets" jsonb NOT NULL,
+	"fica_rules" jsonb NOT NULL,
+	"social_security_rules" jsonb NOT NULL,
+	"early_penalty_rules" jsonb NOT NULL,
+	"niit_rules" jsonb NOT NULL,
+	"aca_rules" jsonb NOT NULL,
+	"niit_threshold" text DEFAULT '200000' NOT NULL,
+	"irmaa_thresholds" jsonb NOT NULL,
+	"ss_taxation_thresholds" jsonb NOT NULL,
+	"contribution_limits" jsonb NOT NULL,
+	"gift_estate_exemptions" jsonb NOT NULL,
+	"aca_subsidy_table" jsonb NOT NULL,
+	"fpl_amount" text DEFAULT '15060' NOT NULL,
+	"secure_act_rules" jsonb NOT NULL,
+	"rmd_uniform_lifetime_table" jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "system_tax_rules_tax_year_idx" ON "system_tax_rules" ("tax_year");

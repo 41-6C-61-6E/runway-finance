@@ -66,6 +66,7 @@ export function aggregateChartData<T extends AggregatablePoint>(
   data: T[],
   numericFields: (keyof T & string)[],
   level?: AggregationLevel,
+  mode: 'average' | 'sum' = 'average',
 ): T[] {
   if (data.length === 0) return [];
   const effectiveLevel = level || getAggregationLevel(data.length);
@@ -101,7 +102,8 @@ export function aggregateChartData<T extends AggregatablePoint>(
       for (const field of numericFields) {
         const sum = sums.get(field);
         if (sum !== undefined) {
-          (result as Record<string, unknown>)[field] = Math.round((sum / count) * 100) / 100;
+          const val = mode === 'sum' ? sum : sum / count;
+          (result as Record<string, unknown>)[field] = Math.round(val * 100) / 100;
         }
       }
       return result;
@@ -141,8 +143,15 @@ export function calculateChartBounds(
   defaultMax = 1000,
   paddingFactor = 0.15,
 ): { maxValue: number; minValue: number } {
-  const rawMax = Math.max(...values, defaultMax);
-  const rawMin = Math.min(...values, 0);
+  let rawMax = defaultMax;
+  let rawMin = 0;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (typeof v === 'number' && !isNaN(v)) {
+      if (v > rawMax) rawMax = v;
+      if (v < rawMin) rawMin = v;
+    }
+  }
   return {
     maxValue: rawMax * (1 + paddingFactor),
     minValue: rawMin < 0 ? rawMin * (1 + paddingFactor) : 0,

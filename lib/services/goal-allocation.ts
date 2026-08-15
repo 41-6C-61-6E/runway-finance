@@ -106,19 +106,6 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
   const accountAllocations: AccountAllocation[] = [];
   let totalAllocated = 0;
   let totalDesired = 0;
-  
-  // Debug logging
-  console.log('[GoalAllocation] Computing allocations for user:', userId);
-  console.log('[GoalAllocation] Total goals with linked accounts:', decryptedGoals.length);
-  console.log('[GoalAllocation] Active goals:', activeGoals.length);
-  console.log('[GoalAllocation] Completed goals:', completedGoals.length);
-  console.log('[GoalAllocation] Accounts with goals:', goalsByAccount.size);
-  for (const [accountId, goals] of goalsByAccount) {
-    console.log('[GoalAllocation] Account', accountId, ':', goals.length, 'goals');
-    for (const g of goals) {
-      console.log('[GoalAllocation]   -', g.name, '| sortOrder:', g.sortOrder, '| percentage:', g.percentage);
-    }
-  }
 
   for (const [accountId, goals] of goalsByAccount) {
     // Fetch account balance
@@ -139,7 +126,7 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
 
     const decryptedBalance = await decryptField(accountData[0].balance, dek);
     const decryptedAccountName = await decryptField(accountData[0].name, dek);
-    const accountBalance = parseFloat(decryptedBalance);
+    const accountBalance = parseFloat(decryptedBalance) || 0;
     
     // Sort goals by sortOrder (ascending) — determined by the reorder UI
     const sortedGoals = [...goals].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
@@ -150,7 +137,9 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
     const activeReserves: number[] = [];
 
     for (const goal of sortedGoals) {
-      const percentage = parseFloat(goal.percentage) || 100;
+      const percentage = goal.percentage !== undefined && goal.percentage !== null && goal.percentage !== ''
+        ? Math.max(0, Math.min(100, parseFloat(goal.percentage) || 0))
+        : 100;
       const reserve = parseFloat(goal.reserve) || 0;
       const goalTarget = parseFloat(goal.targetAmount) || 0;
       activeReserves.push(reserve);
@@ -229,7 +218,7 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
         const additionalRounded = Math.round(additional * 100) / 100;
         
         goal.allocatedAmount = Math.round((goal.allocatedAmount + additionalRounded) * 100) / 100;
-        goal.isUnderfunded = goal.allocatedAmount < goal.desiredAllocation;
+        goal.isUnderfunded = goal.allocatedAmount < goal.desiredAllocation && goal.allocatedAmount < goal.targetAmount;
         remainingReleased = Math.round((remainingReleased - additionalRounded) * 100) / 100;
       }
 
@@ -308,7 +297,7 @@ export async function updateGoalAllocations(userId: string): Promise<void> {
       await db
         .update(financialGoals)
         .set({
-          allocatedAmount: String(goal.allocatedAmount),
+          allocatedAmount: String(isNaN(goal.allocatedAmount) ? 0 : goal.allocatedAmount),
           updatedAt: new Date(),
         })
         .where(and(

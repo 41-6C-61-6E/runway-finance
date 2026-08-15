@@ -31,6 +31,7 @@ export interface ExtraPaymentParams {
 
 export function calculateAmortizationSchedule(params: AmortizationParams): AmortizationRow[] {
   const { originalBalance, annualRate, termMonths, monthlyPayment, startDate } = params;
+  if (!termMonths || termMonths <= 0 || !originalBalance || originalBalance <= 0) return [];
   const schedule: AmortizationRow[] = [];
   const monthlyRate = annualRate / 100 / 12;
   let balance = originalBalance;
@@ -63,10 +64,6 @@ export function calculateAmortizationSchedule(params: AmortizationParams): Amort
     const interest = balance * monthlyRate;
     let principal = effectivePayment - interest;
 
-    if (principal <= 0) {
-      principal = balance;
-    }
-
     if (principal > balance) {
       principal = balance;
     }
@@ -97,6 +94,10 @@ export function calculateAmortizationWithExtraPayments(
 } {
   const standard = calculateAmortizationSchedule(params);
   const { originalBalance, annualRate, termMonths, monthlyPayment, startDate } = params;
+  if (!termMonths || termMonths <= 0 || !originalBalance || originalBalance <= 0) {
+    const defaultSummary = { payoffDate: startDate || '', totalInterest: 0, totalPayments: 0 };
+    return { standard: [], accelerated: [], standardSummary: defaultSummary, acceleratedSummary: { ...defaultSummary, interestSaved: 0, monthsSaved: 0 } };
+  }
   const monthlyRate = annualRate / 100 / 12;
 
   const effectivePayment = monthlyPayment > 0
@@ -145,7 +146,6 @@ export function calculateAmortizationWithExtraPayments(
       }
     }
 
-    if (principal <= 0) principal = balance;
     if (principal > balance) principal = balance;
 
     balance -= principal;

@@ -187,6 +187,7 @@ export interface YearlySimulationResult {
   taxesPaid: number;
   ordinaryTax: number;
   capGainsTax: number;
+  divTax?: number;
   stateTax: number;
   ficaTax: number;
   niitTax?: number;
@@ -348,7 +349,7 @@ export function runRetirementSimulation(
     if (primaryAge === plan.retirementAge && primaryAge < 65) milestonesReached.push(`ACA Premium Tax Credit Subsidy Window Begins (Age ${primaryAge})`);
     if (primaryAge === 50) milestonesReached.push('Catch-up Contribution Limits Unlocked (Age 50)');
     if (primaryAge === 55) milestonesReached.push('Rule of 55 Access & HSA Catch-up Unlocked (Age 55)');
-    if (primaryAge === 59 || primaryAge === 60) milestonesReached.push('Penalty-Free Retirement Access (Age 59½)');
+    if (primaryAge === 60) milestonesReached.push('Penalty-Free Retirement Access (Age 59½)');
     if (primaryAge === 62) milestonesReached.push('Early Social Security Eligibility (Age 62)');
     if (primaryAge === 63) milestonesReached.push('Medicare IRMAA 2-Year MAGI Lookback Window Begins (Age 63)');
     if (primaryAge === 65) milestonesReached.push('Medicare Eligibility & ACA Transition (Age 65)');
@@ -515,6 +516,38 @@ export function runRetirementSimulation(
       return accountsState[tradId];
     };
 
+    // Helper to get statutory contribution cap per owner & account type
+    const getOwnerCap = (owner: string, accType: string) => {
+      const ownerAge = owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
+      const ownerCatchUp50 = ownerAge >= 50;
+      const ownerCatchUp55 = ownerAge >= 55;
+      const t = (accType || '').toLowerCase();
+
+      if (t.includes('401k') || t.includes('403b') || t.includes('sep') || t.includes('simple')) {
+        const base = rules.contributionLimits?.k401 ?? 23500;
+        const catchup = ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0;
+        return base + catchup;
+      }
+      if (t === 'hsa') {
+        const hsaBase = (isMfj || owner === 'joint')
+          ? (rules.contributionLimits?.hsaFamily ?? 8550)
+          : (rules.contributionLimits?.hsaSingle ?? 4300);
+        const catchup = ownerCatchUp55 ? (rules.contributionLimits?.hsaCatchUp ?? 1000) : 0;
+        return hsaBase + catchup;
+      }
+      if (t.includes('ira')) {
+        const base = rules.contributionLimits?.ira ?? 7000;
+        const catchup = ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0;
+        return base + catchup;
+      }
+      return Infinity;
+    };
+
+    // Track cumulative annual contributions per owner across tax-advantaged categories
+    const owner401kContribs: Record<string, number> = { primary: 0, spouse: 0, joint: 0 };
+    const ownerIraContribs: Record<string, number> = { primary: 0, spouse: 0, joint: 0 };
+    let totalHsaContrib = 0;
+
     // 3. Pre-Tax Savings Contributions (Traditional 401k, Traditional IRA, HSA)
     let surplusSaved = 0;
     let totalPreTaxContrib = 0;
@@ -547,38 +580,52 @@ export function runRetirementSimulation(
           const isPreTax = cat === 'taxDeferred' || targetAcc.type === 'hsa';
           if (!isPreTax) continue;
 
-          const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
-          const ownerCatchUp50 = ownerAge >= 50;
-          const ownerCatchUp55 = ownerAge >= 55;
+          const owner = targetAcc.owner || 'primary';
           const salaryBase = getAccountSalaryBase(origAcc);
+          const isSplit = origAcc.rothPercentage !== undefined && origAcc.rothPercentage > 0 && origAcc.rothPercentage < 100;
+          const tradShare = isSplit ? (100 - origAcc.rothPercentage!) / 100 : 1;
 
           let requestedAlloc = 0;
           const contribVal = Number(origAcc.contributionValue || 0);
           if (origAcc.contributionMode === 'percentage' && contribVal > 0) {
             const pct = contribVal <= 1 ? contribVal * 100 : contribVal;
-            requestedAlloc = salaryBase * (pct / 100);
+            requestedAlloc = salaryBase * (pct / 100) * tradShare;
           } else if (origAcc.contributionMode === 'fixed_amount' && contribVal > 0) {
-            requestedAlloc = contribVal * compoundInflation;
+            requestedAlloc = contribVal * compoundInflation * tradShare;
           } else if (origAcc.contributionMode === 'maximize') {
-            let maxLimit = (rules.contributionLimits?.ira ?? 7000) + (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0);
             if (targetAcc.type.includes('401k')) {
-              maxLimit = (rules.contributionLimits?.k401 ?? 23000) + (ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0);
+              const remCap = Math.max(0, getOwnerCap(owner, targetAcc.type) - (owner401kContribs[owner] || 0));
+              requestedAlloc = remCap * tradShare;
             } else if (targetAcc.type === 'hsa') {
-              const hsaBase = (isMfj || targetAcc.owner === 'joint') ? (rules.contributionLimits?.hsaFamily ?? 8300) : (rules.contributionLimits?.hsaSingle ?? 4150);
-              maxLimit = hsaBase + (ownerCatchUp55 ? (rules.contributionLimits?.hsaCatchUp ?? 1000) : 0);
+              const remCap = Math.max(0, getOwnerCap(owner, 'hsa') - totalHsaContrib);
+              requestedAlloc = remCap;
+            } else {
+              const remCap = Math.max(0, getOwnerCap(owner, targetAcc.type) - (ownerIraContribs[owner] || 0));
+              requestedAlloc = remCap * tradShare;
             }
-            if (isMfj && !targetAcc.type.includes('401k') && targetAcc.type !== 'hsa') {
-              maxLimit *= 2;
-            }
-            requestedAlloc = maxLimit;
+          }
+
+          // Enforce per-owner category limits
+          let capLimit = Infinity;
+          if (targetAcc.type.includes('401k')) {
+            capLimit = Math.max(0, getOwnerCap(owner, targetAcc.type) - (owner401kContribs[owner] || 0));
+          } else if (targetAcc.type === 'hsa') {
+            capLimit = Math.max(0, getOwnerCap(owner, 'hsa') - totalHsaContrib);
+          } else if (targetAcc.type.includes('ira')) {
+            capLimit = Math.max(0, getOwnerCap(owner, targetAcc.type) - (ownerIraContribs[owner] || 0));
           }
 
           const maxSalaryAvail = Math.max(0, salaryBase - totalPreTaxContrib);
-          const alloc = Math.min(maxSalaryAvail, requestedAlloc);
+          const alloc = Math.min(maxSalaryAvail, Math.min(capLimit, requestedAlloc));
           if (alloc > 0) {
             targetAcc.balance += alloc;
             totalPreTaxContrib += alloc;
-            if (targetAcc.type === 'hsa') hsaPreTaxContrib += alloc;
+            if (targetAcc.type.includes('401k')) owner401kContribs[owner] = (owner401kContribs[owner] || 0) + alloc;
+            else if (targetAcc.type.includes('ira')) ownerIraContribs[owner] = (ownerIraContribs[owner] || 0) + alloc;
+            else if (targetAcc.type === 'hsa') {
+              hsaPreTaxContrib += alloc;
+              totalHsaContrib += alloc;
+            }
             surplusSaved += alloc;
 
             // Company match (pre-tax employer match goes to Traditional 401(k))
@@ -609,9 +656,7 @@ export function runRetirementSimulation(
           const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
           if (!isPreTax) continue;
 
-          const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
-          const ownerCatchUp50 = ownerAge >= 50;
-          const ownerCatchUp55 = ownerAge >= 55;
+          const owner = targetAcc.owner || 'primary';
           const salaryBase = getFlowSalaryBase(flow, targetAcc);
 
           let requestedAlloc = 0;
@@ -624,25 +669,35 @@ export function runRetirementSimulation(
             const targetBal = (flow.ruleValue || 0) * compoundInflation;
             requestedAlloc = Math.max(0, targetBal - targetAcc.balance);
           } else if (flow.ruleType === 'maximize') {
-            let maxLimit = (rules.contributionLimits?.ira ?? 7000) + (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0);
             if (targetAcc.type.includes('401k')) {
-              maxLimit = (rules.contributionLimits?.k401 ?? 23000) + (ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0);
+              requestedAlloc = Math.max(0, getOwnerCap(owner, targetAcc.type) - (owner401kContribs[owner] || 0));
             } else if (targetAcc.type === 'hsa') {
-              const hsaBase = (isMfj || targetAcc.owner === 'joint') ? (rules.contributionLimits?.hsaFamily ?? 8300) : (rules.contributionLimits?.hsaSingle ?? 4150);
-              maxLimit = hsaBase + (ownerCatchUp55 ? (rules.contributionLimits?.hsaCatchUp ?? 1000) : 0);
+              requestedAlloc = Math.max(0, getOwnerCap(owner, 'hsa') - totalHsaContrib);
+            } else {
+              requestedAlloc = Math.max(0, getOwnerCap(owner, targetAcc.type) - (ownerIraContribs[owner] || 0));
             }
-            if (isMfj && !targetAcc.type.includes('401k') && targetAcc.type !== 'hsa') {
-              maxLimit *= 2;
-            }
-            requestedAlloc = maxLimit;
+          }
+
+          let capLimit = Infinity;
+          if (targetAcc.type.includes('401k')) {
+            capLimit = Math.max(0, getOwnerCap(owner, targetAcc.type) - (owner401kContribs[owner] || 0));
+          } else if (targetAcc.type === 'hsa') {
+            capLimit = Math.max(0, getOwnerCap(owner, 'hsa') - totalHsaContrib);
+          } else if (targetAcc.type.includes('ira')) {
+            capLimit = Math.max(0, getOwnerCap(owner, targetAcc.type) - (ownerIraContribs[owner] || 0));
           }
 
           const maxSalaryAvail = Math.max(0, salaryBase - totalPreTaxContrib);
-          const alloc = Math.min(maxSalaryAvail, requestedAlloc);
+          const alloc = Math.min(maxSalaryAvail, Math.min(capLimit, requestedAlloc));
           if (alloc > 0) {
             targetAcc.balance += alloc;
             totalPreTaxContrib += alloc;
-            if (targetAcc.type === 'hsa') hsaPreTaxContrib += alloc;
+            if (targetAcc.type.includes('401k')) owner401kContribs[owner] = (owner401kContribs[owner] || 0) + alloc;
+            else if (targetAcc.type.includes('ira')) ownerIraContribs[owner] = (ownerIraContribs[owner] || 0) + alloc;
+            else if (targetAcc.type === 'hsa') {
+              hsaPreTaxContrib += alloc;
+              totalHsaContrib += alloc;
+            }
             surplusSaved += alloc;
 
             if (flow.matchRate != null && flow.matchLimit != null) {
@@ -837,10 +892,12 @@ export function runRetirementSimulation(
       }
 
       // Track capital gains for taxable account withdrawals
-      if ((acc.type === 'taxable' || acc.type === 'crypto') && acc.balance > 0) {
-        const gainRatio = Math.max(0, (acc.balance - acc.costBasis) / acc.balance);
+      const cat = getAccountCategory(acc.type);
+      if (cat === 'taxable' && acc.balance > 0) {
+        const costBasis = Math.max(0, acc.costBasis || 0);
+        const gainRatio = Math.max(0, (acc.balance - costBasis) / acc.balance);
         totalTaxableGains += actual * gainRatio;
-        acc.costBasis = Math.max(0, acc.costBasis * (1 - actual / acc.balance));
+        acc.costBasis = Math.max(0, costBasis * (1 - actual / acc.balance));
       }
 
       acc.balance -= actual;
@@ -851,10 +908,10 @@ export function runRetirementSimulation(
         amount: actual,
       });
       if (acc.type === 'cash') drawdownsByType.cash += actual;
-      else if (acc.type === 'taxable' || acc.type === 'crypto') drawdownsByType.taxable += actual;
-      else if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') drawdownsByType.traditional += actual;
-      else if (acc.type === 'roth_ira' || acc.type === 'roth_401k') drawdownsByType.roth += actual;
-      else if (acc.type === 'hsa') drawdownsByType.hsa += actual;
+      else if (cat === 'taxable') drawdownsByType.taxable += actual;
+      else if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k' || cat === 'taxDeferred') drawdownsByType.traditional += actual;
+      else if (acc.type === 'roth_ira' || acc.type === 'roth_401k' || cat === 'taxFree') drawdownsByType.roth += actual;
+      else if (acc.type === 'hsa' || cat === 'hsa') drawdownsByType.hsa += actual;
       return actual;
     };
 
@@ -884,49 +941,64 @@ export function runRetirementSimulation(
             const isPreTax = cat === 'taxDeferred' || targetAcc.type === 'hsa';
             if (isPreTax) continue; // Already handled in Phase 1
 
+            const owner = targetAcc.owner || 'primary';
             const salaryBase = getAccountSalaryBase(origAcc);
-            let limit = surplus;
+            const isSplit = origAcc.rothPercentage !== undefined && origAcc.rothPercentage > 0 && origAcc.rothPercentage < 100;
+            const rothShare = isSplit ? origAcc.rothPercentage! / 100 : 1;
+
+            let requestedAlloc = 0;
             const contribVal = Number(origAcc.contributionValue || 0);
             if (origAcc.contributionMode === 'percentage' && contribVal > 0) {
               const pct = contribVal <= 1 ? contribVal * 100 : contribVal;
-              limit = salaryBase * (pct / 100);
+              requestedAlloc = salaryBase * (pct / 100) * rothShare;
             } else if (origAcc.contributionMode === 'fixed_amount' && contribVal > 0) {
-              limit = contribVal * compoundInflation;
+              requestedAlloc = contribVal * compoundInflation * rothShare;
             } else if (origAcc.contributionMode === 'maximize') {
-              const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
-              const ownerCatchUp50 = ownerAge >= 50;
-              let maxLimit = (rules.contributionLimits?.ira ?? 7000) + (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0);
-              if (targetAcc.type.includes('401k')) maxLimit = (rules.contributionLimits?.k401 ?? 23000) + (ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0);
-              if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
-              limit = Math.min(surplus, maxLimit);
+              if (targetAcc.type.includes('401k')) {
+                requestedAlloc = Math.max(0, getOwnerCap(owner, targetAcc.type) - (owner401kContribs[owner] || 0));
+              } else if (targetAcc.type.includes('ira')) {
+                requestedAlloc = Math.max(0, getOwnerCap(owner, targetAcc.type) - (ownerIraContribs[owner] || 0));
+              } else {
+                requestedAlloc = surplus;
+              }
             } else {
               continue;
             }
 
-            const alloc = Math.min(surplus, limit);
+            let capLimit = surplus;
+            if (targetAcc.type.includes('401k')) {
+              capLimit = Math.min(surplus, Math.max(0, getOwnerCap(owner, targetAcc.type) - (owner401kContribs[owner] || 0)));
+            } else if (targetAcc.type.includes('ira')) {
+              capLimit = Math.min(surplus, Math.max(0, getOwnerCap(owner, targetAcc.type) - (ownerIraContribs[owner] || 0)));
+            }
+
+            const alloc = Math.min(surplus, Math.min(capLimit, requestedAlloc));
             if (alloc > 0) {
               targetAcc.balance += alloc;
+              if (targetAcc.type.includes('401k')) owner401kContribs[owner] = (owner401kContribs[owner] || 0) + alloc;
+              else if (targetAcc.type.includes('ira')) ownerIraContribs[owner] = (ownerIraContribs[owner] || 0) + alloc;
+
               if (cat === 'taxable' || cat === 'taxFree') {
                 targetAcc.costBasis = (targetAcc.costBasis || 0) + alloc;
               }
               surplus -= alloc;
               surplusSaved += alloc;
 
-            if (origAcc.companyMatchRate != null && origAcc.companyMatchLimit != null) {
-              const matchLimitPct = origAcc.companyMatchLimit <= 1 ? origAcc.companyMatchLimit * 100 : origAcc.companyMatchLimit;
-              const matchableContrib = Math.min(alloc, salaryBase * (matchLimitPct / 100));
-              const matchAmount = matchableContrib * origAcc.companyMatchRate;
-              if (matchAmount > 0) {
-                const matchTarget = getMatchTarget(origAcc, targetAcc);
-                matchTarget.balance += matchAmount;
-                const targetCat = getAccountCategory(matchTarget.type);
-                if (targetCat === 'taxable' || targetCat === 'taxFree') {
-                  matchTarget.costBasis = (matchTarget.costBasis || 0) + matchAmount;
+              if (origAcc.companyMatchRate != null && origAcc.companyMatchLimit != null) {
+                const matchLimitPct = origAcc.companyMatchLimit <= 1 ? origAcc.companyMatchLimit * 100 : origAcc.companyMatchLimit;
+                const matchableContrib = Math.min(alloc, salaryBase * (matchLimitPct / 100));
+                const matchAmount = matchableContrib * origAcc.companyMatchRate;
+                if (matchAmount > 0) {
+                  const matchTarget = getMatchTarget(origAcc, targetAcc);
+                  matchTarget.balance += matchAmount;
+                  const targetCat = getAccountCategory(matchTarget.type);
+                  if (targetCat === 'taxable' || targetCat === 'taxFree') {
+                    matchTarget.costBasis = (matchTarget.costBasis || 0) + matchAmount;
+                  }
+                  surplusSaved += matchAmount;
                 }
-                surplusSaved += matchAmount;
               }
             }
-          }
           }
 
           // Sweep remaining surplus to designated surplus destination account
@@ -964,29 +1036,41 @@ export function runRetirementSimulation(
             const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
             if (isPreTax) continue;
 
+            const owner = targetAcc.owner || 'primary';
             const salaryBase = getFlowSalaryBase(flow, targetAcc);
-            let limit = surplus;
+            let requestedAlloc = 0;
             if (flow.ruleType === 'percentage' && flow.ruleValue) {
-              limit = salaryBase * (flow.ruleValue / 100);
+              requestedAlloc = salaryBase * (flow.ruleValue / 100);
             } else if (flow.ruleType === 'fixed_amount' && flow.ruleValue) {
-              limit = flow.ruleValue * compoundInflation;
+              requestedAlloc = flow.ruleValue * compoundInflation;
             } else if (flow.ruleType === 'save_maintain') {
               const targetBal = (flow.ruleValue || 0) * compoundInflation;
-              limit = Math.max(0, targetBal - targetAcc.balance);
+              requestedAlloc = Math.max(0, targetBal - targetAcc.balance);
             } else if (flow.ruleType === 'maximize') {
-              const ownerAge = targetAcc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
-              const ownerCatchUp50 = ownerAge >= 50;
-              let maxLimit = (rules.contributionLimits?.ira ?? 7000) + (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0);
-              if (targetAcc.type.includes('401k')) maxLimit = (rules.contributionLimits?.k401 ?? 23000) + (ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0);
-              if (isMfj && !targetAcc.type.includes('401k')) maxLimit *= 2;
-              limit = Math.min(surplus, maxLimit);
+              if (targetAcc.type.includes('401k')) {
+                requestedAlloc = Math.max(0, getOwnerCap(owner, targetAcc.type) - (owner401kContribs[owner] || 0));
+              } else if (targetAcc.type.includes('ira')) {
+                requestedAlloc = Math.max(0, getOwnerCap(owner, targetAcc.type) - (ownerIraContribs[owner] || 0));
+              } else {
+                requestedAlloc = surplus;
+              }
             } else if (flow.ruleType === 'save_leftover') {
-              limit = surplus;
+              requestedAlloc = surplus;
             }
 
-            const alloc = Math.min(surplus, limit);
+            let capLimit = surplus;
+            if (targetAcc.type.includes('401k')) {
+              capLimit = Math.min(surplus, Math.max(0, getOwnerCap(owner, targetAcc.type) - (owner401kContribs[owner] || 0)));
+            } else if (targetAcc.type.includes('ira')) {
+              capLimit = Math.min(surplus, Math.max(0, getOwnerCap(owner, targetAcc.type) - (ownerIraContribs[owner] || 0)));
+            }
+
+            const alloc = Math.min(surplus, Math.min(capLimit, requestedAlloc));
             if (alloc > 0) {
               targetAcc.balance += alloc;
+              if (targetAcc.type.includes('401k')) owner401kContribs[owner] = (owner401kContribs[owner] || 0) + alloc;
+              else if (targetAcc.type.includes('ira')) ownerIraContribs[owner] = (ownerIraContribs[owner] || 0) + alloc;
+
               const targetCat = getAccountCategory(targetAcc.type);
               if (targetCat === 'taxable' || targetCat === 'taxFree') {
                 targetAcc.costBasis = (targetAcc.costBasis || 0) + alloc;
@@ -1015,7 +1099,7 @@ export function runRetirementSimulation(
           }
         }
       }
-    } else if (netCashFlow < 0 && !isAccumulation) {
+    } else if (netCashFlow < 0) {
       let deficit = Math.abs(netCashFlow);
       deficitWithdrawn = deficit;
       discretionaryDeficitWithdrawn = deficit;
@@ -1067,7 +1151,10 @@ export function runRetirementSimulation(
 
         if (remDeficit > 0) shortfall = remDeficit;
       } else if (method === 'tax_optimized') {
-        const target12Limit = 48475 * (isMfj ? 2 : 1) * compoundInflation;
+        const target12Bracket = rules.ordinaryTaxBrackets?.find((b: any) => Math.abs(b.rate - 0.12) < 0.01)
+          || rules.ordinaryTaxBrackets?.[1]
+          || { threshold: 48475 };
+        const target12Limit = target12Bracket.threshold * (isMfj ? 2 : 1) * compoundInflation;
         const currentTaxable = taxableOrdinaryIncome;
         const bracketRoom = Math.max(0, target12Limit - currentTaxable);
 
@@ -1103,7 +1190,11 @@ export function runRetirementSimulation(
         const accountsList = Object.values(accountsState);
         const getDrawdownOrder = () => {
           if (method === 'custom_order' && plan.customWithdrawalOrder?.length) {
-            return plan.customWithdrawalOrder.map((id) => accountsState[id]).filter(Boolean);
+            return plan.customWithdrawalOrder.flatMap((id) => [
+              accountsState[id],
+              accountsState[`${id}_trad`],
+              accountsState[`${id}_roth`],
+            ]).filter((a): a is EngineAccount => Boolean(a));
           }
           const orderMap: Record<string, number> =
             method === 'tax_deferred_first'
@@ -1144,60 +1235,78 @@ export function runRetirementSimulation(
 
     // 5a. RMD Enforcement (Required Minimum Distributions — SECURE Act 2.0)
     const isRetired = primaryAge >= plan.retirementAge;
-    if (primaryAge >= rmdStartAge) {
-      const tradAccsForRmd = Object.values(accountsState).filter(
-        (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional')) && a.balance > 0
-      );
-      const totalTradBalance = tradAccsForRmd.reduce((s, a) => s + a.balance, 0);
-      if (totalTradBalance > 0) {
-        const divisor = IRS_UNIFORM_LIFETIME_TABLE[primaryAge] || IRS_UNIFORM_LIFETIME_TABLE[120] || 2.0;
-        const totalRmdRequired = totalTradBalance / divisor;
-        const alreadyWithdrawn = drawdownsByType.traditional;
-        const additionalRmd = Math.max(0, totalRmdRequired - alreadyWithdrawn);
+    const rmdOwners: Array<{ owner: string; age: number; rmdAge: number }> = [
+      { owner: 'primary', age: primaryAge, rmdAge: rmdStartAge },
+    ];
+    if (isMfj && spouseAge !== undefined) {
+      const spouseBirthYear = plan.spouseBirthYear || (simYear - spouseAge);
+      const spouseRmdStartAge = (spouseBirthYear >= 1960) ? 75 : (rules.secureActRules?.rmdAge || 73);
+      rmdOwners.push({ owner: 'spouse', age: spouseAge, rmdAge: spouseRmdStartAge });
+    }
 
-        if (additionalRmd > 0) {
-          rmdMandatoryDrawdown = additionalRmd;
-          let remRmd = additionalRmd;
-          for (const acc of tradAccsForRmd) {
-            if (remRmd <= 0) break;
-            const accShare = (acc.balance / totalTradBalance) * additionalRmd;
-            const actual = Math.min(acc.balance, Math.min(remRmd, accShare));
-            if (actual > 0) {
-              acc.balance -= actual;
-              remRmd -= actual;
-              drawdownsByType.traditional += actual;
-              accountDrawdowns.push({
-                accountId: acc.id,
-                accountName: acc.name,
-                accountType: acc.type,
-                amount: actual,
-              });
+    for (const o of rmdOwners) {
+      if (o.age >= o.rmdAge) {
+        const tradAccsForOwner = Object.values(accountsState).filter(
+          (a) =>
+            (a.owner === o.owner || (!a.owner && o.owner === 'primary')) &&
+            (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional') || getAccountCategory(a.type) === 'taxDeferred') &&
+            a.balance > 0
+        );
+        const currentTradBalance = tradAccsForOwner.reduce((s, a) => s + a.balance, 0);
+        const ownerAlreadyWithdrawn = accountDrawdowns
+          .filter((d) => tradAccsForOwner.some((a) => a.id === d.accountId))
+          .reduce((sum, d) => sum + d.amount, 0);
+        const startOfYearTradBalance = currentTradBalance + ownerAlreadyWithdrawn;
 
-              // Preserve net RMD proceeds in Cash / Taxable Brokerage account so funds stay in net worth
-              let destAcc = Object.values(accountsState).find((a) => a.type === 'cash')
-                || Object.values(accountsState).find((a) => a.type === 'taxable' || a.type === 'brokerage' || a.type === 'crypto');
+        if (startOfYearTradBalance > 0) {
+          const divisor = IRS_UNIFORM_LIFETIME_TABLE[o.age] || IRS_UNIFORM_LIFETIME_TABLE[120] || 2.0;
+          const totalRmdRequired = startOfYearTradBalance / divisor;
+          const additionalRmd = Math.max(0, totalRmdRequired - ownerAlreadyWithdrawn);
+          rmdMandatoryDrawdown += totalRmdRequired;
 
-              if (!destAcc) {
-                const newCashId = 'rmd_cash_sweep_target';
-                accountsState[newCashId] = {
-                  id: newCashId,
-                  name: 'Cash / Taxable Savings',
-                  type: 'cash',
-                  owner: 'primary',
-                  balance: 0,
-                  costBasis: 0,
-                  expectedGrowthRate: 2.0,
-                  dividendYield: 0,
-                  reinvestDividends: true,
-                  qualifiedDividendRatio: 1.0,
-                };
-                destAcc = accountsState[newCashId];
-              }
+          if (additionalRmd > 0 && currentTradBalance > 0) {
+            let remRmd = additionalRmd;
+            for (const acc of tradAccsForOwner) {
+              if (remRmd <= 0) break;
+              const accShare = (acc.balance / currentTradBalance) * additionalRmd;
+              const actual = Math.min(acc.balance, Math.min(remRmd, accShare));
+              if (actual > 0) {
+                acc.balance -= actual;
+                remRmd -= actual;
+                drawdownsByType.traditional += actual;
+                accountDrawdowns.push({
+                  accountId: acc.id,
+                  accountName: acc.name,
+                  accountType: acc.type,
+                  amount: actual,
+                });
 
-              destAcc.balance += actual;
-              const destCat = getAccountCategory(destAcc.type);
-              if (destCat === 'taxable' || destCat === 'taxFree') {
-                destAcc.costBasis = (destAcc.costBasis || 0) + actual;
+                // Preserve net RMD proceeds in Cash / Taxable Brokerage account
+                let destAcc = Object.values(accountsState).find((a) => (a.owner === o.owner || a.owner === 'joint' || (!a.owner && o.owner === 'primary')) && a.type === 'cash')
+                  || Object.values(accountsState).find((a) => (a.owner === o.owner || a.owner === 'joint' || (!a.owner && o.owner === 'primary')) && (getAccountCategory(a.type) === 'taxable' || a.type === 'cash'));
+
+                if (!destAcc) {
+                  const newCashId = `rmd_cash_sweep_target_${o.owner}`;
+                  accountsState[newCashId] = {
+                    id: newCashId,
+                    name: `${o.owner === 'spouse' ? (plan.spouseName || 'Spouse') : 'Primary'} Cash / Taxable Savings`,
+                    type: 'cash',
+                    owner: o.owner,
+                    balance: 0,
+                    costBasis: 0,
+                    expectedGrowthRate: 2.0,
+                    dividendYield: 0,
+                    reinvestDividends: true,
+                    qualifiedDividendRatio: 1.0,
+                  };
+                  destAcc = accountsState[newCashId];
+                }
+
+                destAcc.balance += actual;
+                const destCat = getAccountCategory(destAcc.type);
+                if (destCat === 'taxable' || destCat === 'taxFree') {
+                  destAcc.costBasis = (destAcc.costBasis || 0) + actual;
+                }
               }
             }
           }
@@ -1215,8 +1324,9 @@ export function runRetirementSimulation(
         const irmaaList = rules.irmaaThresholds || [];
         if (irmaaList.length > 1) {
           const tier1 = irmaaList[1];
-          const irmaaLimit = isMfj ? tier1.magiJoint : tier1.magiSingle;
-          const preConvMagi = salaryIncome + pensionIncome + taxableSs + otherIncome + drawdownsByType.traditional + totalTaxableGains;
+          const baseIrmaaLimit = isMfj ? tier1.magiJoint : tier1.magiSingle;
+          const irmaaLimit = baseIrmaaLimit * compoundInflation;
+          const preConvMagi = salaryIncome + pensionIncome + (totalSsIncome * 0.5) + otherIncome + drawdownsByType.traditional + totalTaxableGains;
           convHeadroom = Math.max(0, irmaaLimit - preConvMagi - 1000);
         }
       } else {
@@ -1236,11 +1346,12 @@ export function runRetirementSimulation(
       }
 
       if (ceilingSetting !== 'irmaa_tier1' && plan.settings.avoidIrmaaCliffs && primaryAge >= 63) {
-        const preConvMagi = salaryIncome + pensionIncome + taxableSs + otherIncome + drawdownsByType.traditional + totalTaxableGains;
+        const preConvMagi = salaryIncome + pensionIncome + (totalSsIncome * 0.5) + otherIncome + drawdownsByType.traditional + totalTaxableGains;
         const irmaaGuardList = rules.irmaaThresholds || [];
         for (let idx = 1; idx < irmaaGuardList.length; idx++) {
           const tierObj = irmaaGuardList[idx];
-          const irmaaLimit = isMfj ? tierObj.magiJoint : tierObj.magiSingle;
+          const baseIrmaaLimit = isMfj ? tierObj.magiJoint : tierObj.magiSingle;
+          const irmaaLimit = baseIrmaaLimit * compoundInflation;
           if (irmaaLimit > 0 && preConvMagi < irmaaLimit) {
             convHeadroom = Math.min(convHeadroom, Math.max(0, irmaaLimit - preConvMagi - 1000));
             break;
@@ -1251,37 +1362,50 @@ export function runRetirementSimulation(
       rothBracketHeadroom = convHeadroom;
 
       if (convHeadroom > 500) {
-        const tradAccs = Object.values(accountsState).filter(
-          (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional')) && a.balance > 0
-        );
-        let rothAcc = Object.values(accountsState).find((a) => a.type === 'roth_ira' || a.type === 'roth_401k' || a.type.includes('roth'));
+        const ownersToConvert = ['primary'];
+        if (isMfj && spouseAge !== undefined) ownersToConvert.push('spouse');
 
-        if (!rothAcc && tradAccs.length > 0) {
-          const newRothId = 'roth_conversion_target_acc';
-          accountsState[newRothId] = {
-            id: newRothId,
-            name: 'Roth IRA (Conversion Target)',
-            type: 'roth_ira',
-            owner: 'primary',
-            balance: 0,
-            costBasis: 0,
-            expectedGrowthRate: 6.0,
-            dividendYield: 2.5,
-            reinvestDividends: true,
-            qualifiedDividendRatio: 1.0,
-          };
-          rothAcc = accountsState[newRothId];
-        }
+        const headroomPerOwner = convHeadroom / ownersToConvert.length;
+        for (const owner of ownersToConvert) {
+          const tradAccs = Object.values(accountsState).filter(
+            (a) => (a.owner === owner || (!a.owner && owner === 'primary')) &&
+              (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional')) &&
+              a.balance > 0
+          );
+          if (tradAccs.length === 0) continue;
 
-        if (tradAccs.length > 0 && rothAcc) {
-          let remRoom = convHeadroom;
-          for (const tradAcc of tradAccs) {
-            if (remRoom <= 0) break;
-            const convAmt = Math.min(tradAcc.balance, remRoom);
-            tradAcc.balance -= convAmt;
-            rothAcc.balance += convAmt;
-            remRoom -= convAmt;
-            rothConversionAmount += convAmt;
+          let rothAcc = Object.values(accountsState).find(
+            (a) => (a.owner === owner || (!a.owner && owner === 'primary')) &&
+              (a.type === 'roth_ira' || a.type === 'roth_401k' || a.type.includes('roth'))
+          );
+
+          if (!rothAcc && tradAccs.length > 0) {
+            const newRothId = `roth_conversion_target_acc_${owner}`;
+            accountsState[newRothId] = {
+              id: newRothId,
+              name: `${owner === 'spouse' ? (plan.spouseName || 'Spouse') : 'Primary'} Roth IRA (Conversion Target)`,
+              type: 'roth_ira',
+              owner: owner,
+              balance: 0,
+              costBasis: 0,
+              expectedGrowthRate: 6.0,
+              dividendYield: 2.5,
+              reinvestDividends: true,
+              qualifiedDividendRatio: 1.0,
+            };
+            rothAcc = accountsState[newRothId];
+          }
+
+          if (tradAccs.length > 0 && rothAcc) {
+            let remRoom = headroomPerOwner;
+            for (const tradAcc of tradAccs) {
+              if (remRoom <= 0) break;
+              const convAmt = Math.min(tradAcc.balance, remRoom);
+              tradAcc.balance -= convAmt;
+              rothAcc.balance += convAmt;
+              remRoom -= convAmt;
+              rothConversionAmount += convAmt;
+            }
           }
         }
       }
@@ -1289,8 +1413,8 @@ export function runRetirementSimulation(
 
     // 5c. Tax Reconciliation — ordinary tax, capital gains tax, and 3.8% NIIT tax
     let finalTaxableOrdinary = taxableOrdinaryIncome;
-    const post65HsaOrdinary = primaryAge >= 65 ? drawdownsByType.hsa : 0;
-    const additionalOrdinaryIncome = drawdownsByType.traditional + rothConversionAmount + totalNonQualifiedRothEarnings + post65HsaOrdinary;
+    const hsaOrdinaryIncome = drawdownsByType.hsa;
+    const additionalOrdinaryIncome = drawdownsByType.traditional + rothConversionAmount + totalNonQualifiedRothEarnings + hsaOrdinaryIncome;
     if (additionalOrdinaryIncome > 0 || totalTaxableGains > 0) {
       // Recalculate provisional income & taxable Social Security incorporating traditional drawdowns & conversions (IRS Pub 915)
       const updatedProvisional = taxableSalary + pensionIncome + otherIncome + additionalOrdinaryIncome + totalTaxableGains + totalSsIncome * 0.5;
@@ -1420,6 +1544,7 @@ export function runRetirementSimulation(
     let taxFreeTotal = 0;
     let hsaTotal = 0;
     let cashTotal = 0;
+    let totalDivTax = 0;
     const accountBalances: YearlyAccountBalance[] = [];
 
     for (const accId in accountsState) {
@@ -1437,7 +1562,7 @@ export function runRetirementSimulation(
           divYield = acc.dividendYield / 100;
         }
 
-        const isTaxableType = acc.type === 'taxable' || acc.type === 'crypto' || acc.type === 'brokerage' || acc.type === 'investment';
+        const isTaxableType = acc.type === 'taxable' || acc.type === 'crypto' || acc.type === 'brokerage' || acc.type === 'investment' || getAccountCategory(acc.type) === 'taxable';
 
         if (isTaxableType && divYield > 0) {
           const divAmount = acc.balance * divYield;
@@ -1478,10 +1603,11 @@ export function runRetirementSimulation(
           }
 
           const divTax = qualDivTax + ordDivTax;
+          totalDivTax += divTax;
 
           if (acc.reinvestDividends) {
             acc.balance = acc.balance * (1 + growth) + Math.max(0, divAmount - divTax);
-            acc.costBasis += Math.max(0, divAmount - divTax);
+            acc.costBasis = (acc.costBasis || 0) + Math.max(0, divAmount - divTax);
           } else {
             acc.balance = acc.balance * (1 + growth);
             const netDiv = Math.max(0, divAmount - divTax);
@@ -1527,9 +1653,15 @@ export function runRetirementSimulation(
     }
 
     // 0% Long-Term Capital Gains tax headroom and NIIT headroom
-    const ltcg0PctCeiling = (rules.capitalGainsBrackets?.[1]?.threshold ?? 48350) * bracketMult * compoundInflation;
+    const ltcg15Bracket = rules.capitalGainsBrackets?.find((b: any) => b.rate === 0.15)
+      || rules.capitalGainsBrackets?.[1]
+      || { threshold: 50600 };
+    const ltcg0PctCeiling = ltcg15Bracket.threshold * bracketMult * compoundInflation;
     const capitalGains0PctRoom = Math.max(0, ltcg0PctCeiling - finalTaxableOrdinary);
     const niitHeadroom = Math.max(0, niitThresh - magi);
+
+    taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax + totalDivTax;
+    effectiveTaxRate = totalTaxBase > 0 ? ((taxesPaid + earlyPenaltyTax) / totalTaxBase) * 100 : 0;
 
     yearlyResults.push({
       year: simYear,
@@ -1554,6 +1686,7 @@ export function runRetirementSimulation(
       taxesPaid,
       ordinaryTax,
       capGainsTax,
+      divTax: totalDivTax,
       stateTax,
       ficaTax,
       niitTax,
@@ -1603,7 +1736,7 @@ export function runRetirementSimulation(
   return {
     planId: plan.id,
     yearlyResults,
-    success: endingNetWorth > 0,
+    success: endingNetWorth > 0 && depletionAge === undefined,
     endingNetWorth,
     netLegacy,
     depletionAge,
