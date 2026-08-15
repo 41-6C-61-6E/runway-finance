@@ -65,7 +65,11 @@ export function runMonteCarloSimulation(
     // Generate yearly return sequence for this trial
     const yearlyMarketData: Array<{ growth: number; dividend: number }> = [];
     for (let y = 0; y < totalYears; y++) {
-      if (model === 'normal_distribution') {
+      if (model === 'constant') {
+        const divYield = Math.min(0.015, Math.max(0, meanReturn));
+        const priceGrowth = meanReturn - divYield;
+        yearlyMarketData.push({ growth: priceGrowth, dividend: divYield });
+      } else if (model === 'normal_distribution') {
         const u1 = Math.random() || 0.0001;
         const u2 = Math.random() || 0.0001;
         const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);

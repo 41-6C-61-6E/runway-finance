@@ -6,6 +6,21 @@ import { logger } from '@/lib/logger';
 
 export type SystemTaxRulesType = typeof DEFAULT_2026_RULES;
 
+function deepMergeRules<T extends Record<string, any>>(defaults: T, overrides: Partial<T>): T {
+  const result: any = { ...defaults };
+  for (const key of Object.keys(overrides)) {
+    const val = (overrides as any)[key];
+    if (val !== undefined && val !== null) {
+      if (typeof val === 'object' && !Array.isArray(val) && typeof result[key] === 'object' && !Array.isArray(result[key])) {
+        result[key] = deepMergeRules(result[key], val);
+      } else {
+        result[key] = val;
+      }
+    }
+  }
+  return result;
+}
+
 export async function getSystemTaxRules(taxYear: number = 2026): Promise<SystemTaxRulesType> {
   try {
     const existing = await getDb()
@@ -15,10 +30,7 @@ export async function getSystemTaxRules(taxYear: number = 2026): Promise<SystemT
       .limit(1);
 
     if (existing[0]) {
-      return {
-        ...DEFAULT_2026_RULES,
-        ...existing[0],
-      } as SystemTaxRulesType;
+      return deepMergeRules(DEFAULT_2026_RULES, existing[0] as any) as SystemTaxRulesType;
     }
 
     // Seed global tax rules for the requested year if missing
@@ -51,10 +63,7 @@ export async function getSystemTaxRules(taxYear: number = 2026): Promise<SystemT
     };
 
     const inserted = await getDb().insert(systemTaxRules).values(seedValues).returning();
-    return {
-      ...DEFAULT_2026_RULES,
-      ...inserted[0],
-    } as SystemTaxRulesType;
+    return deepMergeRules(DEFAULT_2026_RULES, inserted[0] as any) as SystemTaxRulesType;
   } catch (err) {
     logger.error('Failed to fetch/seed system tax rules, falling back to DEFAULT_2026_RULES', { error: err });
     return DEFAULT_2026_RULES;
@@ -81,7 +90,7 @@ export async function updateSystemTaxRules(taxYear: number = 2026, updates: Reco
       ...payload,
     };
     const inserted = await getDb().insert(systemTaxRules).values(seedValues).returning();
-    return { ...DEFAULT_2026_RULES, ...inserted[0] } as SystemTaxRulesType;
+    return deepMergeRules(DEFAULT_2026_RULES, inserted[0] as any) as SystemTaxRulesType;
   }
 
   const updated = await getDb()
@@ -90,5 +99,5 @@ export async function updateSystemTaxRules(taxYear: number = 2026, updates: Reco
     .where(eq(systemTaxRules.id, existing[0].id))
     .returning();
 
-  return { ...DEFAULT_2026_RULES, ...updated[0] } as SystemTaxRulesType;
+  return deepMergeRules(DEFAULT_2026_RULES, updated[0] as any) as SystemTaxRulesType;
 }

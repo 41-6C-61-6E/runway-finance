@@ -32,11 +32,10 @@ export function calculateSocialSecurityPIA(grossAnnualSalary: number, options?: 
   } else if (monthlyEarnings <= bp2) {
     pia = 0.90 * bp1 + 0.32 * (monthlyEarnings - bp1);
   } else {
-    const maxEarnings = Math.min(monthlyEarnings, wageCap / 12);
     pia =
       0.90 * bp1 +
       0.32 * (bp2 - bp1) +
-      0.15 * (maxEarnings - bp2);
+      0.15 * (monthlyEarnings - bp2);
   }
 
   return Math.round(pia);

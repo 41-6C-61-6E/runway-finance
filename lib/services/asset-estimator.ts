@@ -1,6 +1,6 @@
 import { accountSnapshots, accounts, userSettings } from '@/lib/db/schema';
 import { eq, and, desc, gt, lt, asc, sql } from 'drizzle-orm';
-import { decryptField } from '@/lib/crypto';
+import { decryptField, encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { calculateAmortizationSchedule } from '@/lib/utils/amortization';
 import type { AmortizationParams } from '@/lib/utils/amortization';
@@ -207,16 +207,30 @@ function estimateVehicleHistory(
   const annualDrop = 0.15;
   const monthlyDepreciation = annualDrop / 12;
 
+  const totalMonths = Math.max(1, (endDate.getFullYear() - startDate.getFullYear()) * 12
+    + (endDate.getMonth() - startDate.getMonth()));
+
+  const modelAtEnd = totalMonths <= 12
+    ? purchasePrice * (1 - firstYearDrop * (totalMonths / 12))
+    : purchasePrice * (1 - firstYearDrop) * Math.pow(1 - monthlyDepreciation, totalMonths - 12);
+
   let cursor = new Date(startDate);
   while (cursor <= endDate) {
     const monthsElapsed = (cursor.getFullYear() - startDate.getFullYear()) * 12
       + (cursor.getMonth() - startDate.getMonth());
 
-    let estimatedValue: number;
+    let modelEstimate: number;
     if (monthsElapsed <= 12) {
-      estimatedValue = purchasePrice * (1 - firstYearDrop * (monthsElapsed / 12));
+      modelEstimate = purchasePrice * (1 - firstYearDrop * (monthsElapsed / 12));
     } else {
-      estimatedValue = purchasePrice * (1 - firstYearDrop) * Math.pow(1 - monthlyDepreciation, monthsElapsed - 12);
+      modelEstimate = purchasePrice * (1 - firstYearDrop) * Math.pow(1 - monthlyDepreciation, monthsElapsed - 12);
+    }
+
+    let estimatedValue = modelEstimate;
+    if (currentValue !== undefined && currentValue > 0 && modelAtEnd > 0 && totalMonths > 0) {
+      const blend = Math.min(1, Math.max(0, monthsElapsed / totalMonths));
+      const ratio = currentValue / modelAtEnd;
+      estimatedValue = modelEstimate * (1 - blend + blend * ratio);
     }
 
     snapshots.push({
@@ -468,6 +482,10 @@ export async function generateAssetHistorySnapshots(
 
   const showSynthetic = settings?.showSyntheticData as Record<string, boolean> | null;
   const isRealEstateEnabled = showSynthetic?.global !== false && showSynthetic?.realEstate !== false;
+  const REAL_ESTATE_ASSET_TYPES = [
+    'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
+    'single-family', 'condo', 'townhouse', 'multi-family'
+  ];
 
   if (!isRealEstateEnabled) {
     try {
@@ -485,14 +503,7 @@ export async function generateAssetHistorySnapshots(
     return 0;
   }
 
-  // Delete existing synthetic snapshots first. If this fails, abort —
-  // otherwise old data (potentially from a different amortization
-  // range or property) lingers alongside new data.
-  const REAL_ESTATE_ASSET_TYPES = [
-    'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-    'single-family', 'condo', 'townhouse', 'multi-family', 'other'
-  ];
-
+  // Delete existing synthetic snapshots first.
   try {
     await db.delete(accountSnapshots).where(
       and(
@@ -530,15 +541,24 @@ export async function generateAssetHistorySnapshots(
 
     // Clean up the old purchase date snapshot if it exists and matches the old purchase date/price
     if (REAL_ESTATE_ASSET_TYPES.includes(accountType) && oldPurchaseDate && oldPurchasePrice !== undefined) {
-      await db.delete(accountSnapshots).where(
-        and(
-          eq(accountSnapshots.accountId, accountId),
-          eq(accountSnapshots.userId, userId),
-          eq(accountSnapshots.snapshotDate, oldPurchaseDate),
-          eq(accountSnapshots.isSynthetic, false),
-          eq(accountSnapshots.balance, String(oldPurchasePrice))
-        )
-      );
+      const candidateSnaps = await db
+        .select({ id: accountSnapshots.id, balance: accountSnapshots.balance })
+        .from(accountSnapshots)
+        .where(
+          and(
+            eq(accountSnapshots.accountId, accountId),
+            eq(accountSnapshots.userId, userId),
+            eq(accountSnapshots.snapshotDate, oldPurchaseDate),
+            eq(accountSnapshots.isSynthetic, false)
+          )
+        );
+
+      for (const snap of candidateSnaps) {
+        const decBal = parseFloat(dek ? await decryptField(snap.balance, dek) : snap.balance);
+        if (Math.abs(decBal - oldPurchasePrice) < 0.01) {
+          await db.delete(accountSnapshots).where(eq(accountSnapshots.id, snap.id));
+        }
+      }
     }
 
     // Clean up any historical snapshots (both synthetic and real) before the purchase date
@@ -573,8 +593,7 @@ export async function generateAssetHistorySnapshots(
     case 'single-family':
     case 'condo':
     case 'townhouse':
-    case 'multi-family':
-    case 'other': {
+    case 'multi-family': {
       const purchasePrice = metadata.purchasePrice as number ?? 0;
       const purchaseDate = metadata.purchaseDate as string ?? today;
       const zipCode = metadata.zipCode as string | undefined;
@@ -611,9 +630,10 @@ export async function generateAssetHistorySnapshots(
     case 'vehicle': {
       const purchasePrice = metadata.purchasePrice as number ?? 0;
       const purchaseDate = metadata.purchaseDate as string ?? today;
+      const currentValue = metadata.manualValue as number ?? await getAccountCurrentBalance(accountId, dek);
 
       if (purchasePrice > 0 && purchaseDate < today) {
-        snapshots = estimateVehicleHistory(purchasePrice, purchaseDate);
+        snapshots = estimateVehicleHistory(purchasePrice, purchaseDate, currentValue);
         snapshots = snapshots.filter(s => s.date >= purchaseDate);
       }
       break;
@@ -682,9 +702,6 @@ export async function generateAssetHistorySnapshots(
       const firstReal = validRealSnaps[0];
 
       if (firstReal && originalLoanAmount > 0 && interestRate > 0) {
-        // Hybrid Approach:
-        // 1. Generate amortization paydown history BEFORE the first real snapshot date,
-        // anchoring it to the first real snapshot's balance.
         const firstRealBalanceAbs = Math.abs(firstReal.balance);
         const historyBefore = generateMortgagePaydownHistory(
           { originalBalance: originalLoanAmount, annualRate: interestRate, termMonths, monthlyPayment: monthlyPI, startDate },
@@ -696,20 +713,15 @@ export async function generateAssetHistorySnapshots(
           extraPrincipal
         );
         
-        // Map and filter to only keep snapshots BEFORE the first real snapshot date
         const estBefore = historyBefore
           .map((h) => ({ date: h.date, value: -h.balance }))
           .filter((s) => s.date >= startDate && s.date < firstReal.date);
 
-        // 2. Generate daily history for the period starting at the first real snapshot date
-        // using the transaction-based/real-snapshot-based history generator.
         const { generateHistoricalAccountSnapshots } = await import('./account-history');
         await generateHistoricalAccountSnapshots(accountId, userId, firstReal.date, today, dek);
 
-        // 3. Keep the estimated snapshots before the first real snapshot for insertion
         snapshots = estBefore;
       } else if (originalLoanAmount > 0 && interestRate > 0) {
-        // Fallback: No real snapshots - generate full history using standard amortization from currentBalance to startDate
         const history = generateMortgagePaydownHistory(
           { originalBalance: originalLoanAmount, annualRate: interestRate, termMonths, monthlyPayment: monthlyPI, startDate },
           Math.abs(currentBalance),
@@ -738,17 +750,19 @@ export async function generateAssetHistorySnapshots(
     // Treat the purchase date snapshot as real (isSynthetic = false)
     const isPurchaseDate = (REAL_ESTATE_ASSET_TYPES.includes(accountType) && snap.date === (metadata.purchaseDate as string));
     const isSynth = isPurchaseDate ? false : true;
+    const balanceStr = String(snap.value);
+    const encryptedBalance = dek ? await encryptField(balanceStr, dek) : balanceStr;
 
     try {
       await db.insert(accountSnapshots).values({
         userId,
         accountId,
         snapshotDate: snap.date,
-        balance: String(snap.value),
+        balance: encryptedBalance,
         isSynthetic: isSynth,
       }).onConflictDoUpdate({
         target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-        set: { balance: String(snap.value), isSynthetic: isSynth },
+        set: { balance: encryptedBalance, isSynthetic: isSynth },
         where: isSynth ? eq(accountSnapshots.isSynthetic, true) : undefined,
       });
       inserted++;
@@ -766,14 +780,18 @@ export async function getAccountCurrentBalance(accountId: string, dek?: Uint8Arr
     const { getDb } = await import('@/lib/db');
     const db = getDb();
     const { accounts } = await import('@/lib/db/schema');
+    const { eq } = await import('drizzle-orm');
+
     const [result] = await db
       .select({ balance: accounts.balance })
       .from(accounts)
       .where(eq(accounts.id, accountId))
       .limit(1);
     if (!result) return 0;
-    const balance = result.balance.toString();
-    return parseFloat(dek ? await decryptField(balance, dek) : balance);
+    const balance = result.balance?.toString() || '0';
+    const dec = dek ? await decryptField(balance, dek) : balance;
+    const val = parseFloat(dec);
+    return isNaN(val) ? 0 : val;
   } catch {
     return 0;
   }

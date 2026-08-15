@@ -1,20 +1,4 @@
-/**
- * Format a number as currency
- */
-export function formatCurrency(
-  amount: number | string,
-  currency = 'USD',
-  locale = 'en-US'
-): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-}
+export { formatCurrency } from './format';
 
 /**
  * Format date consistently

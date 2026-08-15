@@ -214,7 +214,9 @@ export async function computeGoalProjections(
       goalId: g.id,
       goalName: g.name,
       targetAmount: parseFloat(g.targetAmount) || 0,
-      percentage: parseFloat(g.percentage) || 100,
+      percentage: g.percentage !== undefined && g.percentage !== null && g.percentage !== ''
+        ? Math.max(0, Math.min(100, parseFloat(g.percentage) || 0))
+        : 100,
       reserve: parseFloat(g.reserve) || 0,
       sortOrder: g.sortOrder,
       initialAllocation: parseFloat(g.allocatedAmount) || 0,
