@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { pushSubscriptions } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -15,6 +16,11 @@ export async function POST(request: Request) {
 
     if (!subscription || !subscription.endpoint || !subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
       return Response.json({ error: 'Invalid subscription payload' }, { status: 400 });
+    }
+
+    const validated = await validateEndpointUrl(subscription.endpoint, { requireHttps: true });
+    if (!validated.ok) {
+      return Response.json({ error: `Disallowed subscription endpoint: ${validated.error}` }, { status: 400 });
     }
 
     const db = getDb();

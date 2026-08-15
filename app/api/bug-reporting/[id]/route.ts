@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { issues } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { UpdateIssueStatusSchema } from '@/lib/validations/issue';
 import { logger } from '@/lib/logger';
 
@@ -45,7 +45,12 @@ export async function PATCH(
         status,
         updatedAt: new Date(),
       })
-      .where(eq(issues.id, id))
+      .where(
+        and(
+          eq(issues.id, id),
+          eq(issues.userId, session.user.id)
+        )
+      )
       .returning();
 
     if (!updated) {
@@ -85,7 +90,12 @@ export async function DELETE(
   try {
     const [deleted] = await getDb()
       .delete(issues)
-      .where(eq(issues.id, id))
+      .where(
+        and(
+          eq(issues.id, id),
+          eq(issues.userId, session.user.id)
+        )
+      )
       .returning();
 
     if (!deleted) {

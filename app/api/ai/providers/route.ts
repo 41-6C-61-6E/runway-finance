@@ -8,6 +8,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { seedUserAiProviders } from '@/lib/db/seed-ai-providers';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 export async function GET() {
   await cookies(); // ensure route is treated as dynamic under cacheComponents
@@ -32,10 +33,15 @@ export async function GET() {
     .orderBy(aiProviders.createdAt);
 
   const providers = await Promise.all(rows.map(async (row) => {
-    let apiKey = '';
+    let hasApiKey = false;
+    let maskedKey = '';
     if (row.apiKeyEncrypted) {
       try {
-        apiKey = await decryptField(row.apiKeyEncrypted, dek);
+        const decrypted = await decryptField(row.apiKeyEncrypted, dek);
+        if (decrypted) {
+          hasApiKey = true;
+          maskedKey = decrypted.length > 8 ? `${decrypted.slice(0, 3)}...${decrypted.slice(-4)}` : '••••••••';
+        }
       } catch { /* empty */ }
     }
     return {
@@ -43,7 +49,8 @@ export async function GET() {
       name: row.name,
       endpoint: row.endpoint,
       model: row.model,
-      apiKey,
+      apiKey: maskedKey,
+      hasApiKey,
       isActive: row.isActive,
       jsonMode: row.jsonMode,
       createdAt: row.createdAt,
@@ -71,6 +78,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'name, endpoint, and model are required' }, { status: 400 });
   }
 
+  const validated = await validateEndpointUrl(body.endpoint);
+  if (!validated.ok) {
+    return NextResponse.json({ error: `Invalid provider endpoint URL: ${validated.error}` }, { status: 400 });
+  }
+
   const db = getDb();
 
   // If setActive is true, deactivate all other providers first
@@ -96,7 +108,7 @@ export async function POST(request: Request) {
       .values({
         userId: session.user.id,
         name: body.name,
-        endpoint: body.endpoint,
+        endpoint: validated.url.toString().replace(/\/+$/, ''),
         model: body.model,
         apiKeyEncrypted,
         isActive: body.setActive ?? false,
@@ -114,12 +126,15 @@ export async function POST(request: Request) {
         .where(eq(userSettings.userId, session.user.id));
     }
 
+    const maskedKey = body.apiKey ? (body.apiKey.length > 8 ? `${body.apiKey.slice(0, 3)}...${body.apiKey.slice(-4)}` : '••••••••') : '';
+
     return NextResponse.json({
       id: created.id,
       name: created.name,
       endpoint: created.endpoint,
       model: created.model,
-      apiKey: body.apiKey ?? '',
+      apiKey: maskedKey,
+      hasApiKey: !!body.apiKey,
       isActive: created.isActive,
       jsonMode: created.jsonMode,
       createdAt: created.createdAt,

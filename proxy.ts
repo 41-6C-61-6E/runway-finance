@@ -18,29 +18,31 @@ const authHandler = NextAuth(authConfig).auth(async (request) => {
     const forwardedHost = request.headers.get('x-forwarded-host');
     const secFetchSite = request.headers.get('sec-fetch-site');
 
-    if (!host && !forwardedHost) {
+    if (!host) {
       return new NextResponse(
         JSON.stringify({ error: 'CSRF_ERROR', message: 'Missing Host header' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Determine allowed origins dynamically based on Host and X-Forwarded-Host
     const allowedOrigins = new Set<string>();
 
-    const rawHosts: string[] = [];
-    if (host) rawHosts.push(host);
-    if (forwardedHost) {
-      forwardedHost.split(',').forEach((h) => rawHosts.push(h.trim()));
+    // 1. Allowed origins from Host header
+    allowedOrigins.add(`http://${host}`);
+    allowedOrigins.add(`https://${host}`);
+
+    // 2. Allowed origins from NEXTAUTH_URL / APP_URL if configured
+    const configuredUrls = [process.env.NEXTAUTH_URL, process.env.NEXT_PUBLIC_APP_URL, process.env.APP_URL].filter(Boolean) as string[];
+    for (const urlStr of configuredUrls) {
+      try {
+        const parsed = new URL(urlStr);
+        allowedOrigins.add(parsed.origin);
+      } catch {}
     }
 
-    for (const h of rawHosts) {
-      if (!h) continue;
-      allowedOrigins.add(`http://${h}`);
-      allowedOrigins.add(`https://${h}`);
-
-      // Handle loopback alias hostnames/IPs (localhost, 127.0.0.1, 0.0.0.0, [::1])
-      const [hostname, port] = h.split(':');
+    // 3. In non-production, permit loopback alias variants
+    if (process.env.NODE_ENV !== 'production') {
+      const [hostname, port] = host.split(':');
       const portSuffix = port ? `:${port}` : '';
       const loopbacks = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]'];
       if (loopbacks.includes(hostname)) {
@@ -49,15 +51,6 @@ const authHandler = NextAuth(authConfig).auth(async (request) => {
           allowedOrigins.add(`https://${lb}${portSuffix}`);
         }
       }
-    }
-
-    // Fallback/additional check using NEXTAUTH_URL if configured
-    const nextAuthUrl = process.env.NEXTAUTH_URL;
-    if (nextAuthUrl) {
-      try {
-        const parsed = new URL(nextAuthUrl);
-        allowedOrigins.add(parsed.origin);
-      } catch {}
     }
 
     let verified = false;
@@ -79,15 +72,15 @@ const authHandler = NextAuth(authConfig).auth(async (request) => {
       } catch {}
     }
 
-    // 3. Fall back to Sec-Fetch-Site header (browser-enforced same-site metadata)
-    if (!verified && (secFetchSite === 'same-origin' || secFetchSite === 'same-site')) {
+    // 3. Fall back to browser-enforced same-origin metadata ONLY (never cross-origin same-site)
+    if (!verified && secFetchSite === 'same-origin') {
       verified = true;
     }
 
     if (!verified) {
       console.warn(
         `[CSRF Block] State-changing request blocked on ${pathname}. ` +
-        `Method: ${request.method}, Origin: ${origin || 'none'}, Referer: ${referer || 'none'}, Host: ${host || 'none'}, Forwarded-Host: ${forwardedHost || 'none'}`
+        `Method: ${request.method}, Origin: ${origin || 'none'}, Referer: ${referer || 'none'}, Host: ${host || 'none'}`
       );
       return new NextResponse(
         JSON.stringify({ error: 'CSRF_ERROR', message: 'Invalid or missing Origin/Referer header' }),

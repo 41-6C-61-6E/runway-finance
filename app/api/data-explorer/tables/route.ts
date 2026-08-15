@@ -25,5 +25,13 @@ export async function GET() {
     return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
   }
 
-  return NextResponse.json(TABLE_METADATA);
+  const userId = session.user.id;
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const isMember = dataUserId !== userId;
+
+  const tables = isMember
+    ? TABLE_METADATA.filter((t) => t.group !== 'System')
+    : TABLE_METADATA;
+
+  return NextResponse.json(tables);
 }

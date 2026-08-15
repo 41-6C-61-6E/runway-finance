@@ -149,6 +149,7 @@ export default function AdvancedTab() {
     try {
       const res = await fetch('/api/users/me', {
         method: 'DELETE',
+        headers: { 'X-Confirm-Delete': 'true' },
         credentials: 'include',
       });
       if (!res.ok) {

@@ -31,6 +31,7 @@ export async function GET() {
       })
       .from(issues)
       .leftJoin(users, eq(issues.userId, users.username))
+      .where(eq(issues.userId, session.user.id))
       .orderBy(desc(issues.createdAt));
 
     return NextResponse.json(rows);

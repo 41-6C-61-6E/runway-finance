@@ -133,14 +133,20 @@ export async function POST(request: Request) {
 
   const userId = session.user.id;
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const isMember = dataUserId !== userId;
+
+  if (isMember) {
+    return NextResponse.json({ error: 'Forbidden', message: 'Sharing members cannot import backups over household financial data' }, { status: 403 });
+  }
+
   const db = getDb();
   const dek = await getSessionDEK();
 
-  let backup: BackupPayload;
+  let backup: any;
   try {
     backup = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
   if (!backup.version || !backup.data || typeof backup.data !== 'object') {
@@ -159,7 +165,8 @@ export async function POST(request: Request) {
 
       // Delete existing data
       for (const { table, dbName } of DELETE_ORDER) {
-        const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
+        const isPersonalTable = dbName === 'ai_providers' || dbName === 'simplefin_connections' || dbName === 'plaid_connections';
+        const targetUserId = isPersonalTable ? userId : dataUserId;
         await tx.delete(table).where(eq(table.userId, targetUserId));
       }
 

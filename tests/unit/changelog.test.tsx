@@ -14,6 +14,10 @@ vi.mock('@/components/ui/dialog', () => ({
   DialogDescription: ({ children }: any) => <p>{children}</p>,
 }));
 
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn().mockResolvedValue({ user: { id: 'test-user' } }),
+}));
+
 describe('Changelog Feature', () => {
   beforeEach(() => {
     vi.clearAllMocks();

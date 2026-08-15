@@ -1,6 +1,7 @@
 import pg from 'pg';
 const { Pool } = pg;
-const pool = new Pool({ connectionString: 'postgresql://postgres:l45606393b@localhost:5432/runway_finance' });
+const connectionString = process.env.DATABASE_URL || `postgresql://${process.env.POSTGRES_USER || 'postgres'}:${process.env.POSTGRES_PASSWORD || ''}@localhost:5432/${process.env.POSTGRES_DB || 'runway_finance'}`;
+const pool = new Pool({ connectionString });
 try {
   const r = await pool.query(`
     SELECT snapshot_date, count(*) as cnt

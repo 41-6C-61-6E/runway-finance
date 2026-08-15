@@ -215,7 +215,7 @@ export async function createInvitation(
       inviterUserId,
       inviteeEmail,
       pinHash,
-      pin,
+      pin: null, // Never persist plaintext PIN
     })
     .returning({ id: accountSharingInvitations.id });
 
@@ -262,6 +262,7 @@ export async function validateInvitation(
   | { valid: false; error: string }
 > {
   const db = getDb();
+  const INVITATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
   const invitations = await db
     .select()
@@ -274,6 +275,14 @@ export async function validateInvitation(
     );
 
   for (const inv of invitations) {
+    if (Date.now() - new Date(inv.createdAt).getTime() > INVITATION_EXPIRY_MS) {
+      await db
+        .update(accountSharingInvitations)
+        .set({ status: 'expired', updatedAt: new Date() })
+        .where(eq(accountSharingInvitations.id, inv.id));
+      continue;
+    }
+
     const match = await bcrypt.compare(pin, inv.pinHash);
     if (match) {
       return { valid: true, invitationId: inv.id, inviterUserId: inv.inviterUserId };

@@ -306,6 +306,7 @@ export async function GET(request: Request) {
 
   const userId = session.user.id;
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const isMember = dataUserId !== userId;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
@@ -342,6 +343,10 @@ export async function GET(request: Request) {
   const config = TABLE_REGISTRY[tableKey];
   if (!config) {
     return NextResponse.json({ error: 'invalid_table', message: `Unknown table: ${tableKey}` }, { status: 400 });
+  }
+
+  if (isMember && config.group === 'System') {
+    return NextResponse.json({ error: 'forbidden', message: 'Sharing members cannot access system and connection configuration' }, { status: 403 });
   }
 
   const { table } = config;
@@ -491,8 +496,19 @@ export async function GET(request: Request) {
     // 5. Paginate in memory
     const paginated = filtered.slice(offset, offset + limit);
 
+    // Sanitize hidden fields (e.g. accessUrlEncrypted, apiKeys, password hashes)
+    const sanitizedPaginated = paginated.map((row) => {
+      const sanitized: Record<string, unknown> = { ...row };
+      for (const [field, override] of Object.entries(config.columnOverrides)) {
+        if (override?.hidden) {
+          delete sanitized[field];
+        }
+      }
+      return sanitized;
+    });
+
     return NextResponse.json({
-      data: paginated,
+      data: sanitizedPaginated,
       total,
       limit,
       offset,
@@ -519,6 +535,12 @@ export async function DELETE(request: Request) {
 
   const userId = session.user.id;
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const isMember = dataUserId !== userId;
+
+  if (isMember) {
+    return NextResponse.json({ error: 'forbidden', message: 'Sharing members cannot delete household records' }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const tableKey = searchParams.get('table');
   const id = searchParams.get('id');

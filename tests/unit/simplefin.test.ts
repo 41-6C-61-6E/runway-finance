@@ -2,6 +2,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { SimpleFINError, claimAccessUrl, fetchAccounts } from '@/lib/simplefin';
 import { isSimilarDescription } from '@/lib/utils/description-matching';
 
+vi.mock('dns/promises', () => ({
+  lookup: vi.fn().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]),
+}));
+
 describe('SimpleFIN', () => {
   let originalFetch: typeof fetch;
 

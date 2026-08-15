@@ -40,10 +40,17 @@ import { logger } from '@/lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ message: 'Unauthorised' }, { status: 401 });
+  }
+
+  if (request.headers.get('X-Confirm-Delete') !== 'true') {
+    return NextResponse.json(
+      { error: 'confirmation_required', message: 'Include X-Confirm-Delete: true header' },
+      { status: 400 }
+    );
   }
 
   const userId = session.user.id;

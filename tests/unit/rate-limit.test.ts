@@ -61,4 +61,16 @@ describe('rate limit helper', () => {
     // Verify client-x is cleared from the map
     expect(checkRateLimit('client-x', 1, windowMs)).toBe(true);
   });
+
+  it('evicts oldest entries instead of clearing the entire map when capacity is reached', () => {
+    clearRateLimitMap();
+    const now = Date.now();
+    // Fill with entries
+    for (let i = 0; i < 10005; i++) {
+      checkRateLimit(`test-fill-${i}`, 5, 60_000);
+    }
+    // Size should be trimmed but not 0
+    expect(getRateLimitMapSize()).toBeLessThan(10000);
+    expect(getRateLimitMapSize()).toBeGreaterThan(5000);
+  });
 });

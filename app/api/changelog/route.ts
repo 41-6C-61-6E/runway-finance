@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { auth } from '@/lib/auth';
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  }
+
   try {
     let buildNumber = process.env.NEXT_PUBLIC_BUILD_NUMBER || 'dev';
     let buildTime = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString();
@@ -16,12 +22,14 @@ export async function GET() {
       type: string;
     }> = [];
 
-    // Attempt to read git log directly
-    try {
-      const gitLogRaw = execSync('git log -n 200 --pretty=format:"%h|%H|%an|%ad|%s" --date=iso-strict', {
-        encoding: 'utf8',
-      });
-      const lines = gitLogRaw.split('\n').filter(Boolean);
+    // Attempt to read git log directly in non-production
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        const gitLogRaw = execSync('git log -n 50 --pretty=format:"%h|%H|%an|%ad|%s" --date=iso-strict', {
+          encoding: 'utf8',
+          timeout: 2000,
+        });
+        const lines = gitLogRaw.split('\n').filter(Boolean);
 
       lines.forEach((line) => {
         const parts = line.split('|');
@@ -51,6 +59,7 @@ export async function GET() {
     } catch {
       // Fallback: git execution failed
     }
+  }
 
     let fileHistory: typeof gitHistory = [];
 

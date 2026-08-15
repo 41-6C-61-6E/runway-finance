@@ -48,7 +48,7 @@ export async function GET() {
         })
         .from(accountTags)
         .leftJoin(tags, eq(accountTags.tagId, tags.id))
-        .where(inArray(accountTags.accountId, accountIds))
+        .where(and(inArray(accountTags.accountId, accountIds), eq(tags.userId, dataUserId)))
     : [];
 
   const tagsByAccountId = new Map<string, any[]>();
