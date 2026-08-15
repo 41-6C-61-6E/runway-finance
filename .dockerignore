@@ -8,4 +8,14 @@ node_modules
 .vitest
 coverage
 README.md
-
+SECURITY_REVIEW.md
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.sql
+*.dump
+dumps/
+private-keys/
+credentials/

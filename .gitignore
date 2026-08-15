@@ -15,6 +15,9 @@ scratch/
 tmp/
 temp/
 
+# Local-only security review (contains sensitive findings, not for publication)
+SECURITY_REVIEW.md
+
 # Build outputs & Logs
 out/
 build/

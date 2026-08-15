@@ -59,7 +59,12 @@ export async function POST(
             categorizedByAi: true,
             updatedAt: new Date(),
           })
-          .where(eq(transactions.id, payload.transactionId));
+          .where(
+            and(
+              eq(transactions.id, payload.transactionId),
+              eq(transactions.userId, dataUserId)
+            )
+          );
         logger.info('Approved categorize proposal', { userId, proposalId: id, transactionId: payload.transactionId });
         break;
       }

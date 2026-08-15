@@ -8,6 +8,7 @@ import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypt
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { findDuplicateRule } from '@/lib/services/rules-engine';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[ai-categorizer]';
 const BATCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per batch
@@ -447,6 +448,10 @@ async function callAiApi(
   signal?: AbortSignal,
 ): Promise<AiResponse> {
   const url = `${endpoint.replace(/\/$/, '')}/chat/completions`;
+  const validated = await validateEndpointUrl(url);
+  if (!validated.ok) {
+    throw new Error(`SSRF blocked request to ${url}: ${validated.error}`);
+  }
 
   const body: Record<string, any> = {
     model,
@@ -768,7 +773,12 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
           await db
             .update(transactions)
             .set({ categoryId, reviewed: true, categorizedByAi: true, updatedAt: new Date() })
-            .where(eq(transactions.id, payload.transactionId));
+            .where(
+              and(
+                eq(transactions.id, payload.transactionId),
+                eq(transactions.userId, dataUserId)
+              )
+            );
           logger.info(`${LOG_TAG} Categorized transaction ${payload.transactionId}`, { userId, categoryId });
         }
         break;

@@ -40,18 +40,37 @@ describe('Proxy CSRF middleware', () => {
     expect(res.status).not.toBe(403);
   });
 
-  it('should allow POST requests when X-Forwarded-Host matches Origin', async () => {
-    const req = new NextRequest('http://internal-docker:3000/api/backup/import', {
+  it('should block POST requests when attacker tries to spoof X-Forwarded-Host', async () => {
+    const req = new NextRequest('http://localhost:3000/api/backup/import', {
       method: 'POST',
       headers: {
-        host: 'internal-docker:3000',
-        'x-forwarded-host': 'my-finance.domain.com',
-        origin: 'https://my-finance.domain.com',
+        host: 'localhost:3000',
+        'x-forwarded-host': 'attacker.domain.com',
+        origin: 'https://attacker.domain.com',
       },
     });
 
     const res = await (proxyHandler as any)(req);
-    expect(res.status).not.toBe(403);
+    expect(res.status).toBe(403);
+  });
+
+  it('should allow POST requests when Origin matches NEXTAUTH_URL', async () => {
+    const prevUrl = process.env.NEXTAUTH_URL;
+    process.env.NEXTAUTH_URL = 'https://my-finance.domain.com';
+    try {
+      const req = new NextRequest('http://internal-docker:3000/api/backup/import', {
+        method: 'POST',
+        headers: {
+          host: 'internal-docker:3000',
+          origin: 'https://my-finance.domain.com',
+        },
+      });
+
+      const res = await (proxyHandler as any)(req);
+      expect(res.status).not.toBe(403);
+    } finally {
+      process.env.NEXTAUTH_URL = prevUrl;
+    }
   });
 
   it('should allow POST requests when Origin is "null" but Referer is valid same-origin', async () => {

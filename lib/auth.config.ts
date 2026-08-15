@@ -7,22 +7,34 @@ export const authConfig = {
     error: "/signin",
   },
   trustHost: true,
-  ...(process.env.NODE_ENV !== "production" ? {
-    cookies: {
-      sessionToken: {
-        name: "authjs.session-token",
-        options: { httpOnly: true, sameSite: "lax", path: "/", secure: false }
-      },
-      csrfToken: {
-        name: "authjs.csrf-token",
-        options: { httpOnly: true, sameSite: "lax", path: "/", secure: false }
-      },
-      callbackUrl: {
-        name: "authjs.callback-url",
-        options: { sameSite: "lax", path: "/", secure: false }
+  cookies: {
+    sessionToken: {
+      name: "authjs.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      }
+    },
+    csrfToken: {
+      name: "authjs.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      }
+    },
+    callbackUrl: {
+      name: "authjs.callback-url",
+      options: {
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
       }
     }
-  } : {}),
+  },
   providers: [],
   callbacks: {
     authorized({ auth, request }) {
@@ -60,5 +72,5 @@ export const authConfig = {
       return false;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || 'dev-secret-change-in-production',
+  secret: process.env.NEXTAUTH_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-secret-change-in-production'),
 } satisfies NextAuthConfig;

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, accountTags, tags, simplifinConnections, plaidConnections } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, encryptRow, decryptField } from '@/lib/crypto';
@@ -28,44 +28,47 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const dek = await getSessionDEK();
   const { id } = await params;
 
-  const [account] = await getDb()
-    .select()
-    .from(accounts)
-    .where(eq(accounts.id, id))
-    .limit(1);
+  try {
+    const db = getDb();
+    const [account] = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
+      .limit(1);
 
-  if (!account) {
+    if (!account) {
+      return NextResponse.json(
+        { error: 'not_found', message: 'Account not found' },
+        { status: 404 }
+      );
+    }
+
+    const decrypted = await decryptRow('accounts', account as Record<string, unknown>, dek);
+
+    // Fetch tags for this account
+    const tagRows = await db
+      .select({ tagId: tags.id, tagName: tags.name, tagColor: tags.color })
+      .from(accountTags)
+      .leftJoin(tags, eq(accountTags.tagId, tags.id))
+      .where(eq(accountTags.accountId, id));
+
+    const acctTags = await Promise.all(
+      tagRows.map(async (r) => ({
+        id: r.tagId,
+        name: r.tagName ? await decryptField(r.tagName, dek) : '',
+        color: r.tagColor,
+      }))
+    );
+
+    return NextResponse.json({ ...decrypted, tags: acctTags });
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to get account', { accountId: id, error: errMsg });
     return NextResponse.json(
-      { error: 'not_found', message: 'Account not found' },
-      { status: 404 }
+      { error: 'query_failed', message: errMsg },
+      { status: 500 }
     );
   }
-
-  if (account.userId !== userId) {
-    return NextResponse.json(
-      { error: 'forbidden', message: 'You do not own this account' },
-      { status: 403 }
-    );
-  }
-
-  const decrypted = await decryptRow('accounts', account, dek);
-
-  // Fetch tags for this account
-  const tagRows = await getDb()
-    .select({ tagId: tags.id, tagName: tags.name, tagColor: tags.color })
-    .from(accountTags)
-    .leftJoin(tags, eq(accountTags.tagId, tags.id))
-    .where(eq(accountTags.accountId, id));
-
-  const acctTags = await Promise.all(
-    tagRows.map(async (r) => ({
-      id: r.tagId,
-      name: r.tagName ? await decryptField(r.tagName, dek) : '',
-      color: r.tagColor,
-    }))
-  );
-
-  return NextResponse.json({ ...decrypted, tags: acctTags });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -81,23 +84,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
-  const [account] = await getDb()
+  const db = getDb();
+  const [account] = await db
     .select()
     .from(accounts)
-    .where(eq(accounts.id, id))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
     .limit(1);
 
   if (!account) {
     return NextResponse.json(
       { error: 'not_found', message: 'Account not found' },
       { status: 404 }
-    );
-  }
-
-  if (account.userId !== userId) {
-    return NextResponse.json(
-      { error: 'forbidden', message: 'You do not own this account' },
-      { status: 403 }
     );
   }
 
@@ -394,20 +391,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const [account] = await getDb()
     .select()
     .from(accounts)
-    .where(eq(accounts.id, id))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
     .limit(1);
 
   if (!account) {
     return NextResponse.json(
       { error: 'not_found', message: 'Account not found' },
       { status: 404 }
-    );
-  }
-
-  if (account.userId !== userId) {
-    return NextResponse.json(
-      { error: 'forbidden', message: 'You do not own this account' },
-      { status: 403 }
     );
   }
 
@@ -419,11 +409,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   // Delete the account from the database
-  await getDb().delete(accounts).where(eq(accounts.id, id));
+  await getDb().delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)));
 
   // Invalidate search cache
   const { invalidateUserSearchCache } = await import('@/lib/services/search-cache');
-  invalidateUserSearchCache(userId);
+  invalidateUserSearchCache(dataUserId);
 
 
   // Recalculate snapshots and summaries in the background

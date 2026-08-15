@@ -6,6 +6,7 @@ import { eq, and, ne } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -37,7 +38,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const updates: Record<string, any> = {};
   if (body.name !== undefined) updates.name = body.name;
-  if (body.endpoint !== undefined) updates.endpoint = body.endpoint;
+  if (body.endpoint !== undefined) {
+    const validated = await validateEndpointUrl(body.endpoint);
+    if (!validated.ok) {
+      return NextResponse.json({ error: `Invalid provider endpoint URL: ${validated.error}` }, { status: 400 });
+    }
+    updates.endpoint = validated.url.toString().replace(/\/+$/, '');
+  }
   if (body.model !== undefined) updates.model = body.model;
   if (body.jsonMode !== undefined) updates.jsonMode = body.jsonMode;
   if (body.apiKey !== undefined) {

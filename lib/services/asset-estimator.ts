@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { calculateAmortizationSchedule } from '@/lib/utils/amortization';
 import type { AmortizationParams } from '@/lib/utils/amortization';
 import { API_KEY_DEFAULTS } from '@/config/defaults';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[asset-estimator]';
 
@@ -48,6 +49,12 @@ async function fetchFredSeries(
   }
 
   const baseUrl = apiConfig?.fredApiUrl || API_KEY_DEFAULTS.fredApiUrl;
+  const validated = await validateEndpointUrl(baseUrl);
+  if (!validated.ok) {
+    logger.warn(`${LOG_TAG} Blocked FRED API request due to SSRF validation: ${validated.error}`);
+    return [];
+  }
+
   const url = `${baseUrl}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&observation_start=${startDate}&observation_end=${endDate}&sort_order=asc`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
@@ -238,6 +245,11 @@ async function estimateMetalsHistory(
     const startTs = Math.floor(new Date(purchaseDate).getTime() / 1000);
     const endTs = Math.floor(new Date(today).getTime() / 1000);
     const baseUrl = apiConfig?.metalsApiUrl || API_KEY_DEFAULTS.metalsApiUrl;
+    const validated = await validateEndpointUrl(baseUrl);
+    if (!validated.ok) {
+      logger.warn(`${LOG_TAG} Blocked metals API request due to SSRF validation: ${validated.error}`);
+      return [];
+    }
     const url = `${baseUrl}/${ticker}?period1=${startTs}&period2=${endTs}&interval=1mo`;
 
     const res = await fetch(url, {

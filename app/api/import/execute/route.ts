@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   const userId = session.user.id;
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
+  const db = getDb();
 
   try {
     const body = await request.json();
@@ -66,7 +67,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not parse CSV' }, { status: 400 });
     }
 
-    logger.info(`[import/execute] Starting import: type=${importType}, totalRows=${parsed.totalRows}`, {
+    logger.info(`[import/execute] Received import request`, {
+      userId,
+      dataUserId,
+      importType,
+      csvTextLength: csvText ? csvText.length : 0,
       accountMappingCount: Object.keys(accountMapping || {}).length,
       categoryMappingCount: Object.keys(categoryMapping || {}).length,
       newAccountsCount: Object.keys(newAccounts || {}).length,
@@ -77,6 +82,19 @@ export async function POST(request: Request) {
     const warnings: string[] = [];
 
     // Step 1: Pre-generate IDs for new accounts and populate accountIdByRef
+    // Validate that mapped accounts and categories belong to dataUserId
+    const existingAccounts = await db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(eq(accounts.userId, dataUserId));
+    const validAccountIds = new Set(existingAccounts.map((a) => a.id));
+
+    const existingCategories = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.userId, dataUserId));
+    const validCategoryIds = new Set(existingCategories.map((c) => c.id));
+
     // Treat empty/unmapped account selections as excluded
     const accountIdByRef = new Map<string, string | typeof EXCLUDED>();
     let excludedAccountCount = 0;
@@ -85,8 +103,12 @@ export async function POST(request: Request) {
         if (!accountId || accountId === EXCLUDED) {
           excludedAccountCount++;
           accountIdByRef.set(csvRef, EXCLUDED);
-        } else {
+        } else if (validAccountIds.has(accountId as string)) {
           accountIdByRef.set(csvRef, accountId as string);
+        } else {
+          logger.warn(`[import/execute] Account ID ${accountId} does not belong to user ${dataUserId} - skipping`);
+          excludedAccountCount++;
+          accountIdByRef.set(csvRef, EXCLUDED);
         }
       }
     }
@@ -104,8 +126,13 @@ export async function POST(request: Request) {
     if (categoryMapping) {
       for (const [csvName, categoryId] of Object.entries(categoryMapping)) {
         if (categoryId && typeof categoryId === 'string' && categoryId !== 'new') {
-          // Valid existing category ID — map it directly
-          categoryIdByName.set(csvName, categoryId);
+          if (validCategoryIds.has(categoryId)) {
+            // Valid existing category ID belonging to user — map it directly
+            categoryIdByName.set(csvName, categoryId);
+          } else {
+            logger.warn(`[import/execute] Category ID ${categoryId} does not belong to user ${dataUserId} - marking uncategorized`, { csvName });
+            unmappedCategories.push(csvName);
+          }
         } else if (categoryId === 'new') {
           // 'new' means the user intended to create a category; the actual ID comes
           // from newCategories below. If newCategories has no entry for this name
@@ -250,7 +277,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const db = getDb();
     const recordsImported = transactionsToInsert.length + snapshotsToInsert.length;
 
     let dataStartDate: string | null = null;
@@ -422,7 +448,12 @@ export async function POST(request: Request) {
                 balanceDate: new Date(),
                 updatedAt: new Date(),
               })
-              .where(eq(accounts.id, acctId));
+              .where(
+                and(
+                  eq(accounts.id, acctId),
+                  eq(accounts.userId, dataUserId)
+                )
+              );
           }
         }
       }

@@ -6,6 +6,13 @@ echo "Syncing local files to antithropic@10.1.1.10:~/runway-finance/ ..."
 rsync -avz --delete \
   --exclude='node_modules' \
   --exclude='.next' \
+  --exclude='.git' \
+  --exclude='.env*' \
+  --exclude='*.env' \
+  --exclude='dumps' \
+  --exclude='*.sql' \
+  --exclude='*.dump' \
+  --exclude='coverage' \
   --exclude='tsconfig.tsbuildinfo' \
   --exclude='.DS_Store' \
   --exclude='._*' \

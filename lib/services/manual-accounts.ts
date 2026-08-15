@@ -13,6 +13,7 @@ import { API_KEY_DEFAULTS } from '@/config/defaults';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
 import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, convertCurrency, roundToCents, getAccountEarliestCalculationDate, formatToCents } from '@/lib/services/account-history';
+import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[manual-accounts]';
 
@@ -362,6 +363,10 @@ const TREZOR_HOSTS = ['btc2.trezor.io', 'btc1.trezor.io', 'btc3.trezor.io'];
 
 async function fetchBtcPrice(apiConfig?: ApiConfig): Promise<number> {
   const url = apiConfig?.btcApiUrl || DEFAULT_API_CONFIG.btcApiUrl!;
+  const validated = await validateEndpointUrl(url);
+  if (!validated.ok) {
+    throw new Error(`BTC price URL blocked by SSRF validation: ${validated.error}`);
+  }
   const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
   logger.info(`${LOG_TAG} BTC price API call`, { url });
   logger.debug(`${LOG_TAG} BTC price curl: ${curlCmd}`);
@@ -420,6 +425,13 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
   for (const fmt of xpubFormats) {
     for (const host of hostList) {
       const url = baseUrlTemplate.replace('{host}', host).replace('{xpub}', encodeURIComponent(fmt));
+      const validated = await validateEndpointUrl(url);
+      if (!validated.ok) {
+        lastError = `SSRF validation blocked: ${validated.error}`;
+        logger.warn(`${LOG_TAG} Bitcoin host ${host} blocked by SSRF validation`, { error: lastError });
+        continue;
+      }
+
       const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
       logger.info(`${LOG_TAG} Bitcoin API call`, { host, xpub: fmt, url });
       logger.debug(`${LOG_TAG} Bitcoin curl: ${curlCmd}`);
@@ -495,6 +507,10 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
 
 async function fetchSpotPrice(type: 'gold' | 'silver', apiConfig?: ApiConfig): Promise<number> {
   const baseUrl = apiConfig?.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl!;
+  const validated = await validateEndpointUrl(baseUrl);
+  if (!validated.ok) {
+    throw new Error(`Spot price URL blocked by SSRF validation: ${validated.error}`);
+  }
   const ticker = type === 'gold' ? 'GC=F' : 'SI=F';
   const url = `${baseUrl}/${ticker}`;
   const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;

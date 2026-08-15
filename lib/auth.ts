@@ -19,6 +19,9 @@ function hexToBytes(hex: string): Uint8Array {
   return new Uint8Array(hex.match(/.{2}/g)!.map((c) => parseInt(c, 16)));
 }
 
+// Cost 12 dummy bcrypt hash for timing attack mitigation on unknown usernames
+const DUMMY_HASH = '$2a$12$e8wVfW4uN0sMvB2dZ.kYquVwFkQ.nOeP.u98L44OQ4n3f1oJ15UeS';
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   trustHost: true,
@@ -38,7 +41,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const username = credentials.username as string;
         const password = credentials.password as string;
         const user = await findUser(username);
-        if (user && await bcrypt.compare(password, user.password_hash)) {
+        const passwordHash = user?.password_hash ?? DUMMY_HASH;
+        const passwordMatches = await bcrypt.compare(password, passwordHash);
+
+        if (user && passwordMatches) {
           logger.info('Auth: successful login', { username: user.username })
 
           let dek: Uint8Array;
@@ -200,6 +206,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
           } catch (err) {
             logger.error('Error verifying share group membership in session callback', { error: err });
+            if (process.env.NODE_ENV === 'production') {
+              return {
+                ...session,
+                user: undefined as any,
+              };
+            }
           }
         }
 

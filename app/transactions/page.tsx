@@ -320,6 +320,7 @@ function TransactionsContent() {
       excludeCategoryIds: null,
       tagId: null,
       tagIds: null,
+      excludeTagIds: null,
       accountTagIds: null,
       search: null,
       type: null,

@@ -47,6 +47,7 @@ const getCommitHash = () => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
   cacheComponents: true,
   turbopack: {
     root: "./",

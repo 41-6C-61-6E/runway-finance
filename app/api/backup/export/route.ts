@@ -95,7 +95,8 @@ export async function GET() {
   const data: Record<string, unknown[]> = {};
 
   for (const { table, dbName } of USER_TABLES) {
-    const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
+    const isPersonalTable = dbName === 'ai_providers' || dbName === 'simplefin_connections' || dbName === 'plaid_connections';
+    const targetUserId = isPersonalTable ? userId : dataUserId;
     const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
     const decrypted = await Promise.all(
       rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
