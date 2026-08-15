@@ -2,6 +2,8 @@
 # Migrate database and start the application as nextjs user
 # Migrations are best-effort; failures don't block server startup
 
+export UV_THREADPOOL_SIZE="${UV_THREADPOOL_SIZE:-16}"
+
 echo "[init] Waiting for database to be ready..."
 
 DB_HOST="postgres"

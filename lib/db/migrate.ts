@@ -425,6 +425,23 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       ON custom_alert_rules (user_id)
     `);
 
+    // 9e. Self-heal high-performance indexes on transactions, snapshots, and AI proposals
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS transactions_user_date_idx ON transactions (user_id, date);
+      CREATE INDEX IF NOT EXISTS transactions_user_account_idx ON transactions (user_id, account_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_category_idx ON transactions (user_id, category_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_deleted_idx ON transactions (user_id, deleted);
+      CREATE INDEX IF NOT EXISTS accounts_user_hidden_idx ON accounts (user_id, is_hidden);
+      CREATE INDEX IF NOT EXISTS transactions_user_uncat_idx ON transactions (user_id, date) WHERE category_id IS NULL AND deleted = false;
+      CREATE INDEX IF NOT EXISTS transactions_user_pending_idx ON transactions (user_id, id) WHERE pending = true;
+      CREATE INDEX IF NOT EXISTS transactions_user_import_idx ON transactions (user_id, import_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_parent_idx ON transactions (user_id, parent_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_posted_date_idx ON transactions (user_id, posted_date);
+      CREATE INDEX IF NOT EXISTS net_worth_snapshots_user_date_idx ON net_worth_snapshots (user_id, snapshot_date);
+      CREATE INDEX IF NOT EXISTS monthly_cash_flow_user_ym_idx ON monthly_cash_flow (user_id, year_month);
+      CREATE INDEX IF NOT EXISTS ai_proposals_user_status_idx ON ai_proposals (user_id, status);
+    `);
+
     // 10. Drop FK constraints that reference the "user" table — the app uses
     //    the "users" (plural) table with usernames and never populates "user".
     //    These FKs were removed in migration 0063; self-heal as a safety net.

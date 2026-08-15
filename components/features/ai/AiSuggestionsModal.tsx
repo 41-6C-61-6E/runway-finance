@@ -11,7 +11,7 @@ import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2
 type AiProposal = {
   id: string;
   type: 'categorize' | 'create_category' | 'create_rule';
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'applied' | 'rejected';
   confidence: string | null;
   payload: any;
   explanation: string | null;
@@ -303,6 +303,9 @@ function ProposalCard({
         )}
         {proposal.status === 'approved' && (
           <span className="text-[10px] font-medium text-chart-2 bg-chart-2/20 px-1.5 py-0.5 rounded-full">Approved</span>
+        )}
+        {proposal.status === 'applied' && (
+          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-500 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">Applied</span>
         )}
         {proposal.status === 'rejected' && (
           <span className="text-[10px] font-medium text-destructive bg-destructive/20 px-1.5 py-0.5 rounded-full">Rejected</span>
@@ -808,8 +811,10 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
     const modifiedPayload = isEditing ? editPayload : undefined;
 
     setProcessing(id);
+    // Single-approve applies the proposal immediately on the server, so the
+    // status transitions straight to 'applied' (no 'approved' intermediate state).
     setProposals((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: 'approved' } : p))
+      prev.map((p) => (p.id === id ? { ...p, status: 'applied' } : p))
     );
     setPendingProposalsCount((prev) => Math.max(0, prev - 1));
 
@@ -1150,7 +1155,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
-                {['all', 'pending', 'approved', 'rejected'].map((s) => (
+                {['all', 'pending', 'approved', 'applied', 'rejected'].map((s) => (
                   <button
                     key={s}
                     type="button"

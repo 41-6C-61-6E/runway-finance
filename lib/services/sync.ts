@@ -164,6 +164,71 @@ export async function createAccountSnapshots(userId: string, dek: Uint8Array, sn
   }
 }
 
+const userRebuildQueues = new Map<string, NodeJS.Timeout>();
+const userRebuildChains = new Map<string, Promise<void>>();
+const userRebuildWaiters = new Map<string, Set<() => void>>();
+
+function drainRebuildWaiters(userId: string): void {
+  const waiters = userRebuildWaiters.get(userId);
+  if (waiters) {
+    userRebuildWaiters.delete(userId);
+    for (const resolve of waiters) {
+      resolve();
+    }
+  }
+}
+
+function executeSummariesRebuild(userId: string, dek: Uint8Array): Promise<void> {
+  return Promise.all([
+    updateCategorySpendingSummaries(userId, dek),
+    updateCategoryIncomeSummaries(userId, dek),
+    updateMonthlyCashFlowSummaries(userId, dek),
+  ])
+    .then(() => {
+      logger.info('[sync] Coalesced summaries rebuild completed', { userId });
+    })
+    .catch((err) => {
+      logger.error('[sync] Coalesced summaries rebuild failed', { userId, error: err });
+    });
+}
+
+/**
+ * Coalesces and debounces summary table rebuilds for a user.
+ * Rapid consecutive mutations trigger a single consolidated rebuild after a quiet period.
+ * If a rebuild is already in flight, a follow-up pass is chained after it so the
+ * latest mutations are always picked up. The returned promise resolves once the
+ * user's pending rebuild pass (and any in-flight pass ahead of it) has completed.
+ */
+export function triggerUserSummariesRebuild(userId: string, dek: Uint8Array, delayMs = 300): Promise<void> {
+  const existingTimer = userRebuildQueues.get(userId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+
+  const timer = setTimeout(() => {
+    userRebuildQueues.delete(userId);
+    const previous = userRebuildChains.get(userId);
+    const chained = previous
+      ? (previous as Promise<void>).then(() => executeSummariesRebuild(userId, dek))
+      : executeSummariesRebuild(userId, dek);
+    const tracked = (chained as Promise<void>).finally(() => {
+      if (userRebuildChains.get(userId) === (tracked as Promise<void>)) {
+        userRebuildChains.delete(userId);
+      }
+    }) as Promise<void>;
+    userRebuildChains.set(userId, tracked);
+    void tracked.then(() => drainRebuildWaiters(userId));
+  }, delayMs);
+
+  userRebuildQueues.set(userId, timer);
+
+  return new Promise<void>((resolve) => {
+    const waiters = userRebuildWaiters.get(userId) ?? new Set<() => void>();
+    waiters.add(resolve);
+    userRebuildWaiters.set(userId, waiters);
+  });
+}
+
 export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8Array): Promise<{ monthsUpdated: number; transactionsProcessed: number }> {
   const userAccounts = await getDb()
     .select()
@@ -1221,12 +1286,12 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       logger.error(`${LOG_TAG} Failed to delete old pending transactions (non-fatal):`, err);
     });
 
-    await updateMonthlyCashFlowSummaries(dataUserId, dek);
-    await updateCategorySpendingSummaries(dataUserId, dek);
-    await updateCategoryIncomeSummaries(dataUserId, dek);
+    // Rebuild summary tables (coalesced); wait for the fresh data before running alerts
+    const summariesReady = triggerUserSummariesRebuild(dataUserId, dek);
 
     // Trigger custom cash flow alerts check
     const { checkCashFlowAlerts } = await import('@/lib/services/notifications');
+    await summariesReady;
     checkCashFlowAlerts(dataUserId, dek).catch((e) => {
       logger.error('[sync] Failed to check cash flow alerts:', e);
     });

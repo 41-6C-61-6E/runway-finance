@@ -3,6 +3,13 @@ services:
     image: postgres:16-alpine
     container_name: finance-db
     restart: unless-stopped
+    command: >
+      postgres
+      -c max_connections=50
+      -c shared_buffers=256MB
+      -c work_mem=16MB
+      -c maintenance_work_mem=64MB
+      -c effective_cache_size=768MB
     env_file:
       - .env
     environment:
@@ -33,6 +40,7 @@ services:
     environment:
       - NEXTAUTH_URL=${NEXTAUTH_URL}        # URL where login page and app are hosted
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}  # Admin set KEY used for authenticaiton
+      - UV_THREADPOOL_SIZE=16
 
       #Not implemented yet
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}

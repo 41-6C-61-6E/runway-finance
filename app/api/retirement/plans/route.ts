@@ -13,7 +13,7 @@ import { populatePlanWithUserFinances } from '@/lib/services/plan-auto-populator
 import { getSystemTaxRules } from '@/lib/services/system-tax-rules-service';
 
 /** Shared helper: hydrate a plan row with all sub-entities + run simulation */
-async function hydratePlan(planRow: any, dek: Uint8Array) {
+async function hydratePlan(planRow: any, dek: Uint8Array, preloadedTaxRules?: any) {
   const decPlan = await decryptRow('plans', planRow, dek);
   const currentYear = new Date().getFullYear();
 
@@ -24,7 +24,7 @@ async function hydratePlan(planRow: any, dek: Uint8Array) {
     getDb().select().from(planFlows).where(eq(planFlows.planId, planRow.id)),
     getDb().select().from(planSettings).where(eq(planSettings.planId, planRow.id)).limit(1),
     getDb().select().from(planLiabilities).where(eq(planLiabilities.planId, planRow.id)),
-    getSystemTaxRules(2026),
+    preloadedTaxRules ? Promise.resolve(preloadedTaxRules) : getSystemTaxRules(2026),
   ]);
 
   const decAccounts = await Promise.all(rawAccounts.map((a) => decryptRow('plan_accounts', a, dek)));
@@ -223,15 +223,18 @@ export async function GET(req: NextRequest) {
     const dek = await getSessionDEK();
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
-    // Fetch user plans
-    let dbPlans = await getDb().select().from(plans).where(eq(plans.userId, dataUserId));
+    // Fetch user plans and tax rules in parallel
+    const [dbPlans, taxRules] = await Promise.all([
+      getDb().select().from(plans).where(eq(plans.userId, dataUserId)),
+      getSystemTaxRules(2026),
+    ]);
 
     if (dbPlans.length === 0) {
       return NextResponse.json([]);
     }
 
     const decryptedPlans = await Promise.all(
-      dbPlans.map((p) => hydratePlan(p, dek))
+      dbPlans.map((p) => hydratePlan(p, dek, taxRules))
     );
 
     return NextResponse.json(decryptedPlans);

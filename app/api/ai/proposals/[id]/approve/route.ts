@@ -132,7 +132,7 @@ export async function POST(
 
     await db
       .update(aiProposals)
-      .set({ status: 'approved', updatedAt: new Date(), payload })
+      .set({ status: 'applied', updatedAt: new Date(), payload })
       .where(eq(aiProposals.id, id));
 
     // If we created a category, find and update dependent proposals

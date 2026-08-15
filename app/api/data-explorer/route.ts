@@ -298,6 +298,51 @@ function buildWhereClause(
   return and(...conditions);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:?\d{2})?$/;
+
+/**
+ * Coerces a client-provided filter value to a safe native value for the target
+ * column. Returns null when the value cannot be pushed down to SQL (e.g. invalid
+ * format for the column type), in which case the filter must be applied in memory.
+ */
+function coercePushdownValue(col: any, field: string, value: unknown): any {
+  if (value === undefined || value === null) return null;
+  const dataType: string | undefined = col?.dataType;
+  const s = typeof value === 'string' ? value : String(value);
+
+  if (dataType === 'number') {
+    const num = typeof value === 'number' ? value : parseFloat(s);
+    return Number.isFinite(num) ? num : null;
+  }
+  if (dataType === 'bigint') {
+    const num = typeof value === 'number' ? value : parseFloat(s);
+    return Number.isInteger(num) && Number.isSafeInteger(num) ? s : null;
+  }
+  if (dataType === 'boolean') {
+    if (typeof value === 'boolean') return value;
+    if (s === 'true' || s === 'false') return s === 'true';
+    return null;
+  }
+  if (dataType === 'json') return null;
+
+  // dataType 'date' covers both PG date and timestamp columns; use columnType
+  // (PgDate vs PgTimestamp*) for exact disambiguation, field name as fallback.
+  if (dataType === 'date' || field.endsWith('_at') || field.endsWith('_date') || field === 'date') {
+    const columnType = String(col?.columnType ?? '');
+    const isTimestamp = columnType.startsWith('PgTimestamp') || (!columnType && field.endsWith('_at'));
+    if (isTimestamp) return DATE_RE.test(s) || DATETIME_RE.test(s) ? s : null;
+    return DATE_RE.test(s) ? s : null;
+  }
+
+  // string-ish columns (text, varchar, uuid)
+  if (field === 'id' || field.endsWith('_id')) {
+    return UUID_RE.test(s) ? s : null;
+  }
+  return s;
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -355,20 +400,110 @@ export async function GET(request: Request) {
     const db = getDb();
     const tableCols = getTableColumns(table);
 
-    // 1. Fetch all rows for the user from the database
     const userIdCol = tableCols['userId'] || (table as any).userId;
     const baseConditions = userIdCol ? [eq(userIdCol, dataUserId)] : [];
-    
+    const encryptedFields = ENCRYPTED_FIELDS[tableKey];
+
+    const pushdownConditions = [...baseConditions];
+    const inMemoryFilters: typeof parsedFilters = [];
+
+    for (const f of parsedFilters) {
+      const col = tableCols[f.field];
+      const isEncrypted = encryptedFields?.includes(f.field);
+      if (col && !isEncrypted) {
+        if (f.op === 'isNull') {
+          pushdownConditions.push(isNull(col));
+        } else if (f.op === 'isNotNull') {
+          pushdownConditions.push(isNotNull(col));
+        } else if (f.op === 'in') {
+          const rawValues: unknown[] = Array.isArray(f.value) ? f.value : f.value === undefined ? [] : [f.value];
+          const coerced = rawValues.map((v) => coercePushdownValue(col, f.field, v));
+          if (rawValues.length > 0 && coerced.every((v) => v !== null)) {
+            pushdownConditions.push(inArray(col, coerced));
+          } else {
+            inMemoryFilters.push(f);
+          }
+        } else {
+          const coerced = coercePushdownValue(col, f.field, f.value);
+          if (coerced === null) {
+            // Value not safe for SQL pushdown (bad format for column type) — filter in memory
+            inMemoryFilters.push(f);
+          } else if (f.op === 'eq') pushdownConditions.push(eq(col, coerced));
+          else if (f.op === 'neq') pushdownConditions.push(ne(col, coerced));
+          else if (f.op === 'gt') pushdownConditions.push(gt(col, coerced));
+          else if (f.op === 'gte') pushdownConditions.push(gte(col, coerced));
+          else if (f.op === 'lt') pushdownConditions.push(lt(col, coerced));
+          else if (f.op === 'lte') pushdownConditions.push(lte(col, coerced));
+          else inMemoryFilters.push(f); // 'contains' and any future ops
+        }
+      } else {
+        inMemoryFilters.push(f);
+      }
+    }
+
+    const sortColName = sort || config.defaultSort;
+    const sortCol = tableCols[sortColName];
+    const isSortEncrypted = encryptedFields?.includes(sortColName);
+    const sortOrder = order || config.defaultSortOrder;
+
+    // Fast path: SQL pagination when no in-memory filters, search, or encrypted sort are required
+    const canSqlPaginate = inMemoryFilters.length === 0 && !search && (!isSortEncrypted || !sortCol);
+
+    if (canSqlPaginate) {
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(table)
+        .where(and(...pushdownConditions))
+        .limit(1);
+
+      const total = Number(countRow?.count ?? 0);
+      let query = db
+        .select()
+        .from(table)
+        .where(and(...pushdownConditions));
+
+      if (sortCol) {
+        query = query.orderBy(sortOrder === 'asc' ? asc(sortCol) : desc(sortCol)) as any;
+      }
+
+      const pagedRows = await query.limit(limit).offset(offset);
+      const decrypted = encryptedFields ? await decryptRows(tableKey, pagedRows, dek) : pagedRows;
+      const columns = extractColumns(table, config.columnOverrides);
+
+      const sanitizedPaginated = decrypted.map((row) => {
+        const sanitized: Record<string, unknown> = { ...row };
+        for (const [field, override] of Object.entries(config.columnOverrides)) {
+          if (override?.hidden) {
+            delete sanitized[field];
+          }
+        }
+        return sanitized;
+      });
+
+      return NextResponse.json({
+        data: sanitizedPaginated,
+        total,
+        limit,
+        offset,
+        columns,
+        table: {
+          key: tableKey,
+          label: config.label,
+          group: config.group,
+        },
+      });
+    }
+
+    // Fallback path: Fetch matching pushdown rows and filter/sort in memory
     const rawData = await db
       .select()
       .from(table)
-      .where(and(...baseConditions));
+      .where(and(...pushdownConditions));
 
-    // 2. Decrypt all rows
-    const encryptedFields = ENCRYPTED_FIELDS[tableKey];
+    // Decrypt rows
     const decrypted = encryptedFields ? await decryptRows(tableKey, rawData, dek) : rawData;
 
-    // 3. Filter in memory
+    // Filter in memory
     const columns = extractColumns(table, config.columnOverrides);
     const colTypes = new Map<string, ColumnMeta['type']>();
     for (const c of columns) {
@@ -377,8 +512,8 @@ export async function GET(request: Request) {
 
     let filtered = decrypted;
 
-    // Apply filter rules in memory
-    for (const f of parsedFilters) {
+    // Apply remaining filter rules in memory
+    for (const f of inMemoryFilters) {
       const type = colTypes.get(f.field) || 'string';
       filtered = filtered.filter((row) => {
         const val = row[f.field];

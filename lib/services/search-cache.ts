@@ -4,7 +4,8 @@ import { eq, and, or } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
-const CACHE_TTL_MS = 1 * 60 * 60 * 1000;
+const CACHE_TTL_MS = process.env.SEARCH_CACHE_TTL_MS ? parseInt(process.env.SEARCH_CACHE_TTL_MS, 10) : 30 * 60 * 1000; // 30 minutes
+const MAX_CACHED_USERS = process.env.SEARCH_CACHE_MAX_USERS ? parseInt(process.env.SEARCH_CACHE_MAX_USERS, 10) : 5;
 
 export interface CachedTransaction {
   description: string;
@@ -25,6 +26,9 @@ export interface UserCacheEntry {
   transactions: Map<string, CachedTransaction>;
   status: 'uninitialized' | 'hydrating' | 'ready';
   promise?: Promise<void>;
+  /** When the cache data was last generated/hydrated (drives TTL expiry). */
+  generatedAt: number;
+  /** Last access time (drives LRU evict order only). */
   touchedAt: number;
 }
 
@@ -32,7 +36,7 @@ export class SimpleLRUCache<K, V> {
   private max: number;
   private cache: Map<K, V>;
 
-  constructor(max: number = 5) {
+  constructor(max: number = MAX_CACHED_USERS) {
     this.max = max;
     this.cache = new Map<K, V>();
   }
@@ -82,7 +86,7 @@ const globalForSearchCache = globalThis as unknown as {
   userCache?: SimpleLRUCache<string, UserCacheEntry>;
 };
 
-const userCache = globalForSearchCache.userCache ?? new SimpleLRUCache<string, UserCacheEntry>(5);
+const userCache = globalForSearchCache.userCache ?? new SimpleLRUCache<string, UserCacheEntry>(MAX_CACHED_USERS);
 
 if (process.env.NODE_ENV !== 'production') {
   globalForSearchCache.userCache = userCache;
@@ -90,11 +94,17 @@ if (process.env.NODE_ENV !== 'production') {
 
 function getUserEntry(userId: string): UserCacheEntry {
   let entry = userCache.get(userId);
+  if (entry && entry.status === 'ready' && Date.now() - entry.generatedAt >= CACHE_TTL_MS) {
+    userCache.delete(userId);
+    entry = undefined;
+  }
   if (!entry) {
+    const now = Date.now();
     entry = {
       transactions: new Map(),
       status: 'uninitialized',
-      touchedAt: Date.now(),
+      generatedAt: now,
+      touchedAt: now,
     };
     userCache.set(userId, entry);
   }
@@ -108,8 +118,8 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
   const entry = getUserEntry(userId);
 
   if (entry.status === 'ready') {
-    if (Date.now() - entry.touchedAt < CACHE_TTL_MS) {
-      entry.touchedAt = Date.now(); // update LRU access time
+    if (Date.now() - entry.generatedAt < CACHE_TTL_MS) {
+      entry.touchedAt = Date.now(); // update LRU access time only; expiry is keyed on generatedAt
       userCache.set(userId, entry); // refresh LRU order
       return;
     }
@@ -192,6 +202,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
 
       entry.transactions = transactionsMap;
       entry.status = 'ready';
+      entry.generatedAt = Date.now();
       entry.touchedAt = Date.now();
       userCache.set(userId, entry); // refresh LRU order
       logger.info('Search cache hydrated successfully', { userId, count: transactionsMap.size });

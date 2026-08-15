@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
 
+const activeConnectionSyncs = new Set<string>();
+
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -16,56 +18,71 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const userId = session.user.id;
 
-  // Verify ownership in SimpleFIN
-  let isSimplefin = true;
-  let [connection] = await getDb()
-    .select()
-    .from(simplifinConnections)
-    .where(eq(simplifinConnections.id, id))
-    .limit(1);
+  if (activeConnectionSyncs.has(id)) {
+    logger.info('Manual sync already running for connection, returning early', { connectionId: id, userId });
+    return NextResponse.json(
+      {
+        status: 'already_running',
+        alreadyRunning: true,
+        message: 'A sync is already in progress for this connection',
+      },
+      { status: 200 }
+    );
+  }
 
-  if (!connection) {
-    isSimplefin = false;
-    const [plaidConn] = await getDb()
+  activeConnectionSyncs.add(id);
+
+  try {
+    // Verify ownership in SimpleFIN
+    let isSimplefin = true;
+    let [connection] = await getDb()
       .select()
-      .from(plaidConnections)
-      .where(eq(plaidConnections.id, id))
+      .from(simplifinConnections)
+      .where(eq(simplifinConnections.id, id))
       .limit(1);
-    connection = plaidConn as any;
-  }
 
-  if (!connection) {
-    return NextResponse.json(
-      { error: 'not_found', message: 'Connection not found' },
-      { status: 404 }
-    );
-  }
+    if (!connection) {
+      isSimplefin = false;
+      const [plaidConn] = await getDb()
+        .select()
+        .from(plaidConnections)
+        .where(eq(plaidConnections.id, id))
+        .limit(1);
+      connection = plaidConn as any;
+    }
 
-  const { resolveDataUserId } = await import('@/lib/sharing');
-  const requestingDataUserId = await resolveDataUserId(userId);
-  const connectionDataUserId = await resolveDataUserId(connection.userId);
+    if (!connection) {
+      return NextResponse.json(
+        { error: 'not_found', message: 'Connection not found' },
+        { status: 404 }
+      );
+    }
 
-  if (connectionDataUserId !== requestingDataUserId) {
-    return NextResponse.json(
-      { error: 'forbidden', message: 'You do not own this connection' },
-      { status: 403 }
-    );
-  }
+    const { resolveDataUserId } = await import('@/lib/sharing');
+    const requestingDataUserId = await resolveDataUserId(userId);
+    const connectionDataUserId = await resolveDataUserId(connection.userId);
 
-  let result: any;
-  if (isSimplefin) {
-    const { syncConnection } = await import('@/lib/services/sync');
-    result = await syncConnection(id, userId);
-  } else {
-    const { syncPlaidConnection } = await import('@/lib/services/plaid-sync');
-    result = await syncPlaidConnection(id, userId);
-  }
+    if (connectionDataUserId !== requestingDataUserId) {
+      return NextResponse.json(
+        { error: 'forbidden', message: 'You do not own this connection' },
+        { status: 403 }
+      );
+    }
 
-  if (result.status === 'success') {
-    logger.info('Sync completed', { connectionId: id, userId, isSimplefin, accountsSynced: result.accountsSynced, transactionsNew: result.transactionsNew });
-  } else {
-    logger.error('Sync failed', { connectionId: id, userId, isSimplefin, error: result.errorMessage });
-  }
+    let result: any;
+    if (isSimplefin) {
+      const { syncConnection } = await import('@/lib/services/sync');
+      result = await syncConnection(id, userId);
+    } else {
+      const { syncPlaidConnection } = await import('@/lib/services/plaid-sync');
+      result = await syncPlaidConnection(id, userId);
+    }
+
+    if (result.status === 'success') {
+      logger.info('Sync completed', { connectionId: id, userId, isSimplefin, accountsSynced: result.accountsSynced, transactionsNew: result.transactionsNew });
+    } else {
+      logger.error('Sync failed', { connectionId: id, userId, isSimplefin, error: result.errorMessage });
+    }
 
   // Reschedule the sync timer based on the updated lastSyncAt
   let refreshed: any;
@@ -87,14 +104,17 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     await syncScheduler.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt, connection.userId);
   }
 
-  return NextResponse.json({
-    status: result.status,
-    accountsSynced: result.accountsSynced,
-    transactionsFetched: result.transactionsFetched,
-    transactionsNew: result.transactionsNew,
-    transactionsUpdated: result.transactionsUpdated,
-    details: result.details ?? [],
-    durationMs: result.durationMs ?? 0,
-    ...(result.status === 'error' && { error: result.errorMessage }),
-  }, { status: result.status === 'success' ? 200 : 502 });
+    return NextResponse.json({
+      status: result.status,
+      accountsSynced: result.accountsSynced,
+      transactionsFetched: result.transactionsFetched,
+      transactionsNew: result.transactionsNew,
+      transactionsUpdated: result.transactionsUpdated,
+      details: result.details ?? [],
+      durationMs: result.durationMs ?? 0,
+      ...(result.status === 'error' && { error: result.errorMessage }),
+    }, { status: result.status === 'success' ? 200 : 502 });
+  } finally {
+    activeConnectionSyncs.delete(id);
+  }
 }

@@ -113,6 +113,7 @@ vi.mock('@/lib/services/sync', () => ({
   updateMonthlyCashFlowSummaries: vi.fn(),
   updateCategorySpendingSummaries: vi.fn(),
   updateCategoryIncomeSummaries: vi.fn(),
+  triggerUserSummariesRebuild: vi.fn().mockResolvedValue(Promise.resolve()),
   deleteOldPendingTransactions: vi.fn().mockResolvedValue(undefined),
 }));
 

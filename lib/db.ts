@@ -15,12 +15,14 @@ export function getPool(): Pool {
     const max = process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 20;
     const idleTimeoutMillis = process.env.DB_POOL_IDLE_TIMEOUT_MS ? parseInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 10) : 30000;
     const connectionTimeoutMillis = process.env.DB_POOL_CONNECTION_TIMEOUT_MS ? parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT_MS, 10) : 10000;
+    const statementTimeout = process.env.DB_STATEMENT_TIMEOUT_MS ? parseInt(process.env.DB_STATEMENT_TIMEOUT_MS, 10) : 60000;
 
     pool = new Pool({
       connectionString: DATABASE_URL,
       max,
       idleTimeoutMillis,
       connectionTimeoutMillis,
+      statement_timeout: statementTimeout,
     });
 
     pool.on('error', (err) => {

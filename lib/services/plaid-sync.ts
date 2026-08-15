@@ -24,9 +24,7 @@ import { resolveDataUserId } from '@/lib/sharing';
 import {
   createAccountSnapshots,
   createNetWorthSnapshot,
-  updateCategoryIncomeSummaries,
-  updateCategorySpendingSummaries,
-  updateMonthlyCashFlowSummaries,
+  triggerUserSummariesRebuild,
   deleteOldPendingTransactions
 } from '@/lib/services/sync';
 
@@ -205,13 +203,10 @@ export async function syncPlaidConnection(
       const now = new Date();
 
       // On first sync: pull max 2 years of investment history.
-      // On subsequent syncs: go back to connection creation date (or 60 days as a buffer), whichever is further.
+      // On subsequent syncs: pull 60 days buffer.
       let startDate: Date;
       if (isFirstSync) {
         startDate = new Date(now.getTime() - 730 * 24 * 60 * 60 * 1000);
-      } else if (connection.createdAt) {
-        // Use connection creation date minus a 14-day overlap buffer
-        startDate = new Date(connection.createdAt.getTime() - 14 * 24 * 60 * 60 * 1000);
       } else {
         startDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
       }
@@ -748,9 +743,12 @@ export async function syncPlaidConnection(
     await createAccountSnapshots(dataUserId, dek, today);
 
     // Historical snapshot generation
-    // Generate synthetic snapshots covering the full transaction history pulled from Plaid.
-    // No watermark — run the full two-pass reconstruction from earliestTx all the way to today.
-    // The anchor is the real snapshot written by createAccountSnapshots() above (today's balance).
+    // On first sync or new accounts, generate full history.
+    // On subsequent syncs, use a watermark date (60 days ago) to only recompute the tail.
+    const watermarkDate = !isFirstSync && !hasNewAccounts
+      ? new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      : undefined;
+
     for (const plaidAcc of plaidAccountsList) {
       const accountId = externalIdToAccountId.get(plaidAcc.account_id);
       if (!accountId) continue;
@@ -768,8 +766,8 @@ export async function syncPlaidConnection(
           dataUserId,
           earliestTx,
           toDateStr,
-          dek
-          // No watermarkDate — generate the full range so all years of history are covered
+          dek,
+          watermarkDate
         );
       }
     }
@@ -785,12 +783,12 @@ export async function syncPlaidConnection(
       logger.error(`${LOG_TAG} Failed to delete old pending transactions (non-fatal):`, err);
     });
 
-    await updateMonthlyCashFlowSummaries(dataUserId, dek);
-    await updateCategorySpendingSummaries(dataUserId, dek);
-    await updateCategoryIncomeSummaries(dataUserId, dek);
+    // Rebuild summary tables (coalesced); wait for the fresh data before running alerts
+    const summariesReady = triggerUserSummariesRebuild(dataUserId, dek);
 
     // Trigger custom cash flow alerts check
     const { checkCashFlowAlerts } = await import('@/lib/services/notifications');
+    await summariesReady;
     checkCashFlowAlerts(dataUserId, dek).catch((e) => {
       logger.error('[plaid-sync] Failed to check cash flow alerts:', e);
     });
