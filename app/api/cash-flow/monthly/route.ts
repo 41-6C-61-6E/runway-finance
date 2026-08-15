@@ -88,13 +88,15 @@ export async function GET(request: Request) {
           .where(eq(categories.userId, dataUserId));
         const catById = new Map(allCategories.map(cat => [cat.id.toString(), cat]));
 
+        const startDateStr = `${startYearMonth}-01`;
         const conditions = [
-              inArray(transactions.accountId, userAccounts.map(a => a.id)),
-              eq(transactions.deleted, false),
-              eq(transactions.pending, false),
-              eq(transactions.ignored, false),
-              eq(transactions.isImported, false),
-            ];
+          inArray(transactions.accountId, userAccounts.map(a => a.id)),
+          eq(transactions.deleted, false),
+          eq(transactions.pending, false),
+          eq(transactions.ignored, false),
+          eq(transactions.isImported, false),
+          gte(transactions.date, startDateStr),
+        ];
         if (!isPaystubEnabled) {
           conditions.push(ne(transactions.source, 'paystub'));
         }
@@ -108,9 +110,20 @@ export async function GET(request: Request) {
           .from(transactions)
           .where(and(...conditions));
 
+        const decryptedTxns = await Promise.all(
+          allTransactions.map(async (tx) => {
+            const amount = parseFloat(await decryptField(tx.amount, dek)) || 0;
+            return {
+              date: tx.date,
+              amount,
+              categoryId: tx.categoryId,
+            };
+          })
+        );
+
         const monthlyData: Record<string, { income: number; expenses: number }> = {};
 
-        for (const tx of allTransactions) {
+        for (const tx of decryptedTxns) {
           const category = tx.categoryId ? catById.get(tx.categoryId.toString()) : undefined;
           let excluded = category?.excludeFromReports ?? false;
           if (!excluded && category?.parentId) {
@@ -122,7 +135,7 @@ export async function GET(request: Request) {
           const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
           const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
           const ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
-          const amount = parseFloat(await decryptField(tx.amount, dek)) || 0;
+          const amount = tx.amount;
 
           if (!monthlyData[ym]) {
             monthlyData[ym] = { income: 0, expenses: 0 };

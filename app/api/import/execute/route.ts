@@ -8,7 +8,7 @@ import { transactions, accountSnapshots, accounts, categories, importLog } from 
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots, formatToCents, roundToCents } from '@/lib/services/account-history';
-import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
+import { triggerUserSummariesRebuild } from '@/lib/services/sync';
 import { logger } from '@/lib/logger';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
@@ -173,97 +173,104 @@ export async function POST(request: Request) {
     let recordsSkipped = 0;
     let recordsErrored = 0;
 
-    // Process allRows and encrypt fields in parallel
-    const mappedRows = await Promise.all(
-      parsed.allRows.map(async (row) => {
-        try {
-          const mapped: Record<string, string> = {};
-          for (const [csvCol, value] of Object.entries(row)) {
-            const systemField = csvToSystem[csvCol];
-            if (systemField) {
-              mapped[systemField] = value;
-            }
-          }
+    // Process allRows and encrypt fields in bounded chunks (250 rows/batch)
+    const mappedRows: any[] = [];
+    const CHUNK_SIZE = 250;
 
-          if (mapped.date) {
-            const parsedRowDate = parseDateField(mapped.date, importType === 'account_snapshots' ? snapshotDayOfMonth : undefined);
-            if (startDate && parsedRowDate < startDate) {
+    for (let chunkIdx = 0; chunkIdx < parsed.allRows.length; chunkIdx += CHUNK_SIZE) {
+      const chunk = parsed.allRows.slice(chunkIdx, chunkIdx + CHUNK_SIZE);
+      const chunkResults = await Promise.all(
+        chunk.map(async (row) => {
+          try {
+            const mapped: Record<string, string> = {};
+            for (const [csvCol, value] of Object.entries(row)) {
+              const systemField = csvToSystem[csvCol];
+              if (systemField) {
+                mapped[systemField] = value;
+              }
+            }
+
+            if (mapped.date) {
+              const parsedRowDate = parseDateField(mapped.date, importType === 'account_snapshots' ? snapshotDayOfMonth : undefined);
+              if (startDate && parsedRowDate < startDate) {
+                return { skipped: true };
+              }
+              if (endDate && parsedRowDate > endDate) {
+                return { skipped: true };
+              }
+            }
+
+            const csvAccountRef = mapped.account;
+            if (!csvAccountRef) {
               return { skipped: true };
             }
-            if (endDate && parsedRowDate > endDate) {
+
+            const resolved = accountIdByRef.get(csvAccountRef);
+            if (!resolved || resolved === EXCLUDED) {
               return { skipped: true };
             }
-          }
+            const resolvedAccountId = resolved;
+            const resolvedCategoryId = mapped.category ? categoryIdByName.get(mapped.category) : null;
+            const externalId = 'imported-' + randomUUID();
 
-          const csvAccountRef = mapped.account;
-          if (!csvAccountRef) {
-            return { skipped: true };
-          }
+            if (importType === 'transactions') {
+              const rawAmount = mapped.amount?.replace(/[^0-9.\-]/g, '') || '0';
+              let parsedAmount = parseFloat(rawAmount);
+              if (isNaN(parsedAmount)) parsedAmount = 0;
 
-          const resolved = accountIdByRef.get(csvAccountRef);
-          if (!resolved || resolved === EXCLUDED) {
-            return { skipped: true };
-          }
-          const resolvedAccountId = resolved;
-          const resolvedCategoryId = mapped.category ? categoryIdByName.get(mapped.category) : null;
-          const externalId = 'imported-' + randomUUID();
+              if (mapped.type) {
+                parsedAmount = determineTransactionSign(parsedAmount, mapped.type);
+              }
 
-          if (importType === 'transactions') {
-            const rawAmount = mapped.amount?.replace(/[^0-9.\-]/g, '') || '0';
-            let parsedAmount = parseFloat(rawAmount);
-            if (isNaN(parsedAmount)) parsedAmount = 0;
+              const encryptedAmount = await encryptField(formatToCents(roundToCents(parsedAmount)), dek);
+              const encryptedDescription = await encryptField(mapped.description || '', dek);
+              const encryptedPayee = mapped.payee ? await encryptField(mapped.payee, dek) : null;
+              const encryptedMemo = mapped.memo ? await encryptField(mapped.memo, dek) : null;
+              const encryptedNotes = mapped.notes ? await encryptField(mapped.notes, dek) : null;
 
-            if (mapped.type) {
-              parsedAmount = determineTransactionSign(parsedAmount, mapped.type);
+              return {
+                type: 'transaction',
+                data: {
+                  userId: dataUserId,
+                  accountId: resolvedAccountId,
+                  externalId,
+                  date: parseDateField(mapped.date),
+                  amount: encryptedAmount,
+                  description: encryptedDescription,
+                  payee: encryptedPayee ?? undefined,
+                  memo: encryptedMemo ?? undefined,
+                  notes: encryptedNotes ?? undefined,
+                  categoryId: resolvedCategoryId ?? undefined,
+                  isImported: true,
+                  importId,
+                  reviewed: true,
+                },
+              };
+            } else {
+              const rawBalance = parseFloat(mapped.balance?.replace(/[^0-9.\-]/g, '') || '0');
+              const roundedBalance = isNaN(rawBalance) ? 0 : roundToCents(rawBalance);
+              const encryptedBalance = await encryptField(formatToCents(roundedBalance), dek);
+
+              return {
+                type: 'snapshot',
+                data: {
+                  userId: dataUserId,
+                  accountId: resolvedAccountId,
+                  snapshotDate: parseDateField(mapped.date, snapshotDayOfMonth ?? 'end'),
+                  balance: encryptedBalance,
+                  isImported: true,
+                  importId,
+                  isSynthetic: false,
+                },
+              };
             }
-
-            const encryptedAmount = await encryptField(formatToCents(roundToCents(parsedAmount)), dek);
-            const encryptedDescription = await encryptField(mapped.description || '', dek);
-            const encryptedPayee = mapped.payee ? await encryptField(mapped.payee, dek) : null;
-            const encryptedMemo = mapped.memo ? await encryptField(mapped.memo, dek) : null;
-            const encryptedNotes = mapped.notes ? await encryptField(mapped.notes, dek) : null;
-
-            return {
-              type: 'transaction',
-              data: {
-                userId: dataUserId,
-                accountId: resolvedAccountId,
-                externalId,
-                date: parseDateField(mapped.date),
-                amount: encryptedAmount,
-                description: encryptedDescription,
-                payee: encryptedPayee ?? undefined,
-                memo: encryptedMemo ?? undefined,
-                notes: encryptedNotes ?? undefined,
-                categoryId: resolvedCategoryId ?? undefined,
-                isImported: true,
-                importId,
-                reviewed: true,
-              },
-            };
-          } else {
-            const rawBalance = parseFloat(mapped.balance?.replace(/[^0-9.\-]/g, '') || '0');
-            const roundedBalance = isNaN(rawBalance) ? 0 : roundToCents(rawBalance);
-            const encryptedBalance = await encryptField(formatToCents(roundedBalance), dek);
-
-            return {
-              type: 'snapshot',
-              data: {
-                userId: dataUserId,
-                accountId: resolvedAccountId,
-                snapshotDate: parseDateField(mapped.date, snapshotDayOfMonth ?? 'end'),
-                balance: encryptedBalance,
-                isImported: true,
-                importId,
-                isSynthetic: false,
-              },
-            };
+          } catch (err) {
+            return { errored: true };
           }
-        } catch (err) {
-          return { errored: true };
-        }
-      })
-    );
+        })
+      );
+      mappedRows.push(...chunkResults);
+    }
 
     for (const res of mappedRows) {
       if (res.skipped) {
@@ -461,11 +468,9 @@ export async function POST(request: Request) {
       // Historically recalculate the daily net worth snapshots table
       await recalculateNetWorthSnapshots(dataUserId, dek);
 
-      // Update cash flow, category spending, and category income summaries for charts
-      await updateMonthlyCashFlowSummaries(dataUserId, dek);
-      await updateCategorySpendingSummaries(dataUserId, dek);
-      await updateCategoryIncomeSummaries(dataUserId, dek);
-      logger.info(`[import/execute] Successfully updated summaries, regenerated snapshots, and updated account balances.`);
+      // Schedule coalesced summary rebuilds (cash flow, category spending, category income)
+      triggerUserSummariesRebuild(dataUserId, dek);
+      logger.info(`[import/execute] Snapshots regenerated; summaries rebuild scheduled.`);
     } catch (postImportError) {
       const msg = postImportError instanceof Error ? postImportError.message : String(postImportError);
       logger.error(`[import/execute] Error in post-import snapshot/summary updates`, { error: msg });

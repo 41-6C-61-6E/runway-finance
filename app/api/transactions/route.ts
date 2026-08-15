@@ -36,6 +36,7 @@ import { getAccountGroupTypes } from "@/lib/constants/account-types";
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from "@/lib/crypto";
 import { sanitizeText } from "@/lib/utils/sanitize";
 import {
+  triggerUserSummariesRebuild,
   updateCategorySpendingSummaries,
   updateCategoryIncomeSummaries,
   updateMonthlyCashFlowSummaries,
@@ -678,16 +679,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ totalAmount });
   }
 
-  // Get total count (before in-memory filters)
-  const [totalRow] = await getDb()
-    .select({ count: sql<number>`count(*)` })
-    .from(transactions)
-    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-    .where(and(...whereConditions))
-    .limit(1);
-
-  const totalBeforeFilters = totalRow?.count ?? 0;
-
   const hasEncryptedFilters = !!(
     filters.minAmount !== undefined ||
     filters.maxAmount !== undefined ||
@@ -699,6 +690,15 @@ export async function GET(request: Request) {
 
   // If we can paginate in the database, do so! (Massive speedup for page loads/nav)
   if (!hasEncryptedFilters && !isEncryptedSort) {
+    // Get total count for SQL path
+    const [totalRow] = await getDb()
+      .select({ count: sql<number>`count(*)` })
+      .from(transactions)
+      .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+      .where(and(...whereConditions))
+      .limit(1);
+
+    const totalBeforeFilters = totalRow?.count ?? 0;
     let orderByClause;
     if (filters.sort === "date") {
       orderByClause =
@@ -1431,14 +1431,7 @@ export async function PATCH(request: Request) {
   }
 
   invalidateUserSearchCache(dataUserId);
-
-  Promise.all([
-    updateCategorySpendingSummaries(dataUserId, dek),
-    updateCategoryIncomeSummaries(dataUserId, dek),
-    updateMonthlyCashFlowSummaries(dataUserId, dek),
-  ]).catch((err) => {
-    logger.error("Background summaries rebuild failed", { userId, error: err });
-  });
+  triggerUserSummariesRebuild(dataUserId, dek);
 
   logger.info("Transactions patched", { updatedCount: updated.length });
   return NextResponse.json({ updated: updated.length });
@@ -1527,14 +1520,7 @@ export async function POST(request: Request) {
   }
 
   invalidateUserSearchCache(dataUserId);
-
-  Promise.all([
-    updateCategorySpendingSummaries(dataUserId, dek),
-    updateCategoryIncomeSummaries(dataUserId, dek),
-    updateMonthlyCashFlowSummaries(dataUserId, dek),
-  ]).catch((err) => {
-    logger.error("Background summaries rebuild failed after create", { userId, error: err });
-  });
+  triggerUserSummariesRebuild(dataUserId, dek);
 
   return NextResponse.json(created, { status: 201 });
 }
@@ -1788,17 +1774,7 @@ export async function DELETE(request: Request) {
   }
 
   invalidateUserSearchCache(dataUserId);
-
-  Promise.all([
-    updateCategorySpendingSummaries(dataUserId, dek),
-    updateCategoryIncomeSummaries(dataUserId, dek),
-    updateMonthlyCashFlowSummaries(dataUserId, dek),
-  ]).catch((err) => {
-    logger.error("Background summaries rebuild failed after bulk DELETE", {
-      userId,
-      error: err,
-    });
-  });
+  triggerUserSummariesRebuild(dataUserId, dek);
 
   logger.info("Transactions deleted", { deletedCount: updated.length });
   return NextResponse.json({ updated: updated.length });

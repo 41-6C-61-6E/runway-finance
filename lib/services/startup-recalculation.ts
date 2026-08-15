@@ -209,11 +209,18 @@ export async function runBackgroundRecalculation(
   });
 }
 
-export async function recalculateAllSnapshots(): Promise<void> {
+export async function recalculateAllSnapshots(force = false): Promise<void> {
+  // Only run startup recalculation if explicitly requested via env (e.g. after schema migration) or forced
+  const startupRecalcEnabled = process.env.RECALCULATE_ON_STARTUP === 'true' || force;
+  if (!startupRecalcEnabled) {
+    logger.info('[startup-recalculation] Startup recalculation skipped (snapshots are up to date; set RECALCULATE_ON_STARTUP=true to force on boot)');
+    return;
+  }
+
   // Defer startup recalculation by 8 seconds to allow server to boot and handle initial requests cleanly
   setTimeout(() => {
     logger.info('[startup-recalculation] Triggering deferred startup recalculation');
-    runBackgroundRecalculation().catch((err: unknown) => {
+    runBackgroundRecalculation(force).catch((err: unknown) => {
       logger.error('[startup-recalculation] Startup recalculation run error', { error: err });
     });
   }, 8000);

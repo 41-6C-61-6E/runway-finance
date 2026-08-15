@@ -184,7 +184,7 @@ export const aiProposals = pgTable('ai_proposals', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),
   type: text('type').notNull(), // 'categorize' | 'create_category' | 'create_rule'
-  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected' | 'applied'
   confidence: text('confidence'),
   payload: jsonb('payload').notNull().$type<AiProposalPayload>(),
   explanation: text('explanation'),

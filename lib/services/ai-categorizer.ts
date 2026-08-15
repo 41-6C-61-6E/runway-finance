@@ -1,7 +1,7 @@
 import { getDb } from '@/lib/db';
 import { resolveDataUserId } from '@/lib/sharing';
 import { transactions, categories as categoriesTable, categoryRules, userSettings, aiProposals, accounts, aiProviders } from '@/lib/db/schema';
-import { eq, and, or, isNull, asc, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, asc, gt, inArray, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypto';
@@ -12,6 +12,7 @@ import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[ai-categorizer]';
 const BATCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per batch
+const activeAiAnalysisUsers = new Set<string>();
 
 type TransactionInfo = {
   index: number;
@@ -56,6 +57,13 @@ export async function analyzeUncategorized(
   onLog?: (message: string) => void,
   abortController?: AbortController,
 ): Promise<{ proposalsCreated: number; autoApproved: number; errors: string[] }> {
+  if (activeAiAnalysisUsers.has(userId)) {
+    logger.info(`${LOG_TAG} Analysis already in progress for user, skipping duplicate run`, { userId });
+    onLog?.('Analysis already in progress for this user.');
+    return { proposalsCreated: 0, autoApproved: 0, errors: ['Analysis already in progress'] };
+  }
+  activeAiAnalysisUsers.add(userId);
+
   const db = getDb();
   const errors: string[] = [];
 
@@ -74,83 +82,82 @@ export async function analyzeUncategorized(
     }
 
     const settings = userSettingsRow[0];
-    const dek = await getSessionDEK();
     const dataUserId = await resolveDataUserId(userId);
+    const dek = await getSessionDEK();
 
-    let endpoint: string;
-    let model: string;
-    let apiKey = '';
-    let jsonMode = false;
+    onLog?.('Resolving active AI provider configuration...');
+    const providerRows = await db
+      .select()
+      .from(aiProviders)
+      .where(
+        and(
+          eq(aiProviders.userId, dataUserId),
+          eq(aiProviders.isActive, true)
+        )
+      )
+      .limit(1);
 
-    if (settings.aiActiveProviderId) {
-      const providerRows = await db
-        .select()
-        .from(aiProviders)
-        .where(eq(aiProviders.id, settings.aiActiveProviderId))
-        .limit(1);
-      if (providerRows.length && providerRows[0].endpoint && providerRows[0].model) {
-        endpoint = providerRows[0].endpoint;
-        model = providerRows[0].model;
-        jsonMode = providerRows[0].jsonMode;
-        if (providerRows[0].apiKeyEncrypted) {
-          try {
-            apiKey = await decryptField(providerRows[0].apiKeyEncrypted, dek);
-          } catch { /* no api key */ }
-        }
-      } else {
-        const msg = 'Active AI provider not found or misconfigured';
-        onLog?.(`Error: ${msg}`);
-        return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
-      }
-    } else {
+    if (!providerRows.length) {
       const msg = 'No active AI provider configured';
       onLog?.(`Error: ${msg}`);
       return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
     }
 
-    onLog?.('Fetching financial categories from database...');
+    const activeProvider = providerRows[0];
+    const endpoint = activeProvider.endpoint;
+    const model = activeProvider.model;
+    const jsonMode = activeProvider.jsonMode ?? false;
+
+    // Validate endpoint URL against SSRF
+    const validation = await validateEndpointUrl(endpoint);
+    if (!validation.ok) {
+      const msg = `AI provider endpoint is invalid or blocked: ${validation.error}`;
+      onLog?.(`Error: ${msg}`);
+      logger.error(`${LOG_TAG} Blocked request to invalid AI endpoint`, { endpoint, error: validation.error });
+      return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
+    }
+
+    let apiKey = '';
+    if (activeProvider.apiKeyEncrypted) {
+      apiKey = await decryptField(activeProvider.apiKeyEncrypted, dek);
+    }
+
+    onLog?.('Fetching categories and rules...');
     const categoryRows = await db
       .select()
       .from(categoriesTable)
-      .where(eq(categoriesTable.userId, dataUserId))
-      .orderBy(asc(categoriesTable.displayOrder));
+      .where(eq(categoriesTable.userId, dataUserId));
 
     const decryptedCategories = await decryptRows('categories', categoryRows, dek);
-    const parentMap = new Map<string, string>();
-    for (const cat of decryptedCategories) {
-      if (cat.parentId) {
-        const parent = decryptedCategories.find((c: any) => c.id === cat.parentId);
-        if (parent) parentMap.set(cat.id, parent.name);
-      }
-    }
+    const categoryMap = new Map(decryptedCategories.map((c) => [c.id, c.name]));
 
-    const categories: CategoryInfo[] = decryptedCategories.map((c: any) => ({
+    const categories: CategoryInfo[] = decryptedCategories.map((c) => ({
       id: c.id,
       name: c.name,
-      parentName: parentMap.get(c.id) ?? null,
-      parentId: c.parentId ?? null,
+      parentName: c.parentId ? categoryMap.get(c.parentId) ?? null : null,
+      parentId: c.parentId,
       color: c.color,
       isIncome: c.isIncome,
     }));
 
-    onLog?.('Loading active auto-categorization rules...');
     const ruleRows = await db
       .select()
       .from(categoryRules)
-      .where(and(eq(categoryRules.userId, dataUserId), eq(categoryRules.isActive, true)))
-      .orderBy(asc(categoryRules.priority));
+      .where(
+        and(
+          eq(categoryRules.userId, dataUserId),
+          eq(categoryRules.isActive, true)
+        )
+      );
 
     const decryptedRules = await decryptRows('category_rules', ruleRows, dek);
-    const rules: RuleInfo[] = decryptedRules.map((r: any) => {
-      const cat = r.setCategoryId ? categories.find((c) => c.id === r.setCategoryId) : null;
-      return {
-        name: r.name,
-        conditionField: r.conditionField,
-        conditionOperator: r.conditionOperator,
-        conditionValue: r.conditionValue,
-        setCategoryName: cat?.name ?? null,
-      };
-    });
+    const rules: RuleInfo[] = decryptedRules.map((r) => ({
+      name: r.name,
+      conditionField: r.conditionField,
+      conditionOperator: r.conditionOperator,
+      conditionValue: r.conditionValue,
+      setCategoryName: r.setCategoryId ? categoryMap.get(r.setCategoryId) ?? null : null,
+    }));
 
     onLog?.('Counting uncategorized transactions...');
     const countResult = await db
@@ -175,12 +182,15 @@ export async function analyzeUncategorized(
     onProgress?.(0, totalUncategorized);
     onLog?.(`Found ${totalUncategorized} uncategorized transaction(s)`);
 
-    const batchSize = settings.aiBatchSize ?? 25;
+    const batchSize = settings.aiBatchSize ?? 100;
     const autoApproveThreshold = settings.aiAutoApproveThreshold ?? 95;
     let proposalsCreated = 0;
     let autoApproved = 0;
-    let offset = 0;
+    let processedCount = 0;
+    let cursorDate: string | null = null;
+    let cursorId: string | null = null;
     let hasMore = true;
+    let batchNum = 1;
 
     while (hasMore) {
       // Check if analysis has been aborted
@@ -188,6 +198,17 @@ export async function analyzeUncategorized(
         onLog?.('Analysis cancelled by user');
         break;
       }
+
+      const cursorConditions = [];
+      if (cursorDate !== null && cursorId !== null) {
+        cursorConditions.push(
+          or(
+            gt(transactions.date, cursorDate),
+            and(eq(transactions.date, cursorDate), gt(transactions.id, cursorId))
+          )
+        );
+      }
+
       const txnRows = await db
         .select({
           transaction: transactions,
@@ -206,40 +227,44 @@ export async function analyzeUncategorized(
                 eq(accounts.isExcludedFromNetWorth, false)
               ),
               eq(accounts.type, 'paystub')
-            )
+            ),
+            ...cursorConditions
           )
         )
-        .orderBy(asc(transactions.date))
-        .limit(batchSize)
-        .offset(offset);
+        .orderBy(asc(transactions.date), asc(transactions.id))
+        .limit(batchSize);
 
       if (txnRows.length === 0) {
         break;
       }
 
-      const decryptedTxns: TransactionInfo[] = [];
-      for (let i = 0; i < txnRows.length; i++) {
-        const row = txnRows[i];
-        const tx = await decryptRow('transactions', row.transaction, dek);
-        let accountType: string | null = null;
-        if (row.account?.type) {
-          accountType = await decryptField(row.account.type, dek);
-        }
-        decryptedTxns.push({
-          index: i + 1,
-          id: tx.id,
-          description: tx.description,
-          payee: tx.payee,
-          memo: tx.memo,
-          amount: tx.amount,
-          date: tx.date,
-          accountType,
-        });
-      }
+      // Update cursor to last item in current batch
+      const lastRow = txnRows[txnRows.length - 1];
+      cursorDate = lastRow.transaction.date;
+      cursorId = lastRow.transaction.id;
 
-      const batchNum = Math.floor(offset / batchSize) + 1;
+      // Parallel batch decryption for fast throughput
+      const decryptedTxns: TransactionInfo[] = await Promise.all(
+        txnRows.map(async (row, i) => {
+          const tx = await decryptRow('transactions', row.transaction, dek);
+          let accountType: string | null = null;
+          if (row.account?.type) {
+            accountType = await decryptField(row.account.type, dek);
+          }
+          return {
+            index: i + 1,
+            id: tx.id,
+            description: tx.description,
+            payee: tx.payee,
+            memo: tx.memo,
+            amount: tx.amount,
+            date: tx.date,
+            accountType,
+          };
+        })
+      );
+
       const prompt = buildPrompt(categories, rules, decryptedTxns);
-
       const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
       onLog?.(`Batch ${batchNum}: Prepared prompt with ${decryptedTxns.length} transaction(s).`);
 
@@ -259,14 +284,14 @@ export async function analyzeUncategorized(
 
       try {
         const batchStart = Date.now();
-        logger.info(`${LOG_TAG} Calling AI API (batch offset=${offset})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
+        logger.info(`${LOG_TAG} Calling AI API (batch ${batchNum})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
         onLog?.(`Batch ${batchNum}: Calling model (${model}). Waiting for response...`);
         const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, jsonMode, batchAbortController.signal);
 
         const { suggestions } = aiResponse;
         const elapsed = ((Date.now() - batchStart) / 1000).toFixed(1);
         onLog?.(`Batch ${batchNum}: Received response from ${model} in ${elapsed}s. Found ${suggestions.length} suggestion(s).`);
-        logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch offset=${offset})`, { userId });
+        logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch ${batchNum})`, { userId });
 
         let batchProposals = 0;
         let batchAutoApproved = 0;
@@ -303,9 +328,10 @@ export async function analyzeUncategorized(
           await applyApprovedProposals(userId, dek);
         }
 
-        onProgress?.(offset + txnRows.length, totalUncategorized);
+        processedCount += txnRows.length;
+        onProgress?.(processedCount, totalUncategorized);
         onLog?.(`Batch ${batchNum}: Saved ${batchProposals} proposal(s) ${batchAutoApproved > 0 ? `(${batchAutoApproved} auto-approved)` : ''}.`);
-        logger.info(`${LOG_TAG} Batch complete (offset=${offset})`, { userId, batchProposals, batchAutoApproved });
+        logger.info(`${LOG_TAG} Batch ${batchNum} complete`, { userId, batchProposals, batchAutoApproved });
       } catch (err) {
         if (abortController?.signal.aborted) {
           onLog?.('Analysis cancelled by user');
@@ -327,7 +353,7 @@ export async function analyzeUncategorized(
         abortController?.signal.removeEventListener('abort', onMainAbort);
       }
 
-      offset += txnRows.length;
+      batchNum++;
       hasMore = txnRows.length >= batchSize;
     }
 
@@ -370,6 +396,8 @@ export async function analyzeUncategorized(
     onLog?.(`Critical Error: ${message}`);
     logger.error(`${LOG_TAG} Analysis failed`, { userId, error: message });
     return { proposalsCreated: 0, autoApproved: 0, errors: [message] };
+  } finally {
+    activeAiAnalysisUsers.delete(userId);
   }
 }
 
@@ -842,6 +870,13 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
     }
   }
 
-  logger.info(`${LOG_TAG} All approved proposals applied`, { userId, count: pending.length });
+  // Mark all processed proposals as applied
+  const appliedIds = pending.map((p) => p.id);
+  await db
+    .update(aiProposals)
+    .set({ status: 'applied', updatedAt: new Date() })
+    .where(inArray(aiProposals.id, appliedIds));
+
+  logger.info(`${LOG_TAG} All approved proposals applied and marked as applied`, { userId, count: pending.length });
   invalidateUserSearchCache(dataUserId);
 }

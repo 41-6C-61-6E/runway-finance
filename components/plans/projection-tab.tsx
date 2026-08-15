@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useDeferredValue } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
@@ -164,17 +164,23 @@ export function ProjectionTab({
     return assets - liabilities;
   }, [plan, accounts]);
 
-  // Construct EnginePlan object dynamically reacting to sliders
+  const deferredRetirementAge = useDeferredValue(localRetirementAge);
+  const deferredSpouseRetirementAge = useDeferredValue(localSpouseRetirementAge);
+  const deferredReturnRate = useDeferredValue(localReturnRate);
+  const deferredInflationRate = useDeferredValue(localInflationRate);
+  const deferredExpenseModifier = useDeferredValue(localExpenseModifier);
+
+  // Construct EnginePlan object dynamically reacting to sliders without blocking UI
   const enginePlanObj = useMemo(() => {
     if (!plan) return null;
     return buildEnginePlan(plan, {
-      retirementAge: localRetirementAge,
-      spouseRetirementAge: localSpouseRetirementAge,
-      expectedGrowthRate: localReturnRate,
-      fixedInflationRate: localInflationRate,
-      expenseModifier: localExpenseModifier,
+      retirementAge: deferredRetirementAge,
+      spouseRetirementAge: deferredSpouseRetirementAge,
+      expectedGrowthRate: deferredReturnRate,
+      fixedInflationRate: deferredInflationRate,
+      expenseModifier: deferredExpenseModifier,
     });
-  }, [plan, localRetirementAge, localSpouseRetirementAge, localReturnRate, localInflationRate, localExpenseModifier]);
+  }, [plan, deferredRetirementAge, deferredSpouseRetirementAge, deferredReturnRate, deferredInflationRate, deferredExpenseModifier]);
 
   const simulation = useMemo(() => {
     if (!enginePlanObj) return null;
@@ -188,9 +194,9 @@ export function ProjectionTab({
       numberOfTrials: 250,
       model: 'historical_bootstrap',
       adjustForInflation: dollarMode === 'real',
-      fixedInflationRate: localInflationRate,
+      fixedInflationRate: deferredInflationRate,
     });
-  }, [viewMode, enginePlanObj, dollarMode, localInflationRate]);
+  }, [viewMode, enginePlanObj, dollarMode, deferredInflationRate]);
 
   const yearlySimResults = useMemo(() => simulation?.yearlyResults || [], [simulation]);
 
