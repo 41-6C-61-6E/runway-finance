@@ -3,22 +3,44 @@ node_modules/
 .pnpm-store/
 .next/
 .dist/
-.env.local
+.env*.local
 .env
-.env.local
+.env.*
+!.env.example
 .vercel/
 .DS_Store
 
-# Build outputs
+# Scratch & Temporary Development Files
+scratch/
+tmp/
+temp/
+
+# Build outputs & Logs
 out/
 build/
-build.log
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 *.tsbuildinfo
+coverage/
+.nyc_output/
 
-# Database
+# Database dumps and local storage
 *.db
 *.sqlite
+*.dump
+*.dmp
+*.sql.gz
+*.sql.tar
 pgdata/
+
+# Backup & swap files
+*.bak
+*.swp
+*.swo
+*.orig
 
 # Editor files
 .vscode/
@@ -28,4 +50,5 @@ chat.json
 
 # PWA Generated Service Worker
 /public/sw.js
+
 
