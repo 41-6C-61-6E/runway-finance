@@ -65,10 +65,11 @@ import { FireProjectionsSidePanel } from './fire-projections-side-panel';
 import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
 const WITHDRAWAL_STRATEGIES = [
-  { id: 'textbook', title: 'Textbook Waterfall', desc: 'Cash → Taxable → Traditional → Roth' },
-  { id: 'tax_optimized', title: 'Tax-Optimized', desc: 'Fill lower tax brackets with Traditional first' },
-  { id: 'proportional', title: 'Proportional', desc: 'Draw evenly across all portfolio accounts' },
-  { id: 'tax_deferred_first', title: 'Tax-Deferred First', desc: 'Traditional before Taxable & Roth' },
+  { id: 'textbook', title: 'Taxable First (Textbook)', desc: 'Cash → Taxable → Traditional → Roth' },
+  { id: 'proportional', title: 'Proportional (Pro-Rata)', desc: 'Draw proportionally across all portfolio accounts' },
+  { id: 'tax_deferred_first', title: 'Tax-Deferred First (Waterfall)', desc: 'Traditional before Taxable & Roth to minimize RMDs' },
+  { id: 'tax_optimized', title: 'Tax Bracket Filling', desc: 'Fill lower tax brackets with Traditional first' },
+  { id: 'roth_ladder', title: 'Roth Conversion Ladder', desc: 'Annual pre-tax conversions to Roth up to 12% bracket', isRothLadder: true, enableRothConversions: true },
 ];
 
 interface ProjectionTabProps {
@@ -296,19 +297,40 @@ export function ProjectionTab({
   }, [milestoneCallouts]);
 
   // Active drawdown strategy (switchable via pill on the Withdrawal Sequencing chart)
-  const activeWithdrawalMethod: string = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
+  const rawWithdrawalMethod: string = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
+  const isRothConversionsEnabled = Boolean(plan?.settings?.enableRothConversions);
+  // Detect roth_ladder: textbook method + Roth conversions enabled
+  const activeWithdrawalMethod: string =
+    rawWithdrawalMethod === 'textbook' && isRothConversionsEnabled ? 'roth_ladder' : rawWithdrawalMethod;
   const activeStrategy = WITHDRAWAL_STRATEGIES.find((s) => s.id === activeWithdrawalMethod);
   const activeStrategyLabel = activeStrategy
     ? activeStrategy.title
     : activeWithdrawalMethod === 'custom_order' ? 'Custom Priority Order' : activeWithdrawalMethod;
 
-  const handleSelectWithdrawalMethod = (method: string) => {
+  const handleSelectWithdrawalMethod = (strategyId: string) => {
     setShowStrategyDropdown(false);
-    if (method === activeWithdrawalMethod) return;
-    onUpdatePlan({
-      withdrawalMethod: method,
-      settings: { withdrawalMethod: method },
-    });
+    if (strategyId === activeWithdrawalMethod) return;
+    const strat = WITHDRAWAL_STRATEGIES.find((s) => s.id === strategyId);
+    if (strat && (strat as any).isRothLadder) {
+      // Roth Conversion Ladder uses textbook withdrawal + enables Roth conversions
+      onUpdatePlan({
+        withdrawalMethod: 'textbook',
+        settings: {
+          withdrawalMethod: 'textbook',
+          enableRothConversions: true,
+          rothConversionTargetCeiling: 'top_of_12',
+          avoidIrmaaCliffs: true,
+        },
+      });
+    } else {
+      onUpdatePlan({
+        withdrawalMethod: strategyId,
+        settings: {
+          withdrawalMethod: strategyId,
+          enableRothConversions: false,
+        },
+      });
+    }
   };
 
   // Unique account list across simulation with color mapping for stacked area chart by individual account
@@ -601,17 +623,9 @@ export function ProjectionTab({
         <CollapsibleCardHeader
           isCollapsed={isMainChartCollapsed}
           onToggle={setIsMainChartCollapsed}
-          title={
-            <div>
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                {viewMode === 'monte_carlo' ? 'Monte Carlo Portfolio Trajectory (250 Bootstrap Trials)' : 'Portfolio Trajectory'}
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Age {currentAge} → {plan?.lifeExpectancyAge || 100} • {dollarMode === 'real' ? 'Real (Inflation-Adjusted Today\'s Dollars)' : 'Nominal Dollars'}
-              </p>
-            </div>
-          }
+          icon={TrendingUp}
+          title={viewMode === 'monte_carlo' ? 'Monte Carlo Portfolio Trajectory (250 Bootstrap Trials)' : 'Portfolio Trajectory'}
+          description={`Age ${currentAge} → ${plan?.lifeExpectancyAge || 100} • ${dollarMode === 'real' ? "Real (Inflation-Adjusted Today's Dollars)" : 'Nominal Dollars'}`}
           actions={
             <div className="flex items-center gap-2 sm:gap-3">
               {viewMode === 'monte_carlo' && monteCarloOutput ? (
@@ -927,17 +941,9 @@ export function ProjectionTab({
         <CollapsibleCardHeader
           isCollapsed={isCashFlowCollapsed}
           onToggle={setIsCashFlowCollapsed}
-          title={
-            <div>
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Layers className="w-4 h-4 text-emerald-500" />
-                Withdrawal Sequencing
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Visualizes salary, pension, Social Security, and portfolio drawdown sequence against expenses
-              </p>
-            </div>
-          }
+          icon={Layers}
+          title="Withdrawal Sequencing"
+          description="Visualizes salary, pension, Social Security, and portfolio drawdown sequence against expenses"
           actions={
             <div className="flex items-center gap-2">
               {(() => {

@@ -1,8 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronLeft, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+
 interface CollapsibleCardHeaderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title' | 'onToggle'> {
   isCollapsed?: boolean;
   onToggle?: (collapsed: boolean) => void;
@@ -36,6 +38,36 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
       );
     };
 
+    const renderTitle = () => {
+      if (!title) return null;
+
+      const titleElement = typeof title === 'string' ? (
+        <h3 className="font-bold truncate text-foreground text-sm sm:text-base">{title}</h3>
+      ) : (
+        <div className="min-w-0 flex-1 text-sm sm:text-base text-foreground font-bold">{title}</div>
+      );
+
+      if (description) {
+        return (
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="min-w-0 flex-1">{titleElement}</div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="shrink-0 text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-help p-0.5">
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="start">
+                {description}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        );
+      }
+
+      return titleElement;
+    };
+
     return (
       <div
         ref={ref}
@@ -50,16 +82,7 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {Icon && <Icon className="w-4 h-4 text-primary shrink-0" />}
             <div className="min-w-0 flex-1">
-              {title && (
-                typeof title === 'string' ? (
-                  <h3 className="font-bold truncate text-foreground text-sm sm:text-base">{title}</h3>
-                ) : (
-                  <div className="min-w-0 flex-1 text-sm sm:text-base text-foreground font-bold">{title}</div>
-                )
-              )}
-              {description && (
-                <p className="text-xs text-muted-foreground font-normal leading-tight mt-0.5">{description}</p>
-              )}
+              {renderTitle()}
             </div>
             {children}
           </div>
