@@ -49,25 +49,28 @@ export async function sendPushNotification(
 ): Promise<PushResult> {
   const db = getDb();
 
-  // 1. Deduplication check
-  if (key) {
-    try {
-      const [existing] = await db
-        .select({ id: sentNotifications.id })
-        .from(sentNotifications)
-        .where(
-          and(
-            eq(sentNotifications.userId, userId),
-            eq(sentNotifications.key, key)
-          )
-        )
-        .limit(1);
-      if (existing) {
-        logger.debug('[notifications-service] Notification already sent, skipping.', { key });
-        return { sent: false, reason: 'Duplicate notification suppressed.' };
-      }
-    } catch (err) {
-      logger.error('[notifications-service] Error checking duplicate notification:', err);
+  const finalKey = key || `generic:${Date.now()}:${Math.random().toString(36).substring(2, 7)}`;
+
+  // 1. Deduplication & Sent Log Insert (Atomic)
+  try {
+    const inserted = await db
+      .insert(sentNotifications)
+      .values({
+        userId,
+        type,
+        key: finalKey,
+      })
+      .onConflictDoNothing({ target: [sentNotifications.userId, sentNotifications.key] })
+      .returning({ id: sentNotifications.id });
+
+    if (key && inserted.length === 0) {
+      logger.debug('[notifications-service] Duplicate notification suppressed.', { key });
+      return { sent: false, reason: 'Duplicate notification suppressed.' };
+    }
+  } catch (err) {
+    logger.error('[notifications-service] Error logging sent notification / dedup check:', err);
+    if (key) {
+      return { sent: false, reason: 'Duplicate notification suppressed.' };
     }
   }
 
@@ -126,18 +129,6 @@ export async function sendPushNotification(
     dbNotificationId = newNotif?.id;
   } catch (dbErr) {
     logger.error('[notifications-service] Failed to save in-app notification to DB:', dbErr);
-  }
-
-  // 4. Log to sentNotifications to enable deduplication for subsequent runs
-  const finalKey = key || `generic:${Date.now()}:${Math.random().toString(36).substring(2, 7)}`;
-  try {
-    await db.insert(sentNotifications).values({
-      userId,
-      type,
-      key: finalKey,
-    });
-  } catch (err) {
-    logger.error('[notifications-service] Failed to record sent notification log:', err);
   }
 
   // 5. Send push notification to all active devices (if configured)

@@ -110,11 +110,27 @@ export async function POST(
       { status: 400 }
     );
   }
+  // Ensure transaction hasn't already been split
+  const existingChildren = await getDb()
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(and(eq(transactions.parentId, id), eq(transactions.deleted, false)))
+    .limit(1);
+
+  if (existingChildren.length > 0) {
+    return NextResponse.json(
+      { error: 'already_split', message: 'Transaction has already been split' },
+      { status: 409 }
+    );
+  }
 
   const newChildren: any[] = [];
 
   try {
     await getDb().transaction(async (tx) => {
+      // Clean up any previously soft-deleted children for this parent to avoid externalId unique conflicts
+      await tx.delete(transactions).where(eq(transactions.parentId, id));
+
       // 3. Mark parent as ignored
       await tx
         .update(transactions)

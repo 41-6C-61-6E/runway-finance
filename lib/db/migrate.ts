@@ -143,6 +143,16 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       await client.query(`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS effective_to TEXT`);
     }
 
+    // 3c. Check if is_discretionary column exists on categories
+    const catColCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'categories' AND column_name = 'is_discretionary'
+    `);
+    if (catColCheck.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Adding missing is_discretionary column to categories...');
+      await client.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_discretionary BOOLEAN NOT NULL DEFAULT TRUE`);
+    }
+
     // 4. Check if account_sharing_invitations table exists
     const tableCheck1 = await client.query(`
       SELECT table_name FROM information_schema.tables

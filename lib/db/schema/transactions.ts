@@ -11,18 +11,19 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { accounts, importLog } from './accounts';
+import { paystubs } from './payroll';
 
 // ── Categories ───────────────────────────────────────────────────────────────
 export const categories = pgTable('categories', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),
-  parentId: uuid('parent_id'), // FK to categories(id) — added via SQL after table creation
+  parentId: uuid('parent_id').references((): any => categories.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   color: text('color').notNull().default('#6366f1'),
   icon: text('icon'),
   isIncome: boolean('is_income').notNull().default(false),
   categoryType: text('category_type').notNull().default('standard'),
-  expenseParentId: uuid('expense_parent_id'),
+  expenseParentId: uuid('expense_parent_id').references((): any => categories.id, { onDelete: 'set null' }),
   isSystem: boolean('is_system').notNull().default(false),
   excludeFromReports: boolean('exclude_from_reports').notNull().default(false),
   displayOrder: integer('display_order').notNull().default(0),
@@ -58,7 +59,7 @@ export const transactions = pgTable(
     isImported: boolean('is_imported').notNull().default(false),
     importId: uuid('import_id').references(() => importLog.id, { onDelete: 'set null' }),
     source: text('source').notNull().default('bank'), // 'bank' | 'manual' | 'import' | 'paystub'
-    paystubId: uuid('paystub_id'),
+    paystubId: uuid('paystub_id').references((): any => paystubs.id, { onDelete: 'set null' }),
     parentId: uuid('parent_id').references((): any => transactions.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

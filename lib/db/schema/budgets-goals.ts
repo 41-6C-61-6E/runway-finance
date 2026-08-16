@@ -63,7 +63,7 @@ export const goalAllocationHistory = pgTable('goal_allocation_history', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),
   goalId: uuid('goal_id').notNull().references(() => financialGoals.id, { onDelete: 'cascade' }),
-  accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'set null' }),
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
   snapshotDate: date('snapshot_date').notNull().defaultNow(),
   accountBalance: text('account_balance').notNull(),
   allocatedAmount: text('allocated_amount').notNull().default('0'),

@@ -219,30 +219,31 @@ export async function DELETE(request: Request) {
             )
           );
 
-        // Reset our connection references
-        const memberConns = await tx
-          .select({ id: simplifinConnections.id })
+        // Delete any connections the member added (and unlink from shared accounts)
+        const memberSimplifinConns = await tx
+          .select()
           .from(simplifinConnections)
           .where(eq(simplifinConnections.userId, userId));
 
-        for (const conn of memberConns) {
+        for (const conn of memberSimplifinConns) {
+          // Unlink accounts from this connection so they don't break
           await tx
             .update(accounts)
             .set({ connectionId: null })
             .where(eq(accounts.connectionId, conn.id));
 
+          // Delete sync logs for this connection
           await tx.delete(syncLogs).where(eq(syncLogs.connectionId, conn.id));
         }
 
-        if (memberConns.length > 0) {
+        if (memberSimplifinConns.length > 0) {
           await tx
             .delete(simplifinConnections)
             .where(eq(simplifinConnections.userId, userId));
         }
 
-        // Reset our Plaid connection references
         const memberPlaidConns = await tx
-          .select({ id: plaidConnections.id })
+          .select()
           .from(plaidConnections)
           .where(eq(plaidConnections.userId, userId));
 
@@ -263,6 +264,9 @@ export async function DELETE(request: Request) {
       }
 
       // ── Clean Up Personal Configuration (All Users) ───────────────────────
+      if (session.user?.email) {
+        await tx.delete(verification).where(eq(verification.identifier, session.user.email));
+      }
       await tx.delete(userSettings).where(eq(userSettings.userId, userId));
       await tx.delete(aiProviders).where(eq(aiProviders.userId, userId));
       await tx.delete(nextAuthSession).where(eq(nextAuthSession.userId, userId));
@@ -271,12 +275,32 @@ export async function DELETE(request: Request) {
       await tx.delete(users).where(eq(users.username, userId));
       await tx.delete(userEncryptionKeys).where(eq(userEncryptionKeys.userId, userId));
 
-      // ── Clean Up Financial Data (Only Standalone & Owners) ──────────────────
+      // ── Clean Up Financial & User Data (Only Standalone & Owners) ───────────
       const isDataOwner = !isMember;
       if (isDataOwner) {
         logger.info('[delete-account] Deleting financial data owned by user.', { userId });
 
-        // Order is important to satisfy PostgreSQL foreign keys
+        // 1. Retirement planning (child tables first, then plans, then rules)
+        await tx.delete(planFlows).where(eq(planFlows.userId, userId));
+        await tx.delete(planEvents).where(eq(planEvents.userId, userId));
+        await tx.delete(planAccounts).where(eq(planAccounts.userId, userId));
+        await tx.delete(planLiabilities).where(eq(planLiabilities.userId, userId));
+        await tx.delete(planSettings).where(eq(planSettings.userId, userId));
+        await tx.delete(plans).where(eq(plans.userId, userId));
+        await tx.delete(retirementRules).where(eq(retirementRules.userId, userId));
+
+        // 2. Notifications, alert rules, job logs, issues
+        await tx.delete(userNotifications).where(eq(userNotifications.userId, userId));
+        await tx.delete(customAlertRules).where(eq(customAlertRules.userId, userId));
+        await tx.delete(sentNotifications).where(eq(sentNotifications.userId, userId));
+        await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+        await tx.delete(schedulerJobLogs).where(eq(schedulerJobLogs.userId, userId));
+        await tx.delete(issues).where(eq(issues.userId, userId));
+
+        // 3. Goal allocation history (must precede financialGoals and accounts)
+        await tx.delete(goalAllocationHistory).where(eq(goalAllocationHistory.userId, userId));
+
+        // 4. Financial & connection tables (in foreign key safe order)
         await tx.delete(syncLogs).where(eq(syncLogs.userId, userId));
         await tx.delete(simplifinConnections).where(eq(simplifinConnections.userId, userId));
         await tx.delete(plaidConnections).where(eq(plaidConnections.userId, userId));
@@ -288,7 +312,6 @@ export async function DELETE(request: Request) {
         await tx.delete(accounts).where(eq(accounts.userId, userId));
         await tx.delete(budgets).where(eq(budgets.userId, userId));
 
-        // Self-referencing FK on categories: set parentId = null first
         await tx.update(categories).set({ parentId: null }).where(eq(categories.userId, userId));
         await tx.delete(categories).where(eq(categories.userId, userId));
 

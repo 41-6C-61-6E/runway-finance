@@ -42,7 +42,8 @@ async function runSelfHealingChecks(client) {
       { name: 'notify_monthly_summary', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'notify_weekly_net_worth_change', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'weekly_net_worth_alert_day', type: "TEXT NOT NULL DEFAULT 'sunday'" },
-      { name: 'delete_pending_days', type: 'INTEGER NOT NULL DEFAULT 10' }
+      { name: 'delete_pending_days', type: 'INTEGER NOT NULL DEFAULT 10' },
+      { name: 'budget_exclusions', type: "JSONB DEFAULT '{\"categoryIds\":[],\"tagIds\":[]}'::jsonb" }
     ];
 
     for (const col of columnsToCheck) {
@@ -85,6 +86,16 @@ async function runSelfHealingChecks(client) {
     if (!budgetColsFound.has('effective_to')) {
       console.log('[migrate] [self-heal] Adding missing effective_to column to budgets...');
       await client.query(`ALTER TABLE budgets ADD COLUMN IF NOT EXISTS effective_to TEXT`);
+    }
+
+    // 3c. Check if is_discretionary column exists on categories
+    const catColCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'categories' AND column_name = 'is_discretionary'
+    `);
+    if (catColCheck.rows.length === 0) {
+      console.log('[migrate] [self-heal] Adding missing is_discretionary column to categories...');
+      await client.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_discretionary BOOLEAN NOT NULL DEFAULT TRUE`);
     }
 
     // 4. Check if account_sharing_invitations table exists

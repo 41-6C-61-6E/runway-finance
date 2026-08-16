@@ -55,6 +55,14 @@ class MockDbQueryBuilder {
     return this;
   }
 
+  onConflictDoNothing(config?: any) {
+    return this;
+  }
+
+  async transaction(callback: (tx: any) => Promise<any>) {
+    return callback(this);
+  }
+
   update(table: any) {
     return this;
   }

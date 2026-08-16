@@ -44,12 +44,15 @@ let mockSentResponse: any[] = [];
 
 class MockDbQueryBuilder {
   private table: any;
+  private isInsert = false;
 
   constructor(table?: any) {
     this.table = table;
+    if (table) this.isInsert = true;
   }
 
   select(...args: any[]) {
+    this.isInsert = false;
     return this;
   }
 
@@ -72,10 +75,15 @@ class MockDbQueryBuilder {
 
   insert(table: any) {
     this.table = table;
+    this.isInsert = true;
     return this;
   }
 
   values(data: any) {
+    return this;
+  }
+
+  onConflictDoNothing(config?: any) {
     return this;
   }
 
@@ -87,7 +95,9 @@ class MockDbQueryBuilder {
     let result: any[] = [];
     const tableName = getTableName(this.table);
 
-    if (tableName === 'user_settings') {
+    if (this.isInsert) {
+      result = [{ id: 'mock_inserted_id' }];
+    } else if (tableName === 'user_settings') {
       result = [mockSettingsResponse];
     } else if (tableName === 'net_worth_snapshots') {
       result = mockSnapshotsResponse;

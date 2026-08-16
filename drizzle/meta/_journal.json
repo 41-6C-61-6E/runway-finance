@@ -561,6 +561,20 @@
       "when": 1786824760818,
       "tag": "0079_create_system_tax_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1786900000000,
+      "tag": "0080_goal_allocation_history_account_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1786910000000,
+      "tag": "0081_add_missing_schema_columns",
+      "breakpoints": true
     }
   ]
 }

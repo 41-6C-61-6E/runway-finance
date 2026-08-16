@@ -749,35 +749,41 @@ export async function syncManualAccount(
     accountUpdate.metadata = dek ? await encryptField(updatedMeta, dek) : updatedMeta;
   }
 
-  await db.update(accounts).set(accountUpdate).where(eq(accounts.id, accountId));
+  await db.transaction(async (tx) => {
+    await tx.update(accounts).set(accountUpdate).where(eq(accounts.id, accountId));
 
-  if (Math.abs(delta) > 0.0001) {
-    const assetTypeLabels: Record<string, string> = {
-      realestate: 'Real Estate',
-      primaryhome: 'Primary Home',
-      secondaryhome: 'Secondary Home',
-      rentalproperty: 'Rental Property',
-      commercial: 'Commercial',
-      land: 'Land',
-      otherrealestate: 'Other Real Estate',
-      crypto: 'Bitcoin',
-      metals: 'Metals',
-    };
-    const txnValues = {
-      userId,
-      accountId,
-      externalId: adjExternalId(),
-      date: nowISO(),
-      amount: formatToCents(delta),
-      description: `${assetTypeLabels[account.type] ?? account.name} value adjustment`,
-      payee: null,
-      memo: null,
-      pending: false,
-      categoryId: await ensureSystemCategories(userId, dek),
-    };
-    const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
-    await db.insert(transactions).values(encryptedTxn);
-  }
+    if (Math.abs(delta) > 0.0001) {
+      const assetTypeLabels: Record<string, string> = {
+        realestate: 'Real Estate',
+        primaryhome: 'Primary Home',
+        secondaryhome: 'Secondary Home',
+        rentalproperty: 'Rental Property',
+        commercial: 'Commercial',
+        land: 'Land',
+        otherrealestate: 'Other Real Estate',
+        crypto: 'Bitcoin',
+        metals: 'Metals',
+      };
+      const adjKey = `adj-${accountId}-${nowISO()}`;
+      const txnValues = {
+        userId,
+        accountId,
+        externalId: adjKey,
+        date: nowISO(),
+        amount: formatToCents(delta),
+        description: `${assetTypeLabels[account.type] ?? account.name} value adjustment`,
+        payee: null,
+        memo: null,
+        pending: false,
+        categoryId: await ensureSystemCategories(userId, dek),
+      };
+      const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
+      await tx
+        .insert(transactions)
+        .values(encryptedTxn)
+        .onConflictDoNothing({ target: [transactions.accountId, transactions.externalId] });
+    }
+  });
 
   await ensureCompoundCategories(userId, dek);
   await ensureEmployerContributions(userId, dek);
@@ -863,53 +869,46 @@ export async function adjustManualAccountValue(
   }
   const meta: Record<string, unknown> = JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta));
 
-  if (account.type === 'metals' && amountOz !== undefined) {
-    try {
-      const subType = (meta.subType ?? 'gold') as 'gold' | 'silver';
-      const spotPrice = await fetchSpotPrice(subType, apiConfig);
-      finalNewValue = amountOz * spotPrice;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Spot price fetch failed';
-      logger.error(`${LOG_TAG} Adjust failed for metals account`, { accountId, error: msg });
-      return { status: 'error', newBalance: oldBalance, oldBalance, changed: false, errorMessage: msg };
+  await db.transaction(async (tx) => {
+    if (account.type === 'metals' && amountOz !== undefined) {
+      const updatedMeta = { ...meta, amountOz };
+      const encryptedMeta = dek ? await encryptField(JSON.stringify(updatedMeta), dek) : JSON.stringify(updatedMeta);
+      const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
+      await tx.update(accounts).set({
+        balance: encryptedBalance,
+        balanceDate: new Date(),
+        updatedAt: new Date(),
+        metadata: encryptedMeta,
+      }).where(eq(accounts.id, accountId));
+    } else {
+      const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
+      await tx.update(accounts).set({
+        balance: encryptedBalance,
+        balanceDate: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(accounts.id, accountId));
     }
 
-    const updatedMeta = { ...meta, amountOz };
-    const encryptedMeta = dek ? await encryptField(JSON.stringify(updatedMeta), dek) : JSON.stringify(updatedMeta);
-    const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
-    await db.update(accounts).set({
-      balance: encryptedBalance,
-      balanceDate: new Date(),
-      updatedAt: new Date(),
-      metadata: encryptedMeta,
-    }).where(eq(accounts.id, accountId));
-  } else {
-    const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
-    await db.update(accounts).set({
-      balance: encryptedBalance,
-      balanceDate: new Date(),
-      updatedAt: new Date(),
-    }).where(eq(accounts.id, accountId));
-  }
-
-  const delta = finalNewValue - oldBalance;
-
-  if (Math.abs(delta) > 0.0001) {
-    const txnValues = {
-      userId,
-      accountId,
-      externalId: adjExternalId(),
-      date: nowISO(),
-      amount: formatToCents(delta),
-      description: note ?? `${account.name} value adjustment`,
-      payee: null,
-      memo: null,
-      pending: false,
-      categoryId: await ensureSystemCategories(userId, dek),
-    };
-    const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
-    await db.insert(transactions).values(encryptedTxn);
-  }
+    if (Math.abs(delta) > 0.0001) {
+      const txnValues = {
+        userId,
+        accountId,
+        externalId: adjExternalId(),
+        date: nowISO(),
+        amount: formatToCents(delta),
+        description: note ?? `${account.name} value adjustment`,
+        payee: null,
+        memo: null,
+        pending: false,
+        categoryId: await ensureSystemCategories(userId, dek),
+      };
+      const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
+      await tx
+        .insert(transactions)
+        .values(encryptedTxn)
+        .onConflictDoNothing({ target: [transactions.accountId, transactions.externalId] });
+    }
+  });
 
   await ensureCompoundCategories(userId, dek);
   await ensureEmployerContributions(userId, dek);
@@ -981,76 +980,83 @@ export async function addAccountSnapshot(
       logger.error(`${LOG_TAG} Add snapshot failed for metals account`, { accountId, error: msg });
       return { status: 'error', newBalance: oldBalance, oldBalance, changed: false, errorMessage: msg };
     }
-
-    const updatedMeta = { ...meta, amountOz };
-    const encryptedMeta = dek ? await encryptField(JSON.stringify(updatedMeta), dek) : JSON.stringify(updatedMeta);
-    const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
-    
-    // Update current account balance only if snapshot date is >= current balanceDate
-    const currentBalanceDate = account.balanceDate ? new Date(account.balanceDate).toISOString().split('T')[0] : '';
-    if (date >= currentBalanceDate) {
-      await db.update(accounts).set({
-        balance: encryptedBalance,
-        balanceDate: new Date(date),
-        updatedAt: new Date(),
-        metadata: encryptedMeta,
-      }).where(eq(accounts.id, accountId));
-    } else {
-      await db.update(accounts).set({
-        updatedAt: new Date(),
-        metadata: encryptedMeta,
-      }).where(eq(accounts.id, accountId));
-    }
-  } else {
-    const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
-    // Update current account balance only if snapshot date is >= current balanceDate
-    const currentBalanceDate = account.balanceDate ? new Date(account.balanceDate).toISOString().split('T')[0] : '';
-    if (date >= currentBalanceDate) {
-      await db.update(accounts).set({
-        balance: encryptedBalance,
-        balanceDate: new Date(date),
-        updatedAt: new Date(),
-      }).where(eq(accounts.id, accountId));
-    }
   }
 
-  // Insert or update the snapshot in account_snapshots (isSynthetic = false, isImported = true)
-  const encryptedSnapshotBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
-  await db.insert(accountSnapshots).values({
-    userId,
-    accountId,
-    snapshotDate: date,
-    balance: encryptedSnapshotBalance,
-    isSynthetic: false,
-    isImported: true,
-  }).onConflictDoUpdate({
-    target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
-    set: {
+  await db.transaction(async (tx) => {
+    if (account.type === 'metals' && amountOz !== undefined) {
+      const updatedMeta = { ...meta, amountOz };
+      const encryptedMeta = dek ? await encryptField(JSON.stringify(updatedMeta), dek) : JSON.stringify(updatedMeta);
+      const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
+      
+      // Update current account balance only if snapshot date is >= current balanceDate
+      const currentBalanceDate = account.balanceDate ? new Date(account.balanceDate).toISOString().split('T')[0] : '';
+      if (date >= currentBalanceDate) {
+        await tx.update(accounts).set({
+          balance: encryptedBalance,
+          balanceDate: new Date(date),
+          updatedAt: new Date(),
+          metadata: encryptedMeta,
+        }).where(eq(accounts.id, accountId));
+      } else {
+        await tx.update(accounts).set({
+          updatedAt: new Date(),
+          metadata: encryptedMeta,
+        }).where(eq(accounts.id, accountId));
+      }
+    } else {
+      const encryptedBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
+      // Update current account balance only if snapshot date is >= current balanceDate
+      const currentBalanceDate = account.balanceDate ? new Date(account.balanceDate).toISOString().split('T')[0] : '';
+      if (date >= currentBalanceDate) {
+        await tx.update(accounts).set({
+          balance: encryptedBalance,
+          balanceDate: new Date(date),
+          updatedAt: new Date(),
+        }).where(eq(accounts.id, accountId));
+      }
+    }
+
+    // Insert or update the snapshot in account_snapshots (isSynthetic = false, isImported = true)
+    const encryptedSnapshotBalance = dek ? await encryptField(formatToCents(finalNewValue), dek) : formatToCents(finalNewValue);
+    await tx.insert(accountSnapshots).values({
+      userId,
+      accountId,
+      snapshotDate: date,
       balance: encryptedSnapshotBalance,
       isSynthetic: false,
       isImported: true,
-    },
-  });
+    }).onConflictDoUpdate({
+      target: [accountSnapshots.userId, accountSnapshots.accountId, accountSnapshots.snapshotDate],
+      set: {
+        balance: encryptedSnapshotBalance,
+        isSynthetic: false,
+        isImported: true,
+      },
+    });
 
-  // If a note is provided, insert a zero-amount transaction
-  if (note) {
-    const formattedBalance = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(finalNewValue);
-    const txnDescription = `Snapshot Balance: ${formattedBalance} (${note})`;
-    const txnValues = {
-      userId,
-      accountId,
-      externalId: adjExternalId(),
-      date,
-      amount: '0',
-      description: txnDescription,
-      payee: null,
-      memo: null,
-      pending: false,
-      categoryId: await ensureSystemCategories(userId, dek),
-    };
-    const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
-    await db.insert(transactions).values(encryptedTxn);
-  }
+    // If a note is provided, insert a zero-amount transaction
+    if (note) {
+      const formattedBalance = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(finalNewValue);
+      const txnDescription = `Snapshot Balance: ${formattedBalance} (${note})`;
+      const txnValues = {
+        userId,
+        accountId,
+        externalId: adjExternalId(),
+        date,
+        amount: '0',
+        description: txnDescription,
+        payee: null,
+        memo: null,
+        pending: false,
+        categoryId: await ensureSystemCategories(userId, dek),
+      };
+      const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;
+      await tx
+        .insert(transactions)
+        .values(encryptedTxn)
+        .onConflictDoNothing({ target: [transactions.accountId, transactions.externalId] });
+    }
+  });
 
   // Regenerate history for this account
   const MODEL_SNAPSHOT_TYPES = [
