@@ -388,18 +388,6 @@ export default function FilterBar({
     onChange('endDate', end || null);
   };
 
-  const hasActiveFilters = Object.values(filters).some(
-    (v) => {
-      // Return true if any filter is active (excluding null, empty strings, and default values)
-      if (v === null || v === '') return false;
-      
-      // Handle special cases for filters that could be default values
-      if (v === 'all' && (filters.startDate === null && filters.endDate === null)) return false;
-      
-      return true;
-    }
-  );
-
   const parents = categories.filter((c) => !c.parentId);
   const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
 
@@ -495,12 +483,45 @@ export default function FilterBar({
     return pills;
   }, [selectedAccountTypes, selectedAccountIds, selectedCategoryIds, selectedTagIds, selectedAccountTagIds, filters, datePreset]);
 
+  const hasActiveFilters = useMemo(() => {
+    return activePills.length > 0 || Boolean(search && search.trim() !== '') || Boolean(filters.search && filters.search.trim() !== '');
+  }, [activePills, search, filters.search]);
+
+  const activeFilterCount = useMemo(() => {
+    return activePills.length + (search.trim() ? 1 : 0);
+  }, [activePills, search]);
+
   return (
     <div className="mb-5 sm:mb-6 bg-muted hover:bg-muted/85 border border-border rounded-xl transition-all duration-200 overflow-visible">
       {/* Filter Controls Section with Dynamic Search Bar */}
       <CollapsibleFilterPanel
         isOpen={isOpen}
         onToggle={() => setIsOpen(!isOpen)}
+        activeFilterCount={activeFilterCount}
+        actions={
+          hasActiveFilters ? (
+            <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+              <span className="text-[11px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+                Filtered
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setCustomStartDate('');
+                  setCustomEndDate('');
+                  onClearAll();
+                }}
+                className="flex items-center gap-1 px-2 py-1 h-8 rounded-lg text-xs font-semibold bg-background hover:bg-muted text-muted-foreground hover:text-foreground border border-border transition-colors cursor-pointer shadow-sm min-touch-target-inline"
+                title="Clear all filters"
+                aria-label="Clear all filters"
+              >
+                <X size={13} className="text-muted-foreground" />
+                <span>Clear</span>
+              </button>
+            </div>
+          ) : null
+        }
         feedbackItems={activePills.map((pill) => (
           <span
             key={pill}

@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  let body: { label?: string; syncFrequency?: string; disabledAccounts?: string[] };
+  let body: { label?: string; syncFrequency?: string; disabledAccounts?: string[]; setupToken?: string; accessUrl?: string };
   try {
     body = await request.json();
   } catch {
@@ -94,6 +94,56 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       );
     }
     updateData.disabledAccounts = body.disabledAccounts;
+  }
+
+  if (('setupToken' in body && body.setupToken) || ('accessUrl' in body && body.accessUrl)) {
+    if (!isSimplefin) {
+      return NextResponse.json(
+        { error: 'validation_error', message: 'Cannot update access URL for non-SimpleFIN connections' },
+        { status: 400 }
+      );
+    }
+
+    const rawTokenOrUrl = (body.setupToken || body.accessUrl)?.trim();
+    if (!rawTokenOrUrl) {
+      return NextResponse.json(
+        { error: 'validation_error', message: 'SimpleFIN setup token or access URL is required' },
+        { status: 400 }
+      );
+    }
+
+    let finalAccessUrl: string;
+    if (rawTokenOrUrl.startsWith('http://') || rawTokenOrUrl.startsWith('https://')) {
+      const { validateEndpointUrl } = await import('@/lib/utils/ssrf');
+      const validated = await validateEndpointUrl(rawTokenOrUrl, { requireHttps: true });
+      if (!validated.ok) {
+        return NextResponse.json(
+          { error: 'validation_error', message: `Invalid SimpleFIN access URL: ${validated.error}` },
+          { status: 400 }
+        );
+      }
+      finalAccessUrl = rawTokenOrUrl;
+    } else {
+      // It's a setup token (base64 string)
+      try {
+        const { claimAccessUrl } = await import('@/lib/simplefin');
+        finalAccessUrl = await claimAccessUrl(rawTokenOrUrl);
+      } catch (err: any) {
+        logger.warn('Connection rotate token claim failed', { error: err.message });
+        return NextResponse.json(
+          { error: 'claim_failed', message: err.message || 'Failed to claim SimpleFIN access URL. Invalid token or already claimed.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    const { encryptField } = await import('@/lib/crypto');
+    const { getSessionDEK } = await import('@/lib/crypto-context');
+    const dek = await getSessionDEK();
+    const encryptedPayload = await encryptField(finalAccessUrl, dek);
+
+    updateData.accessUrlEncrypted = encryptedPayload;
+    updateData.lastSyncError = null;
   }
 
   let updated: any;
