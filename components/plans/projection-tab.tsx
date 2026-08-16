@@ -64,6 +64,13 @@ import { ProjectionOptionsPopover } from './projection-options-popover';
 import { FireProjectionsSidePanel } from './fire-projections-side-panel';
 import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
+const WITHDRAWAL_STRATEGIES = [
+  { id: 'textbook', title: 'Textbook Waterfall', desc: 'Cash → Taxable → Traditional → Roth' },
+  { id: 'tax_optimized', title: 'Tax-Optimized', desc: 'Fill lower tax brackets with Traditional first' },
+  { id: 'proportional', title: 'Proportional', desc: 'Draw evenly across all portfolio accounts' },
+  { id: 'tax_deferred_first', title: 'Tax-Deferred First', desc: 'Traditional before Taxable & Roth' },
+];
+
 interface ProjectionTabProps {
   plan: any;
   accounts: any[];
@@ -113,6 +120,7 @@ export function ProjectionTab({
   const [chartType, setChartType] = useState<'total' | 'stacked_category' | 'stacked_account'>('stacked_category');
   const [showMilestones, setShowMilestones] = useState(true);
   const [showChartOptionsDropdown, setShowChartOptionsDropdown] = useState(false);
+  const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
   const [isOptionsPopoverOpen, setIsOptionsPopoverOpen] = useState(false);
   const [selectedYearDetail, setSelectedYearDetail] = useState<any>(null);
   const [activeAssetCategories, setActiveAssetCategories] = useState<Record<string, boolean>>({
@@ -287,14 +295,21 @@ export function ProjectionTab({
     return map;
   }, [milestoneCallouts]);
 
-  // Strategy description tag
-  const activeStrategyLabel = useMemo(() => {
-    const method = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
-    if (method === 'tax_optimized') return 'Tax-Bracket Shielding (Fill 12% Bracket First)';
-    if (method === 'proportional') return 'Proportional Drawdown Across Portfolio';
-    if (method === 'custom_order') return 'Custom Priority Order';
-    return 'Textbook Waterfall (Cash → Taxable → Traditional → Roth)';
-  }, [plan]);
+  // Active drawdown strategy (switchable via pill on the Withdrawal Sequencing chart)
+  const activeWithdrawalMethod: string = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
+  const activeStrategy = WITHDRAWAL_STRATEGIES.find((s) => s.id === activeWithdrawalMethod);
+  const activeStrategyLabel = activeStrategy
+    ? activeStrategy.title
+    : activeWithdrawalMethod === 'custom_order' ? 'Custom Priority Order' : activeWithdrawalMethod;
+
+  const handleSelectWithdrawalMethod = (method: string) => {
+    setShowStrategyDropdown(false);
+    if (method === activeWithdrawalMethod) return;
+    onUpdatePlan({
+      withdrawalMethod: method,
+      settings: { withdrawalMethod: method },
+    });
+  };
 
   // Unique account list across simulation with color mapping for stacked area chart by individual account
   const accountSeries = useMemo(() => {
@@ -936,9 +951,65 @@ export function ProjectionTab({
                   </span>
                 );
               })()}
-              <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
-                {activeStrategyLabel}
-              </span>
+              <div className="relative inline-block text-left">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowStrategyDropdown(!showStrategyDropdown);
+                  }}
+                  title="Change drawdown strategy"
+                  className={`text-[10px] font-bold px-2 py-1 rounded border flex items-center gap-1 transition-colors cursor-pointer ${
+                    showStrategyDropdown
+                      ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                      : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
+                  }`}
+                >
+                  {activeStrategyLabel}
+                  <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${showStrategyDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showStrategyDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowStrategyDropdown(false);
+                      }}
+                    />
+                    <div
+                      className="absolute right-0 top-full mt-1.5 w-72 bg-card border border-border rounded-xl shadow-xl p-1.5 z-50 space-y-0.5 text-left animate-in fade-in zoom-in-95 duration-150"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="px-2 pt-1.5 pb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Drawdown Strategy
+                      </div>
+                      {WITHDRAWAL_STRATEGIES.map((strat) => {
+                        const isActive = strat.id === activeWithdrawalMethod;
+                        return (
+                          <button
+                            key={strat.id}
+                            type="button"
+                            onClick={() => handleSelectWithdrawalMethod(strat.id)}
+                            className={`w-full text-left p-2 rounded-lg transition-colors cursor-pointer ${
+                              isActive ? 'bg-primary/10' : 'hover:bg-muted/70'
+                            }`}
+                          >
+                            <span className="flex items-center justify-between gap-2">
+                              <span className={`text-[11px] font-bold ${isActive ? 'text-primary' : 'text-foreground'}`}>
+                                {strat.title}
+                              </span>
+                              {isActive && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                            </span>
+                            <span className="block text-[10px] text-muted-foreground mt-0.5">{strat.desc}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
               <ProjectionOptionsPopover
                 dollarMode={dollarMode}
                 onToggleDollarMode={setDollarMode}

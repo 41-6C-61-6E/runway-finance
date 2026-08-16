@@ -19,10 +19,8 @@ import {
   ChevronRight,
   TrendingUp,
   DollarSign,
-  Zap,
   Compass,
   Layers,
-  PieChart,
   HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -77,32 +75,6 @@ export function FireProjectionsSidePanel({
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('fireProjectionsSidePanel');
   const [showAllMilestones, setShowAllMilestones] = useState(false);
 
-  const activeStrategyLabel = useMemo(() => {
-    const method = plan?.withdrawalMethod || plan?.settings?.withdrawalMethod || 'textbook';
-    if (method === 'tax_optimized') return 'Tax-Bracket Shielding (Fill 12% Bracket)';
-    if (method === 'proportional') return 'Proportional Drawdown';
-    if (method === 'tax_deferred_first') return 'Tax-Deferred Waterfall (Trad → Cash/Taxable → Roth)';
-    if (method === 'custom_order') return 'Custom Priority Order';
-    return 'Textbook Waterfall (Cash → Taxable → Trad → Roth)';
-  }, [plan]);
-
-  const strategyDescription = useMemo(() => {
-    const method = plan?.withdrawalMethod || plan?.settings?.withdrawalMethod || 'textbook';
-    if (method === 'tax_optimized') {
-      return 'Prioritizes taxable accounts while filling lower tax brackets with traditional withdrawals, preserving Roth assets for tax-free growth.';
-    }
-    if (method === 'proportional') {
-      return 'Draws funds proportionally across taxable, tax-deferred, and tax-free accounts based on current balance ratios.';
-    }
-    if (method === 'tax_deferred_first') {
-      return 'Draws from pre-tax tax-deferred accounts first to reduce future RMD exposure and legacy tax burdens.';
-    }
-    if (method === 'custom_order') {
-      return 'Draws funds according to your custom defined account withdrawal priority order.';
-    }
-    return 'Standard waterfall order: Taxable Cash → Taxable Brokerage → Tax-Deferred (Traditional IRA/401k) → Tax-Free (Roth IRA).';
-  }, [plan]);
-
   // Coast FIRE Calculation with Real Plan Parameters
   const coastFireInfo = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -130,37 +102,6 @@ export function FireProjectionsSidePanel({
       isReached,
     };
   }, [plan, localRetirementAge, fireNumber, currentNetWorth]);
-
-  // Asset Allocation Glidepath Preview
-  const glidepathInfo = useMemo(() => {
-    const accs = Array.isArray(plan?.accounts) ? plan.accounts.filter((a: any) => a.isIncluded !== false) : [];
-    const totalBal = accs.reduce((s: number, a: any) => s + (parseFloat(a.balance) || 0), 0);
-
-    let cashBal = 0;
-    let invBal = 0;
-    for (const a of accs) {
-      const b = parseFloat(a.balance) || 0;
-      const t = (a.type || '').toLowerCase();
-      if (t === 'cash' || t === 'checking' || t === 'savings' || t === 'emergency_fund') {
-        cashBal += b;
-      } else {
-        invBal += b;
-      }
-    }
-
-    const currentCashPct = totalBal > 0 ? Math.round((cashBal / totalBal) * 100) : 10;
-    const currentEquityPct = totalBal > 0 ? Math.round((invBal / totalBal) * 85) : 75;
-    const currentFixedPct = Math.max(0, 100 - currentCashPct - currentEquityPct);
-
-    const targetEquityPct = 60;
-    const targetFixedPct = 30;
-    const targetCashPct = 10;
-
-    return {
-      current: { equity: currentEquityPct, fixed: currentFixedPct, cash: currentCashPct },
-      target: { equity: targetEquityPct, fixed: targetFixedPct, cash: targetCashPct },
-    };
-  }, [plan]);
 
   // Semi-circle gauge SVG parameters
   const strokeWidth = 10;
@@ -323,7 +264,7 @@ export function FireProjectionsSidePanel({
             </TooltipProvider>
           </div>
 
-          {/* Section 3: Coast FIRE & Glidepath Asset Mix */}
+           {/* Section 3: Coast FIRE */}
           {coastFireInfo.coastTarget > 0 && (
             <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip
@@ -381,61 +322,6 @@ export function FireProjectionsSidePanel({
             </div>
           )}
 
-          {/* Glidepath Asset Mix Section */}
-          <div className="py-4 first:pt-0 last:pb-0">
-            <ChartHoverTooltip
-              content={
-                <>
-                  <TooltipHeader>Asset Allocation & Retirement Glidepath</TooltipHeader>
-                  <TooltipRow label="Current Equities" value={`${glidepathInfo.current.equity}%`} color="var(--color-chart-1)" />
-                  <TooltipRow label="Current Fixed Income" value={`${glidepathInfo.current.fixed}%`} color="var(--color-chart-2)" />
-                  <TooltipRow label="Current Cash" value={`${glidepathInfo.current.cash}%`} color="var(--color-chart-5)" />
-                  <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1 text-[10px]">
-                    <div className="font-semibold text-foreground">Target at Retirement:</div>
-                    <TooltipRow label="Target Equities" value={`${glidepathInfo.target.equity}%`} color="var(--color-chart-1)" />
-                    <TooltipRow label="Target Fixed Income" value={`${glidepathInfo.target.fixed}%`} color="var(--color-chart-2)" />
-                    <TooltipRow label="Target Cash" value={`${glidepathInfo.target.cash}%`} color="var(--color-chart-5)" />
-                  </div>
-                </>
-              }
-            >
-              <div className="space-y-2.5 cursor-help">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-foreground flex items-center gap-1">
-                    <PieChart className="w-3.5 h-3.5 text-primary shrink-0" />
-                    Glidepath Asset Mix
-                    <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
-                  </span>
-                  <span className="text-muted-foreground font-mono text-[11px]">
-                    Now vs. Target
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px] text-muted-foreground font-medium">
-                      <span>Current Allocation</span>
-                    </div>
-                    <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden flex">
-                      <div className="h-full bg-chart-1" style={{ width: `${glidepathInfo.current.equity}%` }} />
-                      <div className="h-full bg-chart-2" style={{ width: `${glidepathInfo.current.fixed}%` }} />
-                      <div className="h-full bg-chart-5" style={{ width: `${glidepathInfo.current.cash}%` }} />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px] text-muted-foreground font-medium">
-                      <span>Retirement Target</span>
-                    </div>
-                    <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden flex">
-                      <div className="h-full bg-chart-1 opacity-70" style={{ width: `${glidepathInfo.target.equity}%` }} />
-                      <div className="h-full bg-chart-2 opacity-70" style={{ width: `${glidepathInfo.target.fixed}%` }} />
-                      <div className="h-full bg-chart-5 opacity-70" style={{ width: `${glidepathInfo.target.cash}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </ChartHoverTooltip>
-          </div>
-
           {/* Section 5: Upcoming Key Milestones */}
           {milestoneCallouts.length > 0 && (
             <div className="py-4 first:pt-0 last:pb-0 space-y-2.5">
@@ -482,25 +368,6 @@ export function FireProjectionsSidePanel({
             </div>
           )}
 
-          {/* Active Drawdown Strategy Pill */}
-          <div className="py-4 first:pt-0 last:pb-0 space-y-1.5">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Active Drawdown Strategy
-            </span>
-            <TooltipProvider delayDuration={100}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20 text-xs font-medium text-primary flex items-center gap-2 cursor-help hover:bg-primary/15 transition-colors">
-                    <Zap className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{activeStrategyLabel}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-                  {strategyDescription}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
         </div>
       )}
     </div>

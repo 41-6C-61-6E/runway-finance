@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
@@ -27,6 +27,7 @@ import {
   Flame,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
 } from 'lucide-react';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -122,9 +123,24 @@ export function ScenariosTab({
       const lastYr = sim.yearlyResults[sim.yearlyResults.length - 1];
       const endNW = lastYr?.netWorth || 0;
       const totalTaxes = sim.yearlyResults.reduce((sum: number, y: any) => sum + (y.taxesPaid || 0), 0);
+      const totalRealizedIncome = sim.yearlyResults.reduce((sum: number, y: any) => {
+        const drawdowns = (y.drawdownsByType?.traditional || 0) + (y.drawdownsByType?.taxable || 0) + (y.drawdownsByType?.roth || 0) + (y.drawdownsByType?.cash || 0);
+        return sum + (y.grossIncome || 0) + drawdowns;
+      }, 0);
+      const effectiveTaxRate = totalRealizedIncome > 0 ? (totalTaxes / totalRealizedIncome) * 100 : 0;
       const maxRmd = Math.max(...sim.yearlyResults.map((y: any) => y.rmdMandatoryDrawdown || y.rmdAmount || 0));
       const ranOutOfMoney = sim.yearlyResults.some((y: any) => y.netWorth <= 0);
-      return { endNW, totalTaxes, maxRmd, ranOutOfMoney, yearlyResults: sim.yearlyResults };
+      const depletionYear = sim.yearlyResults.find((y: any) => y.netWorth <= 0);
+      const depletionAge = sim.depletionAge || (depletionYear ? (depletionYear.primaryAge ?? depletionYear.age) : undefined);
+      return {
+        endNW,
+        totalTaxes,
+        effectiveTaxRate,
+        maxRmd,
+        ranOutOfMoney,
+        depletionAge,
+        yearlyResults: sim.yearlyResults,
+      };
     };
 
     const textSum = getSimSummary(simTextbook);
@@ -256,24 +272,22 @@ export function ScenariosTab({
           avoidIrmaaCliffs: true,
         },
       });
-      setAppliedMsg(`Applied ${strat.name} with Top of 12% Bracket & IRMAA Guardrail.`);
+      setAppliedMsg(`Applied ${strat.name} (Textbook + 12% Bracket Roth Conversions)`);
     } else {
       onUpdatePlan({
         withdrawalMethod: strat.method,
         settings: {
           ...plan?.settings,
           withdrawalMethod: strat.method,
-          enableRothConversions: false,
+          enableRothConversions: wasRothEnabled && strat.method === plan?.withdrawalMethod ? true : false,
         },
       });
-      setAppliedMsg(
-        wasRothEnabled
-          ? `Applied ${strat.name}. Roth conversions set to inactive.`
-          : `Applied ${strat.name} strategy to active plan!`
-      );
+      setAppliedMsg(`Applied ${strat.name}`);
     }
 
-    setTimeout(() => setAppliedMsg(''), 5000);
+    setTimeout(() => {
+      setAppliedMsg('');
+    }, 4000);
   };
 
   return (
@@ -284,16 +298,6 @@ export function ScenariosTab({
       onTabChange={(tabId) => setActiveSubTab(tabId as any)}
     >
       {subHeader && <div className="lg:hidden">{subHeader}</div>}
-
-      {/* Toast Notification Banner */}
-      {appliedMsg && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span>{appliedMsg}</span>
-          </div>
-        </div>
-      )}
 
       {/* Desktop Scenarios Sub-Tab Navigation Bar */}
       <div className="hidden lg:block">
@@ -329,6 +333,13 @@ export function ScenariosTab({
 
             {!isStrategiesCollapsed && (
               <div className="p-5 space-y-6">
+                {appliedMsg && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    {appliedMsg}
+                  </div>
+                )}
+
                 {/* Visual Trajectory Multi-Line Chart */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -373,15 +384,15 @@ export function ScenariosTab({
                 </div>
 
                 {/* Strategy Metrics Comparison Table */}
-                <div className="border border-border rounded-xl overflow-hidden shadow-sm">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-muted/60 text-muted-foreground font-semibold">
+                <div className="border border-border rounded-xl overflow-x-auto shadow-sm">
+                  <table className="w-full text-xs text-left min-w-[720px]">
+                    <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border">
                       <tr>
                         <th className="px-4 py-3">Strategy Name</th>
+                        <th className="px-3 py-3 text-center">Longevity</th>
                         <th className="px-3 py-3 text-right">Ending Net Worth</th>
                         <th className="px-3 py-3 text-right">Lifetime Taxes</th>
-                        <th className="px-3 py-3 text-right">Max Age 75 RMD</th>
-                        <th className="px-3 py-3 text-center">Status</th>
+                        <th className="px-3 py-3 text-right">Peak Age 75+ RMD</th>
                         <th className="px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
@@ -389,162 +400,184 @@ export function ScenariosTab({
                       {strategiesList.map((strat) => {
                         const isCurrentActive = plan?.withdrawalMethod === strat.method && (!strat.enableRoth || Boolean(plan?.settings?.enableRothConversions));
                         const isHighestNW = strat.summary.endNW === Math.max(...strategiesList.map((s) => s.summary.endNW));
+                        const isLowestTax = strat.summary.totalTaxes === Math.min(...strategiesList.map((s) => s.summary.totalTaxes));
                         const isExpanded = expandedStrategyId === strat.id;
 
                         return (
-                          <tr key={strat.id} className="group">
-                            <td colSpan={6} className="p-0">
-                              {/* Main Strategy Header Row */}
-                              <div
-                                onClick={() => setExpandedStrategyId(isExpanded ? null : strat.id)}
-                                className={`flex flex-wrap items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
-                                  isCurrentActive ? 'bg-primary/10 font-medium border-l-4 border-l-primary' : 'hover:bg-muted/30'
-                                }`}
-                              >
-                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                          <Fragment key={strat.id}>
+                            <tr
+                              onClick={() => setExpandedStrategyId(isExpanded ? null : strat.id)}
+                              className={`cursor-pointer transition-colors ${
+                                isCurrentActive ? 'bg-primary/10 font-medium' : 'hover:bg-muted/30'
+                              }`}
+                            >
+                              <td className="px-4 py-3.5 align-middle">
+                                <div className="flex items-center gap-3">
                                   <button
+                                    type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setExpandedStrategyId(isExpanded ? null : strat.id);
                                     }}
-                                    className="text-muted-foreground hover:text-foreground transition-transform"
+                                    className="text-muted-foreground hover:text-foreground transition-transform shrink-0"
                                   >
                                     {isExpanded ? <ChevronUp className="w-4 h-4 text-primary" /> : <ChevronDown className="w-4 h-4" />}
                                   </button>
                                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: strat.color }} />
                                   <div>
-                                    <span className="font-bold text-foreground block flex items-center gap-2">
+                                    <span className="font-bold text-foreground block">
                                       {strat.name}
                                     </span>
-                                    <span className="text-[10px] text-muted-foreground">{strat.description}</span>
+                                    <span className="text-[10px] text-muted-foreground line-clamp-1">{strat.description}</span>
                                   </div>
                                 </div>
+                              </td>
 
-                                <div className="flex items-center gap-6 mt-2 sm:mt-0 ml-auto">
-                                  <div className="text-right">
-                                    <span className="text-[10px] text-muted-foreground block sm:hidden">Ending NW</span>
-                                    <span className={`font-mono font-bold ${isHighestNW ? 'text-emerald-500' : 'text-foreground'}`}>
-                                      {formatCurrency(strat.summary.endNW)}
-                                    </span>
-                                  </div>
+                              <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                                {strat.summary.depletionAge ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                                    <AlertTriangle className="w-3 h-3" /> Depleted Age {strat.summary.depletionAge}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                    <Check className="w-3 h-3" /> Age {plan?.lifeExpectancyAge || 90}+ (100%)
+                                  </span>
+                                )}
+                              </td>
 
-                                  <div className="text-right hidden sm:block">
-                                    <span className="font-mono text-muted-foreground">{formatCurrency(strat.summary.totalTaxes)}</span>
-                                  </div>
+                              <td className="px-3 py-3.5 text-right align-middle whitespace-nowrap">
+                                <span className={`font-mono font-bold text-xs ${isHighestNW ? 'text-emerald-500' : 'text-foreground'}`}>
+                                  {formatCurrency(strat.summary.endNW)}
+                                </span>
+                              </td>
 
-                                  <div className="text-right hidden md:block">
-                                    <span className="font-mono text-amber-500 font-semibold">{formatCurrency(strat.summary.maxRmd)}</span>
-                                  </div>
-
-                                  <div className="text-center min-w-[120px]">
-                                    {isCurrentActive ? (
-                                      <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-xs">
-                                        <Check className="w-3.5 h-3.5" /> Active
-                                      </span>
-                                    ) : (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleApplyStrategy(strat);
-                                        }}
-                                        className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                                      >
-                                        Apply Strategy
-                                      </button>
-                                    )}
-                                  </div>
+                              <td className="px-3 py-3.5 text-right align-middle whitespace-nowrap">
+                                <div className={`font-mono font-semibold ${isLowestTax ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                                  {formatCurrency(strat.summary.totalTaxes)}
                                 </div>
-                              </div>
-
-                              {/* Expanded Strategy Sequencing Breakdown Panel */}
-                              {isExpanded && (
-                                <div className="bg-muted/20 p-5 border-t border-border space-y-5 animate-in fade-in duration-200">
-                                  {/* 1. Account Drawdown Priority Sequence Badges */}
-                                  <div className="flex flex-wrap items-center gap-2 bg-card p-3.5 rounded-xl border border-border">
-                                    <span className="font-bold text-foreground text-xs shrink-0">Drawdown Priority Order:</span>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      {strat.drawdownOrder.map((step, idx) => (
-                                        <div key={idx} className="flex items-center gap-2">
-                                          <span className="bg-primary/10 text-primary font-mono text-[11px] font-bold px-2.5 py-1 rounded-lg border border-primary/20">
-                                            {idx + 1}. {step}
-                                          </span>
-                                          {idx < strat.drawdownOrder.length - 1 && (
-                                            <span className="text-muted-foreground text-xs">→</span>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* 2. Execution Steps Across Retirement Phases */}
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
-                                      <h5 className="font-bold text-primary flex items-center gap-1.5 text-xs">
-                                        <Calendar className="w-3.5 h-3.5 text-primary" /> Phase 1: Early Retirement (Pre-59.5)
-                                      </h5>
-                                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                        {strat.phases.early}
-                                      </p>
-                                    </div>
-                                    <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
-                                      <h5 className="font-bold text-indigo-500 flex items-center gap-1.5 text-xs">
-                                        <Zap className="w-3.5 h-3.5 text-indigo-500" /> Phase 2: Pre-RMD Window (Ages 59.5 - 74)
-                                      </h5>
-                                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                        {strat.phases.preRmd}
-                                      </p>
-                                    </div>
-                                    <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
-                                      <h5 className="font-bold text-amber-500 flex items-center gap-1.5 text-xs">
-                                        <ShieldCheck className="w-3.5 h-3.5 text-amber-500" /> Phase 3: RMD & Legacy (Age 75+)
-                                      </h5>
-                                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                        {strat.phases.rmd}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  {/* 3. Interactive Annual Drawdown & Tax Breakdown Log */}
-                                  <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                      <h5 className="font-bold text-foreground text-xs">Annual Drawdown & Tax Breakdown Log</h5>
-                                      <span className="text-[10px] text-muted-foreground">Retirement Phase Projections</span>
-                                    </div>
-                                    <div className="max-h-56 overflow-y-auto border border-border rounded-xl bg-card shadow-inner">
-                                      <table className="w-full text-[11px] text-left">
-                                        <thead className="bg-muted/80 text-muted-foreground font-semibold sticky top-0 backdrop-blur-sm">
-                                          <tr>
-                                            <th className="px-3 py-2">Age</th>
-                                            <th className="px-3 py-2 text-right">Cash Draw</th>
-                                            <th className="px-3 py-2 text-right">Taxable Draw</th>
-                                            <th className="px-3 py-2 text-right">Pre-Tax Draw</th>
-                                            <th className="px-3 py-2 text-right">Roth Draw</th>
-                                            <th className="px-3 py-2 text-right">Taxes Paid</th>
-                                            <th className="px-3 py-2 text-right">Ending Net Worth</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border/40">
-                                          {strat.summary.yearlyResults
-                                            .filter((y: any) => (y.primaryAge ?? y.age) >= (primaryEnginePlan.retirementAge || 60))
-                                            .map((y: any) => (
-                                              <tr key={y.year} className="hover:bg-muted/40 font-mono">
-                                                <td className="px-3 py-1.5 font-bold text-foreground font-sans">Age {y.primaryAge ?? y.age}</td>
-                                                <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.cash || 0)}</td>
-                                                <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.taxable || 0)}</td>
-                                                <td className="px-3 py-1.5 text-right text-amber-500 font-medium">{formatCurrency(y.drawdownsByType?.traditional || 0)}</td>
-                                                <td className="px-3 py-1.5 text-right text-purple-500 font-medium">{formatCurrency(y.drawdownsByType?.roth || 0)}</td>
-                                                <td className="px-3 py-1.5 text-right text-rose-400 font-medium">{formatCurrency(y.taxesPaid || 0)}</td>
-                                                <td className="px-3 py-1.5 text-right font-bold text-foreground">{formatCurrency(y.netWorth || 0)}</td>
-                                              </tr>
-                                            ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </div>
+                                <div className="text-[10px] text-muted-foreground/80 font-mono">
+                                  {strat.summary.effectiveTaxRate.toFixed(1)}% eff. rate
                                 </div>
-                              )}
-                            </td>
-                          </tr>
+                              </td>
+
+                              <td className="px-3 py-3.5 text-right align-middle whitespace-nowrap">
+                                <span className="font-mono text-amber-500 font-semibold">
+                                  {strat.summary.maxRmd > 0 ? formatCurrency(strat.summary.maxRmd) : '$0'}
+                                </span>
+                              </td>
+
+                              <td className="px-4 py-3.5 text-right align-middle whitespace-nowrap">
+                                {isCurrentActive ? (
+                                  <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-xs">
+                                    <Check className="w-3.5 h-3.5" /> Active
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleApplyStrategy(strat);
+                                    }}
+                                    className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                                  >
+                                    Apply Strategy
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* Expanded Strategy Sequencing Breakdown Panel */}
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={6} className="p-0">
+                                  <div className="bg-muted/20 p-5 border-t border-border space-y-5 animate-in fade-in duration-200">
+                                    {/* 1. Account Drawdown Priority Sequence Badges */}
+                                    <div className="flex flex-wrap items-center gap-2 bg-card p-3.5 rounded-xl border border-border">
+                                      <span className="font-bold text-foreground text-xs shrink-0">Drawdown Priority Order:</span>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {strat.drawdownOrder.map((step, idx) => (
+                                          <div key={idx} className="flex items-center gap-2">
+                                            <span className="bg-primary/10 text-primary font-mono text-[11px] font-bold px-2.5 py-1 rounded-lg border border-primary/20">
+                                              {idx + 1}. {step}
+                                            </span>
+                                            {idx < strat.drawdownOrder.length - 1 && (
+                                              <span className="text-muted-foreground text-xs">→</span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* 2. Execution Steps Across Retirement Phases */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                      <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
+                                        <h5 className="font-bold text-primary flex items-center gap-1.5 text-xs">
+                                          <Calendar className="w-3.5 h-3.5 text-primary" /> Phase 1: Early Retirement (Pre-59.5)
+                                        </h5>
+                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                          {strat.phases.early}
+                                        </p>
+                                      </div>
+                                      <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
+                                        <h5 className="font-bold text-indigo-500 flex items-center gap-1.5 text-xs">
+                                          <Zap className="w-3.5 h-3.5 text-indigo-500" /> Phase 2: Pre-RMD Window (Ages 59.5 - 74)
+                                        </h5>
+                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                          {strat.phases.preRmd}
+                                        </p>
+                                      </div>
+                                      <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
+                                        <h5 className="font-bold text-amber-500 flex items-center gap-1.5 text-xs">
+                                          <ShieldCheck className="w-3.5 h-3.5 text-amber-500" /> Phase 3: RMD & Legacy (Age 75+)
+                                        </h5>
+                                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                          {strat.phases.rmd}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* 3. Interactive Annual Drawdown & Tax Breakdown Log */}
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <h5 className="font-bold text-foreground text-xs">Annual Drawdown & Tax Breakdown Log</h5>
+                                        <span className="text-[10px] text-muted-foreground">Retirement Phase Projections</span>
+                                      </div>
+                                      <div className="max-h-56 overflow-y-auto border border-border rounded-xl bg-card shadow-inner">
+                                        <table className="w-full text-[11px] text-left">
+                                          <thead className="bg-muted/80 text-muted-foreground font-semibold sticky top-0 backdrop-blur-sm">
+                                            <tr>
+                                              <th className="px-3 py-2">Age</th>
+                                              <th className="px-3 py-2 text-right">Cash Draw</th>
+                                              <th className="px-3 py-2 text-right">Taxable Draw</th>
+                                              <th className="px-3 py-2 text-right">Pre-Tax Draw</th>
+                                              <th className="px-3 py-2 text-right">Roth Draw</th>
+                                              <th className="px-3 py-2 text-right">Taxes Paid</th>
+                                              <th className="px-3 py-2 text-right">Ending Net Worth</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-border/40">
+                                            {strat.summary.yearlyResults
+                                              .filter((y: any) => (y.primaryAge ?? y.age) >= (primaryEnginePlan.retirementAge || 60))
+                                              .map((y: any) => (
+                                                <tr key={y.year} className="hover:bg-muted/40 font-mono">
+                                                  <td className="px-3 py-1.5 font-bold text-foreground font-sans">Age {y.primaryAge ?? y.age}</td>
+                                                  <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.cash || 0)}</td>
+                                                  <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.taxable || 0)}</td>
+                                                  <td className="px-3 py-1.5 text-right text-amber-500 font-medium">{formatCurrency(y.drawdownsByType?.traditional || 0)}</td>
+                                                  <td className="px-3 py-1.5 text-right text-purple-500 font-medium">{formatCurrency(y.drawdownsByType?.roth || 0)}</td>
+                                                  <td className="px-3 py-1.5 text-right text-rose-400 font-medium">{formatCurrency(y.taxesPaid || 0)}</td>
+                                                  <td className="px-3 py-1.5 text-right font-bold text-foreground">{formatCurrency(y.netWorth || 0)}</td>
+                                                </tr>
+                                              ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                         );
                       })}
                     </tbody>

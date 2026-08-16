@@ -10,7 +10,7 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   CartesianGrid,
   Legend,
@@ -25,10 +25,14 @@ import {
   Sparkles,
   ShieldCheck,
   Zap,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
 
@@ -172,55 +176,55 @@ export function SocialSecurityTab({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Primary Claiming Age</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Primary Claiming</span>
             <Calendar className="w-4 h-4 text-primary" />
           </div>
           <div className="text-xl font-bold font-mono text-foreground flex items-baseline gap-2">
             Age {primaryAge}
           </div>
-          <span className="text-[10px] text-muted-foreground block">
-            {(getSsMult(primaryAge) * 100).toFixed(0)}% of Full Benefit (PIA)
+          <span className="text-[10px] text-muted-foreground block font-medium">
+            {(getSsMult(primaryAge) * 100).toFixed(0)}% of Full PIA
           </span>
         </div>
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Primary Monthly Benefit</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Primary Payout</span>
             <DollarSign className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-xl font-bold font-mono text-emerald-500">
-            {formatCurrency(primaryMonthlyAmount)}/mo
+            {formatCurrency(primaryMonthlyAmount)}<span className="text-xs font-normal text-muted-foreground">/mo</span>
           </div>
-          <span className="text-[10px] text-muted-foreground block">
-            Base PIA at Age 67: {formatCurrency(primaryMonthlyPIA)}/mo
+          <span className="text-[10px] text-muted-foreground block font-mono">
+            PIA: {formatCurrency(primaryMonthlyPIA)}/mo
           </span>
         </div>
 
         {isMfj && (
           <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-muted-foreground">Spouse Monthly Benefit</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">Spouse Payout</span>
               <HeartHandshake className="w-4 h-4 text-purple-500" />
             </div>
             <div className="text-xl font-bold font-mono text-purple-500">
-              {formatCurrency(spouseMonthlyAmount)}/mo
+              {formatCurrency(spouseMonthlyAmount)}<span className="text-xs font-normal text-muted-foreground">/mo</span>
             </div>
-            <span className="text-[10px] text-muted-foreground block">
-              Claiming at Age {spouseAge} ({(getSsMult(spouseAge) * 100).toFixed(0)}% PIA)
+            <span className="text-[10px] text-muted-foreground block font-medium">
+              Age {spouseAge} ({(getSsMult(spouseAge) * 100).toFixed(0)}% PIA)
             </span>
           </div>
         )}
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Annual Household Benefit</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Household Total</span>
             <TrendingUp className="w-4 h-4 text-indigo-500" />
           </div>
           <div className="text-xl font-bold font-mono text-foreground">
-            {formatCurrency(totalAnnualHouseholdSS)}/yr
+            {formatCurrency(totalAnnualHouseholdSS)}<span className="text-xs font-normal text-muted-foreground">/yr</span>
           </div>
           <span className="text-[10px] text-muted-foreground block">
-            Adjusts for inflation annually
+            Annual COLA-adjusted
           </span>
         </div>
       </div>
@@ -228,24 +232,33 @@ export function SocialSecurityTab({
       {/* SECTION 1: INTERACTIVE CLAIMING AGE & BASE BENEFIT CONTROLS */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
-          title="Social Security Monthly Base & Claiming Strategy"
-          description="Configure base monthly PIA benefit estimates at Full Retirement Age (67) and optimize claiming ages (62 to 70)"
+          title="Social Security Claiming Strategy"
+          description="Configure base PIA benefits at Full Retirement Age (67) and optimize claiming ages (62 to 70)"
           icon={HeartHandshake}
           isCollapsed={isOverviewCollapsed}
           onToggle={() => setIsOverviewCollapsed(!isOverviewCollapsed)}
         />
 
         {!isOverviewCollapsed && (
-          <div className="p-5 space-y-6">
+          <div className="p-5 space-y-5">
             {/* Base PIA Inputs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-card border border-border p-4 rounded-xl shadow-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/20 border border-border p-4 rounded-xl">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                  Primary Estimated Monthly Benefit at FRA (Age 67)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    Primary Benefit at FRA (Age 67)
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Your estimated Primary Insurance Amount (PIA) at Full Retirement Age (67) from ssa.gov.
+                      </TooltipContent>
+                    </Tooltip>
+                  </label>
+                </div>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">$</span>
+                  <span className="absolute left-3 top-2 text-xs text-muted-foreground">$</span>
                   <input
                     type="number"
                     value={primaryMonthlyPIAInput}
@@ -253,23 +266,29 @@ export function SocialSecurityTab({
                       setPrimaryMonthlyPIAInput(e.target.value);
                       updatePlanParameters({ primarySsMonthlyAmount: e.target.value });
                     }}
-                    className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 text-xs font-mono font-bold text-foreground focus:ring-1 focus:ring-primary"
+                    className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-1.5 text-xs font-mono font-bold text-foreground focus:ring-1 focus:ring-primary"
                     placeholder="2500"
                   />
                 </div>
-                <span className="text-[10px] text-muted-foreground block">
-                  Check ssa.gov statement for estimated Primary Insurance Amount (PIA)
-                </span>
               </div>
 
               {isMfj ? (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                    <HeartHandshake className="w-3.5 h-3.5 text-purple-500" />
-                    Spouse Estimated Monthly Benefit at FRA (Age 67)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      Spouse Benefit at FRA (Age 67)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Spouse's earned PIA from ssa.gov. If spousal benefit is enabled, spouse receives at least 50% of primary PIA.
+                        </TooltipContent>
+                      </Tooltip>
+                    </label>
+                  </div>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">$</span>
+                    <span className="absolute left-3 top-2 text-xs text-muted-foreground">$</span>
                     <input
                       type="number"
                       value={spouseMonthlyPIAInput}
@@ -277,31 +296,28 @@ export function SocialSecurityTab({
                         setSpouseMonthlyPIAInput(e.target.value);
                         updatePlanParameters({ spouseSsMonthlyAmount: e.target.value });
                       }}
-                      className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-2 text-xs font-mono font-bold text-foreground focus:ring-1 focus:ring-purple-500"
+                      className="w-full bg-background border border-border rounded-lg pl-7 pr-3 py-1.5 text-xs font-mono font-bold text-foreground focus:ring-1 focus:ring-purple-500"
                       placeholder="2000"
                     />
                   </div>
-                  <span className="text-[10px] text-muted-foreground block">
-                    Spouse's own earned PIA at Full Retirement Age (Age 67)
-                  </span>
                 </div>
               ) : (
-                <div className="flex items-center p-3 bg-muted/20 border border-border rounded-lg text-xs text-muted-foreground">
-                  Filing status is Single. Change status under Settings -&gt; Profile to enable spouse benefit inputs.
+                <div className="flex items-center p-3 bg-card border border-border rounded-lg text-xs text-muted-foreground">
+                  Filing status is Single. Enable spouse under Profile to configure spouse benefits.
                 </div>
               )}
             </div>
 
             {/* Claiming Age Sliders */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-4 rounded-xl border border-border">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-card p-4 rounded-xl border border-border">
               {/* Primary Claiming Age Slider */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-foreground">
                     Primary Claiming Age: <span className="font-mono text-primary text-sm">{primaryAge}</span>
-                  </label>
+                  </span>
                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">
-                    {primaryAge === 67 ? 'Full Retirement Age (100%)' : primaryAge < 67 ? `Early Claim (${(getSsMult(primaryAge) * 100).toFixed(0)}%)` : `Delayed Credit (${(getSsMult(primaryAge) * 100).toFixed(0)}%)`}
+                    {formatCurrency(primaryMonthlyAmount)}/mo ({(getSsMult(primaryAge) * 100).toFixed(0)}%)
                   </span>
                 </div>
                 <Slider
@@ -327,11 +343,11 @@ export function SocialSecurityTab({
               {isMfj ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-foreground">
                       Spouse Claiming Age: <span className="font-mono text-purple-500 text-sm">{spouseAge}</span>
-                    </label>
+                    </span>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-500">
-                      {spouseAge === 67 ? 'Full Retirement Age (100%)' : spouseAge < 67 ? `Early Claim (${(getSsMult(spouseAge) * 100).toFixed(0)}%)` : `Delayed Credit (${(getSsMult(spouseAge) * 100).toFixed(0)}%)`}
+                      {formatCurrency(spouseMonthlyAmount)}/mo ({(getSsMult(spouseAge) * 100).toFixed(0)}%)
                     </span>
                   </div>
                   <Slider
@@ -353,19 +369,35 @@ export function SocialSecurityTab({
                     ariaLabel="Spouse Claiming Age"
                   />
                 </div>
-              ) : (
-                <div className="flex items-center justify-center p-4 bg-card rounded-lg border border-border text-xs text-muted-foreground">
-                  Filing status is Single. Enable spouse under Settings -&gt; Profile for spousal benefits.
-                </div>
-              )}
+              ) : null}
             </div>
 
-            {/* Action & Active Status Bar */}
-            <div className="flex items-center justify-between pt-2">
-              <div className="text-xs text-muted-foreground">
-                Plan Ending Net Worth: <strong className="text-foreground font-mono">{formatCurrency(simSelected.endingNetWorth)}</strong>
+            {/* Spousal Top-Up Checkbox (if MFJ) */}
+            {isMfj && (
+              <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border border-border rounded-lg text-xs">
+                <label className="flex items-center gap-2 font-medium text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enableSpousal}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setEnableSpousal(val);
+                      updatePlanParameters({ enableSpousalSsBenefit: val });
+                    }}
+                    className="w-4 h-4 accent-primary rounded cursor-pointer"
+                  />
+                  <span>Enable 50% Spousal Benefit Top-Up Rule</span>
+                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Automatically tops up spouse benefit to 50% of the primary earner's PIA if higher than their own benefit.
+                  </TooltipContent>
+                </Tooltip>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -373,8 +405,8 @@ export function SocialSecurityTab({
       {/* SECTION 2: CUMULATIVE LIFETIME PAYOUT TRAJECTORY CHART */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
-          title="Cumulative Lifetime Payout Trajectory & Break-Even Analysis"
-          description="Compare total lifetime Social Security cash flows between claiming early at 62, at FRA 67, or delayed at 70"
+          title="Lifetime Payout & Break-Even Trajectory"
+          description="Compare cumulative lifetime cash flows between claiming early at 62, at FRA 67, or delayed at 70"
           icon={TrendingUp}
           isCollapsed={isTrajectoryCollapsed}
           onToggle={() => setIsTrajectoryCollapsed(!isTrajectoryCollapsed)}
@@ -389,7 +421,7 @@ export function SocialSecurityTab({
         />
 
         {!isTrajectoryCollapsed && (
-          <div className="p-5 space-y-6">
+          <div className="p-5 space-y-5">
             <div className="h-72 w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
@@ -401,7 +433,7 @@ export function SocialSecurityTab({
                     tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                     tickLine={false}
                   />
-                  <Tooltip content={<SocialSecurityTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
+                  <RechartsTooltip content={<SocialSecurityTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <ReferenceLine
                     x={78}
@@ -433,27 +465,51 @@ export function SocialSecurityTab({
               </ResponsiveContainer>
             </div>
 
-            {/* Break-Even Insights Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="bg-card p-4 rounded-xl border border-border space-y-1">
-                <span className="font-bold text-foreground block">Age 62 vs Age 67 Break-Even</span>
-                <p className="text-[11px] text-muted-foreground">
-                  Delaying from 62 to 67 breaks even at <strong>Age 78.6</strong>. If you live past 78.6, age 67 yields higher total cash.
-                </p>
+            {/* Break-Even Key Stats in Compact Strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="bg-muted/20 p-3 rounded-xl border border-border flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-muted-foreground block">62 vs 67 Break-Even</span>
+                  <span className="font-bold text-foreground font-mono">Age 78.6</span>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Delaying to 67 yields higher total cumulative cash if you live beyond age 78.6.
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
-              <div className="bg-card p-4 rounded-xl border border-border space-y-1">
-                <span className="font-bold text-foreground block">Age 67 vs Age 70 Break-Even</span>
-                <p className="text-[11px] text-muted-foreground">
-                  Delaying from 67 to 70 breaks even at <strong>Age 80.4</strong>. Past age 80.4, the 24% delayed credit dominates.
-                </p>
+              <div className="bg-muted/20 p-3 rounded-xl border border-border flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-muted-foreground block">67 vs 70 Break-Even</span>
+                  <span className="font-bold text-foreground font-mono">Age 80.4</span>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Delaying from 67 to 70 breaks even at age 80.4. Past 80.4, the 24% delayed credits deliver higher lifetime payout.
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
-              <div className="bg-card p-4 rounded-xl border border-border space-y-1">
-                <span className="font-bold text-foreground block">Portfolio Preservation Impact</span>
-                <p className="text-[11px] text-muted-foreground">
-                  Delaying Social Security acts as an inflation-indexed longevity annuity, reducing portfolio withdrawal drag after age 70.
-                </p>
+              <div className="bg-muted/20 p-3 rounded-xl border border-border flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-muted-foreground block">Longevity Hedge</span>
+                  <span className="font-bold text-emerald-500 font-mono">+24% Base Credit</span>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Delaying Social Security provides guaranteed inflation-adjusted income, reducing portfolio drawdown risk later in life.
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -463,8 +519,8 @@ export function SocialSecurityTab({
       {/* SECTION 3: IRS SOCIAL SECURITY TAXABILITY & PROVISIONAL INCOME */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
-          title="IRS Provisional Income & Social Security Taxability"
-          description="Understand how traditional 401(k) withdrawals, pensions, and interest push Social Security into 0%, 50%, or 85% taxable tiers"
+          title="Social Security Taxability & Provisional Income Tiers"
+          description="IRS Publication 915 rules on how provisional income subjects Social Security to federal taxation"
           icon={ShieldCheck}
           isCollapsed={isTaxabilityCollapsed}
           onToggle={() => setIsTaxabilityCollapsed(!isTaxabilityCollapsed)}
@@ -472,31 +528,43 @@ export function SocialSecurityTab({
 
         {!isTaxabilityCollapsed && (
           <div className="p-5 space-y-4 text-xs">
-            <p className="text-muted-foreground leading-relaxed">
-              Under IRS Publication 915, Social Security benefits are taxed based on your <strong>Provisional Income</strong> (AGI + Non-taxable Interest + 50% of Social Security).
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-card p-4 rounded-xl border border-border space-y-1">
-                <div className="font-bold text-emerald-500">Tier 1: 0% Taxable</div>
-                <div className="text-[11px] text-muted-foreground">
-                  Provisional Income under {isMfj ? '$32,000 (MFJ)' : '$25,000 (Single)'}. 100% of Social Security is tax-free.
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-card p-3.5 rounded-xl border border-border space-y-1">
+                <div className="font-bold text-emerald-500 flex items-center justify-between">
+                  <span>0% Taxable</span>
+                  <span className="text-[10px] font-mono text-muted-foreground">Tier 1</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground font-mono">
+                  &lt; {isMfj ? '$32,000 MFJ' : '$25,000 Single'}
                 </div>
               </div>
 
-              <div className="bg-card p-4 rounded-xl border border-border space-y-1">
-                <div className="font-bold text-amber-500">Tier 2: Up to 50% Taxable</div>
-                <div className="text-[11px] text-muted-foreground">
-                  Provisional Income between {isMfj ? '$32k–$44k' : '$25k–$34k'}. Up to 50% of benefits are subject to federal income tax.
+              <div className="bg-card p-3.5 rounded-xl border border-border space-y-1">
+                <div className="font-bold text-amber-500 flex items-center justify-between">
+                  <span>Up to 50% Taxable</span>
+                  <span className="text-[10px] font-mono text-muted-foreground">Tier 2</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground font-mono">
+                  {isMfj ? '$32k – $44k MFJ' : '$25k – $34k Single'}
                 </div>
               </div>
 
-              <div className="bg-card p-4 rounded-xl border border-border space-y-1">
-                <div className="font-bold text-rose-500">Tier 3: Up to 85% Taxable</div>
-                <div className="text-[11px] text-muted-foreground">
-                  Provisional Income above {isMfj ? '$44,000' : '$34,000'}. Up to 85% of Social Security benefits are taxed as ordinary income.
+              <div className="bg-card p-3.5 rounded-xl border border-border space-y-1">
+                <div className="font-bold text-rose-500 flex items-center justify-between">
+                  <span>Up to 85% Taxable</span>
+                  <span className="text-[10px] font-mono text-muted-foreground">Tier 3</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground font-mono">
+                  &gt; {isMfj ? '$44,000 MFJ' : '$34,000 Single'}
                 </div>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-muted-foreground text-[11px] bg-muted/20 p-2.5 rounded-lg">
+              <Info className="w-4 h-4 text-primary shrink-0" />
+              <span>
+                <strong>Provisional Income Formula:</strong> AGI (excluding SS) + Tax-Exempt Interest + 50% of Social Security Benefits.
+              </span>
             </div>
           </div>
         )}

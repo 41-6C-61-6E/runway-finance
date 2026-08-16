@@ -398,46 +398,58 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
     <div className="space-y-6">
       {/* Top Details Summary Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Included Portfolio</span>
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Total Portfolio</span>
+            <Landmark className="w-4 h-4 text-violet-500" />
+          </div>
           <p className="text-xl font-extrabold text-foreground font-mono">{formatCurrency(totalPortfolio)}</p>
           <p className="text-[10px] text-muted-foreground">{includedAccounts.length} of {planAccounts.length} accounts enabled</p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Annual Contributions</span>
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Annual Contributions</span>
+            <ArrowUpCircle className="w-4 h-4 text-primary" />
+          </div>
           <p className="text-xl font-extrabold text-primary font-mono">{formatCurrency(totalContributions)}</p>
           <p className="text-[10px] text-muted-foreground">
             {includedAccounts.filter((a: any) => safeString(a.contributionMode, 'none') !== 'none').length} accounts receiving contributions
           </p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Annual Expenses</span>
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Annual Expenses</span>
+            <ArrowDownCircle className="w-4 h-4 text-rose-500" />
+          </div>
           <p className="text-xl font-extrabold text-rose-500 font-mono">{formatCurrency(totalAnnualExpenses)}</p>
           <p className="text-[10px] text-muted-foreground">{expenses.length} defined outflows</p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contribution Rate</span>
-          <p className={`text-lg font-extrabold font-mono ${savingsRate >= 20 ? 'text-emerald-500' : savingsRate >= 10 ? 'text-amber-500' : 'text-rose-500'}`}>
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Contribution Rate</span>
+            <Zap className="w-4 h-4 text-amber-500" />
+          </div>
+          <p className={`text-xl font-extrabold font-mono ${savingsRate >= 20 ? 'text-emerald-500' : savingsRate >= 10 ? 'text-amber-500' : 'text-rose-500'}`}>
             {savingsRate.toFixed(1)}%
           </p>
           <p className="text-[10px] text-muted-foreground">
-            {combinedSalary > 0 ? `of ${formatCurrency(combinedSalary)} salary` : 'Set salary in Settings'}
+            {combinedSalary > 0 ? `of ${formatCurrency(combinedSalary)} salary` : 'Set salary in Profile'}
           </p>
         </div>
       </div>
 
       {/* Quick Section Filter Anchor Bar */}
-      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-card border border-border/80 shadow-xs overflow-x-auto no-scrollbar">
+      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-card border border-border shadow-xs overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setActiveFilter('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeFilter === 'all'
-                ? 'bg-primary text-primary-foreground shadow-2xs'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
@@ -503,25 +515,20 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
             const visibleAccounts = showExcludedAccounts ? planAccounts : includedAccounts;
 
             return (
-              <div className="bg-card border-l-4 border-l-violet-500 border-y border-r border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+              <div className="@container relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-4 sm:p-5 shadow-sm space-y-4">
             <CollapsibleCardHeader
               isCollapsed={isAccountsCollapsed}
               onToggle={setIsAccountsCollapsed}
-              title={
-                <div className="flex items-center gap-2">
-                  <Landmark className="w-5 h-5 text-primary" />
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">Plan Accounts & Contributions</h3>
-                    <p className="text-[11px] text-muted-foreground">Configure how much goes into each account during the accumulation phase.</p>
-                  </div>
-                </div>
-              }
+              title="Plan Accounts & Contributions"
+              description="Configure accumulation phase savings into each asset pool"
+              icon={Landmark}
+              className="px-0 py-0"
               actions={
                 excludedAccountsCount > 0 ? (
                   <button
                     type="button"
                     onClick={() => setShowExcludedAccounts(!showExcludedAccounts)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-muted/40 text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-background/80 text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
                   >
                     {showExcludedAccounts ? (
                       <>
@@ -540,13 +547,13 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
             />
 
             {!isAccountsCollapsed && (
-              <div className="p-5 space-y-3">
+              <div className="space-y-3 pt-1">
                 {/* Salary Reminder Banner */}
                 {combinedSalary <= 0 && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400">
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400">
                     <Zap className="w-4 h-4 shrink-0" />
                     <span>
-                      <strong>Set your salary</strong> in Settings → Milestones & Profile to enable percentage-based contributions.
+                      <strong>Set your salary</strong> in Profile to enable percentage-based contributions.
                     </span>
                   </div>
                 )}
@@ -566,21 +573,22 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   return (
                     <div
                       key={accId}
-                      className={`rounded-xl border transition-all ${
+                      className={`@container relative rounded-xl border transition-all duration-200 p-4 sm:p-4.5 shadow-2xs ${
                         isIncluded
                           ? isExpanded
-                            ? 'bg-muted/20 border-primary/40 shadow-sm'
-                            : 'bg-muted/10 border-border hover:border-primary/30'
-                          : 'bg-muted/5 border-border/40 opacity-60'
+                            ? 'bg-card border-primary/50 shadow-xs ring-1 ring-primary/20'
+                            : 'bg-card border-border hover:border-primary/40 hover:bg-card/90'
+                          : 'bg-card/40 border-border/40 opacity-60'
                       }`}
                     >
-                      {/* Account Header Row */}
-                      <div className="flex items-center justify-between p-3.5 text-xs">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                      {/* Account Card Header & Body */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          {/* Checkbox toggle */}
                           <button
                             type="button"
                             onClick={() => handleToggleAccount(accId, isIncluded)}
-                            className="text-primary hover:scale-110 transition-transform shrink-0 cursor-pointer"
+                            className="mt-1 text-primary hover:scale-110 transition-transform shrink-0 cursor-pointer"
                             title={isIncluded ? 'Exclude from plan' : 'Include in plan'}
                           >
                             {isIncluded ? (
@@ -590,64 +598,114 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                             )}
                           </button>
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`font-bold block truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                          {/* Account Icon Badge */}
+                          <div className={`p-2.5 rounded-xl shrink-0 ${
+                            accType === 'cash'
+                              ? 'bg-cyan-500/10 text-cyan-500'
+                              : accType === 'roth_ira' || accType === 'roth_401k'
+                              ? 'bg-emerald-500/10 text-emerald-500'
+                              : isPreTaxType(accType)
+                              ? 'bg-amber-500/10 text-amber-500'
+                              : 'bg-blue-500/10 text-blue-500'
+                          }`}>
+                            {accType === 'cash' ? (
+                              <Building2 className="w-5 h-5" />
+                            ) : (
+                              <Landmark className="w-5 h-5" />
+                            )}
+                          </div>
+
+                          {/* Account Info & Badges */}
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`font-bold text-sm truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
                                 {accName}
                               </span>
                               {!isIncluded && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500">
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
                                   <EyeOff className="w-2.5 h-2.5" /> Excluded
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <p className={`text-[11px] font-medium ${getAccountTypeColor(accType)}`}>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                accType === 'cash'
+                                  ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20'
+                                  : accType === 'roth_ira' || accType === 'roth_401k'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  : isPreTaxType(accType)
+                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                                  : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                              }`}>
                                 {getAccountTypeLabel(accType)}
-                              </p>
+                              </span>
+
                               {safeString(acc.owner) === 'spouse' && plan.hasSpouse && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">{plan.spouseName || 'Spouse'}</span>
-                              )}
-                              {isPreTaxType(accType) && (!acc.rothPercentage || acc.rothPercentage === 0) && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 uppercase tracking-wider">Pre-Tax</span>
-                              )}
-                              {acc.rothPercentage !== undefined && acc.rothPercentage > 0 && acc.rothPercentage < 100 && (
-                                <span className="inline-flex items-center gap-1 text-[9.5px] font-semibold px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300">
-                                  <span>{100 - acc.rothPercentage}% Pre-Tax ({formatCurrency((parseFloat(acc.balance) || 0) * (1 - acc.rothPercentage / 100))})</span>
-                                  <span className="text-muted-foreground">•</span>
-                                  <span className="text-pink-600 dark:text-pink-400 font-bold">{acc.rothPercentage}% Roth ({formatCurrency((parseFloat(acc.balance) || 0) * (acc.rothPercentage / 100))})</span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                  {plan.spouseName || 'Spouse'}
                                 </span>
                               )}
+
+                              {isPreTaxType(accType) && (!acc.rothPercentage || acc.rothPercentage === 0) && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                                  Pre-Tax
+                                </span>
+                              )}
+
+                              {acc.rothPercentage !== undefined && acc.rothPercentage > 0 && acc.rothPercentage < 100 && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300">
+                                  <span>{100 - acc.rothPercentage}% Pre-Tax</span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="text-pink-600 dark:text-pink-400 font-bold">{acc.rothPercentage}% Roth</span>
+                                </span>
+                              )}
+
                               {isSurplus && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-500 uppercase tracking-wider">Surplus Sweep</span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 uppercase tracking-wider">
+                                  RMD Sweep
+                                </span>
                               )}
                             </div>
+
+                            {/* Sub-metrics strip */}
+                            {isIncluded && contribMode !== 'none' && (
+                              <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-0.5 flex-wrap">
+                                <span className="font-semibold text-primary">
+                                  Inflow: +{formatCurrency(totalInflow)}/yr
+                                </span>
+                                {contribMode === 'percentage' && (
+                                  <span>({acc.contributionValue || 0}% of salary)</span>
+                                )}
+                                {matchAmt > 0 && (
+                                  <span className="text-emerald-600 dark:text-emerald-400">
+                                    • incl. {formatCurrency(matchAmt)} match
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 
+                        {/* Right: Balance & Configure Action */}
                         <div className="flex items-center gap-3 shrink-0">
-                          {/* Contribution summary inline */}
-                          {isIncluded && contribMode !== 'none' && (
-                            <div className="text-right hidden sm:block">
-                              <span className="font-mono font-bold text-primary text-xs">
-                                +{formatCurrency(totalInflow)}/yr
-                              </span>
-                              {matchAmt > 0 && (
-                                <p className="text-[9px] text-emerald-500 font-medium">incl. {formatCurrency(matchAmt)} match</p>
-                              )}
-                            </div>
-                          )}
-
-                          <span className={`font-mono font-bold ml-1 ${isIncluded ? 'text-foreground' : 'text-muted-foreground/60 line-through'}`}>
-                            {formatCurrency(parseFloat(acc.balance) || 0)}
-                          </span>
+                          <div className="text-right">
+                            <span className="text-[10px] text-muted-foreground block font-medium">Balance</span>
+                            <span className={`font-mono text-sm font-bold block ${isIncluded ? 'text-foreground' : 'text-muted-foreground/60 line-through'}`}>
+                              {formatCurrency(parseFloat(acc.balance) || 0)}
+                            </span>
+                          </div>
 
                           {isIncluded && (
                             <button
                               type="button"
                               onClick={() => setExpandedAccountId(isExpanded ? null : accId)}
-                              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all cursor-pointer"
-                              title="Configure contribution"
+                              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                                isExpanded
+                                  ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                                  : 'bg-background/50 border-border text-muted-foreground hover:text-foreground hover:bg-background'
+                              }`}
+                              title={isExpanded ? 'Collapse contribution' : 'Configure contribution'}
                             >
                               {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                             </button>
@@ -655,11 +713,11 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                         </div>
                       </div>
 
-                      {/* Expanded Contribution Configuration */}
+                      {/* Expanded Contribution Configuration Drawer */}
                       {isExpanded && (
-                        <div className="border-t border-border/60 p-4 space-y-3 bg-muted/5">
+                        <div className="mt-3.5 pt-3.5 border-t border-border/80 p-4 rounded-xl bg-muted/20 space-y-4">
                           {/* Contribution Mode */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                             <div className="space-y-1">
                               <div className="flex items-center gap-1">
                                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Contribution Mode</label>
@@ -716,7 +774,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                     value={acc.contributionValue || ''}
                                     onChange={(e) => handleUpdateContribution(accId, { contributionValue: parseFloat(e.target.value) || 0 })}
                                     placeholder={contribMode === 'percentage' ? 'e.g. 15' : 'e.g. 23000'}
-                                    className={`w-full bg-background border border-border rounded-lg ${contribMode === 'fixed_amount' ? 'pl-7' : 'pl-3'} pr-3 py-2 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary`}
+                                    className={`w-full bg-background border border-border rounded-lg ${contribMode === 'fixed_amount' ? 'pl-7' : 'pl-3'} pr-3 py-2 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary font-bold`}
                                   />
                                   {contribMode === 'percentage' && (
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono">%</span>
@@ -740,7 +798,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                     </Tooltip>
                                   </TooltipProvider>
                                 </div>
-                                <div className="flex items-center h-[34px] px-3 rounded-lg bg-muted/40 border border-border">
+                                <div className="flex items-center h-[38px] px-3 rounded-lg bg-background border border-border">
                                   <span className="text-xs font-mono font-bold text-primary">{formatCurrency(getContributionAmount(acc))}/yr</span>
                                 </div>
                               </div>
@@ -756,7 +814,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                         <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
                                       </TooltipTrigger>
                                       <TooltipContent className="max-w-xs text-xs">
-                                        Select which spouse&apos;s salary is used as the base for percentage contributions and employer matches.
+                                        Which salary to use for calculating this contribution. Useful when you and your partner contribute to separate retirement accounts.
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
@@ -766,140 +824,75 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                   onChange={(e) => handleUpdateContribution(accId, { contributionSalarySource: e.target.value })}
                                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:ring-1 focus:ring-primary font-medium"
                                 >
-                                  <option value="primary">Primary Salary ({primarySalary > 0 ? formatCurrency(primarySalary) : 'not set'})</option>
-                                  <option value="spouse">{plan.spouseName || 'Spouse'} Salary ({spouseSalary > 0 ? formatCurrency(spouseSalary) : 'not set'})</option>
+                                  <option value="primary">Primary Salary ({formatCurrency(primarySalary)})</option>
+                                  <option value="spouse">{plan.spouseName || 'Spouse'} Salary ({formatCurrency(spouseSalary)})</option>
                                 </select>
                               </div>
                             )}
                           </div>
 
-                          {/* Company Match (for employer-sponsored accounts) */}
-                          {hasEmployerPlan(accType) && contribMode !== 'none' && (
+                          {/* Employer Match Section (for 401k / employer plans) */}
+                          {hasEmployerPlan(accType) && (
                             <div className="pt-2 border-t border-border/40">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Building2 className="w-3.5 h-3.5 text-emerald-500" />
-                                <span className="text-[11px] font-bold text-foreground uppercase tracking-wider">Employer Match</span>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs text-xs">
-                                      Pre-tax employer matching contributions deposited into your account (e.g. 100% match up to 6% of salary).
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+                                Employer Match Settings
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1">
-                                  <label className="text-[11px] font-semibold text-muted-foreground">Match Rate</label>
+                                  <label className="text-[11px] text-muted-foreground">Match Rate (% of contribution matched)</label>
                                   <div className="relative">
                                     <input
                                       type="number"
-                                      step="0.1"
-                                      value={acc.companyMatchRate != null ? (parseFloat(acc.companyMatchRate) * 100).toString() : ''}
-                                      onChange={(e) => {
-                                        const pct = parseFloat(e.target.value) || 0;
-                                        handleUpdateContribution(accId, { companyMatchRate: pct / 100 });
-                                      }}
-                                      placeholder="e.g. 100"
-                                      className="w-full bg-background border border-border rounded-lg pl-3 pr-7 py-2 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
+                                      step="5"
+                                      min="0"
+                                      max="200"
+                                      value={acc.companyMatchRate != null ? acc.companyMatchRate * 100 : ''}
+                                      onChange={(e) => handleUpdateContribution(accId, { companyMatchRate: (parseFloat(e.target.value) || 0) / 100 })}
+                                      placeholder="e.g. 50 (for 50% match)"
+                                      className="w-full bg-background border border-border rounded-lg pl-3 pr-7 py-2 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
                                     />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px] font-mono">%</span>
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono">%</span>
                                   </div>
                                 </div>
                                 <div className="space-y-1">
-                                  <label className="text-[11px] font-semibold text-muted-foreground">Up to % of Salary</label>
+                                  <label className="text-[11px] text-muted-foreground">Match Limit (% of salary)</label>
                                   <div className="relative">
                                     <input
                                       type="number"
                                       step="0.5"
+                                      min="0"
+                                      max="50"
                                       value={acc.companyMatchLimit || ''}
                                       onChange={(e) => handleUpdateContribution(accId, { companyMatchLimit: parseFloat(e.target.value) || 0 })}
-                                      placeholder="e.g. 6"
-                                      className="w-full bg-background border border-border rounded-lg pl-3 pr-7 py-2 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
+                                      placeholder="e.g. 6 (matched up to 6% salary)"
+                                      className="w-full bg-background border border-border rounded-lg pl-3 pr-7 py-2 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
                                     />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px] font-mono">%</span>
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-mono">%</span>
                                   </div>
                                 </div>
-                                {matchAmt > 0 && (
-                                  <div className="space-y-1">
-                                    <label className="text-[11px] font-semibold text-muted-foreground">Annual Match</label>
-                                    <div className="flex items-center h-[34px] px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                      <span className="text-xs font-mono font-bold text-emerald-500">+{formatCurrency(matchAmt)}/yr</span>
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           )}
 
-                          {/* Roth vs Pre-Tax Split Configuration */}
-                          {(accType.includes('401k') || accType.includes('403b') || accType.includes('457') || accType.includes('ira') || accType.includes('retirement')) && (
-                            <div className="pt-2 border-t border-border/40 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
-                                  <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Roth vs Pre-Tax Split</label>
+                          {/* RMD Sweep Destination Toggle */}
+                          <div className="pt-2 border-t border-border/40 space-y-1">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isSurplus}
+                                  onChange={(e) => handleUpdateContribution(accId, { isSurplusDestination: e.target.checked })}
+                                  className="w-4 h-4 text-primary focus:ring-primary rounded accent-primary cursor-pointer"
+                                />
+                                <span className="text-xs font-semibold text-foreground flex items-center gap-1">
+                                  Set as RMD Sweep Destination
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <HelpCircle className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
                                       </TooltipTrigger>
-                                      <TooltipContent className="max-w-xs text-xs">
-                                        For mixed retirement accounts (e.g. 401k with both Roth and Traditional balances), set the percentage that is Tax-Free Roth vs Pre-Tax Traditional.
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                </div>
-                                <span className="text-xs font-mono font-bold text-foreground">
-                                  <span className="text-purple-600 dark:text-purple-400">{100 - (acc.rothPercentage ?? 0)}% Pre-Tax</span>
-                                  <span className="mx-1.5 text-muted-foreground">•</span>
-                                  <span className="text-pink-600 dark:text-pink-400">{acc.rothPercentage ?? 0}% Roth</span>
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <Slider
-                                  min={0}
-                                  max={100}
-                                  step={5}
-                                  value={acc.rothPercentage ?? 0}
-                                  onChange={(val) => handleUpdateContribution(accId, { rothPercentage: Math.round(val) })}
-                                  ariaLabel="Roth vs Traditional Split Percentage"
-                                />
-                                <div className="relative w-24 shrink-0">
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={acc.rothPercentage ?? 0}
-                                    onChange={(e) => handleUpdateContribution(accId, { rothPercentage: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) })}
-                                    className="w-full bg-background border border-border rounded-lg pl-2 pr-6 py-1 text-xs font-mono text-foreground text-center"
-                                  />
-                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px] font-mono">%</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Surplus Destination Toggle & Contribution Summary */}
-                          <div className="pt-2 border-t border-border/40 space-y-1">
-                            <div className="flex items-center justify-between">
-                              <label className="flex items-center gap-2 cursor-pointer text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={isSurplus}
-                                  onChange={(e) => handleUpdateContribution(accId, { isSurplusDestination: e.target.checked })}
-                                  className="rounded border-border accent-violet-500"
-                                />
-                                <span className="text-muted-foreground font-medium flex items-center gap-1.5">
-                                  Sweep leftover savings here
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <HelpCircle className="w-3.5 h-3.5 text-violet-400 hover:text-violet-300 transition-colors cursor-pointer" />
-                                      </TooltipTrigger>
                                       <TooltipContent className="max-w-xs text-xs leading-relaxed">
-                                        <strong>Surplus Cash Sweep:</strong> During your working years, 100% of any remaining unallocated cash surplus (salary minus taxes, expenses, and set contributions) is automatically saved into this account.
+                                        <strong>RMD Excess Sweep:</strong> In retirement, mandatory RMD distributions in excess of living expenses and taxes are automatically swept into this account. (During accumulation, only defined contributions are made; unallocated surplus is not swept.)
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
@@ -913,9 +906,6 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                 </div>
                               )}
                             </div>
-                            <p className="text-[10px] text-muted-foreground/70 pl-5">
-                              Unallocated net cash flow (after expenses and set contributions) is automatically swept into this account each year during your accumulation phase.
-                            </p>
                           </div>
                         </div>
                       )}
@@ -952,23 +942,18 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
       {/* Debts & Liabilities Section */}
       {(activeFilter === 'all' || activeFilter === 'liabilities') && (
-        <div className="bg-card border-l-4 border-l-amber-500 border-y border-r border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+        <div className="@container relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-4 sm:p-5 shadow-sm space-y-4">
           <CollapsibleCardHeader
             isCollapsed={isLiabilitiesCollapsed}
             onToggle={setIsLiabilitiesCollapsed}
-            title={
-              <div className="flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-amber-500" />
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Debts & Liabilities</h3>
-                  <p className="text-[11px] text-muted-foreground">Mortgages, student loans, car loans, and credit card balances.</p>
-                </div>
-              </div>
-            }
+            title="Debts & Liabilities"
+            description="Mortgages, student loans, car loans, and credit card balances"
+            icon={Receipt}
+            className="px-0 py-0"
             actions={
               <button
                 onClick={openAddLiabilityModal}
-                className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+                className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Liability
@@ -977,12 +962,12 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
           />
 
           {!isLiabilitiesCollapsed && (
-            <div className="p-5 space-y-3">
-              <div className="space-y-2">
+            <div className="space-y-3 pt-1">
+              <div className="space-y-3">
                 {liabilities.length === 0 ? (
-                  <div className="py-4 text-center border border-dashed border-border rounded-lg space-y-1">
+                  <div className="py-6 text-center border border-dashed border-border rounded-xl space-y-1">
                     <p className="text-xs text-muted-foreground italic">No debts or liabilities defined yet.</p>
-                    <p className="text-[11px] text-muted-foreground/70">Add Mortgages, Auto Loans, or Personal Debt to model debt obligations.</p>
+                    <p className="text-[11px] text-muted-foreground/70">Add Mortgages, Auto Loans, or Personal Debt to model obligations.</p>
                   </div>
                 ) : (
                   liabilities.map((liab: any, i: number) => {
@@ -994,36 +979,67 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                     const yearsRem = parseFloat(liab.yearsRemaining) || 0;
 
                     return (
-                      <div key={liabId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-amber-500/40 transition-all">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-foreground">{liabNameStr}</span>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
-                              {interest}% APR • {yearsRem} yrs remaining
-                            </span>
+                      <div
+                        key={liabId}
+                        className="@container relative rounded-xl border border-border bg-card hover:border-amber-500/40 hover:bg-card/90 transition-all duration-200 p-4 sm:p-4.5 shadow-2xs space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            {/* Icon badge */}
+                            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
+                              <Receipt className="w-5 h-5" />
+                            </div>
+
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-sm text-foreground truncate">{liabNameStr}</span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                                  {interest}% APR
+                                </span>
+                                {yearsRem > 0 && (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-muted/40 text-muted-foreground border-border">
+                                    {yearsRem} yrs remaining
+                                  </span>
+                                )}
+                                {safeString(liab.owner) === 'spouse' && plan.hasSpouse && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                    {plan.spouseName || 'Spouse'}
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-[11px] text-muted-foreground">
+                                Monthly Payment: <strong className="text-foreground font-mono">{formatCurrency(monthlyPmt)}/mo</strong> ({formatCurrency(monthlyPmt * 12)}/yr)
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-[11px] text-muted-foreground capitalize mt-0.5">
-                            Owner: {safeString(liab.owner, 'primary')} • Monthly Payment: {formatCurrency(monthlyPmt)}/mo ({formatCurrency(monthlyPmt * 12)}/yr)
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-amber-500">
-                            {formatCurrency(balance)}
-                          </span>
-                          <button
-                            onClick={() => openEditLiabilityModal(liab)}
-                            className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
-                            title="Edit Liability"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLiability(liabId)}
-                            className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
-                            title="Delete Liability"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+
+                          {/* Right side: Balance and actions */}
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className="text-[10px] text-muted-foreground block font-medium">Principal</span>
+                              <span className="font-mono text-sm font-bold text-amber-500 block">
+                                {formatCurrency(balance)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => openEditLiabilityModal(liab)}
+                                className="p-2 rounded-xl border border-border bg-background/50 hover:bg-background text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                                title="Edit Liability"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteLiability(liabId)}
+                                className="p-2 rounded-xl border border-border bg-background/50 hover:bg-background text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                title="Delete Liability"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1039,23 +1055,18 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
         {/* Right Column: Incomes & Expenses */}
         <div className="space-y-6">
           {(activeFilter === 'all' || activeFilter === 'incomes') && (
-            <div className="bg-card border-l-4 border-l-emerald-500 border-y border-r border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+            <div className="@container relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-4 sm:p-5 shadow-sm space-y-4">
         <CollapsibleCardHeader
           isCollapsed={isIncomesCollapsed}
           onToggle={setIsIncomesCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <ArrowUpCircle className="w-5 h-5 text-emerald-500" />
-              <div>
-                <h3 className="text-sm font-bold text-foreground">Additional Retirement Income Streams</h3>
-                <p className="text-[11px] text-muted-foreground">Pensions, Annuities, Rental/Side Income, and Pass-through Cash Flow (Salary &amp; Social Security are set in Settings).</p>
-              </div>
-            </div>
-          }
+          title="Additional Retirement Income Streams"
+          description="Pensions, Annuities, Rental Income, and Pass-through Cash Flow"
+          icon={ArrowUpCircle}
+          className="px-0 py-0"
           actions={
             <button
               onClick={openAddIncomeModal}
-              className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Income Stream
@@ -1064,17 +1075,17 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
         />
 
         {!isIncomesCollapsed && (
-          <div className="p-5 space-y-3">
+          <div className="space-y-3 pt-1">
             {/* Income Guidance Collapsible Banner */}
             {showIncomeNotice ? (
-              <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400">
                 <div className="flex items-start gap-2">
                   <Zap className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-bold text-foreground">Income Stream Guidelines:</p>
                     <ul className="list-disc list-inside space-y-0.5 mt-1 text-[11px]">
                       <li><strong>Include:</strong> Pensions, guaranteed annuities, passive rental income, royalties, or side-job wages.</li>
-                      <li><strong>Do NOT include:</strong> Core salary, Social Security (computed automatically from your benefit &amp; claiming age in <em>Settings → Profile</em>), or portfolio withdrawals (calculated automatically).</li>
+                      <li><strong>Do NOT include:</strong> Core salary, Social Security (computed automatically in Profile), or portfolio withdrawals.</li>
                     </ul>
                   </div>
                 </div>
@@ -1100,11 +1111,11 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               {incomes.length === 0 ? (
-                <div className="py-4 text-center border border-dashed border-border rounded-lg space-y-1">
-                  <p className="text-xs text-muted-foreground italic">No additional or retirement income streams defined yet.</p>
-                  <p className="text-[11px] text-muted-foreground/70">Add Pensions, Annuities, or passive income streams for pre/post retirement.</p>
+                <div className="py-6 text-center border border-dashed border-border rounded-xl space-y-1">
+                  <p className="text-xs text-muted-foreground italic">No additional income streams defined yet.</p>
+                  <p className="text-[11px] text-muted-foreground/70">Add Pensions, Annuities, or passive income streams.</p>
                 </div>
               ) : (
               incomes.map((inc: any, i: number) => {
@@ -1122,14 +1133,14 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   phaseBadge = { label: 'Pre-Retirement Only', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
                 } else if (endType === 'after_n_years' || endType === 'duration') {
                   if (startType === 'retirement') {
-                    phaseBadge = { label: `Retirement (${endVal || 'N'} Years)`, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+                    phaseBadge = { label: `Retirement (${endVal || 'N'} Yrs)`, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
                   } else if (startType === 'now') {
-                    phaseBadge = { label: `Next ${endVal || 'N'} Years`, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+                    phaseBadge = { label: `Next ${endVal || 'N'} Yrs`, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
                   } else if (startType === 'age' && startVal) {
                     const endAge = parseInt(startVal, 10) + (parseInt(endVal, 10) || 0);
                     phaseBadge = { label: `Ages ${startVal}–${endAge}`, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' };
                   } else {
-                    phaseBadge = { label: `${endVal || 'N'} Years Duration`, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+                    phaseBadge = { label: `${endVal || 'N'} Yrs Duration`, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
                   }
                 } else if (startType === 'retirement' || (startType === 'age' && parseInt(startVal, 10) >= (plan.retirementAge || 60))) {
                   phaseBadge = { label: 'Retirement Phase', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
@@ -1140,39 +1151,67 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                 }
 
                 return (
-                  <div key={incId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-emerald-500/40 transition-all">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-foreground">{incNameStr}</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${phaseBadge.color}`}>
-                          {phaseBadge.label}
-                        </span>
+                  <div
+                    key={incId}
+                    className="@container relative rounded-xl border border-border bg-card hover:border-emerald-500/40 hover:bg-card/90 transition-all duration-200 p-4 sm:p-4.5 shadow-2xs space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        {/* Icon badge */}
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
+                          <ArrowUpCircle className="w-5 h-5" />
+                        </div>
+
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-sm text-foreground truncate">{incNameStr}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${phaseBadge.color}`}>
+                              {phaseBadge.label}
+                            </span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-muted/40 text-muted-foreground border-border capitalize">
+                              {incTypeStr === 'salary' ? 'Side Job' : incTypeStr.replace(/_/g, ' ')}
+                            </span>
+                            {safeString(inc.owner) === 'spouse' && plan.hasSpouse && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                {plan.spouseName || 'Spouse'}
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-[11px] text-muted-foreground">
+                            {inc.growthRate ? `${inc.growthRate}% annual growth` : 'Fixed amount'}
+                            {startType === 'retirement' ? ' • Starts at Retirement' : startType === 'age' && startVal ? ` • Starts Age ${startVal}` : startType === 'year' && startVal ? ` • Starts ${startVal}` : ''}
+                            {endType === 'retirement' ? ' • Until Retirement' : endType === 'end_of_plan' ? ' • Lifetime' : (endType === 'after_n_years' || endType === 'duration') && endVal ? ` • For ${endVal} yrs` : endType === 'age' && endVal ? ` • Until Age ${endVal}` : endType === 'year' && endVal ? ` • Until ${endVal}` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-muted-foreground capitalize mt-0.5">
-                        {incTypeStr === 'salary' ? 'Side Job / Pre-Retirement Wages' : incTypeStr.replace(/_/g, ' ')}
-                        {inc.growthRate ? ` • ${inc.growthRate}% annual growth` : ''}
-                        {startType === 'retirement' ? ' • Starts at Retirement' : startType === 'age' && startVal ? ` • Starts Age ${startVal}` : startType === 'year' && startVal ? ` • Starts ${startVal}` : ''}
-                        {endType === 'retirement' ? ' • Until Retirement' : endType === 'end_of_plan' ? ' • Lifetime' : (endType === 'after_n_years' || endType === 'duration') && endVal ? ` • For ${endVal} years` : endType === 'age' && endVal ? ` • Until Age ${endVal}` : endType === 'year' && endVal ? ` • Until ${endVal}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono font-bold text-emerald-500">
-                        {formatCurrency(parseFloat(inc.amount) || 0)}/yr
-                      </span>
-                      <button
-                        onClick={() => openEditIncomeModal(inc)}
-                        className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
-                        title="Edit Income Stream"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEvent(incId)}
-                        className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
-                        title="Delete Income Stream"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+
+                      {/* Right side: Amount and actions */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="text-[10px] text-muted-foreground block font-medium">Annual Inflow</span>
+                          <span className="font-mono text-sm font-bold text-emerald-500 block">
+                            +{formatCurrency(parseFloat(inc.amount) || 0)}/yr
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => openEditIncomeModal(inc)}
+                            className="p-2 rounded-xl border border-border bg-background/50 hover:bg-background text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                            title="Edit Income Stream"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteEvent(incId)}
+                            className="p-2 rounded-xl border border-border bg-background/50 hover:bg-background text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer"
+                            title="Delete Income Stream"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1186,23 +1225,18 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
     {/* Expenses Section */}
     {(activeFilter === 'all' || activeFilter === 'expenses') && (
-      <div className="bg-card border-l-4 border-l-rose-500 border-y border-r border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+      <div className="@container relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-4 sm:p-5 shadow-sm space-y-4">
         <CollapsibleCardHeader
           isCollapsed={isExpensesCollapsed}
           onToggle={setIsExpensesCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <ArrowDownCircle className="w-5 h-5 text-rose-500" />
-              <div>
-                <h3 className="text-sm font-bold text-foreground">Retirement Expenses and Outflows</h3>
-                <p className="text-[11px] text-muted-foreground">Living expenses, healthcare, housing, and discretionary spending goals.</p>
-              </div>
-            </div>
-          }
+          title="Retirement Expenses & Outflows"
+          description="Living expenses, healthcare, housing, and discretionary goals"
+          icon={ArrowDownCircle}
+          className="px-0 py-0"
           actions={
             <button
               onClick={openAddExpenseModal}
-              className="flex items-center gap-1.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Expense
@@ -1211,10 +1245,10 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
         />
 
         {!isExpensesCollapsed && (
-          <div className="p-5 space-y-3">
+          <div className="space-y-3 pt-1">
             {/* Tax Handling Explanatory Banner (Collapsible) */}
             {showTaxNotice ? (
-              <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-blue-400">
+              <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-blue-400">
                 <div className="flex items-start gap-2">
                   <Zap className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
@@ -1243,11 +1277,12 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               {expenses.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic py-3 text-center border border-dashed border-border rounded-lg">
-                  No expenses defined yet.
-                </p>
+                <div className="py-6 text-center border border-dashed border-border rounded-xl space-y-1">
+                  <p className="text-xs text-muted-foreground italic">No expenses defined yet.</p>
+                  <p className="text-[11px] text-muted-foreground/70">Add Living Expenses, Healthcare, or Goal Outflows to model retirement spending.</p>
+                </div>
               ) : (
                 expenses.map((exp: any, i: number) => {
                   const expNameStr = safeString(exp.name, 'Expense');
@@ -1267,12 +1302,12 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                       const endAge = (plan.retirementAge || 60) + (parseInt(endVal, 10) || 0);
                       phaseBadge = { label: `Early Retirement (${plan.retirementAge || 60}–${endAge})`, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
                     } else if (startType === 'now') {
-                      phaseBadge = { label: `Next ${endVal} Years`, color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
+                      phaseBadge = { label: `Next ${endVal} Yrs`, color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
                     } else if (startType === 'age' && startVal) {
                       const endAge = parseInt(startVal, 10) + (parseInt(endVal, 10) || 0);
                       phaseBadge = { label: `Ages ${startVal}–${endAge}`, color: 'bg-violet-500/10 text-violet-500 border-violet-500/20' };
                     } else {
-                      phaseBadge = { label: `${endVal} Years Duration`, color: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
+                      phaseBadge = { label: `${endVal} Yrs Duration`, color: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
                     }
                   } else if (startType === 'retirement' && endType === 'age' && endVal) {
                     phaseBadge = { label: `Early Retirement (${plan.retirementAge || 60}–${endVal})`, color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
@@ -1291,39 +1326,67 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   }
 
                   return (
-                    <div key={expId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border text-xs hover:border-rose-500/40 transition-all">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-foreground">{expNameStr}</span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${phaseBadge.color}`}>
-                            {phaseBadge.label}
-                          </span>
+                    <div
+                      key={expId}
+                      className="@container relative rounded-xl border border-border bg-card hover:border-rose-500/40 hover:bg-card/90 transition-all duration-200 p-4 sm:p-4.5 shadow-2xs space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          {/* Icon badge */}
+                          <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
+                            <ArrowDownCircle className="w-5 h-5" />
+                          </div>
+
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-foreground truncate">{expNameStr}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${phaseBadge.color}`}>
+                                {phaseBadge.label}
+                              </span>
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-muted/40 text-muted-foreground border-border capitalize">
+                                {expTypeStr.replace(/_/g, ' ')}
+                              </span>
+                              {safeString(exp.owner) === 'spouse' && plan.hasSpouse && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                  {plan.spouseName || 'Spouse'}
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-[11px] text-muted-foreground">
+                              {exp.growthRate ? `${exp.growthRate}% annual inflation` : 'Fixed amount'}
+                              {startType === 'retirement' ? ' • Starts at Retirement' : startType === 'age' && startVal ? ` • Starts Age ${startVal}` : startType === 'year' && startVal ? ` • Starts ${startVal}` : ''}
+                              {endType === 'retirement' ? ' • Until Retirement' : endType === 'end_of_plan' ? ' • Lifetime' : (endType === 'after_n_years' || endType === 'duration') && endVal ? ` • For ${endVal} yrs` : endType === 'age' && endVal ? ` • Until Age ${endVal}` : endType === 'year' && endVal ? ` • Until ${endVal}` : ''}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-muted-foreground capitalize mt-0.5">
-                          {expTypeStr.replace(/_/g, ' ')}
-                          {exp.growthRate ? ` • ${exp.growthRate}% annual inflation` : ''}
-                          {startType === 'retirement' ? ' • Starts at Retirement' : startType === 'age' && startVal ? ` • Starts Age ${startVal}` : startType === 'year' && startVal ? ` • Starts ${startVal}` : ''}
-                          {endType === 'retirement' ? ' • Until Retirement' : endType === 'end_of_plan' ? ' • Lifetime' : (endType === 'after_n_years' || endType === 'duration') && endVal ? ` • For ${endVal} years` : endType === 'age' && endVal ? ` • Until Age ${endVal}` : endType === 'year' && endVal ? ` • Until ${endVal}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono font-bold text-rose-500">
-                          {formatCurrency(parseFloat(exp.amount) || 0)}/yr
-                        </span>
-                        <button
-                          onClick={() => openEditExpenseModal(exp)}
-                          className="text-muted-foreground hover:text-primary transition-colors p-1 cursor-pointer"
-                          title="Edit Expense"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteEvent(expId)}
-                          className="text-muted-foreground hover:text-rose-500 transition-colors p-1 cursor-pointer"
-                          title="Delete Expense"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+
+                        {/* Right side: Amount and actions */}
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <span className="text-[10px] text-muted-foreground block font-medium">Annual Outflow</span>
+                            <span className="font-mono text-sm font-bold text-rose-500 block">
+                              {formatCurrency(parseFloat(exp.amount) || 0)}/yr
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openEditExpenseModal(exp)}
+                              className="p-2 rounded-xl border border-border bg-background/50 hover:bg-background text-muted-foreground hover:text-primary hover:bg-muted/60 transition-all cursor-pointer"
+                              title="Edit Expense"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEvent(expId)}
+                              className="p-2 rounded-xl border border-border bg-background/50 hover:bg-background text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer"
+                              title="Delete Expense"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );

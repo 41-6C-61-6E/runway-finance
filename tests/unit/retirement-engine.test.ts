@@ -29,6 +29,8 @@ describe('Retirement Projection Engine', () => {
           dividendYield: 2.0,
           reinvestDividends: true,
           qualifiedDividendRatio: 1.0,
+          contributionMode: 'percentage',
+          contributionValue: 20.0,
         },
         {
           id: 'acc_2',
@@ -41,6 +43,7 @@ describe('Retirement Projection Engine', () => {
           dividendYield: 0.0,
           reinvestDividends: true,
           qualifiedDividendRatio: 1.0,
+          contributionMode: 'maximize',
         },
       ],
       liabilities: [],
@@ -1111,9 +1114,9 @@ describe('Retirement Projection Engine', () => {
     const taxableAcc = yr1.accountBalances.find(a => a.id === 'acc_taxable');
 
     // 4% of $190,000 = $7,600 contribution. Starting balance $10,000.
-    // Plus leftover net cash surplus sweep (salary $190k - $50k exp - ~$43k tax = ~$97k surplus).
-    // The taxable brokerage balance should be at least starting $10,000 + $7,600 = $17,600.
-    expect(taxableAcc?.balance).toBeGreaterThanOrEqual(17600);
+    // In accumulation, no surplus sweep occurs. Only defined contributions are funded.
+    // The taxable brokerage balance should be starting $10,000 + $7,600 = $17,600.
+    expect(taxableAcc?.balance).toBe(17600);
   });
 
   it('correctly allocates fixed taxable contribution when a non-contributing cash account precedes it', () => {
@@ -1843,6 +1846,241 @@ describe('Retirement Projection Engine', () => {
     // 12% on ($27,500 - $17,000 = $10,500) = $1,260.
     // Total ordinary tax = $1,700 + $1,260 = $2,960.
     expect(yr1.ordinaryTax).toBe(2960);
+  });
+
+  it('accumulation phase: does not sweep unallocated surplus into accounts even when an account has isSurplusDestination', () => {
+    const plan: EnginePlan = {
+      id: 'accum_no_sweep_test',
+      name: 'Accumulation No Sweep Test',
+      hasSpouse: false,
+      primaryBirthYear: 1995, // Age 31 in 2026
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 85,
+      primarySalary: 200000,
+      primarySalaryYear: 2026,
+      primarySalaryRaisePct: 0,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc_taxable',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          owner: 'primary',
+          balance: 50000,
+          costBasis: 50000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+          // Defined contribution of $10,000/yr
+          contributionMode: 'fixed_amount',
+          contributionValue: 10000,
+          isSurplusDestination: true,
+        },
+        {
+          id: 'acc_cash',
+          name: 'Emergency Fund',
+          type: 'cash',
+          owner: 'primary',
+          balance: 20000,
+          costBasis: 20000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 0,
+          contributionMode: 'none',
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 40000,
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const yr1 = sim.yearlyResults[0];
+
+    const taxableAcc = yr1.accountBalances.find((a) => a.id === 'acc_taxable');
+    const cashAcc = yr1.accountBalances.find((a) => a.id === 'acc_cash');
+
+    // Taxable starting $50k + defined contribution $10k = $60,000.
+    // Leftover net salary (~$100k+ after taxes and expenses) is NOT swept into the taxable account or cash account.
+    expect(taxableAcc?.balance).toBe(60000);
+    expect(cashAcc?.balance).toBe(20000);
+    expect(yr1.surplusSaved).toBe(10000);
+  });
+
+  it('retirement phase: RMD in excess of living expenses and taxes sweeps into the specified destination account', () => {
+    const plan: EnginePlan = {
+      id: 'rmd_excess_sweep_test',
+      name: 'RMD Excess Sweep Test',
+      hasSpouse: false,
+      primaryBirthYear: 1950, // Age 76 in 2026 (RMD active, divisor ~23.7)
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 85,
+      primarySalary: 0,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc_trad',
+          name: 'Traditional 401(k)',
+          type: 'traditional_401k',
+          owner: 'primary',
+          balance: 1000000, // $1M balance -> ~$42,194 RMD
+          costBasis: 1000000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+        },
+        {
+          id: 'acc_taxable_dest',
+          name: 'Designated Sweep Brokerage',
+          type: 'taxable',
+          owner: 'primary',
+          balance: 50000,
+          costBasis: 50000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+          isSurplusDestination: true,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 15000, // Living expenses lower than RMD (~$42,194)
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const yr1 = sim.yearlyResults[0];
+
+    // RMD required: $1M / 23.7 ≈ $42,194
+    expect(yr1.rmdMandatoryDrawdown).toBeGreaterThan(40000);
+
+    const tradAcc = yr1.accountBalances.find((a) => a.id === 'acc_trad');
+    const taxableAcc = yr1.accountBalances.find((a) => a.id === 'acc_taxable_dest');
+
+    // Traditional balance reduced by full RMD
+    expect(tradAcc?.balance).toBeCloseTo(1000000 - yr1.rmdMandatoryDrawdown!, -1);
+
+    // Living expenses ($15k) covered by RMD; remainder (~$27,194) swept into designated sweep account
+    // Taxable balance increases by excess RMD minus taxes paid on the RMD ordinary income
+    const excessRmd = yr1.rmdMandatoryDrawdown! - 15000;
+    expect(taxableAcc?.balance).toBeCloseTo(50000 + excessRmd - yr1.taxesPaid, -1);
+    expect(taxableAcc?.balance).toBeGreaterThan(70000);
+  });
+
+  it('retirement phase: RMD smaller than expenses offsets deficit and remaining deficit is drawn via strategy with zero sweep', () => {
+    const plan: EnginePlan = {
+      id: 'rmd_deficit_drawdown_test',
+      name: 'RMD Deficit Drawdown Test',
+      hasSpouse: false,
+      primaryBirthYear: 1950, // Age 76 in 2026
+      primaryBirthMonth: 1,
+      filingStatus: 'single',
+      retirementAge: 65,
+      lifeExpectancyAge: 85,
+      primarySalary: 0,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc_trad',
+          name: 'Traditional 401(k)',
+          type: 'traditional_401k',
+          owner: 'primary',
+          balance: 237000, // Divisor 23.7 -> $10,000 RMD
+          costBasis: 237000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+        },
+        {
+          id: 'acc_taxable',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 0,
+          dividendYield: 0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+          isSurplusDestination: true,
+        },
+      ],
+      liabilities: [],
+      events: [
+        {
+          id: 'ev_exp',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 30000, // $30k expenses > $10k RMD
+          frequency: 'yearly',
+          growthRate: 0,
+          adjustForInflation: false,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      settings: { fixedInflationRate: 0.0 },
+      rules: DEFAULT_2026_RULES,
+    };
+
+    const sim = runRetirementSimulation(plan);
+    const yr1 = sim.yearlyResults[0];
+
+    // RMD is ~$10,000
+    expect(yr1.rmdMandatoryDrawdown).toBeCloseTo(10000, -2);
+
+    const tradAcc = yr1.accountBalances.find((a) => a.id === 'acc_trad');
+    const taxableAcc = yr1.accountBalances.find((a) => a.id === 'acc_taxable');
+
+    // Traditional reduced by ~$10,000 RMD
+    expect(tradAcc?.balance).toBeCloseTo(227000, -2);
+
+    // Remaining deficit of ~$20,000 drawn from taxable brokerage (textbook priority)
+    expect(taxableAcc?.balance).toBeCloseTo(80000, -2);
+    expect(yr1.discretionaryDeficitWithdrawn).toBeCloseTo(20000, -2);
   });
 });
 

@@ -37,6 +37,7 @@ import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 import { AppTabs } from '@/components/ui/app-tabs';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { EngineRulesView } from './engine-rules-view';
 import { PlanDetailsTab } from './plan-details-tab';
 import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
@@ -960,53 +961,193 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
 
         return (
           <div className="space-y-6">
-            {/* Allow Penalty Withdrawals Card */}
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3 text-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-foreground text-sm flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 text-amber-500" />
-                    Allow Early Withdrawals at a Penalty
-                  </span>
-                  <span className="text-xs text-muted-foreground block mt-0.5">
-                    When enabled, the engine may draw from penalized tax-deferred accounts (with 10%/20% early withdrawal penalty) if liquid non-penalized funds are fully exhausted.
-                  </span>
+            {/* Macroeconomic & Tax Assumptions + Estate & Settlement in 2-Column Shaded Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Macroeconomic & Tax Rates */}
+              <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden p-5 space-y-4">
+                <div className="flex items-center gap-2 border-b border-border pb-3">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Macroeconomic & Tax Rates</h3>
+                    <p className="text-[11px] text-muted-foreground">General inflation rate and state/local income tax overlay</p>
+                  </div>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={allowPenaltyWithdrawals}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setAllowPenaltyWithdrawals(checked);
-                    onUpdatePlan({ settings: { allowPenaltyWithdrawals: checked } });
-                  }}
-                  className="w-4 h-4 text-primary focus:ring-primary rounded accent-primary cursor-pointer"
-                />
+
+                <div className="space-y-3.5 text-xs">
+                  <div className="space-y-1.5 bg-muted/20 border border-border rounded-xl p-3.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-foreground flex items-center gap-1.5">
+                        Fixed Annual Inflation Rate (%)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Applies annual compounding to living expenses and adjusts federal tax brackets/limits.
+                          </TooltipContent>
+                        </Tooltip>
+                      </label>
+                      <span className="font-mono text-xs font-bold text-primary">{inflationRate}%</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={inflationRate}
+                      onChange={(e) => {
+                        setInflationRate(e.target.value);
+                        onUpdatePlan({ settings: { fixedInflationRate: e.target.value } });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 bg-muted/20 border border-border rounded-xl p-3.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-foreground flex items-center gap-1.5">
+                        State / Local Income Tax Rate (%)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Applied as a flat tax on taxable ordinary income. Set to 0% for tax-free states (TX, FL, NV, WA, etc.).
+                          </TooltipContent>
+                        </Tooltip>
+                      </label>
+                      <span className="font-mono text-xs font-bold text-primary">{incomeTaxModifier}%</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={incomeTaxModifier}
+                      onChange={(e) => {
+                        setIncomeTaxModifier(e.target.value);
+                        onUpdatePlan({ settings: { incomeTaxModifier: e.target.value } });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Estate & Legacy Settlement Assumptions */}
+              <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden p-5 space-y-4">
+                <div className="flex items-center gap-2 border-b border-border pb-3">
+                  <ShieldCheck className="w-5 h-5 text-amber-500" />
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Estate & Legacy Settlement</h3>
+                    <p className="text-[11px] text-muted-foreground">Heir tax drag and estate liquidation friction upon plan end</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div className="space-y-1.5 bg-muted/20 border border-border rounded-xl p-3">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-foreground flex items-center gap-1.5">
+                        Heir Flat Income Tax Rate (%)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Effective tax rate paid by heirs when liquidating inherited pre-tax Traditional IRAs under the 10-year SECURE Act rule.
+                          </TooltipContent>
+                        </Tooltip>
+                      </label>
+                      <span className="font-mono text-xs font-bold text-foreground">{heirTaxRate}%</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={heirTaxRate}
+                      onChange={(e) => {
+                        setHeirTaxRate(e.target.value);
+                        onUpdatePlan({ settings: { heirFlatIncomeTaxRate: e.target.value } });
+                      }}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-1.5 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1 bg-muted/20 border border-border rounded-xl p-3">
+                      <label className="font-bold text-foreground text-[11px] block">Real Estate Fee (%)</label>
+                      <input
+                        type="text"
+                        value={liquidationRate}
+                        onChange={(e) => {
+                          setLiquidationRate(e.target.value);
+                          onUpdatePlan({ settings: { realEstateLiquidationRate: e.target.value } });
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1 bg-muted/20 border border-border rounded-xl p-3">
+                      <label className="font-bold text-foreground text-[11px] block">Probate & Drag (%)</label>
+                      <input
+                        type="text"
+                        value={adminRate}
+                        onChange={(e) => {
+                          setAdminRate(e.target.value);
+                          onUpdatePlan({ settings: { administrativeCostRate: e.target.value } });
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* LIVE WATERFALL & ACCOUNT DRAWDOWN SEQUENCE */}
-            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 text-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Layers className="w-4 h-4 text-primary" />
-                    Active Account Drawdown Waterfall & Sequence
-                  </h4>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Based on strategy <span className="font-semibold text-foreground capitalize">{(withdrawalMethod || 'textbook').replace(/_/g, ' ')}</span>, active plan accounts will be drawn in the sequence below:
-                  </p>
-                </div>
-                {totalPortfolioBal > 0 && (
-                  <div className="text-right">
-                    <span className="text-[10px] text-muted-foreground block font-medium">Included Assets</span>
-                    <span className="font-mono text-xs font-bold text-foreground">{formatCurrency(totalPortfolioBal)}</span>
+            <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden p-5 space-y-4 text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-primary" />
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">
+                      Active Account Drawdown Waterfall & Sequence
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Strategy: <span className="font-semibold text-foreground capitalize">{(withdrawalMethod || 'textbook').replace(/_/g, ' ')}</span>
+                    </p>
                   </div>
-                )}
+                </div>
+
+                <div className="flex items-center gap-4 shrink-0">
+                  {/* Allow Penalty Withdrawals Toggle inline */}
+                  <div className="flex items-center gap-2 bg-muted/30 border border-border px-3 py-1.5 rounded-xl">
+                    <input
+                      type="checkbox"
+                      id="allowPenaltyCheck"
+                      checked={allowPenaltyWithdrawals}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setAllowPenaltyWithdrawals(checked);
+                        onUpdatePlan({ settings: { allowPenaltyWithdrawals: checked } });
+                      }}
+                      className="w-4 h-4 accent-primary rounded cursor-pointer"
+                    />
+                    <label htmlFor="allowPenaltyCheck" className="text-xs font-semibold text-foreground flex items-center gap-1 cursor-pointer">
+                      Early Penalty Draw
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          When enabled, the engine may draw from penalized tax-deferred accounts (with 10%/20% early withdrawal penalty) if liquid non-penalized funds are fully exhausted.
+                        </TooltipContent>
+                      </Tooltip>
+                    </label>
+                  </div>
+
+                  {totalPortfolioBal > 0 && (
+                    <div className="text-right pl-2 border-l border-border">
+                      <span className="text-[10px] text-muted-foreground block font-medium">Included Assets</span>
+                      <span className="font-mono text-xs font-bold text-foreground">{formatCurrency(totalPortfolioBal)}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {expandedPortions.length === 0 ? (
-                <div className="p-4 border border-dashed border-border rounded-xl text-center text-xs text-muted-foreground">
+                <div className="p-6 border border-dashed border-border rounded-xl text-center text-xs text-muted-foreground">
                   No active FIRE eligible accounts found for this plan. Accounts added to your plan portfolio will automatically map to this drawdown sequence.
                 </div>
               ) : (
@@ -1039,7 +1180,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                                 <div className="flex items-center gap-2.5">
                                   <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
                                   <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-bold text-foreground">{item.accountName}</span>
                                       <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
                                         item.portionType === 'roth'
@@ -1081,96 +1222,6 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                   })}
                 </div>
               )}
-            </div>
-
-            {/* Rates & Estate Assumptions Cards BELOW Strategy */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Rates & Inflation Card */}
-              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  Growth Rates & Inflation
-                </h3>
-                <div className="space-y-3 text-xs">
-                  <div className="space-y-1">
-                    <label className="font-semibold text-muted-foreground">Fixed Annual Inflation Rate (%)</label>
-                    <input
-                      type="text"
-                      value={inflationRate}
-                      onChange={(e) => {
-                        setInflationRate(e.target.value);
-                        onUpdatePlan({ settings: { fixedInflationRate: e.target.value } });
-                      }}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                    />
-                    <p className="text-[11px] text-muted-foreground">Applies to expense growth and tax bracket inflation adjustments.</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-semibold text-muted-foreground">State / Local Income Tax Rate (%)</label>
-                    <input
-                      type="text"
-                      value={incomeTaxModifier}
-                      onChange={(e) => {
-                        setIncomeTaxModifier(e.target.value);
-                        onUpdatePlan({ settings: { incomeTaxModifier: e.target.value } });
-                      }}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      Applied as a flat tax rate on taxable ordinary income. Set to 0% for states with no income tax (TX, FL, NV, etc.).
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Estate & Tax Settlement Assumptions Card */}
-              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 text-xs">
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-amber-500" />
-                  Estate & Tax Settlement Assumptions
-                </h3>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="font-semibold text-muted-foreground">Heir Flat Income Tax Rate (%)</label>
-                    <input
-                      type="text"
-                      value={heirTaxRate}
-                      onChange={(e) => {
-                        setHeirTaxRate(e.target.value);
-                        onUpdatePlan({ settings: { heirFlatIncomeTaxRate: e.target.value } });
-                      }}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-semibold text-muted-foreground">Real Estate Liquidation Fee (%)</label>
-                    <input
-                      type="text"
-                      value={liquidationRate}
-                      onChange={(e) => {
-                        setLiquidationRate(e.target.value);
-                        onUpdatePlan({ settings: { realEstateLiquidationRate: e.target.value } });
-                      }}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-semibold text-muted-foreground">Probate & Admin Drag (%)</label>
-                    <input
-                      type="text"
-                      value={adminRate}
-                      onChange={(e) => {
-                        setAdminRate(e.target.value);
-                        onUpdatePlan({ settings: { administrativeCostRate: e.target.value } });
-                      }}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         );

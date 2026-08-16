@@ -1,5 +1,1811 @@
 {
-  "buildNumber": "26.08.1786658257890",
-  "buildTime": "2026-08-13T21:57:37.890Z",
-  "version": "1.0.0"
+  "buildNumber": "26.08.1786847124297",
+  "buildTime": "2026-08-16T02:25:24.297Z",
+  "hash": "efe8cd6",
+  "fullHash": "efe8cd6b486445b5d24fd1f930509286dde2b978",
+  "commits": [
+    "style: standardize border radii, button styles, and tooltip delay across components while introducing AppTabs for layout navigation.",
+    "feat: add tax-deferred withdrawal strategy and enhance FIRE/glidepath calculations with real plan data",
+    "refactor: extract currency logic to constants, implement system tax rules, and improve goal allocation and chart aggregation reliability.",
+    "perf: implement connection sync locking, optimize database configurations, and parallelize plan hydration and startup tasks",
+    "refactor: strengthen SSRF protection with improved IP validation, add CSV injection sanitization, and enforce delete confirmation headers",
+    "chore: remove scratch files from tracking and update .gitignore",
+    "feat: implement comprehensive transaction exclusion logic for tagged items and linked splits in budget calculations and filtering",
+    "fix: improve category transaction filtering logic, update budget table navigation, and refine mobile tooltip interaction behavior",
+    "feat: implement user-defined budget exclusions for categories and transaction tags",
+    "feat: implement cross-period budget rollups and support for synthetic Everything Else categories",
+    "feat: migrate state management to TanStack Query and add database performance indexes",
+    "feat: add multi-period support and enhanced budget pacing projections to budget-summary component",
+    "fix: improve error handling for budget API requests, update query logic for nullable categories, and refine budget table UI components.",
+    "refactor: remove all recurring transaction management features and associated database schema",
+    "refactor: implement tax wrapper logic with metadata support and update sparkline coloring to a cycling palette",
+    "feat: enhance investment tracking with expanded transaction classification, annualized income metrics, discrete timeframe support, and a new holding detail modal.",
+    "feat: implement recurring revenue and expense management system with database schema, engine, and CRUD API endpoints",
+    "feat/refactor:  account management UI features, extend database schema migrations, and update authentication context handling",
+    "refactor: update budget overrun thresholds and implement responsive mobile header padding variables",
+    "style: refine typography, spacing, and color utility patterns across dashboard components",
+    "feat: implement time-based budget pacing and date-range logic for rollup calculations in budget API.",
+    "docs: update project metadata, dependencies, installation instructions, and license file references in README",
+    "style: update collapsible filter panel button height and padding for better alignment",
+    "feat: add 10s request timeout and manual redirects to AI API routes, and restrict SSRF to block all IP literals",
+    "refactor: implement ResizeObserver in budget table to dynamically manage column visibility based on container width",
+    "feat: implement time-based budget pacing and improved health status projections for monthly, quarterly, and yearly periods",
+    "feat: implement net value calculation to correctly handle income versus expense logic in budget actuals",
+    "refactor: improve budget status health logic and update transaction tooltip interaction behavior",
+    "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component",
+    "feat: implement collapsible sidebar UI for desktop dashboards and update side panel styling",
+    "ui: redesign Everything Else breakout pill for improved compactness and text truncation in budget table",
+    "refactor: simplify budget actuals calculation by implementing ancestor-based transaction attribution",
+    "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses",
+    "refactor: implement server-side budget filtering with effective date bounds and dynamic catch-all category breakout",
+    "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
+    "refactor: centralize account exclusion logic and apply consistently across budget proposals and transactions summaries",
+    "feat: add functionality to exclude individual transactions from auto-budget proposals and recalculate totals accordingly",
+    "refactor: remove mobile navigation layout editing and section components from mobile-nav.tsx",
+    "refactor: standardize dialog layout for responsive mobile behavior and enhance auto-budget configuration options",
+    "feat: add support for quarterly and yearly auto-budgets with improved outlier filtering and zero-spending inclusion options.",
+    "feat: implement auto-budgeting system with automated calculation proposals and batch application endpoints",
+    "feat: implement responsive mobile tab navigation and optimize TransactionTable dependency array",
+    "feat: implement responsive mobile tab navigation with swipe gestures and auto-closing notification menus",
+    "feat: decouple sub-navigation into a floating capsule with swipe gesture support and auto-dimming on scroll",
+    "feat: implement mobile sub-navigation context and update bottom navigation to support dynamic tab switching",
+    "feat: implement mobile-responsive view switching and haptic feedback across main dashboard and planning tabs.",
+    "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel",
+    "refactor: migrate responsive layouts to container queries and integrate tooltips into the mode toggle component.",
+    "feat: add net worth milestone tracker and liquid asset breakdown to net worth side panel",
+    "refactor: remove Summary Statistics and Milestones cards from projection-tab and prepare side panel for integration",
+    "feat: implement side panels for net worth, fire projections, and goals, and add shared chart tooltip component",
+    "refactor: consolidate transaction search and filter UI by integrating the search bar into the FilterBar component and updating table layouts",
+    "refactor: introduce system-wide tax rules service and integrate dynamic configuration into retirement engine calculations",
+    "feat: introduce buildEnginePlan utility to standardize retirement plan model construction across the codebase",
+    "style: refine tab and button sizing with smaller paddings, rounded corners, and compact text styles",
+    "feat: add fullWidth support to AppTabs and update tab UI components for consistent centered layout",
+    "refactor: improve URL parsing robustness across services, normalize email inputs, and upgrade next-auth",
+    "feat: redesign budget overview with health status tracking, visual summary charts, and alert navigation links",
+    "refactor: consolidate plan sub-tabs using AppTabs component and update strategy selection UX",
+    "feat: refine dashboard layouts and add NaN safety checks for sankey charts and tooltips",
+    "feat: update chart visibility settings and refine dashboard layouts for flows, net worth, and spending pages",
+    "refactor: rename Financial Goals to Goals throughout the UI and remove redundant account indicators",
+    "refactor: replace legacy metrics layout with modern status cards and updated UI components in budget summary and selector.",
+    "feat: update budget table UI to display monthly amounts and add migration definitions for plan and user settings",
+    "feat: decouple accounts and budgets data fetching and update budget endpoint to include categories",
+    "refactor: update budget period logic, improve transaction table UI, and unify fetch implementation with TanStack Query",
+    "refactor: update navigation to deep-link to specific accounts and remove balance change indicators from the dashboard",
+    "fix: correctly identify delta commits and display top message when no prior version history is matched",
+    "feat: enhance PWA update detection with commit hash tracking and delta commit filtering",
+    "chore: implement Redfin API URL normalization, update project version, and fix route reference path",
+    "chore: update build version, resolve path reference, and remove redundant dynamic route configuration",
+    "feat: implement DuckDuckGo fallback for Redfin ID resolution and improve WAF challenge detection in AVM queries",
+    "refactor: modularize account transactions component and centralize API response/session utilities",
+    "refactor: centralize real estate type logic and add real estate form component with ZIP extraction",
+    "refactor: implement history merging in changelog API and build script to preserve commit logs in shallow clones",
+    "refactor: centralize scheduler logic with BaseScheduler, migrate auth patterns to higher-order functions, and update net worth notification configuration",
+    "feat: integrate dynamic tick labels directly into the Slider component and remove manual layout wrappers from tabs",
+    "feat: replace daily net worth alerts with weekly notifications and introduce reusable UI components for tabs and empty states.",
+    "feat: add PWA update prompt to changelog modal and refine dialog UI styling",
+    "feat: add PWA update prompt to changelog modal and update dialog z-index and overlay style",
+    "style: update transaction account badge colors and decrease font weight to semi-bold",
+    "feat: implement changelog modal to display version history and recent commits",
+    "refactor: migrate 'best' sync frequency to 'daily' and remove auto-calculation option",
+    "feat: handle Redfin AVM rate limiting by throwing a descriptive error and add corresponding unit test",
+    "feat: migrate property valuation service from RentCast to Redfin and clean up unused scratch files.",
+    "refactor: migrate backup and restore functionality from AdvancedTab to ImportExportTab",
+    "feat: implement comprehensive user data export system with custom CSV and report generation capabilities",
+    "refactor: harden CSRF protection with expanded proxy validation and improve backup import data integrity checks",
+    "feat: add plan data to backups and enable cross-user alert rule evaluation for share groups",
+    "feat: implement account grouping logic and unify transaction filtering by asset class",
+    "feat: add projection options popover and integrate simulation controls across planning tabs",
+    "feat: add IRMAA tax planning tab and introduce tax-deferred first withdrawal strategy",
+    "feat: make projection controls collapsible and optimize tab navigation styling",
+    "feat: add Social Security utility for benefit calculations and restrict account scope to FIRE-eligible assets across UI components",
+    "refactor: remove outdated documentation specs and update retirement engine logic",
+    "chore: upgrade core dependencies, update archiver implementation, and improve VAPID initialization logic",
+    "feat: add AiSuggestionsModal for interactive transaction categorization and rule management",
+    "feat: add rothPercentage configuration to retirement accounts to support tax-advantaged split balances",
+    "fix: implement penalty-aware withdrawal logic and ensure proper cost basis tracking for tax-free accounts",
+    "chore: revert plan account changes and add migration self-heal for plan_settings penalty withdrawals",
+    "feat: add allowPenaltyWithdrawals setting to retirement engine and UI, update account types, and visualize shortfall in projections.",
+    "feat: add retirement planning contribution configurations and projection dashboard enhancements",
+    "feat: enable nullable inputs in plan-wizard-modal and track sourcePlanId in plan updates",
+    "refactor: improve salary base calculations, add employer match redirection for Roth 401k, and update cost basis logic for taxable contributions.",
+    "refactor: unify contribution logic and add input tooltips to retirement engine and plan details UI",
+    "feat: add withdrawal strategy selector, diagnostic warnings, and shortfall visualization to projection dashboard",
+    "feat: add salary projections to retirement plans and visualize early withdrawal penalties in projections UI",
+    "feat: migrate salary tracking from event-based to native plan properties with salary raise overrides.",
+    "feat: add salary-based account contribution logic and configurable employer matching settings to the retirement planning engine",
+    "refactor: remove automatic default plan creation, update plan deletion flow, and enhance projection tooltips with per-account breakdowns",
+    "feat: add salary_source column to plan_flows table",
+    "refactor: extract engine rules management into a reusable EngineRulesView component and update empty state messaging",
+    "fix: implement financial engine updates for Roth percentages, dual-salary flows, NIIT tax, IRMAA thresholds, and early withdrawal penalties.",
+    "refactor: reorder financial milestones component within projection tab layout",
+    "feat: add descriptive tooltips to plan management actions, rename reset to re-sync, and adjust modal z-indexing",
+    "style: standardize projection tab UI elements to use primary theme colors",
+    "feat: add plan management components and enhance retirement projection visualizations with interactive milestone markers",
+    "feat: implement Roth conversion logic in beam search optimizer and update flow management forms",
+    "refactor: integrate real-time retirement engine for dynamic projection and account simulation updates",
+    "feat: implement retirement drawdown strategy visualization and extend database schema for spousal benefits",
+    "feat: enable spouse age tracking in projections and add retirement rule update API endpoint",
+    "feat: implement plan creation modal and modernize navigation UI with integrated plan management",
+    "feat: enhance projection chart with rich milestone callouts and high-contrast tooltip styling",
+    "refactor: overhaul plan management with new projection, details, and scenario tabs while updating the retirement engine simulation logic",
+    "feat: implement comprehensive retirement planning engine v1, calculation services, and multi-tab interface for financial projections.",
+    "feat: implement tax wrapper splitting with account metadata and add corresponding unit tests",
+    "feat: add customizable savings rate calculation settings including account/category exclusions and income adjustments",
+    "refactor: implement automated paystub regeneration logic with state reconciliation and deletion support",
+    "docs: add visual tour to README and expand real estate account type filtering in API route",
+    "chore: trigger workflow run for privacy-mode-provider",
+    "feat: replace blur effect with canvas-based pixelation for privacy mode to improve visual obfuscation",
+    "feat: add Best auto-calculated option to frequency select for real estate accounts",
+    "refactor: update chart date formatting and improve responsiveness for account page components",
+    "feat: introduce dynamic best sync frequency for real estate accounts with interval auto-calculation",
+    "feat: align daily sync schedule to run one hour before user-configured alert time",
+    "feat: migrate filter panel toggles to Switch components and modernize account filter UI in Cash Flow chart",
+    "feat: add responsive mobile layout to filter panel, update build version, and correct Next.js type reference path",
+    "feat: add 1d_discrete timeframe support and drill-down navigation for daily chart data",
+    "feat: add percentage toggle to net worth chart, update Sankey tooltip positioning, and bump build version",
+    "feat: add percentage-based change toggle to net worth chart and improve axis formatting logic",
+    "refactor: redesign UI tabs across dashboard components, remove math description features, and improve net worth change bar calculation logic.",
+    "refactor: enhance chart Y-axis scaling for positive-only data and update wealth flow calculations to support current-day balances.",
+    "feat: replace sync issue banner with interactive tooltips for account sync statuses",
+    "feat: integrate account sync health monitoring, status display in UI, and manual sync controls",
+    "fix: improve chart currency formatting precision and scope, and update collapsible header component styles",
+    "chore: update copyright attribution",
+    "refactor: implement constructive color theme, update sign-out logic to use next-auth, and refresh service worker cache",
+    "refactor: remove budget-vs-actual-chart component and update README feature documentation",
+    "refactor: remove budget-vs-actual-chart component and related references",
+    "refactor: simplify savings chart by removing dual-axis, adding average rate reference line, and updating presets",
+    "feat: add interactive modal to IncomeExpenseChart for detailed monthly savings breakdown analysis",
+    "feat: integrate savings rate data and visualization into spending dashboard",
+    "refactor: normalize all financial currency fields to cent-based strings using formatToCents throughout services and API routes.",
+    "feat: add dynamic platform-aware keyboard shortcut labels to Privacy Mode UI and logic",
+    "feat: implement 24-hour date window and update account data handling and privacy features",
+    "refactor: standardize account balance storage to two-decimal string format and add precision cleanup scripts",
+    "refactor: restrict real estate accounts to weekly or manual sync frequency with automatic coercion",
+    "fix: prevent notifications and alerts for hidden or excluded accounts across sync and preview services",
+    "refactor: replace vashon color scheme with bainbridge, update chart color logic, and improve net worth visualization rendering",
+    "feat: implement privacy mode for sensitive financial data and chart accessibility labels",
+    "feat: implement transaction splitting with database support, API endpoints, and UI integration",
+    "feat: add user-configurable timezone settings with dynamic IANA selection and registration support",
+    "feat: add configurable retention period for automatic deletion of pending transactions",
+    "feat: include paystub accounts in cash flow calculations regardless of virtual status",
+    "feat: add hideFromTransactions setting to categories and optimize cash flow data fetching using month-aligned summary tables.",
+    "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page",
+    "chore: automate service worker generation during build and implement commit history preservation in versioning script",
+    "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
+    "feat: use earliest snapshot as starting balance for new accounts and fix sankey chart rendering logic",
+    "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections.",
+    "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync",
+    "refactor: update Sankey visualization logic and initialize net worth reporting variables",
+    "fix: clear stale account snapshots during startup healing and update service worker cache version",
+    "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup",
+    "refactor: inline loading and error states within Sankey chart components for improved rendering logic",
+    "refactor: introduce account activity checking logic to standardize net worth calculations and currency conversion across services",
+    "style: remove border radius from sankey chart rectangles",
+    "refactor: modularize wealth flow calculation by extracting balance fetching and updating account grouping logic",
+    "refactor: improve Sankey hub rendering, add chart navigation, and implement account-level adjusted delta routing",
+    "refactor: replace static feedback components with an array-based API in CollapsibleFilterPanel",
+    "refactor: wealth flow visualization and calculation",
+    "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility",
+    "feat: enhance sankey hub visualization with net change delta bars and improved labels",
+    "feat: implement ExpandableDriverRow component to display granular net worth breakdown and account-level transaction details",
+    "feat: add 1D time range, migrate /net-worth to /flows, update sankey hub tooltips, and refine sync/projection logic.",
+    "style: refine card border transparency, update chart filter button typography, and adjust filter panel layout",
+    "refactor: calculate average of price and range bounds for valuation methods and update corresponding unit tests",
+    "refactor: introduce centralized chart formatting utilities and apply them to standardise axis labels and tick generation across all financial charts",
+    "dev server change",
+    "bug fix",
+    "wealth flow improvements",
+    "net worth flow",
+    "alerts updates",
+    "bug fix",
+    "bug fix",
+    "re chart improvements",
+    "net-worth improvements",
+    "better goals",
+    "better goals cards",
+    "better ai suggestions"
+  ],
+  "history": [
+    {
+      "hash": "efe8cd6",
+      "fullHash": "efe8cd6b486445b5d24fd1f930509286dde2b978",
+      "author": "Alan Racek",
+      "date": "2026-08-15T18:23:49-07:00",
+      "message": "style: standardize border radii, button styles, and tooltip delay across components while introducing AppTabs for layout navigation.",
+      "type": "style",
+      "buildNumber": "26.08.1786847124297"
+    },
+    {
+      "hash": "d9026dd",
+      "fullHash": "d9026dd761dafc4de2976eeff7292802fce464bb",
+      "author": "Alan Racek",
+      "date": "2026-08-15T17:55:43-07:00",
+      "message": "feat: add tax-deferred withdrawal strategy and enhance FIRE/glidepath calculations with real plan data",
+      "type": "feat"
+    },
+    {
+      "hash": "dfbd4a1",
+      "fullHash": "dfbd4a1b6245b2c04ada6c7014933bf4d5b88b02",
+      "author": "Alan Racek",
+      "date": "2026-08-15T13:41:53-07:00",
+      "message": "refactor: extract currency logic to constants, implement system tax rules, and improve goal allocation and chart aggregation reliability.",
+      "type": "refactor"
+    },
+    {
+      "hash": "4d310c0",
+      "fullHash": "4d310c0ce450c7b4e55d3d77c19f833984f9acf1",
+      "author": "Alan Racek",
+      "date": "2026-08-15T12:39:54-07:00",
+      "message": "perf: implement connection sync locking, optimize database configurations, and parallelize plan hydration and startup tasks",
+      "type": "perf"
+    },
+    {
+      "hash": "85c9890",
+      "fullHash": "85c9890d9deab82f262beff7d73ac3cf6c4092c2",
+      "author": "Alan Racek",
+      "date": "2026-08-14T19:31:32-07:00",
+      "message": "refactor: strengthen SSRF protection with improved IP validation, add CSV injection sanitization, and enforce delete confirmation headers",
+      "type": "refactor"
+    },
+    {
+      "hash": "60c9f52",
+      "fullHash": "60c9f5230a7ece480c6ab729d41876ff15301ef2",
+      "author": "Alan Racek",
+      "date": "2026-08-14T17:24:48-07:00",
+      "message": "chore: remove scratch files from tracking and update .gitignore",
+      "type": "chore"
+    },
+    {
+      "hash": "a719f5c",
+      "fullHash": "a719f5cdbe0fbcf435de16f46b279e8ec478f2ca",
+      "author": "Alan Racek",
+      "date": "2026-08-13T22:11:33-07:00",
+      "message": "feat: implement comprehensive transaction exclusion logic for tagged items and linked splits in budget calculations and filtering",
+      "type": "feat"
+    },
+    {
+      "hash": "1564613",
+      "fullHash": "156461344cd65aa5f9129196d3f3dc40439ed8e7",
+      "author": "Alan Racek",
+      "date": "2026-08-13T21:37:34-07:00",
+      "message": "fix: improve category transaction filtering logic, update budget table navigation, and refine mobile tooltip interaction behavior",
+      "type": "fix"
+    },
+    {
+      "hash": "817656a",
+      "fullHash": "817656a8bc8c9e562abd459c7af663028825f68e",
+      "author": "Alan Racek",
+      "date": "2026-08-13T21:11:59-07:00",
+      "message": "feat: implement user-defined budget exclusions for categories and transaction tags",
+      "type": "feat"
+    },
+    {
+      "hash": "cb034ee",
+      "fullHash": "cb034ee4b39a8d4badb735a63c12d11d359acb8e",
+      "author": "Alan Racek",
+      "date": "2026-08-13T19:42:18-07:00",
+      "message": "feat: implement cross-period budget rollups and support for synthetic Everything Else categories",
+      "type": "feat"
+    },
+    {
+      "hash": "01cff03",
+      "fullHash": "01cff03e5e072b5377ffc33d5e2cf478dcb93c01",
+      "author": "Alan Racek",
+      "date": "2026-08-13T19:15:16-07:00",
+      "message": "feat: migrate state management to TanStack Query and add database performance indexes",
+      "type": "feat"
+    },
+    {
+      "hash": "2e47362",
+      "fullHash": "2e4736242cc707d02afa8a3873251dc85fd8f2fb",
+      "author": "Alan Racek",
+      "date": "2026-08-13T17:55:25-07:00",
+      "message": "feat: add multi-period support and enhanced budget pacing projections to budget-summary component",
+      "type": "feat"
+    },
+    {
+      "hash": "e411dee",
+      "fullHash": "e411deeec27f812bf00c8c5d2fb2d4d80848f1b2",
+      "author": "Alan Racek",
+      "date": "2026-08-13T15:07:04-07:00",
+      "message": "fix: improve error handling for budget API requests, update query logic for nullable categories, and refine budget table UI components.",
+      "type": "fix"
+    },
+    {
+      "hash": "47f8fb1",
+      "fullHash": "47f8fb1b5da2df118bfe2314d51ed401cae1d75b",
+      "author": "Alan Racek",
+      "date": "2026-08-13T14:50:57-07:00",
+      "message": "refactor: remove all recurring transaction management features and associated database schema",
+      "type": "refactor"
+    },
+    {
+      "hash": "2f50c16",
+      "fullHash": "2f50c1627f3e2c736678dbf829f0e9da8071daf4",
+      "author": "Alan Racek",
+      "date": "2026-08-13T14:42:07-07:00",
+      "message": "refactor: implement tax wrapper logic with metadata support and update sparkline coloring to a cycling palette",
+      "type": "refactor"
+    },
+    {
+      "hash": "71a1507",
+      "fullHash": "71a1507da3b83ed4d957a69cea954edb19a0cc34",
+      "author": "Alan Racek",
+      "date": "2026-08-13T14:24:40-07:00",
+      "message": "feat: enhance investment tracking with expanded transaction classification, annualized income metrics, discrete timeframe support, and a new holding detail modal.",
+      "type": "feat"
+    },
+    {
+      "hash": "2d8167d",
+      "fullHash": "2d8167d244ad50ff445d0d0747cd394c1f05576c",
+      "author": "Alan Racek",
+      "date": "2026-08-13T14:07:19-07:00",
+      "message": "feat: implement recurring revenue and expense management system with database schema, engine, and CRUD API endpoints",
+      "type": "feat"
+    },
+    {
+      "hash": "f4a1b4e",
+      "fullHash": "f4a1b4e094937c6209a7f4f04b9d393f3b844283",
+      "author": "Alan Racek",
+      "date": "2026-08-13T13:41:10-07:00",
+      "message": "feat/refactor:  account management UI features, extend database schema migrations, and update authentication context handling",
+      "type": "other"
+    },
+    {
+      "hash": "e7329c6",
+      "fullHash": "e7329c67f46da596c80a2259b49314bc3d0c7799",
+      "author": "Alan Racek",
+      "date": "2026-08-13T13:13:17-07:00",
+      "message": "refactor: update budget overrun thresholds and implement responsive mobile header padding variables",
+      "type": "refactor"
+    },
+    {
+      "hash": "cfebe02",
+      "fullHash": "cfebe021bb7e1656039bfe95610e1bef5341a1f1",
+      "author": "Alan Racek",
+      "date": "2026-08-13T13:03:10-07:00",
+      "message": "style: refine typography, spacing, and color utility patterns across dashboard components",
+      "type": "style"
+    },
+    {
+      "hash": "98178e3",
+      "fullHash": "98178e3efca5fab18e458c04baddeeecdc60f68c",
+      "author": "Alan Racek",
+      "date": "2026-08-13T12:56:03-07:00",
+      "message": "feat: implement time-based budget pacing and date-range logic for rollup calculations in budget API.",
+      "type": "feat"
+    },
+    {
+      "hash": "e0f610a",
+      "fullHash": "e0f610a3ef741f5197b35bebbc21558c886688f5",
+      "author": "Alan Racek",
+      "date": "2026-08-12T16:08:13-07:00",
+      "message": "docs: update project metadata, dependencies, installation instructions, and license file references in README",
+      "type": "docs"
+    },
+    {
+      "hash": "4bd6be5",
+      "fullHash": "4bd6be5f60cdb8892374c21ce482bc84964bfdef",
+      "author": "Alan Racek",
+      "date": "2026-08-12T15:39:26-07:00",
+      "message": "style: update collapsible filter panel button height and padding for better alignment",
+      "type": "style"
+    },
+    {
+      "hash": "06b9551",
+      "fullHash": "06b95510039562b46ec4575cc256a48d89a2b5a2",
+      "author": "Alan Racek",
+      "date": "2026-08-12T15:29:19-07:00",
+      "message": "feat: add 10s request timeout and manual redirects to AI API routes, and restrict SSRF to block all IP literals",
+      "type": "feat"
+    },
+    {
+      "hash": "2fa0471",
+      "fullHash": "2fa0471ff1bcdc3852fc5842405f9a24081d6092",
+      "author": "Alan Racek",
+      "date": "2026-08-10T17:39:52-07:00",
+      "message": "refactor: implement ResizeObserver in budget table to dynamically manage column visibility based on container width",
+      "type": "refactor"
+    },
+    {
+      "hash": "7946619",
+      "fullHash": "7946619834e8627e2973f5819d044e7e7b4c0123",
+      "author": "Alan Racek",
+      "date": "2026-08-10T16:39:16-07:00",
+      "message": "feat: implement time-based budget pacing and improved health status projections for monthly, quarterly, and yearly periods",
+      "type": "feat"
+    },
+    {
+      "hash": "5815ecd",
+      "fullHash": "5815ecdbe7bfdf1609165818300e80e339cac9c7",
+      "author": "Alan Racek",
+      "date": "2026-08-10T16:06:39-07:00",
+      "message": "feat: implement net value calculation to correctly handle income versus expense logic in budget actuals",
+      "type": "feat"
+    },
+    {
+      "hash": "1ff6822",
+      "fullHash": "1ff6822df874289e9fa036cb1f106642bbd87134",
+      "author": "Alan Racek",
+      "date": "2026-08-10T15:50:44-07:00",
+      "message": "refactor: improve budget status health logic and update transaction tooltip interaction behavior",
+      "type": "refactor"
+    },
+    {
+      "hash": "e41627c",
+      "fullHash": "e41627c68cedb34d826bf8e54a98cc7f9e4fc591",
+      "author": "Alan Racek",
+      "date": "2026-08-10T15:17:16-07:00",
+      "message": "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component",
+      "type": "feat"
+    },
+    {
+      "hash": "9fb55ea",
+      "fullHash": "9fb55ea222bb4718cebf092b6152d95b8a3d95a8",
+      "author": "Alan Racek",
+      "date": "2026-08-10T15:03:26-07:00",
+      "message": "feat: implement collapsible sidebar UI for desktop dashboards and update side panel styling",
+      "type": "feat"
+    },
+    {
+      "hash": "5470e27",
+      "fullHash": "5470e273fbca79e90ead3a4ea4f1a0797be5e78f",
+      "author": "Alan Racek",
+      "date": "2026-08-10T14:50:58-07:00",
+      "message": "ui: redesign Everything Else breakout pill for improved compactness and text truncation in budget table",
+      "type": "ui"
+    },
+    {
+      "hash": "9095a31",
+      "fullHash": "9095a31c6d053ef39302b2c3f78bdc069b9426fe",
+      "author": "Alan Racek",
+      "date": "2026-08-10T14:43:30-07:00",
+      "message": "refactor: simplify budget actuals calculation by implementing ancestor-based transaction attribution",
+      "type": "refactor"
+    },
+    {
+      "hash": "d1d394d",
+      "fullHash": "d1d394da787762f9a3c2768a9cbfd3d3120a2188",
+      "author": "Alan Racek",
+      "date": "2026-08-10T14:14:53-07:00",
+      "message": "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses",
+      "type": "refactor"
+    },
+    {
+      "hash": "d963a51",
+      "fullHash": "d963a51dadde314f23a4402671f3dd4c520151ea",
+      "author": "Alan Racek",
+      "date": "2026-08-10T13:46:47-07:00",
+      "message": "refactor: implement server-side budget filtering with effective date bounds and dynamic catch-all category breakout",
+      "type": "refactor"
+    },
+    {
+      "hash": "07b874c",
+      "fullHash": "07b874c51cc09f5eee705e4def223ee5abc678d8",
+      "author": "Alan Racek",
+      "date": "2026-08-10T11:04:49-07:00",
+      "message": "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
+      "type": "feat"
+    },
+    {
+      "hash": "d644f78",
+      "fullHash": "d644f788d5248e07445f66843eb397a5ad637116",
+      "author": "Alan Racek",
+      "date": "2026-08-10T10:35:52-07:00",
+      "message": "refactor: centralize account exclusion logic and apply consistently across budget proposals and transactions summaries",
+      "type": "refactor"
+    },
+    {
+      "hash": "933cd7b",
+      "fullHash": "933cd7b36989ac2e6857f299926f59057b76a500",
+      "author": "Alan Racek",
+      "date": "2026-08-10T10:19:27-07:00",
+      "message": "feat: add functionality to exclude individual transactions from auto-budget proposals and recalculate totals accordingly",
+      "type": "feat"
+    },
+    {
+      "hash": "8b64681",
+      "fullHash": "8b64681e505902729a218a51ca7d77f400b65b4c",
+      "author": "Alan Racek",
+      "date": "2026-08-10T09:57:33-07:00",
+      "message": "refactor: remove mobile navigation layout editing and section components from mobile-nav.tsx",
+      "type": "refactor"
+    },
+    {
+      "hash": "5383577",
+      "fullHash": "538357744b263c829e2310067feb76ae85c75c9f",
+      "author": "Alan Racek",
+      "date": "2026-08-10T09:46:16-07:00",
+      "message": "refactor: standardize dialog layout for responsive mobile behavior and enhance auto-budget configuration options",
+      "type": "refactor"
+    },
+    {
+      "hash": "f37e599",
+      "fullHash": "f37e599cff58f78712c090dde7e09f9c89eef2b4",
+      "author": "Alan Racek",
+      "date": "2026-08-10T08:58:04-07:00",
+      "message": "feat: add support for quarterly and yearly auto-budgets with improved outlier filtering and zero-spending inclusion options.",
+      "type": "feat"
+    },
+    {
+      "hash": "89dea4b",
+      "fullHash": "89dea4b9615afe8b08f16477e14fb62b89b3c928",
+      "author": "Alan Racek",
+      "date": "2026-08-10T08:47:31-07:00",
+      "message": "feat: implement auto-budgeting system with automated calculation proposals and batch application endpoints",
+      "type": "feat"
+    },
+    {
+      "hash": "0492561",
+      "fullHash": "0492561977eb6e9cf8090cab200b7c2c13775c07",
+      "author": "Alan Racek",
+      "date": "2026-08-08T13:51:15-07:00",
+      "message": "feat: implement responsive mobile tab navigation and optimize TransactionTable dependency array",
+      "type": "feat"
+    },
+    {
+      "hash": "ddfc92c",
+      "fullHash": "ddfc92c95d5729b7fa30284b13a429fb375a035f",
+      "author": "Alan Racek",
+      "date": "2026-08-08T11:19:05-07:00",
+      "message": "feat: implement responsive mobile tab navigation with swipe gestures and auto-closing notification menus",
+      "type": "feat"
+    },
+    {
+      "hash": "7e1880d",
+      "fullHash": "7e1880dbafe30a983a12b9999325e510bfee6e4f",
+      "author": "Alan Racek",
+      "date": "2026-08-08T10:08:20-07:00",
+      "message": "feat: decouple sub-navigation into a floating capsule with swipe gesture support and auto-dimming on scroll",
+      "type": "feat"
+    },
+    {
+      "hash": "de9c47b",
+      "fullHash": "de9c47b551894c11eaf4684ec60827ac82d598fd",
+      "author": "Alan Racek",
+      "date": "2026-08-08T09:36:33-07:00",
+      "message": "feat: implement mobile sub-navigation context and update bottom navigation to support dynamic tab switching",
+      "type": "feat"
+    },
+    {
+      "hash": "1f45d54",
+      "fullHash": "1f45d547f8d6c0c23b8733556189bd690b12bf24",
+      "author": "Alan Racek",
+      "date": "2026-08-08T08:46:35-07:00",
+      "message": "feat: implement mobile-responsive view switching and haptic feedback across main dashboard and planning tabs.",
+      "type": "feat"
+    },
+    {
+      "hash": "509781f",
+      "fullHash": "509781f0f86b2498bf6d8ba75fb3c87d89bf1546",
+      "author": "Alan Racek",
+      "date": "2026-08-07T20:01:42-07:00",
+      "message": "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel",
+      "type": "feat"
+    },
+    {
+      "hash": "e17d05c",
+      "fullHash": "e17d05cec43d8d402b57ebfbc7f73efc0d7de8a4",
+      "author": "Alan Racek",
+      "date": "2026-08-07T19:39:09-07:00",
+      "message": "refactor: migrate responsive layouts to container queries and integrate tooltips into the mode toggle component.",
+      "type": "refactor"
+    },
+    {
+      "hash": "9cda9aa",
+      "fullHash": "9cda9aaf29cbeaec02c94ba18aea7c16c10932cb",
+      "author": "Alan Racek",
+      "date": "2026-08-07T19:10:07-07:00",
+      "message": "feat: add net worth milestone tracker and liquid asset breakdown to net worth side panel",
+      "type": "feat"
+    },
+    {
+      "hash": "a66f500",
+      "fullHash": "a66f500c19dbb753e579c4f57ae7d0df249d14c9",
+      "author": "Alan Racek",
+      "date": "2026-08-07T15:52:14-07:00",
+      "message": "refactor: remove Summary Statistics and Milestones cards from projection-tab and prepare side panel for integration",
+      "type": "refactor"
+    },
+    {
+      "hash": "22f063f",
+      "fullHash": "22f063f1b1f19af545b602f424921556834eb09c",
+      "author": "Alan Racek",
+      "date": "2026-08-07T15:39:03-07:00",
+      "message": "feat: implement side panels for net worth, fire projections, and goals, and add shared chart tooltip component",
+      "type": "feat"
+    },
+    {
+      "hash": "7fd3023",
+      "fullHash": "7fd302399ad9319cad5409ac027b999d84139441",
+      "author": "Alan Racek",
+      "date": "2026-08-07T14:23:06-07:00",
+      "message": "refactor: consolidate transaction search and filter UI by integrating the search bar into the FilterBar component and updating table layouts",
+      "type": "refactor"
+    },
+    {
+      "hash": "27280f5",
+      "fullHash": "27280f584ef0f7514ba2329e47312e8d07dfe52e",
+      "author": "Alan Racek",
+      "date": "2026-08-07T14:08:33-07:00",
+      "message": "refactor: introduce system-wide tax rules service and integrate dynamic configuration into retirement engine calculations",
+      "type": "refactor"
+    },
+    {
+      "hash": "6c6a8dd",
+      "fullHash": "6c6a8dd9ca029fa81212e842d23ec310b36c1c5a",
+      "author": "Alan Racek",
+      "date": "2026-08-07T13:21:20-07:00",
+      "message": "feat: introduce buildEnginePlan utility to standardize retirement plan model construction across the codebase",
+      "type": "feat"
+    },
+    {
+      "hash": "5662bb7",
+      "fullHash": "5662bb77be846f81a332d15d4b2cde2fe6808293",
+      "author": "Alan Racek",
+      "date": "2026-08-06T15:22:28-07:00",
+      "message": "style: refine tab and button sizing with smaller paddings, rounded corners, and compact text styles",
+      "type": "style"
+    },
+    {
+      "hash": "376d3a2",
+      "fullHash": "376d3a25840d59aa5431182e845d8a161b167184",
+      "author": "Alan Racek",
+      "date": "2026-08-06T12:47:15-07:00",
+      "message": "feat: add fullWidth support to AppTabs and update tab UI components for consistent centered layout",
+      "type": "feat"
+    },
+    {
+      "hash": "7194094",
+      "fullHash": "7194094b9463c8f12b8c297d77604ea82577a966",
+      "author": "Alan Racek",
+      "date": "2026-08-06T11:38:24-07:00",
+      "message": "refactor: improve URL parsing robustness across services, normalize email inputs, and upgrade next-auth",
+      "type": "refactor"
+    },
+    {
+      "hash": "c9f12a2",
+      "fullHash": "c9f12a250456a94f8581ecc3ec39d76daacb88f7",
+      "author": "Alan Racek",
+      "date": "2026-08-06T11:19:44-07:00",
+      "message": "feat: redesign budget overview with health status tracking, visual summary charts, and alert navigation links",
+      "type": "feat"
+    },
+    {
+      "hash": "2ccd61e",
+      "fullHash": "2ccd61e3c7607c2ef690df4221419f88202be631",
+      "author": "Alan Racek",
+      "date": "2026-08-06T10:32:26-07:00",
+      "message": "refactor: consolidate plan sub-tabs using AppTabs component and update strategy selection UX",
+      "type": "refactor"
+    },
+    {
+      "hash": "a3447f7",
+      "fullHash": "a3447f74dd773eca6df36f544ac3fed37b87d4e8",
+      "author": "Alan Racek",
+      "date": "2026-08-04T08:35:40-07:00",
+      "message": "feat: refine dashboard layouts and add NaN safety checks for sankey charts and tooltips",
+      "type": "feat"
+    },
+    {
+      "hash": "5d42578",
+      "fullHash": "5d425783eee1b06fb151e7a9d28658f37ebfddc7",
+      "author": "Alan Racek",
+      "date": "2026-08-04T08:01:07-07:00",
+      "message": "feat: update chart visibility settings and refine dashboard layouts for flows, net worth, and spending pages",
+      "type": "feat"
+    },
+    {
+      "hash": "b736429",
+      "fullHash": "b7364298b65eba9779afa820ce411b4c8b7e8e46",
+      "author": "Alan Racek",
+      "date": "2026-08-04T07:50:30-07:00",
+      "message": "refactor: rename Financial Goals to Goals throughout the UI and remove redundant account indicators",
+      "type": "refactor"
+    },
+    {
+      "hash": "c4738d7",
+      "fullHash": "c4738d748b879740ead23ba46e2a5b512b1e3e59",
+      "author": "Alan Racek",
+      "date": "2026-08-03T15:52:08-07:00",
+      "message": "refactor: replace legacy metrics layout with modern status cards and updated UI components in budget summary and selector.",
+      "type": "refactor"
+    },
+    {
+      "hash": "00f2459",
+      "fullHash": "00f2459bf5a944e93bb5096af9f2e30a9490298e",
+      "author": "Alan Racek",
+      "date": "2026-08-03T15:19:36-07:00",
+      "message": "feat: update budget table UI to display monthly amounts and add migration definitions for plan and user settings",
+      "type": "feat"
+    },
+    {
+      "hash": "02c7533",
+      "fullHash": "02c753314ecbca868028558d49b50e000e12a6c2",
+      "author": "Alan Racek",
+      "date": "2026-08-03T14:52:07-07:00",
+      "message": "feat: decouple accounts and budgets data fetching and update budget endpoint to include categories",
+      "type": "feat"
+    },
+    {
+      "hash": "141b2cf",
+      "fullHash": "141b2cfc676dceee318db9522f4646cff54d5ea6",
+      "author": "Alan Racek",
+      "date": "2026-08-03T14:28:22-07:00",
+      "message": "refactor: update budget period logic, improve transaction table UI, and unify fetch implementation with TanStack Query",
+      "type": "refactor"
+    },
+    {
+      "hash": "e1f5627",
+      "fullHash": "e1f56278552249a2ea32d03ed6aa96ac46d17451",
+      "author": "Alan Racek",
+      "date": "2026-08-03T13:29:30-07:00",
+      "message": "refactor: update navigation to deep-link to specific accounts and remove balance change indicators from the dashboard",
+      "type": "refactor"
+    },
+    {
+      "hash": "65dc1f1",
+      "fullHash": "65dc1f169c10a136fd9488a3274d858ed8b532cd",
+      "author": "Alan Racek",
+      "date": "2026-08-03T13:19:14-07:00",
+      "message": "fix: correctly identify delta commits and display top message when no prior version history is matched",
+      "type": "fix"
+    },
+    {
+      "hash": "55fb33e",
+      "fullHash": "55fb33ee7cd9993e16bc1968c7f9c4c5dd6a0e01",
+      "author": "Alan Racek",
+      "date": "2026-08-03T12:35:41-07:00",
+      "message": "feat: enhance PWA update detection with commit hash tracking and delta commit filtering",
+      "type": "feat"
+    },
+    {
+      "hash": "93ae3ce",
+      "fullHash": "93ae3cef023009e35bce397567b87fe4fd4b4b66",
+      "author": "Alan Racek",
+      "date": "2026-08-03T11:53:41-07:00",
+      "message": "chore: implement Redfin API URL normalization, update project version, and fix route reference path",
+      "type": "chore"
+    },
+    {
+      "hash": "8ef5ff6",
+      "fullHash": "8ef5ff6fc96b3d8a66af2be053cda988c776d8e5",
+      "author": "Alan Racek",
+      "date": "2026-08-03T09:20:47-07:00",
+      "message": "chore: update build version, resolve path reference, and remove redundant dynamic route configuration",
+      "type": "chore"
+    },
+    {
+      "hash": "ee539c6",
+      "fullHash": "ee539c65229a0cd5bcc752f90ee9d2e6fa9bd608",
+      "author": "Alan Racek",
+      "date": "2026-08-02T20:07:49-07:00",
+      "message": "feat: implement DuckDuckGo fallback for Redfin ID resolution and improve WAF challenge detection in AVM queries",
+      "type": "feat"
+    },
+    {
+      "hash": "39934f0",
+      "fullHash": "39934f054514bdebad647b0a47b025286eeca04f",
+      "author": "Alan Racek",
+      "date": "2026-08-02T11:00:08-07:00",
+      "message": "refactor: modularize account transactions component and centralize API response/session utilities",
+      "type": "refactor"
+    },
+    {
+      "hash": "769d0d5",
+      "fullHash": "769d0d5564eb2dee110f55021b905ebe96e31d9b",
+      "author": "Alan Racek",
+      "date": "2026-08-02T10:50:38-07:00",
+      "message": "refactor: centralize real estate type logic and add real estate form component with ZIP extraction",
+      "type": "refactor"
+    },
+    {
+      "hash": "b7a7590",
+      "fullHash": "b7a7590303f9e27d986edd05f421acf07ae2b3fd",
+      "author": "Alan Racek",
+      "date": "2026-08-02T10:06:30-07:00",
+      "message": "refactor: implement history merging in changelog API and build script to preserve commit logs in shallow clones",
+      "type": "refactor"
+    },
+    {
+      "hash": "4facb33",
+      "fullHash": "4facb33c3f1c602cdf93f92b927da712eb14bf13",
+      "author": "Alan Racek",
+      "date": "2026-08-02T10:01:22-07:00",
+      "message": "refactor: centralize scheduler logic with BaseScheduler, migrate auth patterns to higher-order functions, and update net worth notification configuration",
+      "type": "refactor"
+    },
+    {
+      "hash": "2f37169",
+      "fullHash": "2f3716942a12684f4fa3a26c81ff4a6b42a18109",
+      "author": "Alan Racek",
+      "date": "2026-08-02T09:45:41-07:00",
+      "message": "feat: integrate dynamic tick labels directly into the Slider component and remove manual layout wrappers from tabs",
+      "type": "feat"
+    },
+    {
+      "hash": "2950c22",
+      "fullHash": "2950c227b2c003d383a6a32d78d89fdbf2544b9a",
+      "author": "Alan Racek",
+      "date": "2026-08-02T09:43:03-07:00",
+      "message": "feat: replace daily net worth alerts with weekly notifications and introduce reusable UI components for tabs and empty states.",
+      "type": "feat"
+    },
+    {
+      "hash": "8738aa4",
+      "fullHash": "8738aa4191a574b76b6f1068802ae26cdea03716",
+      "author": "Alan Racek",
+      "date": "2026-08-01T19:57:57-07:00",
+      "message": "feat: add PWA update prompt to changelog modal and refine dialog UI styling",
+      "type": "feat"
+    },
+    {
+      "hash": "abce884",
+      "fullHash": "abce884d04ac57724c6850b0a6fe4a9954b7d2da",
+      "author": "Alan Racek",
+      "date": "2026-08-01T12:14:06-07:00",
+      "message": "feat: add PWA update prompt to changelog modal and update dialog z-index and overlay style",
+      "type": "feat"
+    },
+    {
+      "hash": "01f4c3b",
+      "fullHash": "01f4c3be18630b101ec1211cbafba811ae673a33",
+      "author": "Alan Racek",
+      "date": "2026-08-01T12:05:59-07:00",
+      "message": "style: update transaction account badge colors and decrease font weight to semi-bold",
+      "type": "style"
+    },
+    {
+      "hash": "d9972a1",
+      "fullHash": "d9972a18825228302228cb662133f0b3737d90bd",
+      "author": "Alan Racek",
+      "date": "2026-08-01T11:55:59-07:00",
+      "message": "feat: implement changelog modal to display version history and recent commits",
+      "type": "feat"
+    },
+    {
+      "hash": "a4e50a9",
+      "fullHash": "a4e50a9c015d464e73a4a219c47bdc4c9fc862e7",
+      "author": "Alan Racek",
+      "date": "2026-08-01T10:58:09-07:00",
+      "message": "refactor: migrate 'best' sync frequency to 'daily' and remove auto-calculation option",
+      "type": "refactor"
+    },
+    {
+      "hash": "d0ee88e",
+      "fullHash": "d0ee88e1219b0f5fa3cd77b9b67832a15d647321",
+      "author": "Alan Racek",
+      "date": "2026-08-01T09:53:10-07:00",
+      "message": "feat: handle Redfin AVM rate limiting by throwing a descriptive error and add corresponding unit test",
+      "type": "feat"
+    },
+    {
+      "hash": "85a4eaa",
+      "fullHash": "85a4eaa560b4a4696345e16a3bc17209658502b5",
+      "author": "Alan Racek",
+      "date": "2026-08-01T09:49:57-07:00",
+      "message": "feat: migrate property valuation service from RentCast to Redfin and clean up unused scratch files.",
+      "type": "feat"
+    },
+    {
+      "hash": "c11d445",
+      "fullHash": "c11d445c43d89d60a4ad59823b9ab3d8bef8e53a",
+      "author": "Alan Racek",
+      "date": "2026-07-31T10:17:30-07:00",
+      "message": "refactor: migrate backup and restore functionality from AdvancedTab to ImportExportTab",
+      "type": "refactor"
+    },
+    {
+      "hash": "dae6060",
+      "fullHash": "dae6060fffd824f30487d52034051e823cb56695",
+      "author": "Alan Racek",
+      "date": "2026-07-31T09:33:58-07:00",
+      "message": "feat: implement comprehensive user data export system with custom CSV and report generation capabilities",
+      "type": "feat"
+    },
+    {
+      "hash": "2b0e094",
+      "fullHash": "2b0e09452c6f6de28c3df085a4844b49c1eddf08",
+      "author": "Alan Racek",
+      "date": "2026-07-31T09:19:41-07:00",
+      "message": "refactor: harden CSRF protection with expanded proxy validation and improve backup import data integrity checks",
+      "type": "refactor"
+    },
+    {
+      "hash": "7596cb8",
+      "fullHash": "7596cb88c232fe2b1b09b6d6ecde94a5e2bcb031",
+      "author": "Alan Racek",
+      "date": "2026-07-30T17:13:46-07:00",
+      "message": "feat: add plan data to backups and enable cross-user alert rule evaluation for share groups",
+      "type": "feat"
+    },
+    {
+      "hash": "e6ef458",
+      "fullHash": "e6ef4585bfc601744a081b58a8ee82a8afc5a3a4",
+      "author": "Alan Racek",
+      "date": "2026-07-30T11:10:03-07:00",
+      "message": "feat: implement account grouping logic and unify transaction filtering by asset class",
+      "type": "feat"
+    },
+    {
+      "hash": "77bd33b",
+      "fullHash": "77bd33b63685fc8ae3a6b90a39defd0f4e47728c",
+      "author": "Alan Racek",
+      "date": "2026-07-30T09:52:03-07:00",
+      "message": "feat: add projection options popover and integrate simulation controls across planning tabs",
+      "type": "feat"
+    },
+    {
+      "hash": "9da6a3c",
+      "fullHash": "9da6a3c6d3ca84c547cfd6d887b08b31a12ce3f2",
+      "author": "Alan Racek",
+      "date": "2026-07-23T16:04:25-07:00",
+      "message": "feat: add IRMAA tax planning tab and introduce tax-deferred first withdrawal strategy",
+      "type": "feat"
+    },
+    {
+      "hash": "d9ec9b5",
+      "fullHash": "d9ec9b540eb42857f976798fdf6b8cfea168da7c",
+      "author": "Alan Racek",
+      "date": "2026-07-23T10:52:57-07:00",
+      "message": "feat: make projection controls collapsible and optimize tab navigation styling",
+      "type": "feat"
+    },
+    {
+      "hash": "8026f1f",
+      "fullHash": "8026f1fc7a30fb27e7f107d2c372d70d5f819b65",
+      "author": "Alan Racek",
+      "date": "2026-07-23T10:41:29-07:00",
+      "message": "feat: add Social Security utility for benefit calculations and restrict account scope to FIRE-eligible assets across UI components",
+      "type": "feat"
+    },
+    {
+      "hash": "77fc218",
+      "fullHash": "77fc218a8859f8b2e895a84e689ac56910d74271",
+      "author": "Alan Racek",
+      "date": "2026-07-23T08:53:11-07:00",
+      "message": "refactor: remove outdated documentation specs and update retirement engine logic",
+      "type": "refactor"
+    },
+    {
+      "hash": "1d7f0e6",
+      "fullHash": "1d7f0e6959ffe22bb45b9b59c865194657edf657",
+      "author": "Alan Racek",
+      "date": "2026-07-22T22:03:27-07:00",
+      "message": "chore: upgrade core dependencies, update archiver implementation, and improve VAPID initialization logic",
+      "type": "chore"
+    },
+    {
+      "hash": "cb494e0",
+      "fullHash": "cb494e0e3f127faf0d5abb56d6edb742c60400b2",
+      "author": "Alan Racek",
+      "date": "2026-07-22T21:41:36-07:00",
+      "message": "feat: add AiSuggestionsModal for interactive transaction categorization and rule management",
+      "type": "feat"
+    },
+    {
+      "hash": "bb593b2",
+      "fullHash": "bb593b227727ace1c8b6c8d3f54fa0de5e403f03",
+      "author": "Alan Racek",
+      "date": "2026-07-22T21:36:53-07:00",
+      "message": "feat: add rothPercentage configuration to retirement accounts to support tax-advantaged split balances",
+      "type": "feat"
+    },
+    {
+      "hash": "bedbf34",
+      "fullHash": "bedbf3475c5f82fec5d377459d0f2d0cadbb249b",
+      "author": "Alan Racek",
+      "date": "2026-07-22T21:28:24-07:00",
+      "message": "fix: implement penalty-aware withdrawal logic and ensure proper cost basis tracking for tax-free accounts",
+      "type": "fix"
+    },
+    {
+      "hash": "2bcdd65",
+      "fullHash": "2bcdd65fb0912b11d46115f58720a02802d029da",
+      "author": "Alan Racek",
+      "date": "2026-07-22T20:54:55-07:00",
+      "message": "chore: revert plan account changes and add migration self-heal for plan_settings penalty withdrawals",
+      "type": "chore"
+    },
+    {
+      "hash": "0b03621",
+      "fullHash": "0b03621df8447ff0f47995aae3f828e9f47f5a9e",
+      "author": "Alan Racek",
+      "date": "2026-07-22T17:54:24-07:00",
+      "message": "feat: add allowPenaltyWithdrawals setting to retirement engine and UI, update account types, and visualize shortfall in projections.",
+      "type": "feat"
+    },
+    {
+      "hash": "f0ce786",
+      "fullHash": "f0ce7868053bcd707ff3aa1a262e54f35e339c21",
+      "author": "Alan Racek",
+      "date": "2026-07-22T16:37:03-07:00",
+      "message": "feat: add retirement planning contribution configurations and projection dashboard enhancements",
+      "type": "feat"
+    },
+    {
+      "hash": "28fcf08",
+      "fullHash": "28fcf085df028855714ed7f15066f1bb01705b9e",
+      "author": "Alan Racek",
+      "date": "2026-07-22T15:53:09-07:00",
+      "message": "feat: enable nullable inputs in plan-wizard-modal and track sourcePlanId in plan updates",
+      "type": "feat"
+    },
+    {
+      "hash": "ab00162",
+      "fullHash": "ab00162c4eb1b1b024cbd0a18b83f9bf970cdf08",
+      "author": "Alan Racek",
+      "date": "2026-07-22T15:24:39-07:00",
+      "message": "refactor: improve salary base calculations, add employer match redirection for Roth 401k, and update cost basis logic for taxable contributions.",
+      "type": "refactor"
+    },
+    {
+      "hash": "f7e0771",
+      "fullHash": "f7e0771c30b19cc1ec7906a5e49cff47256b836c",
+      "author": "Alan Racek",
+      "date": "2026-07-22T14:02:15-07:00",
+      "message": "refactor: unify contribution logic and add input tooltips to retirement engine and plan details UI",
+      "type": "refactor"
+    },
+    {
+      "hash": "411be9b",
+      "fullHash": "411be9b8f62a15c20ea0a1754150433d0b0a901c",
+      "author": "Alan Racek",
+      "date": "2026-07-22T13:45:12-07:00",
+      "message": "feat: add withdrawal strategy selector, diagnostic warnings, and shortfall visualization to projection dashboard",
+      "type": "feat"
+    },
+    {
+      "hash": "2816039",
+      "fullHash": "281603964ddb9392b49b33f0683a5165b1770e2b",
+      "author": "Alan Racek",
+      "date": "2026-07-22T12:32:42-07:00",
+      "message": "feat: add salary projections to retirement plans and visualize early withdrawal penalties in projections UI",
+      "type": "feat"
+    },
+    {
+      "hash": "8ba0cd5",
+      "fullHash": "8ba0cd53d370d1cde2140f581c2bb1ae5487cb81",
+      "author": "Alan Racek",
+      "date": "2026-07-22T11:01:16-07:00",
+      "message": "feat: migrate salary tracking from event-based to native plan properties with salary raise overrides.",
+      "type": "feat"
+    },
+    {
+      "hash": "58ba9e0",
+      "fullHash": "58ba9e05d21d519fa5e2eea46fab801ec4fcbaef",
+      "author": "Alan Racek",
+      "date": "2026-07-22T09:24:43-07:00",
+      "message": "feat: add salary-based account contribution logic and configurable employer matching settings to the retirement planning engine",
+      "type": "feat"
+    },
+    {
+      "hash": "f8012f6",
+      "fullHash": "f8012f625e92ee04c916cd586f68f313ec8b41d2",
+      "author": "Alan Racek",
+      "date": "2026-07-22T08:43:51-07:00",
+      "message": "refactor: remove automatic default plan creation, update plan deletion flow, and enhance projection tooltips with per-account breakdowns",
+      "type": "refactor"
+    },
+    {
+      "hash": "e8d8489",
+      "fullHash": "e8d8489156a01a8931abbbfb65af822cca78c909",
+      "author": "Alan Racek",
+      "date": "2026-07-22T08:26:39-07:00",
+      "message": "feat: add salary_source column to plan_flows table",
+      "type": "feat"
+    },
+    {
+      "hash": "c59faf9",
+      "fullHash": "c59faf9123786f97b05c939b8827349b2d1aa86f",
+      "author": "Alan Racek",
+      "date": "2026-07-22T08:10:08-07:00",
+      "message": "refactor: extract engine rules management into a reusable EngineRulesView component and update empty state messaging",
+      "type": "refactor"
+    },
+    {
+      "hash": "bbbab96",
+      "fullHash": "bbbab96991a926a2f59ffcce935d8865a9bb8214",
+      "author": "Alan Racek",
+      "date": "2026-07-22T07:57:18-07:00",
+      "message": "fix: implement financial engine updates for Roth percentages, dual-salary flows, NIIT tax, IRMAA thresholds, and early withdrawal penalties.",
+      "type": "fix"
+    },
+    {
+      "hash": "d3f19e3",
+      "fullHash": "d3f19e3ca1201e1052a36be6bf2ad40ecf669f1b",
+      "author": "Alan Racek",
+      "date": "2026-07-21T21:27:19-07:00",
+      "message": "refactor: reorder financial milestones component within projection tab layout",
+      "type": "refactor"
+    },
+    {
+      "hash": "571020b",
+      "fullHash": "571020b63bea3b4af5c8a53ef1d4a75de0bc84a2",
+      "author": "Alan Racek",
+      "date": "2026-07-21T18:54:14-07:00",
+      "message": "feat: add descriptive tooltips to plan management actions, rename reset to re-sync, and adjust modal z-indexing",
+      "type": "feat"
+    },
+    {
+      "hash": "57e9266",
+      "fullHash": "57e9266ad1fe4a37d8e8f3f43abafa94997dd5f1",
+      "author": "Alan Racek",
+      "date": "2026-07-21T18:13:10-07:00",
+      "message": "style: standardize projection tab UI elements to use primary theme colors",
+      "type": "style"
+    },
+    {
+      "hash": "b4ec6db",
+      "fullHash": "b4ec6db2a74d3d51700798557fa0294e36ee0fe9",
+      "author": "Alan Racek",
+      "date": "2026-07-21T18:04:24-07:00",
+      "message": "feat: add plan management components and enhance retirement projection visualizations with interactive milestone markers",
+      "type": "feat"
+    },
+    {
+      "hash": "3dbdc26",
+      "fullHash": "3dbdc264b5428d524d8161f3092d339220246424",
+      "author": "Alan Racek",
+      "date": "2026-07-21T17:35:14-07:00",
+      "message": "feat: implement Roth conversion logic in beam search optimizer and update flow management forms",
+      "type": "feat"
+    },
+    {
+      "hash": "48e35d8",
+      "fullHash": "48e35d8f96e0036469ea6f9aec3fb7c75f9e8143",
+      "author": "Alan Racek",
+      "date": "2026-07-21T13:42:27-07:00",
+      "message": "refactor: integrate real-time retirement engine for dynamic projection and account simulation updates",
+      "type": "refactor"
+    },
+    {
+      "hash": "fca1f3a",
+      "fullHash": "fca1f3a56696ee87faeda5ddf084b4c52678473f",
+      "author": "Alan Racek",
+      "date": "2026-07-21T12:42:40-07:00",
+      "message": "feat: implement retirement drawdown strategy visualization and extend database schema for spousal benefits",
+      "type": "feat"
+    },
+    {
+      "hash": "dbe370c",
+      "fullHash": "dbe370c7f6bb571faeda69f648b5ba32ffa11f9a",
+      "author": "Alan Racek",
+      "date": "2026-07-21T12:16:53-07:00",
+      "message": "feat: enable spouse age tracking in projections and add retirement rule update API endpoint",
+      "type": "feat"
+    },
+    {
+      "hash": "881d6d2",
+      "fullHash": "881d6d2d0b27d12f909f001d487cb7efb0c41ad4",
+      "author": "Alan Racek",
+      "date": "2026-07-21T11:48:46-07:00",
+      "message": "feat: implement plan creation modal and modernize navigation UI with integrated plan management",
+      "type": "feat"
+    },
+    {
+      "hash": "05c56be",
+      "fullHash": "05c56be8ec1aa08320da03c5b77612ca749f07a3",
+      "author": "Alan Racek",
+      "date": "2026-07-21T10:11:14-07:00",
+      "message": "feat: enhance projection chart with rich milestone callouts and high-contrast tooltip styling",
+      "type": "feat"
+    },
+    {
+      "hash": "e279210",
+      "fullHash": "e279210d296b1247fb2cf5be81051cd3f14e2a85",
+      "author": "Alan Racek",
+      "date": "2026-07-21T10:00:24-07:00",
+      "message": "refactor: overhaul plan management with new projection, details, and scenario tabs while updating the retirement engine simulation logic",
+      "type": "refactor"
+    },
+    {
+      "hash": "b88a39c",
+      "fullHash": "b88a39cc47fc50c0cc8ade377d3b119eb16dc36f",
+      "author": "Alan Racek",
+      "date": "2026-07-21T08:46:31-07:00",
+      "message": "feat: implement comprehensive retirement planning engine v1, calculation services, and multi-tab interface for financial projections.",
+      "type": "feat"
+    },
+    {
+      "hash": "aaaecc9",
+      "fullHash": "aaaecc9b67d628287eb89086faafe5eac182d861",
+      "author": "Alan Racek",
+      "date": "2026-07-20T13:53:48-07:00",
+      "message": "feat: implement tax wrapper splitting with account metadata and add corresponding unit tests",
+      "type": "feat"
+    },
+    {
+      "hash": "5bfb9bc",
+      "fullHash": "5bfb9bc9b9b32e796ea99e8dacb385bc2eec0d8f",
+      "author": "Alan Racek",
+      "date": "2026-07-20T10:11:56-07:00",
+      "message": "feat: add customizable savings rate calculation settings including account/category exclusions and income adjustments",
+      "type": "feat"
+    },
+    {
+      "hash": "1a4b6a8",
+      "fullHash": "1a4b6a80c62a0b6232cd80ac30f12cc78a439d04",
+      "author": "Alan Racek",
+      "date": "2026-07-20T09:53:35-07:00",
+      "message": "refactor: implement automated paystub regeneration logic with state reconciliation and deletion support",
+      "type": "refactor"
+    },
+    {
+      "hash": "971f8f7",
+      "fullHash": "971f8f7b14f22b13c10a4f55d6b0596719758b7c",
+      "author": "Alan Racek",
+      "date": "2026-07-20T09:08:34-07:00",
+      "message": "docs: add visual tour to README and expand real estate account type filtering in API route",
+      "type": "docs"
+    },
+    {
+      "hash": "ccadb67",
+      "fullHash": "ccadb67c3129e4c77a2f269d09951a7d9f1e8e04",
+      "author": "Alan Racek",
+      "date": "2026-07-19T19:43:19-07:00",
+      "message": "chore: trigger workflow run for privacy-mode-provider",
+      "type": "chore"
+    },
+    {
+      "hash": "b3990a5",
+      "fullHash": "b3990a5e8d9ae4224afbfb799fc6eb6368cfda48",
+      "author": "Alan Racek",
+      "date": "2026-07-19T19:12:08-07:00",
+      "message": "feat: replace blur effect with canvas-based pixelation for privacy mode to improve visual obfuscation",
+      "type": "feat"
+    },
+    {
+      "hash": "9198f9a",
+      "fullHash": "9198f9ac049f7cdcf74059898f614245c74e5269",
+      "author": "Alan Racek",
+      "date": "2026-07-15T14:23:56-07:00",
+      "message": "feat: add Best auto-calculated option to frequency select for real estate accounts",
+      "type": "feat"
+    },
+    {
+      "hash": "685f1ad",
+      "fullHash": "685f1ad93810c18a1f505e9d7fef58131ac80306",
+      "author": "Alan Racek",
+      "date": "2026-07-15T13:20:23-07:00",
+      "message": "refactor: update chart date formatting and improve responsiveness for account page components",
+      "type": "refactor"
+    },
+    {
+      "hash": "a927427",
+      "fullHash": "a927427d64bcfe54d519271a531046cd9ae2ad0b",
+      "author": "Alan Racek",
+      "date": "2026-07-15T12:50:27-07:00",
+      "message": "feat: introduce dynamic best sync frequency for real estate accounts with interval auto-calculation",
+      "type": "feat"
+    },
+    {
+      "hash": "6cf4694",
+      "fullHash": "6cf4694db1c1d1a170adcaf0f3cf33d9416ec0fc",
+      "author": "Alan Racek",
+      "date": "2026-07-15T08:53:37-07:00",
+      "message": "feat: align daily sync schedule to run one hour before user-configured alert time",
+      "type": "feat"
+    },
+    {
+      "hash": "d7d77fc",
+      "fullHash": "d7d77fcc3b4677e08240c5c7ccf81b64bea08204",
+      "author": "Alan Racek",
+      "date": "2026-07-15T08:12:41-07:00",
+      "message": "feat: migrate filter panel toggles to Switch components and modernize account filter UI in Cash Flow chart",
+      "type": "feat"
+    },
+    {
+      "hash": "6a3aa57",
+      "fullHash": "6a3aa57fa36c1fd7e91badd93fe0865067247aca",
+      "author": "Alan Racek",
+      "date": "2026-07-14T17:02:01-07:00",
+      "message": "feat: add responsive mobile layout to filter panel, update build version, and correct Next.js type reference path",
+      "type": "feat"
+    },
+    {
+      "hash": "7da4ec7",
+      "fullHash": "7da4ec72d0190f79809b877c68e87295a3a637f2",
+      "author": "Alan Racek",
+      "date": "2026-07-13T18:04:31-07:00",
+      "message": "feat: add 1d_discrete timeframe support and drill-down navigation for daily chart data",
+      "type": "feat"
+    },
+    {
+      "hash": "a2d561b",
+      "fullHash": "a2d561bf7ea0c1c6d145dc94bdb6f0a533715c46",
+      "author": "Alan Racek",
+      "date": "2026-07-13T11:01:21-07:00",
+      "message": "feat: add percentage toggle to net worth chart, update Sankey tooltip positioning, and bump build version",
+      "type": "feat"
+    },
+    {
+      "hash": "0512ccc",
+      "fullHash": "0512cccf3051a7e1ab530aac1ed6e5b17bca6166",
+      "author": "Alan Racek",
+      "date": "2026-07-13T09:40:34-07:00",
+      "message": "feat: add percentage-based change toggle to net worth chart and improve axis formatting logic",
+      "type": "feat"
+    },
+    {
+      "hash": "fb00047",
+      "fullHash": "fb000478b6db205dfd54054bc4e6eb8382f49668",
+      "author": "Alan Racek",
+      "date": "2026-07-13T08:50:35-07:00",
+      "message": "refactor: redesign UI tabs across dashboard components, remove math description features, and improve net worth change bar calculation logic.",
+      "type": "refactor"
+    },
+    {
+      "hash": "06b5a47",
+      "fullHash": "06b5a47d80cc0803d6ba4d49884aff65f17c4e5b",
+      "author": "Alan Racek",
+      "date": "2026-07-10T09:56:52-07:00",
+      "message": "refactor: enhance chart Y-axis scaling for positive-only data and update wealth flow calculations to support current-day balances.",
+      "type": "refactor"
+    },
+    {
+      "hash": "d33c7e1",
+      "fullHash": "d33c7e135ccada1b6817cd6d0f8e99cefc9db37f",
+      "author": "Alan Racek",
+      "date": "2026-07-09T21:40:17-07:00",
+      "message": "feat: replace sync issue banner with interactive tooltips for account sync statuses",
+      "type": "feat"
+    },
+    {
+      "hash": "b635793",
+      "fullHash": "b6357932e5f130063a608f5d27ce41a37a94882c",
+      "author": "Alan Racek",
+      "date": "2026-07-09T21:15:14-07:00",
+      "message": "feat: integrate account sync health monitoring, status display in UI, and manual sync controls",
+      "type": "feat"
+    },
+    {
+      "hash": "a3d7560",
+      "fullHash": "a3d7560829958336afa8ea79babcce7e7ef6a640",
+      "author": "Alan Racek",
+      "date": "2026-07-09T19:55:06-07:00",
+      "message": "fix: improve chart currency formatting precision and scope, and update collapsible header component styles",
+      "type": "fix"
+    },
+    {
+      "hash": "e587635",
+      "fullHash": "e587635a4a02ffe5eca946d87a8ee50d0d358c59",
+      "author": "Alan Racek",
+      "date": "2026-07-09T19:20:38-07:00",
+      "message": "chore: update copyright attribution",
+      "type": "chore"
+    },
+    {
+      "hash": "a981ab7",
+      "fullHash": "a981ab7eba0eabc750811c2acdb1618c068c46b1",
+      "author": "Alan Racek",
+      "date": "2026-07-09T16:05:38-07:00",
+      "message": "refactor: implement constructive color theme, update sign-out logic to use next-auth, and refresh service worker cache",
+      "type": "refactor"
+    },
+    {
+      "hash": "b2b8828",
+      "fullHash": "b2b882866c8f31f0eac7ea1a236950073635b86c",
+      "author": "Alan Racek",
+      "date": "2026-07-09T15:46:48-07:00",
+      "message": "refactor: remove budget-vs-actual-chart component and update README feature documentation",
+      "type": "refactor"
+    },
+    {
+      "hash": "a8c2173",
+      "fullHash": "a8c2173a3af13b702de0b6a3f9c086f90bcf4cff",
+      "author": "Alan Racek",
+      "date": "2026-07-09T13:37:56-07:00",
+      "message": "refactor: remove budget-vs-actual-chart component and related references",
+      "type": "refactor"
+    },
+    {
+      "hash": "d1c7079",
+      "fullHash": "d1c707996b7a38af9e6bec727f38ff9aa3ff558f",
+      "author": "Alan Racek",
+      "date": "2026-07-09T12:22:17-07:00",
+      "message": "refactor: simplify savings chart by removing dual-axis, adding average rate reference line, and updating presets",
+      "type": "refactor"
+    },
+    {
+      "hash": "5da72b5",
+      "fullHash": "5da72b5a6e984ca4fd11702386fcfeafe3673486",
+      "author": "Alan Racek",
+      "date": "2026-07-09T10:51:01-07:00",
+      "message": "feat: add interactive modal to IncomeExpenseChart for detailed monthly savings breakdown analysis",
+      "type": "feat"
+    },
+    {
+      "hash": "34d9a4b",
+      "fullHash": "34d9a4bbe1dfc12af720d27073c446368553fddb",
+      "author": "Alan Racek",
+      "date": "2026-07-09T10:32:54-07:00",
+      "message": "feat: integrate savings rate data and visualization into spending dashboard",
+      "type": "feat"
+    },
+    {
+      "hash": "88a68e3",
+      "fullHash": "88a68e3c92444a1e705bb873a7da4f2ac506db5b",
+      "author": "Alan Racek",
+      "date": "2026-07-09T09:57:58-07:00",
+      "message": "refactor: normalize all financial currency fields to cent-based strings using formatToCents throughout services and API routes.",
+      "type": "refactor"
+    },
+    {
+      "hash": "07bd5e4",
+      "fullHash": "07bd5e4c5dfb70f1c5a74447f87ae1ca3dfb69ed",
+      "author": "Alan Racek",
+      "date": "2026-07-09T09:47:38-07:00",
+      "message": "feat: add dynamic platform-aware keyboard shortcut labels to Privacy Mode UI and logic",
+      "type": "feat"
+    },
+    {
+      "hash": "baaf98e",
+      "fullHash": "baaf98ebacac1e0336523682c1b2bdf6ad91b846",
+      "author": "Alan Racek",
+      "date": "2026-07-09T09:39:19-07:00",
+      "message": "feat: implement 24-hour date window and update account data handling and privacy features",
+      "type": "feat"
+    },
+    {
+      "hash": "7d1a5dc",
+      "fullHash": "7d1a5dc67265d2ad3ad4e5f6a3c2b46276d6484b",
+      "author": "Alan Racek",
+      "date": "2026-07-09T09:22:38-07:00",
+      "message": "refactor: standardize account balance storage to two-decimal string format and add precision cleanup scripts",
+      "type": "refactor"
+    },
+    {
+      "hash": "d4694d6",
+      "fullHash": "d4694d6ce6c16c8ed0eefb476fe430a352e5ecac",
+      "author": "Alan Racek",
+      "date": "2026-07-09T07:53:37-07:00",
+      "message": "refactor: restrict real estate accounts to weekly or manual sync frequency with automatic coercion",
+      "type": "refactor"
+    },
+    {
+      "hash": "5c4f0cf",
+      "fullHash": "5c4f0cff3ec3218e58dc30ea6215e960671080cd",
+      "author": "Alan Racek",
+      "date": "2026-07-08T18:02:50-07:00",
+      "message": "fix: prevent notifications and alerts for hidden or excluded accounts across sync and preview services",
+      "type": "fix"
+    },
+    {
+      "hash": "f8b9f9c",
+      "fullHash": "f8b9f9cda433198212cc8d2f67b7eb485e66aa82",
+      "author": "Alan Racek",
+      "date": "2026-07-08T16:07:55-07:00",
+      "message": "refactor: replace vashon color scheme with bainbridge, update chart color logic, and improve net worth visualization rendering",
+      "type": "refactor"
+    },
+    {
+      "hash": "59b70d7",
+      "fullHash": "59b70d753a13a52cbbe2e0f35387656d1c3d094a",
+      "author": "Alan Racek",
+      "date": "2026-07-08T13:45:16-07:00",
+      "message": "feat: implement privacy mode for sensitive financial data and chart accessibility labels",
+      "type": "feat"
+    },
+    {
+      "hash": "e9d00f7",
+      "fullHash": "e9d00f7ce747b27217ac487d5392152ec1057d5b",
+      "author": "Alan Racek",
+      "date": "2026-07-08T11:56:46-07:00",
+      "message": "feat: implement transaction splitting with database support, API endpoints, and UI integration",
+      "type": "feat"
+    },
+    {
+      "hash": "beb6a7c",
+      "fullHash": "beb6a7c14bd32fd69212b2ab82a8039532e5b993",
+      "author": "Alan Racek",
+      "date": "2026-07-08T08:40:42-07:00",
+      "message": "feat: add user-configurable timezone settings with dynamic IANA selection and registration support",
+      "type": "feat"
+    },
+    {
+      "hash": "5a7403b",
+      "fullHash": "5a7403b6258f9e93f7a1d7214f241820b736b1fd",
+      "author": "Alan Racek",
+      "date": "2026-07-07T19:25:04-07:00",
+      "message": "feat: add configurable retention period for automatic deletion of pending transactions",
+      "type": "feat"
+    },
+    {
+      "hash": "0fb7f33",
+      "fullHash": "0fb7f334e4e88ea7cfb846925ccd372f44a02c1a",
+      "author": "Alan Racek",
+      "date": "2026-07-07T18:53:12-07:00",
+      "message": "feat: include paystub accounts in cash flow calculations regardless of virtual status",
+      "type": "feat"
+    },
+    {
+      "hash": "ebae50a",
+      "fullHash": "ebae50a1facdf71602477a879e8a3b379902e8aa",
+      "author": "Alan Racek",
+      "date": "2026-07-07T16:12:12-07:00",
+      "message": "feat: add hideFromTransactions setting to categories and optimize cash flow data fetching using month-aligned summary tables.",
+      "type": "feat"
+    },
+    {
+      "hash": "189f1a6",
+      "fullHash": "189f1a6bd8dfcfca09c04de192b3b3f025f5459b",
+      "author": "Alan Racek",
+      "date": "2026-07-06T15:57:07-07:00",
+      "message": "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page",
+      "type": "feat"
+    },
+    {
+      "hash": "9f81954",
+      "fullHash": "9f81954de65846cfd0e068737eaa3fbc680eae2c",
+      "author": "Alan Racek",
+      "date": "2026-07-06T10:12:03-07:00",
+      "message": "chore: automate service worker generation during build and implement commit history preservation in versioning script",
+      "type": "chore"
+    },
+    {
+      "hash": "9064086",
+      "fullHash": "9064086ad59a48c3671032348a6d1806aa5c2019",
+      "author": "Alan Racek",
+      "date": "2026-07-06T09:54:00-07:00",
+      "message": "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
+      "type": "refactor"
+    },
+    {
+      "hash": "d6ce7fa",
+      "fullHash": "d6ce7fac26253d59020c9ee2d39044b36017c3d7",
+      "author": "Alan Racek",
+      "date": "2026-07-06T09:39:41-07:00",
+      "message": "feat: use earliest snapshot as starting balance for new accounts and fix sankey chart rendering logic",
+      "type": "feat"
+    },
+    {
+      "hash": "345261d",
+      "fullHash": "345261d0417ffa316689ecda0b0d4cf8ed5cdc69",
+      "author": "Alan Racek",
+      "date": "2026-07-06T09:19:30-07:00",
+      "message": "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections.",
+      "type": "feat"
+    },
+    {
+      "hash": "937a8c7",
+      "fullHash": "937a8c73c75b8092ca86cc1959502b9df057032e",
+      "author": "Alan Racek",
+      "date": "2026-07-06T08:20:52-07:00",
+      "message": "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync",
+      "type": "feat"
+    },
+    {
+      "hash": "cd22cca",
+      "fullHash": "cd22cca77b443494a402ab18a7af3cdab8d76a00",
+      "author": "Alan Racek",
+      "date": "2026-07-05T21:40:31-07:00",
+      "message": "refactor: update Sankey visualization logic and initialize net worth reporting variables",
+      "type": "refactor"
+    },
+    {
+      "hash": "b351307",
+      "fullHash": "b35130734ab24d108a9ec045fbe7029c201b1279",
+      "author": "Alan Racek",
+      "date": "2026-07-05T21:29:17-07:00",
+      "message": "fix: clear stale account snapshots during startup healing and update service worker cache version",
+      "type": "fix"
+    },
+    {
+      "hash": "35ca5d8",
+      "fullHash": "35ca5d8e262706c4e8cdc8745995ebb42928767d",
+      "author": "Alan Racek",
+      "date": "2026-07-05T21:17:28-07:00",
+      "message": "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup",
+      "type": "feat"
+    },
+    {
+      "hash": "2e4fc43",
+      "fullHash": "2e4fc4375ae968637b033de7eba7a53ce0d2699d",
+      "author": "Alan Racek",
+      "date": "2026-07-05T20:59:38-07:00",
+      "message": "refactor: inline loading and error states within Sankey chart components for improved rendering logic",
+      "type": "refactor"
+    },
+    {
+      "hash": "623ed92",
+      "fullHash": "623ed9226f5d92b8ac865ab049220785ad299a85",
+      "author": "Alan Racek",
+      "date": "2026-07-05T20:00:38-07:00",
+      "message": "refactor: introduce account activity checking logic to standardize net worth calculations and currency conversion across services",
+      "type": "refactor"
+    },
+    {
+      "hash": "827bf3a",
+      "fullHash": "827bf3a93ae2983ae6c3d5fc797db1007fdf2e36",
+      "author": "Alan Racek",
+      "date": "2026-07-05T17:57:15-07:00",
+      "message": "style: remove border radius from sankey chart rectangles",
+      "type": "style"
+    },
+    {
+      "hash": "e3d5515",
+      "fullHash": "e3d55153e874a8c9bc1ced04e5560939b0c421d0",
+      "author": "Alan Racek",
+      "date": "2026-07-05T17:55:12-07:00",
+      "message": "refactor: modularize wealth flow calculation by extracting balance fetching and updating account grouping logic",
+      "type": "refactor"
+    },
+    {
+      "hash": "a22c5cb",
+      "fullHash": "a22c5cb43f56643d2f7750fa96c32764087d0058",
+      "author": "Alan Racek",
+      "date": "2026-07-05T16:29:31-07:00",
+      "message": "refactor: improve Sankey hub rendering, add chart navigation, and implement account-level adjusted delta routing",
+      "type": "refactor"
+    },
+    {
+      "hash": "5c4e33a",
+      "fullHash": "5c4e33a0766b16cc957771a98094c0433003707b",
+      "author": "Alan Racek",
+      "date": "2026-07-05T11:15:20-07:00",
+      "message": "refactor: replace static feedback components with an array-based API in CollapsibleFilterPanel",
+      "type": "refactor"
+    },
+    {
+      "hash": "12ed5dc",
+      "fullHash": "12ed5dcbc1d920cf0b64e40ad6cd75078140ca94",
+      "author": "Alan Racek",
+      "date": "2026-07-05T10:45:05-07:00",
+      "message": "refactor: wealth flow visualization and calculation",
+      "type": "refactor"
+    },
+    {
+      "hash": "6727c44",
+      "fullHash": "6727c44ca341e867424818a74556d2df24e12332",
+      "author": "Alan Racek",
+      "date": "2026-07-04T19:44:49-07:00",
+      "message": "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility",
+      "type": "refactor"
+    },
+    {
+      "hash": "fb4b58a",
+      "fullHash": "fb4b58a19cebf9561e3f2dfd024ce1dd58a15f39",
+      "author": "Alan Racek",
+      "date": "2026-07-04T16:16:24-07:00",
+      "message": "feat: enhance sankey hub visualization with net change delta bars and improved labels",
+      "type": "feat"
+    },
+    {
+      "hash": "94ffedd",
+      "fullHash": "94ffeddd600385d607ba117b049363316781ce14",
+      "author": "Alan Racek",
+      "date": "2026-07-04T15:45:51-07:00",
+      "message": "feat: implement ExpandableDriverRow component to display granular net worth breakdown and account-level transaction details",
+      "type": "feat"
+    },
+    {
+      "hash": "059f4a3",
+      "fullHash": "059f4a3d07605ba07d1bbd1e67cb9dae61eacd7b",
+      "author": "Alan Racek",
+      "date": "2026-07-04T15:34:16-07:00",
+      "message": "feat: add 1D time range, migrate /net-worth to /flows, update sankey hub tooltips, and refine sync/projection logic.",
+      "type": "feat"
+    },
+    {
+      "hash": "deefc2f",
+      "fullHash": "deefc2fc722f92bc56eccf640f58ee6db4878960",
+      "author": "Alan Racek",
+      "date": "2026-07-03T08:39:42-07:00",
+      "message": "style: refine card border transparency, update chart filter button typography, and adjust filter panel layout",
+      "type": "style"
+    },
+    {
+      "hash": "9c0efae",
+      "fullHash": "9c0efae3705bd052cc239ca8ebedb67533ed7460",
+      "author": "Alan Racek",
+      "date": "2026-07-03T08:32:06-07:00",
+      "message": "refactor: calculate average of price and range bounds for valuation methods and update corresponding unit tests",
+      "type": "refactor"
+    },
+    {
+      "hash": "095ed2e",
+      "fullHash": "095ed2e17771090ea5d67c4fa79fa00bbbf30318",
+      "author": "Alan Racek",
+      "date": "2026-07-02T15:13:40-07:00",
+      "message": "refactor: introduce centralized chart formatting utilities and apply them to standardise axis labels and tick generation across all financial charts",
+      "type": "refactor"
+    },
+    {
+      "hash": "13fd86e",
+      "fullHash": "13fd86e5b817dbc3a307c7869f7f0f8dad2cb7fd",
+      "author": "Alan Racek",
+      "date": "2026-07-02T11:13:55-07:00",
+      "message": "dev server change",
+      "type": "other"
+    },
+    {
+      "hash": "1add774",
+      "fullHash": "1add774c6b9b0de338300a9945702e4d501a2f61",
+      "author": "Alan Racek",
+      "date": "2026-07-02T08:09:53-07:00",
+      "message": "bug fix",
+      "type": "other"
+    },
+    {
+      "hash": "bc1fb55",
+      "fullHash": "bc1fb553fac193e5d3d1b756f7bf5ef9526223d2",
+      "author": "Alan Racek",
+      "date": "2026-07-01T16:48:00-07:00",
+      "message": "wealth flow improvements",
+      "type": "other"
+    },
+    {
+      "hash": "9f265a0",
+      "fullHash": "9f265a06a7953ad2e3c9ac25281d5a9c56d2feba",
+      "author": "Alan Racek",
+      "date": "2026-07-01T15:49:19-07:00",
+      "message": "net worth flow",
+      "type": "other"
+    },
+    {
+      "hash": "5ee35f6",
+      "fullHash": "5ee35f66dcdf6e30d82c2e6cd68b6e2d296099a0",
+      "author": "Alan Racek",
+      "date": "2026-07-01T07:55:34-07:00",
+      "message": "alerts updates",
+      "type": "other"
+    },
+    {
+      "hash": "7da0598",
+      "fullHash": "7da05989093e28994462fd6dab385ec2c01199de",
+      "author": "Alan Racek",
+      "date": "2026-06-30T20:07:45-07:00",
+      "message": "bug fix",
+      "type": "other"
+    },
+    {
+      "hash": "e047fea",
+      "fullHash": "e047feaf38a7f00c22b1854836ffea0a93d21abe",
+      "author": "Alan Racek",
+      "date": "2026-06-30T10:13:18-07:00",
+      "message": "bug fix",
+      "type": "other"
+    },
+    {
+      "hash": "b984c9b",
+      "fullHash": "b984c9beb6e049f69b37e9b88753ac575c5bc26c",
+      "author": "Alan Racek",
+      "date": "2026-06-29T15:50:51-07:00",
+      "message": "re chart improvements",
+      "type": "other"
+    },
+    {
+      "hash": "6bb29e5",
+      "fullHash": "6bb29e516612ff09baaa3a2828ccdfa76291d03b",
+      "author": "Alan Racek",
+      "date": "2026-06-29T15:26:20-07:00",
+      "message": "net-worth improvements",
+      "type": "other"
+    },
+    {
+      "hash": "b819f4f",
+      "fullHash": "b819f4f1b2b53654fc456fc70d37ee95989e0137",
+      "author": "Alan Racek",
+      "date": "2026-06-29T15:02:58-07:00",
+      "message": "better goals",
+      "type": "other"
+    },
+    {
+      "hash": "8df64be",
+      "fullHash": "8df64be86578c8611d6fccc049c21d11c9bae1d0",
+      "author": "Alan Racek",
+      "date": "2026-06-29T14:48:15-07:00",
+      "message": "better goals cards",
+      "type": "other"
+    },
+    {
+      "hash": "c35ea78",
+      "fullHash": "c35ea78326b995c778462a70c4bb95f69b8fe022",
+      "author": "Alan Racek",
+      "date": "2026-06-29T14:33:33-07:00",
+      "message": "better ai suggestions",
+      "type": "other"
+    }
+  ]
 }

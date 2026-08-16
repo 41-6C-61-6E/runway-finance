@@ -10,7 +10,7 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   CartesianGrid,
   Legend,
@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
 
@@ -184,25 +185,25 @@ export function RothConversionTab({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Pre-Tax Traditional Balance</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Pre-Tax Traditional</span>
             <Layers className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-xl font-bold font-mono text-foreground">{formatCurrency(accountTotals.preTax)}</div>
-          <span className="text-[10px] text-muted-foreground block">Subject to ordinary tax & mandatory RMDs</span>
+          <span className="text-[10px] text-muted-foreground block">Subject to RMD tax drag</span>
         </div>
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Tax-Free Roth Balance</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Tax-Free Roth</span>
             <Flame className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-xl font-bold font-mono text-rose-500">{formatCurrency(accountTotals.roth)}</div>
-          <span className="text-[10px] text-muted-foreground block">Grows and withdraws 100% tax-free</span>
+          <span className="text-[10px] text-muted-foreground block">Grows 100% tax-free</span>
         </div>
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Max Age {rmdStartAge} RMD</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Peak Age {rmdStartAge}+ RMD</span>
             <AlertTriangle className="w-4 h-4 text-rose-400" />
           </div>
           <div className="text-xl font-bold font-mono text-foreground">
@@ -210,40 +211,52 @@ export function RothConversionTab({
           </div>
           <span className="text-[10px] text-muted-foreground block">
             {enableRoth
-              ? `Reduced from ${formatCurrency(summaryNoRoth.maxRmd)} baseline`
-              : `Can be reduced to ${formatCurrency(summaryActive.maxRmd)} via ladder`}
+              ? `Down from ${formatCurrency(summaryNoRoth.maxRmd)} baseline`
+              : `Can be reduced to ${formatCurrency(summaryActive.maxRmd)}`}
           </span>
         </div>
 
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Lifetime Net Worth Advantage</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Net Strategy Advantage</span>
             <Sparkles className="w-4 h-4 text-emerald-500" />
           </div>
           <div className={`text-xl font-bold font-mono ${summaryActive.endNW >= summaryNoRoth.endNW ? 'text-emerald-500' : 'text-rose-500'}`}>
             {summaryActive.endNW >= summaryNoRoth.endNW ? `+${formatCurrency(summaryActive.endNW - summaryNoRoth.endNW)}` : formatCurrency(summaryActive.endNW - summaryNoRoth.endNW)}
           </div>
-          <span className="text-[10px] text-muted-foreground block">Net ending wealth gain from conversions</span>
+          <span className="text-[10px] text-muted-foreground block">Ending wealth gain from ladder</span>
         </div>
       </div>
 
       {/* SECTION 1: ROTH CONVERSION STRATEGY CONTROLS */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
-          title="Roth Conversion Ladder & Bracket Headroom Controls"
-          description="Systematically convert pre-tax traditional IRA/401(k) assets to tax-free Roth during low-income retirement years"
+          title="Roth Conversion Ladder Controls"
+          description="Systematically convert pre-tax balances to tax-free Roth during low-tax retirement years"
           icon={Flame}
           isCollapsed={isOverviewCollapsed}
           onToggle={() => setIsOverviewCollapsed(!isOverviewCollapsed)}
         />
 
         {!isOverviewCollapsed && (
-          <div className="p-5 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/20 p-4 rounded-xl border border-border text-xs">
+          <div className="p-5 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/20 p-4 rounded-xl border border-border text-xs">
               {/* Toggle Enable Roth Conversions */}
               <div className="space-y-2">
-                <label className="font-bold text-foreground block">Enable Roth Conversion Strategy</label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-foreground flex items-center gap-1.5">
+                    Conversion Strategy
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Executes annual Roth conversions from retirement (Age {retirementAge}) up to RMD start (Age {rmdStartAge}) to lock in low tax brackets and shrink future RMDs.
+                      </TooltipContent>
+                    </Tooltip>
+                  </label>
+                </div>
+                <div className="flex items-center gap-2 pt-0.5">
                   <input
                     type="checkbox"
                     id="enableRothCheck"
@@ -255,18 +268,27 @@ export function RothConversionTab({
                     }}
                     className="w-4 h-4 accent-primary rounded cursor-pointer"
                   />
-                  <label htmlFor="enableRothCheck" className="text-xs font-semibold text-muted-foreground cursor-pointer">
-                    {enableRoth ? 'Roth Conversions Active' : 'Disabled (No Conversions)'}
+                  <label htmlFor="enableRothCheck" className="text-xs font-semibold text-foreground cursor-pointer">
+                    {enableRoth ? 'Active (Auto Convert)' : 'Disabled'}
                   </label>
                 </div>
-                <span className="text-[10px] text-muted-foreground block">
-                  Executes conversions between retirement (Age {retirementAge}) and RMD start (Age {rmdStartAge}).
-                </span>
               </div>
 
               {/* Select Target Tax Bracket */}
               <div className="space-y-2">
-                <label className="font-bold text-foreground block">Target Bracket Ceiling</label>
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-foreground flex items-center gap-1.5">
+                    Target Bracket Ceiling
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Converts pre-tax IRA/401(k) assets up to the upper dollar threshold of the selected federal tax bracket each year.
+                      </TooltipContent>
+                    </Tooltip>
+                  </label>
+                </div>
                 <select
                   value={targetCeiling}
                   onChange={(e: any) => {
@@ -275,23 +297,32 @@ export function RothConversionTab({
                     updatePlanSettings({ rothConversionTargetCeiling: val });
                   }}
                   disabled={!enableRoth}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground font-medium focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground font-medium focus:ring-1 focus:ring-primary disabled:opacity-50"
                 >
-                  <option value="top_of_10">Top of 10% Bracket ($23.8k MFJ / $11.9k Single)</option>
-                  <option value="top_of_12">Top of 12% Bracket ($96.9k MFJ / $48.4k Single) [Recommended]</option>
-                  <option value="top_of_22">Top of 22% Bracket ($206.7k MFJ / $103.3k Single)</option>
-                  <option value="top_of_24">Top of 24% Bracket ($394.6k MFJ / $197.3k Single)</option>
-                  <option value="top_of_32">Top of 32% Bracket ($501.0k MFJ / $250.5k Single)</option>
+                  <option value="top_of_10">10% Bracket ($23.8k MFJ)</option>
+                  <option value="top_of_12">12% Bracket ($96.9k MFJ) • Recommended</option>
+                  <option value="top_of_22">22% Bracket ($206.7k MFJ)</option>
+                  <option value="top_of_24">24% Bracket ($394.6k MFJ)</option>
+                  <option value="top_of_32">32% Bracket ($501.0k MFJ)</option>
                 </select>
-                <span className="text-[10px] text-muted-foreground block">
-                  Fills up to the chosen tax bracket headroom each year.
-                </span>
               </div>
 
               {/* IRMAA Guardrail Checkbox */}
               <div className="space-y-2">
-                <label className="font-bold text-foreground block">Medicare IRMAA Cliff Guard</label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-foreground flex items-center gap-1.5">
+                    Medicare IRMAA Guard
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Caps conversions $1,000 below Medicare Part B & D surcharge cliffs starting at age 63 (the 2-year lookback window).
+                      </TooltipContent>
+                    </Tooltip>
+                  </label>
+                </div>
+                <div className="flex items-center gap-2 pt-0.5">
                   <input
                     type="checkbox"
                     id="avoidIrmaaCheck"
@@ -304,20 +335,17 @@ export function RothConversionTab({
                     disabled={!enableRoth}
                     className="w-4 h-4 accent-primary rounded cursor-pointer disabled:opacity-50"
                   />
-                  <label htmlFor="avoidIrmaaCheck" className="text-xs font-semibold text-muted-foreground cursor-pointer">
-                    {avoidIrmaa ? 'Avoid IRMAA Cliffs (Headroom - $1,000)' : 'No IRMAA Cap'}
+                  <label htmlFor="avoidIrmaaCheck" className="text-xs font-semibold text-foreground cursor-pointer">
+                    {avoidIrmaa ? 'Guardrail Active ($1k margin)' : 'No IRMAA Cap'}
                   </label>
                 </div>
-                <span className="text-[10px] text-muted-foreground block">
-                  Caps conversions $1,000 below Medicare Part B & D surcharges starting at age 63.
-                </span>
               </div>
             </div>
 
             {/* Active Status Bar */}
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-1">
               <div className="text-xs text-muted-foreground">
-                Lifetime Taxes Paid with selected strategy: <strong className="text-foreground font-mono">{formatCurrency(summaryActive.totalTaxes)}</strong>
+                Lifetime Taxes with Selected Strategy: <strong className="text-foreground font-mono">{formatCurrency(summaryActive.totalTaxes)}</strong>
               </div>
             </div>
           </div>
@@ -370,21 +398,19 @@ export function RothConversionTab({
 
         {!isComparisonCollapsed && (
           <div className="p-5 space-y-6">
-            {/* Chart Legend Callout Banner */}
-            <div className="flex items-center justify-between text-xs bg-muted/20 border border-border p-3 rounded-xl">
+            {/* Chart Callout Banner */}
+            <div className="flex items-center justify-between text-xs bg-muted/20 border border-border px-3.5 py-2.5 rounded-xl">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Info className="w-4 h-4 text-primary shrink-0" />
                 <span>
                   {chartView === 'net_worth'
-                    ? 'Note: Upfront conversion taxes cause a temporary net worth dip during conversion years (shaded pink area), followed by long-term outperformance as RMD tax drag is avoided.'
-                    : 'Shows how pre-tax balances decrease while Roth balances compound tax-free over time.'}
+                    ? 'Upfront conversion taxes cause a minor early net worth dip, followed by compounding tax-free outperformance.'
+                    : 'Shows how traditional pre-tax balances decrease while tax-free Roth balances compound over time.'}
                 </span>
               </div>
-              <div className="flex items-center gap-4 text-[11px] font-medium shrink-0">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-xs bg-pink-500/20 border border-pink-500/50 inline-block" />
-                  Conversion Window (Ages {retirementAge}–{rmdStartAge - 1})
-                </span>
+              <div className="flex items-center gap-2 text-[11px] font-medium shrink-0">
+                <span className="w-2.5 h-2.5 rounded-xs bg-pink-500/20 border border-pink-500/50 inline-block" />
+                <span>Conversion Window (Ages {retirementAge}–{rmdStartAge - 1})</span>
               </div>
             </div>
 
@@ -399,7 +425,7 @@ export function RothConversionTab({
                     tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`}
                     tickLine={false}
                   />
-                  <Tooltip content={<RothConversionTooltip chartView={chartView} />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
+                  <RechartsTooltip content={<RothConversionTooltip chartView={chartView} />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
 
                   {/* Shaded Conversion Ladder Window */}
