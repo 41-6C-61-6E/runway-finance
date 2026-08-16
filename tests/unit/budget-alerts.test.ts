@@ -161,4 +161,18 @@ describe('checkBudgetsAndNotify', () => {
     expect(insertedNotifications[0].title).toBe('Budget Exceeded: Food');
     expect(insertedNotifications[0].body).toContain("You've spent $101 of your $100 budget for Food.");
   });
+
+  it('handles 410 Gone push failure gracefully', async () => {
+    const webpush = (await import('web-push')).default;
+    const error410 = Object.assign(new Error('Gone'), { statusCode: 410 });
+    vi.mocked(webpush.sendNotification).mockRejectedValueOnce(error410);
+
+    mockTransactions = [
+      { amount: '-150' },
+    ];
+
+    // Should complete without throwing
+    await expect(checkBudgetsAndNotify('user-1', new Uint8Array())).resolves.not.toThrow();
+    expect(insertedNotifications.length).toBe(1);
+  });
 });

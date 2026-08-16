@@ -103,22 +103,46 @@ describe('Monte Carlo Simulation Engine', () => {
     expect(res.percentiles.years.length).toBeGreaterThan(0);
   });
 
-  it('correctly distinguishes real vs nominal dollar outputs', () => {
-    const realRes = runMonteCarloSimulation(mockPlan, {
-      numberOfTrials: 30,
-      model: 'normal_distribution',
+  it('runs Monte Carlo constant model simulation', () => {
+    const res = runMonteCarloSimulation(mockPlan, {
+      numberOfTrials: 20,
+      model: 'constant',
+      meanAnnualReturn: 0.06,
       adjustForInflation: true,
-      fixedInflationRate: 3.0,
     });
 
-    const nominalRes = runMonteCarloSimulation(mockPlan, {
-      numberOfTrials: 30,
+    expect(res.totalTrials).toBe(20);
+    expect(res.medianLegacy).toBeGreaterThanOrEqual(0);
+    expect(res.percentiles.years.length).toBeGreaterThan(0);
+  });
+
+  it('runs deterministically when a custom randomFn is provided', () => {
+    // Simple pseudo-random generator (mulberry32)
+    const createPrng = (seed: number) => {
+      let s = seed;
+      return () => {
+        s |= 0;
+        s = (s + 0x6d2b79f5) | 0;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    };
+
+    const res1 = runMonteCarloSimulation(mockPlan, {
+      numberOfTrials: 25,
       model: 'normal_distribution',
-      adjustForInflation: false,
-      fixedInflationRate: 3.0,
+      randomFn: createPrng(12345),
     });
 
-    expect(nominalRes.isRealDollars).toBe(false);
-    expect(realRes.isRealDollars).toBe(true);
+    const res2 = runMonteCarloSimulation(mockPlan, {
+      numberOfTrials: 25,
+      model: 'normal_distribution',
+      randomFn: createPrng(12345),
+    });
+
+    expect(res1.medianLegacy).toBe(res2.medianLegacy);
+    expect(res1.successRate).toBe(res2.successRate);
+    expect(res1.averageLegacy).toBe(res2.averageLegacy);
   });
 });

@@ -9,6 +9,7 @@ export interface MonteCarloOptions {
   equityAllocation: number; // e.g. 80 for 80% Stocks / 20% Bonds
   adjustForInflation: boolean; // true = Real Today's Dollars, false = Nominal
   fixedInflationRate?: number; // e.g. 3.0 for 3%
+  randomFn?: () => number; // Optional deterministic RNG for testing
 }
 
 export interface MonteCarloTrialResult {
@@ -53,6 +54,7 @@ export function runMonteCarloSimulation(
   const bondRatio = 1 - equityRatio;
   const adjustForInflation = options.adjustForInflation ?? true;
   const inflationRate = ((options.fixedInflationRate ?? basePlan.settings?.fixedInflationRate ?? 3.0)) / 100;
+  const rng = options.randomFn ?? Math.random;
 
   const trials: MonteCarloTrialResult[] = [];
   const currentYear = new Date().getFullYear();
@@ -70,8 +72,8 @@ export function runMonteCarloSimulation(
         const priceGrowth = meanReturn - divYield;
         yearlyMarketData.push({ growth: priceGrowth, dividend: divYield });
       } else if (model === 'normal_distribution') {
-        const u1 = Math.random() || 0.0001;
-        const u2 = Math.random() || 0.0001;
+        const u1 = rng() || 0.0001;
+        const u2 = rng() || 0.0001;
         const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
         const randomReturn = meanReturn + stdDev * z;
         const boundedReturn = Math.max(-0.35, Math.min(0.45, randomReturn));
@@ -81,7 +83,7 @@ export function runMonteCarloSimulation(
         const priceGrowth = boundedReturn - divYield;
         yearlyMarketData.push({ growth: priceGrowth, dividend: divYield });
       } else {
-        const randomIndex = Math.floor(Math.random() * HISTORICAL_RETURNS_DATA.length);
+        const randomIndex = Math.floor(rng() * HISTORICAL_RETURNS_DATA.length);
         const histData = HISTORICAL_RETURNS_DATA[randomIndex];
 
         // Stock Total Return = histData.stocksGrowth (price + dividend)

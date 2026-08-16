@@ -396,17 +396,10 @@ describe('wealth-flow service (snapshot-only)', () => {
   });
 
   it('falls back to live balance from accounts table when target date is today', async () => {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const parts = formatter.formatToParts(new Date());
-    const year = parts.find(p => p.type === 'year')?.value;
-    const month = parts.find(p => p.type === 'month')?.value;
-    const day = parts.find(p => p.type === 'day')?.value;
-    const todayStr = `${year}-${month}-${day}`;
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00-04:00'));
+
+    const todayStr = '2026-07-15';
 
     mockState.mockAccounts = [
       { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false, balance: '5000.00' },
@@ -420,5 +413,7 @@ describe('wealth-flow service (snapshot-only)', () => {
     expect(result.summary.beginningNetWorth).toBe(2000);
     expect(result.summary.endingNetWorth).toBe(5000);
     expect(result.summary.netWorthChange).toBe(3000);
+
+    vi.useRealTimers();
   });
 });

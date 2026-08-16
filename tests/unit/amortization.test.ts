@@ -84,4 +84,34 @@ describe('amortization utility calculations', () => {
       expect(month7Diff - month6Diff).toBeLessThan(100); // interest savings growth is very small month-to-month
     }
   });
+
+  it('amortizes 0% annual interest rate as straight line without NaN', () => {
+    const zeroRateSchedule = calculateAmortizationSchedule({
+      originalBalance: 120000,
+      annualRate: 0,
+      termMonths: 240,
+      monthlyPayment: 500,
+      startDate: '2025-01-01',
+    });
+
+    expect(zeroRateSchedule).toHaveLength(240);
+    expect(zeroRateSchedule[0].interest).toBe(0);
+    expect(zeroRateSchedule[0].principal).toBe(500);
+    expect(zeroRateSchedule[239].remainingBalance).toBeCloseTo(0, 2);
+    expect(zeroRateSchedule.every((p) => Number.isFinite(p.remainingBalance))).toBe(true);
+  });
+
+  it('handles negative annual interest rate without producing NaN', () => {
+    const negRateSchedule = calculateAmortizationSchedule({
+      originalBalance: 100000,
+      annualRate: -2,
+      termMonths: 360,
+      monthlyPayment: 300,
+      startDate: '2025-01-01',
+    });
+
+    expect(negRateSchedule.length).toBeGreaterThan(0);
+    expect(negRateSchedule.every((p) => Number.isFinite(p.remainingBalance))).toBe(true);
+    expect(negRateSchedule.at(-1)!.remainingBalance).toBeLessThan(100000);
+  });
 });

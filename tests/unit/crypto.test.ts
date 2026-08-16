@@ -118,4 +118,31 @@ describe('Crypto', () => {
       { field: 'payee', operator: 'contains', value: 'Starbucks', caseSensitive: false }
     ]);
   });
+
+  it('unwrapKey throws when unwrapping with wrong KEK', async () => {
+    const kek1 = hexToBytes('11'.repeat(32));
+    const kek2 = hexToBytes('22'.repeat(32));
+    const dek = crypto.getRandomValues(new Uint8Array(32));
+
+    const wrapped = await wrapKey(dek, kek1);
+    await expect(unwrapKey(wrapped, kek2)).rejects.toThrow('Decryption failed');
+  });
+
+  it('wrapKey throws when DEK is not exactly 32 bytes', async () => {
+    const invalidDek = new Uint8Array(16);
+    await expect(wrapKey(invalidDek, testKey)).rejects.toThrow('DEK must be exactly 32 bytes');
+  });
+
+  it('getServerKey throws if ENCRYPTION_KEY is missing or invalid', async () => {
+    const originalEnv = process.env.ENCRYPTION_KEY;
+    const { getServerKey } = await import('@/lib/crypto');
+
+    delete process.env.ENCRYPTION_KEY;
+    expect(() => getServerKey()).toThrow('ENCRYPTION_KEY is missing or invalid');
+
+    process.env.ENCRYPTION_KEY = 'invalid-hex-short';
+    expect(() => getServerKey()).toThrow('ENCRYPTION_KEY is missing or invalid');
+
+    process.env.ENCRYPTION_KEY = originalEnv;
+  });
 });

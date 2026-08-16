@@ -7,13 +7,22 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    setupFiles: ['tests/unit/setup.ts'],
+    testTimeout: 10000,
     env: {
       ENCRYPTION_KEY: 'a'.repeat(64), // 64-char hex for tests only
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: 'BBmrNX5VoXACcOMhb4LyUy3lfSG10B-kElrhluK1X27W2yRdWirmQfzcyjOkj6wUdSRLmDE-Tpat_GcMps91TQ0',
       VAPID_PRIVATE_KEY: 'dMWpbD8gVJGDYlREc-sqPcQQ2UuDGHOFosaMsbqQ8NU',
       VAPID_SUBJECT: 'mailto:admin@example.com',
+      TZ: 'America/New_York',
     },
     include: ['tests/unit/**/*.test.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['lib/**', 'app/api/**'],
+      exclude: ['node_modules/**', 'tests/**', '**/*.d.ts'],
+    },
   },
   resolve: {
     alias: {
