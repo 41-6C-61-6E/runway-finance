@@ -84,12 +84,18 @@ export default function AccountRow({
         {showTags && account.tags && account.tags.length > 0 && (
           <div className="flex items-center gap-1 flex-shrink-0">
             {account.tags.map((tag) => (
-              <span
-                key={tag.id}
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: tag.color }}
-                title={tag.name}
-              />
+              <Tooltip key={tag.id}>
+                <TooltipTrigger asChild>
+                  <span
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0 cursor-help"
+                    style={{ backgroundColor: tag.color }}
+                    title={tag.name}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Tag: #{tag.name}
+                </TooltipContent>
+              </Tooltip>
             ))}
           </div>
         )}

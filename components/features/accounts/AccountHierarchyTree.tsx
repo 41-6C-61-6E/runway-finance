@@ -759,25 +759,45 @@ export default function AccountHierarchyTree({
                                               </Tooltip>
                                             )}
                                             {acc.isHidden && (
-                                              <span className="text-[9px] sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <span className="text-[9px] sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded cursor-help">Hidden</span>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top" className="text-xs">
+                                                  This account is hidden from lists and summaries
+                                                </TooltipContent>
+                                              </Tooltip>
                                             )}
                                             {acc.isExcludedFromNetWorth && (
-                                              <span className="text-[9px] sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <span className="text-[9px] sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded cursor-help">Excluded</span>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top" className="text-xs">
+                                                  Excluded from Net Worth totals
+                                                </TooltipContent>
+                                              </Tooltip>
                                             )}
                                             {acc.tags && acc.tags.length > 0 && (
                                               <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
                                                 {acc.tags.map((tag) => (
-                                                  <span
-                                                    key={tag.id}
-                                                    className="px-1.5 py-0.2 rounded-full text-[8px] sm:text-[9px] font-medium border"
-                                                    style={{
-                                                      backgroundColor: `${tag.color}15`,
-                                                      color: tag.color,
-                                                      borderColor: `${tag.color}30`
-                                                    }}
-                                                  >
-                                                    #{tag.name}
-                                                  </span>
+                                                  <Tooltip key={tag.id}>
+                                                    <TooltipTrigger asChild>
+                                                      <span
+                                                        className="px-1.5 py-0.2 rounded-full text-[8px] sm:text-[9px] font-medium border cursor-help"
+                                                        style={{
+                                                          backgroundColor: `${tag.color}15`,
+                                                          color: tag.color,
+                                                          borderColor: `${tag.color}30`
+                                                        }}
+                                                      >
+                                                        #{tag.name}
+                                                      </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="text-xs">
+                                                      Account Tag: #{tag.name}
+                                                    </TooltipContent>
+                                                  </Tooltip>
                                                 ))}
                                               </div>
                                             )}
@@ -910,25 +930,45 @@ export default function AccountHierarchyTree({
                                                     </Tooltip>
                                                   )}
                                                   {acc.isHidden && (
-                                                    <span className="text-[9px] sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
+                                                    <Tooltip>
+                                                      <TooltipTrigger asChild>
+                                                        <span className="text-[9px] sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded cursor-help">Hidden</span>
+                                                      </TooltipTrigger>
+                                                      <TooltipContent side="top" className="text-xs">
+                                                        This account is hidden from lists and summaries
+                                                      </TooltipContent>
+                                                    </Tooltip>
                                                   )}
                                                   {acc.isExcludedFromNetWorth && (
-                                                    <span className="text-[9px] sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
+                                                    <Tooltip>
+                                                      <TooltipTrigger asChild>
+                                                        <span className="text-[9px] sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded cursor-help">Excluded</span>
+                                                      </TooltipTrigger>
+                                                      <TooltipContent side="top" className="text-xs">
+                                                        Excluded from Net Worth totals
+                                                      </TooltipContent>
+                                                    </Tooltip>
                                                   )}
                                                   {acc.tags && acc.tags.length > 0 && (
                                                     <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
                                                       {acc.tags.map((tag) => (
-                                                        <span
-                                                          key={tag.id}
-                                                          className="px-1.5 py-0.2 rounded-full text-[8px] sm:text-[9px] font-medium border"
-                                                          style={{
-                                                            backgroundColor: `${tag.color}15`,
-                                                            color: tag.color,
-                                                            borderColor: `${tag.color}30`
-                                                          }}
-                                                        >
-                                                          #{tag.name}
-                                                        </span>
+                                                        <Tooltip key={tag.id}>
+                                                          <TooltipTrigger asChild>
+                                                            <span
+                                                              className="px-1.5 py-0.2 rounded-full text-[8px] sm:text-[9px] font-medium border cursor-help"
+                                                              style={{
+                                                                backgroundColor: `${tag.color}15`,
+                                                                color: tag.color,
+                                                                borderColor: `${tag.color}30`
+                                                              }}
+                                                            >
+                                                              #{tag.name}
+                                                            </span>
+                                                          </TooltipTrigger>
+                                                          <TooltipContent side="top" className="text-xs">
+                                                            Account Tag: #{tag.name}
+                                                          </TooltipContent>
+                                                        </Tooltip>
                                                       ))}
                                                     </div>
                                                   )}

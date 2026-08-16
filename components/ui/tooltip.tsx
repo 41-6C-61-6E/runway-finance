@@ -59,11 +59,13 @@ function Tooltip({
   }, [open, setOpen]);
 
   return (
-    <TooltipContext.Provider value={{ open, setOpen }}>
-      <TooltipPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props}>
-        {children}
-      </TooltipPrimitive.Root>
-    </TooltipContext.Provider>
+    <TooltipPrimitive.Provider delayDuration={200}>
+      <TooltipContext.Provider value={{ open, setOpen }}>
+        <TooltipPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props}>
+          {children}
+        </TooltipPrimitive.Root>
+      </TooltipContext.Provider>
+    </TooltipPrimitive.Provider>
   );
 }
 

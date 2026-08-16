@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { getAccountGroupKey } from "@/lib/constants/account-types";
 import { toast } from "sonner";
 import {
@@ -1019,23 +1020,37 @@ export default function TransactionTable({
                   {tx.payee || tx.description}
                 </span>
                 {isPending && (
-                  <span
-                    className="inline-flex items-center text-primary shrink-0"
-                    title="Pending"
-                  >
-                    <svg
-                      className="h-2 w-2"
-                      fill="currentColor"
-                      viewBox="0 0 8 8"
-                    >
-                      <circle cx="4" cy="4" r="3" />
-                    </svg>
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="inline-flex items-center text-primary shrink-0 cursor-help"
+                        aria-label="Pending transaction"
+                      >
+                        <svg
+                          className="h-2 w-2"
+                          fill="currentColor"
+                          viewBox="0 0 8 8"
+                        >
+                          <circle cx="4" cy="4" r="3" />
+                        </svg>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Pending transaction (awaiting bank settlement)
+                    </TooltipContent>
+                  </Tooltip>
                 )}
                 {tx.splits && tx.splits.length > 0 && (
-                  <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0">
-                    Split
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0 cursor-help">
+                        Split
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Split transaction ({tx.splits.length} categories)
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </div>
               {!tx.isSplitChild && (
@@ -1066,12 +1081,19 @@ export default function TransactionTable({
           const categorizedByAi = row.getValue("ai") as boolean;
           if (!categorizedByAi) return null;
           return (
-            <div
-              className="flex items-center justify-center"
-              title="Categorized by AI"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-primary/70" />
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="flex items-center justify-center cursor-help"
+                  aria-label="Categorized by AI"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-primary/70" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Categorized automatically by AI rule
+              </TooltipContent>
+            </Tooltip>
           );
         },
       },
@@ -1091,12 +1113,17 @@ export default function TransactionTable({
               {showAccountTags && tx.accountTags && tx.accountTags.length > 0 && (
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {tx.accountTags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: tag.color }}
-                      title={tag.name}
-                    />
+                    <Tooltip key={tag.id}>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="w-1.5 h-1.5 rounded-full flex-shrink-0 cursor-help"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Account Tag: #{tag.name}
+                      </TooltipContent>
+                    </Tooltip>
                   ))}
                 </div>
               )}
@@ -1487,16 +1514,21 @@ export default function TransactionTable({
           return (
             <div className="flex flex-wrap gap-1">
               {txTags.map((tag) => (
-                <span
-                  key={tag.id}
-                  className="tag-pill inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
-                  style={{
-                    '--tag-color': tag.color,
-                  } as React.CSSProperties}
-                  title={tag.name}
-                >
-                  #{tag.name}
-                </span>
+                <Tooltip key={tag.id}>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="tag-pill inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap cursor-help"
+                      style={{
+                        '--tag-color': tag.color,
+                      } as React.CSSProperties}
+                    >
+                      #{tag.name}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Tag: #{tag.name}
+                  </TooltipContent>
+                </Tooltip>
               ))}
             </div>
           );
@@ -1714,11 +1746,21 @@ export default function TransactionTable({
                           {tx.payee || tx.description}
                         </span>
                         {isPending && (
-                          <span className="inline-flex items-center text-primary shrink-0" title="Pending">
-                            <svg className="h-2 w-2" fill="currentColor" viewBox="0 0 8 8">
-                              <circle cx="4" cy="4" r="3" />
-                            </svg>
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                className="inline-flex items-center text-primary shrink-0 cursor-help"
+                                aria-label="Pending transaction"
+                              >
+                                <svg className="h-2 w-2" fill="currentColor" viewBox="0 0 8 8">
+                                  <circle cx="4" cy="4" r="3" />
+                                </svg>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              Pending transaction (awaiting bank settlement)
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                         {!(tx as any).isSplitChild && (
                           <button
@@ -1741,22 +1783,35 @@ export default function TransactionTable({
                           </button>
                         )}
                         {tx.splits && tx.splits.length > 0 && (
-                          <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0">
-                            Split
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0 cursor-help">
+                                Split
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              Split transaction ({tx.splits.length} categories)
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                         {txTags.length > 0 && (
                           <div className="flex items-center gap-1 min-w-0 overflow-hidden shrink-0">
                             {txTags.map((tag) => (
-                              <span
-                                key={tag.id}
-                                className="tag-pill inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0"
-                                style={{
-                                  '--tag-color': tag.color,
-                                } as React.CSSProperties}
-                              >
-                                #{tag.name}
-                              </span>
+                              <Tooltip key={tag.id}>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className="tag-pill inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap shrink-0 cursor-help"
+                                    style={{
+                                      '--tag-color': tag.color,
+                                    } as React.CSSProperties}
+                                  >
+                                    #{tag.name}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                  Tag: #{tag.name}
+                                </TooltipContent>
+                              </Tooltip>
                             ))}
                           </div>
                         )}
@@ -1764,7 +1819,16 @@ export default function TransactionTable({
                       {/* Row 1, Col 3: Amount */}
                       <div className="flex items-center justify-end gap-1">
                         {tx.categorizedByAi && (
-                          <Sparkles className="h-3 w-3 text-primary/60 shrink-0" />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center justify-center cursor-help">
+                                <Sparkles className="h-3 w-3 text-primary/60 shrink-0" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              Categorized automatically by AI rule
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                         <span className={`text-sm font-mono font-medium whitespace-nowrap financial-value ${
                           parseFloat(tx.amount) >= 0 ? "text-foreground" : ""
