@@ -32,6 +32,21 @@ import {
   user as nextAuthUser,
   session as nextAuthSession,
   account as nextAuthAccount,
+  verification,
+  planFlows,
+  planEvents,
+  planAccounts,
+  planLiabilities,
+  planSettings,
+  plans,
+  retirementRules,
+  userNotifications,
+  customAlertRules,
+  sentNotifications,
+  pushSubscriptions,
+  schedulerJobLogs,
+  issues,
+  goalAllocationHistory,
 } from '@/lib/db/schema';
 import { eq, or, and, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';

@@ -8,7 +8,7 @@ import { sanitizeText } from '@/lib/utils/sanitize';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, encryptRow, decryptRows } from '@/lib/crypto';
-import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries } from '@/lib/services/sync';
+import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries, triggerUserSummariesRebuild } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -214,9 +214,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // Rebuild summaries since categories/transactions changed (coalesced background task)
   if (dek) {
-    triggerUserSummariesRebuild(dataUserId, dek).catch((err) => {
-      logger.error('Background summaries rebuild failed', { userId, error: err });
-    });
+    void triggerUserSummariesRebuild(dataUserId, dek);
   }
 
   return NextResponse.json(updated);
@@ -272,9 +270,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   // Rebuild summaries since categories/transactions changed (coalesced background task)
   if (dek) {
-    triggerUserSummariesRebuild(dataUserId, dek).catch((err) => {
-      logger.error('Background summaries rebuild failed after DELETE', { userId, error: err });
-    });
+    void triggerUserSummariesRebuild(dataUserId, dek);
   }
 
   return NextResponse.json(updated);

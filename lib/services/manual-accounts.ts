@@ -868,6 +868,7 @@ export async function adjustManualAccountValue(
     rawMeta = account.metadata || {};
   }
   const meta: Record<string, unknown> = JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta));
+  const delta = finalNewValue - oldBalance;
 
   await db.transaction(async (tx) => {
     if (account.type === 'metals' && amountOz !== undefined) {

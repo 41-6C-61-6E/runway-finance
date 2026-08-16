@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { checkRateLimit, pruneRateLimitMap, getRateLimitMapSize, clearRateLimitMap } from '@/lib/rate-limit';
 
 describe('rate limit helper', () => {
@@ -27,21 +27,24 @@ describe('rate limit helper', () => {
     expect(checkRateLimit(keyB, 2, 1000)).toBe(true);
   });
 
-  it('resets limit after window has expired', async () => {
+  it('resets limit after window has expired', () => {
+    vi.useFakeTimers();
     const key = 'test-client-reset';
     const windowMs = 50;
 
     expect(checkRateLimit(key, 1, windowMs)).toBe(true);
     expect(checkRateLimit(key, 1, windowMs)).toBe(false);
 
-    // Wait for window to expire
-    await new Promise((resolve) => setTimeout(resolve, windowMs + 10));
+    // Advance fake timer past window
+    vi.advanceTimersByTime(windowMs + 10);
 
     // Should be allowed again
     expect(checkRateLimit(key, 1, windowMs)).toBe(true);
+    vi.useRealTimers();
   });
 
-  it('correctly prunes expired entries', async () => {
+  it('correctly prunes expired entries', () => {
+    vi.useFakeTimers();
     clearRateLimitMap();
     const windowMs = 30;
 
@@ -50,8 +53,8 @@ describe('rate limit helper', () => {
 
     expect(getRateLimitMapSize()).toBe(2);
 
-    // Wait for client-x to expire
-    await new Promise((resolve) => setTimeout(resolve, windowMs + 10));
+    // Advance fake timer past client-x window
+    vi.advanceTimersByTime(windowMs + 10);
 
     pruneRateLimitMap();
 
@@ -60,6 +63,7 @@ describe('rate limit helper', () => {
     
     // Verify client-x is cleared from the map
     expect(checkRateLimit('client-x', 1, windowMs)).toBe(true);
+    vi.useRealTimers();
   });
 
   it('evicts oldest entries instead of clearing the entire map when capacity is reached', () => {

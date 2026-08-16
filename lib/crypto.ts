@@ -127,11 +127,17 @@ export function generateDEK(): Uint8Array {
 }
 
 export async function wrapKey(dek: Uint8Array, kek: Uint8Array): Promise<EncryptedPayload> {
+  if (dek.length !== 32) {
+    throw new Error('DEK must be exactly 32 bytes');
+  }
   return encrypt(bytesToHex(dek), kek);
 }
 
 export async function unwrapKey(payload: EncryptedPayload, kek: Uint8Array): Promise<Uint8Array> {
   const hex = await decrypt(payload, kek);
+  if (!hex || hex.length !== 64 || !/^[0-9a-f]+$/i.test(hex)) {
+    throw new Error('Unwrapped DEK is invalid: expected 64-character hex string (32 bytes)');
+  }
   return hexToBytes(hex);
 }
 

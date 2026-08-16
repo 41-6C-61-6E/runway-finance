@@ -93,4 +93,60 @@ describe('Retirement Engine IRMAA & Statutory Threshold Tests', () => {
     expect(enginePlan.accounts[0].expectedGrowthRate).toBe(0);
     expect(enginePlan.accounts[0].dividendYield).toBe(0);
   });
+
+  it('evaluates IRMAA across multiple thresholds for both single and married filing statuses with inflation', () => {
+    const currentYear = new Date().getFullYear();
+    for (const filingStatus of ['single', 'married'] as const) {
+      for (const salary of [95000, 103000, 103001, 150000, 206000, 500000]) {
+        const plan: EnginePlan = {
+          id: `irmaa_bound_${filingStatus}_${salary}`,
+          name: 'IRMAA Boundary Plan',
+          hasSpouse: filingStatus === 'married',
+          primaryBirthYear: currentYear - 63,
+          filingStatus,
+          retirementAge: 65,
+          lifeExpectancyAge: 70,
+          primarySalary: salary,
+          accounts: [
+            {
+              id: 'acc1',
+              name: 'Taxable Account',
+              type: 'taxable',
+              owner: 'primary',
+              balance: 500000,
+              expectedGrowthRate: 5.0,
+              dividendYield: 1.0,
+              reinvestDividends: true,
+            },
+          ],
+          liabilities: [],
+          events: [],
+          flows: [],
+          settings: {
+            fixedInflationRate: 2.5,
+            withholdingDeferred: 20,
+            withholdingTaxable: 10,
+            incomeTaxModifier: 0,
+            capGainsTaxModifier: 0,
+            heirFlatIncomeTaxRate: 25,
+            stepUpBasis: true,
+            realEstateLiquidationRate: 6,
+            administrativeCostRate: 1,
+            charitableGiving: 0,
+            withdrawalMethod: 'textbook',
+            enableRothConversions: false,
+            avoidIrmaaCliffs: false,
+          },
+          rules: DEFAULT_2026_RULES,
+        };
+
+        const res = runRetirementSimulation(plan);
+        expect(res.yearlyResults.length).toBeGreaterThan(0);
+        for (const y of res.yearlyResults) {
+          expect(Number.isFinite(y.irmaaSurchargeAnnual)).toBe(true);
+          expect(y.irmaaSurchargeAnnual).toBeGreaterThanOrEqual(0);
+        }
+      }
+    }
+  });
 });
