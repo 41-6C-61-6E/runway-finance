@@ -7,6 +7,7 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { PieChart as PieIcon } from 'lucide-react';
 
 interface Holding {
@@ -325,46 +326,27 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       {!isCollapsed && (
         <div className="flex-1 flex flex-col p-4 sm:p-5">
           {/* Main Mode Toggle: Allocation vs Rebalance */}
-          <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-3 mb-4">
-            <div className="flex bg-muted/40 p-0.5 rounded-lg border border-border/60">
-              <button
-                onClick={() => setViewMode('allocation')}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                  viewMode === 'allocation'
-                    ? 'bg-primary text-primary-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Allocation Breakdown
-              </button>
-              <button
-                onClick={() => setViewMode('rebalance')}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                  viewMode === 'rebalance'
-                    ? 'bg-primary text-primary-foreground shadow-xs'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Rebalancing Assistant
-              </button>
-            </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-3 mb-4">
+            <AppTabs
+              tabs={[
+                { id: 'allocation', label: 'Allocation Breakdown' },
+                { id: 'rebalance', label: 'Rebalancing Assistant' },
+              ]}
+              activeTab={viewMode}
+              onChange={(tabId) => setViewMode(tabId as 'allocation' | 'rebalance')}
+              variant="pills"
+              size="sm"
+            />
 
             {viewMode === 'allocation' && (
-              <div className="flex gap-4 overflow-x-auto scrollbar-none">
-                {groupOptions.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setGroupBy(opt.value)}
-                    className={`text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      groupBy === opt.value
-                        ? 'text-primary font-bold border-b-2 border-primary pb-0.5'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              <AppTabs
+                tabs={groupOptions.map((opt) => ({ id: opt.value, label: opt.label }))}
+                activeTab={groupBy}
+                onChange={(tabId) => setGroupBy(tabId as GroupByOption)}
+                variant="underline"
+                size="sm"
+                className="border-b-0 -mb-3 pb-0"
+              />
             )}
           </div>
 

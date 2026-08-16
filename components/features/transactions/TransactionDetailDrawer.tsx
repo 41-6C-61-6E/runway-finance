@@ -424,17 +424,17 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
         <div className="space-y-5">
           {/* Warning Banners */}
           {mode === 'edit' && isSynced && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Synced Transaction</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">Synced Transaction</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 This transaction was synced from SimpleFIN. Changes to <strong>amount</strong>, <strong>description</strong>, <strong>posted date</strong>, or <strong>pending</strong> status will be overwritten on the next sync. Consider using payee, memo, notes, and tags for annotations instead.
               </p>
             </div>
           )}
           {mode === 'create' && isLinkedToSynced && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <p className="text-xs font-medium text-amber-800 dark:text-amber-300">SimpleFIN Account</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">SimpleFIN Account</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 This account is linked to SimpleFIN. This manual transaction won&apos;t sync to your bank and the account balance shown here may differ from your actual bank balance.
               </p>
             </div>

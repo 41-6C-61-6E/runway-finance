@@ -69,7 +69,7 @@ export function PlanManagementMenu({
         <select
           value={selectedPlan?.id || ''}
           onChange={(e) => onSelectPlan(e.target.value)}
-          className="bg-card border border-border rounded-xl pl-3 pr-8 py-1.5 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary/50 shadow-xs appearance-none cursor-pointer"
+          className="bg-card border border-border rounded-lg pl-3 pr-8 py-1.5 text-xs font-semibold text-foreground focus:ring-2 focus:ring-primary/40 focus:outline-none shadow-xs appearance-none cursor-pointer"
         >
           {plans.map((p) => (
             <option key={p.id} value={p.id}>
@@ -82,7 +82,7 @@ export function PlanManagementMenu({
 
       {/* Default Badge */}
       {isCurrentDefault && (
-        <span className="hidden md:inline-flex items-center gap-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-lg text-[10px] font-bold">
+        <span className="hidden md:inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md text-[10px] font-semibold">
           <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
           Default Plan
         </span>
@@ -91,7 +91,7 @@ export function PlanManagementMenu({
       {/* New Plan Button */}
       <button
         onClick={onOpenWizardNew}
-        className="flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+        className="flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer"
         title="Create new plan using Setup Wizard"
       >
         <Plus className="w-3.5 h-3.5" />
@@ -102,7 +102,7 @@ export function PlanManagementMenu({
       <div className="relative">
         <button
           onClick={() => setDropdownOpen((prev) => !prev)}
-          className="flex items-center gap-1 bg-muted/40 hover:bg-muted text-foreground border border-border p-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+          className="flex items-center gap-1 bg-muted/40 hover:bg-muted text-foreground border border-border p-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
           title="Plan Actions & Settings"
         >
           <MoreVertical className="w-4 h-4" />
@@ -117,7 +117,7 @@ export function PlanManagementMenu({
             />
 
             {/* Menu Popover */}
-            <div className="absolute right-0 top-full mt-2 z-50 w-56 bg-card border border-border rounded-2xl shadow-xl p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+            <div className="absolute right-0 top-full mt-2 z-50 w-56 bg-card border border-border rounded-xl shadow-xl p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
               <div className="px-3 py-2 border-b border-border mb-1">
                 <p className="text-[11px] font-bold text-foreground truncate">{selectedPlan?.name}</p>
                 <p className="text-[10px] text-muted-foreground">
@@ -132,7 +132,7 @@ export function PlanManagementMenu({
                   onOpenWizardEdit(selectedPlan);
                 }}
                 title="Review and adjust all plan settings (retirement age, accounts, income, expenses, investment flows) in the step-by-step wizard."
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-left cursor-pointer"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
                 <span>Re-run Setup Wizard</span>
@@ -146,7 +146,7 @@ export function PlanManagementMenu({
                     await onSetDefaultPlan(selectedPlan.id);
                   }}
                   title="Make this the active plan used for projections, dashboards, and the FIRE engine."
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-amber-500/10 hover:text-amber-600 rounded-xl transition-colors text-left cursor-pointer"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-amber-500/10 hover:text-amber-600 rounded-lg transition-colors text-left cursor-pointer"
                 >
                   <Star className="w-3.5 h-3.5 shrink-0 text-amber-500" />
                   <span>Set as Default Plan</span>
@@ -158,7 +158,7 @@ export function PlanManagementMenu({
                 onClick={handleReset}
                 disabled={resetting}
                 title="Re-import your latest linked accounts, paystub salary, and auto-generate income/expense events and investment flows. Overwrites custom changes."
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-blue-500/10 hover:text-blue-600 rounded-xl transition-colors text-left cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-blue-500/10 hover:text-blue-600 rounded-lg transition-colors text-left cursor-pointer disabled:opacity-50"
               >
                 <RotateCcw className={`w-3.5 h-3.5 shrink-0 ${resetting ? 'animate-spin' : ''}`} />
                 <span>{resetting ? 'Syncing...' : 'Re-Sync Finances'}</span>
@@ -173,7 +173,7 @@ export function PlanManagementMenu({
                   onOpenDeleteConfirm(selectedPlan);
                 }}
                 title="Permanently remove this plan and all its settings, accounts, events, and flows."
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors text-left cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5 shrink-0" />
                 <span>Delete Plan...</span>

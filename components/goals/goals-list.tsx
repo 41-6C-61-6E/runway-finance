@@ -7,6 +7,9 @@ import { formatCurrency } from '@/lib/utils/goals';
 import { useGoalInflow } from './goal-inflow-context';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { AppTabs } from '@/components/ui/app-tabs';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 
 interface Goal {
   id: string;
@@ -317,34 +320,23 @@ export function GoalsList() {
     <div>
       {/* Filters & Actions */}
       <div className="flex flex-row items-center justify-between flex-wrap gap-4 mb-5 w-full">
-        <div className="flex gap-6 border-b border-border w-full sm:w-auto">
-          {filters.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
-                filter === f.key
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {f.label}
-              <span className={`ml-1 ${filter === f.key ? 'text-primary/70' : 'text-muted-foreground/50'}`}>
-                {f.count}
-              </span>
-            </button>
-          ))}
-        </div>
+        <AppTabs
+          tabs={filters.map((f) => ({ id: f.key, label: f.label, count: f.count }))}
+          activeTab={filter}
+          onChange={(tabId) => setFilter(tabId as FilterStatus)}
+          variant="underline"
+          className="border-b-0"
+        />
 
-        <button
+        <Button
           onClick={() => setShowForm(true)}
-          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors"
+          variant="default"
+          size="sm"
+          className="ml-auto inline-flex items-center gap-1.5"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <Plus className="w-3.5 h-3.5" />
           Add Goal
-        </button>
+        </Button>
       </div>
 
       {/* Active Goals Grid */}
