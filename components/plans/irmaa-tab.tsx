@@ -10,7 +10,7 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   CartesianGrid,
   Legend,
@@ -28,6 +28,7 @@ import {
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { ProjectionOptionsPopover } from './projection-options-popover';
 
 interface IrmaaTabProps {
@@ -154,7 +155,7 @@ export function IrmaaTab({
             <ShieldCheck className="w-4 h-4 text-indigo-500" />
           </div>
           <div className="text-xl font-bold font-mono text-indigo-500">
-            {rules.irmaaLookbackYears || 2} Years
+            {rules.irmaaLookbackYears || 2} Years (Age 63+)
           </div>
         </div>
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
@@ -170,24 +171,36 @@ export function IrmaaTab({
             <Sparkles className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-xl font-bold font-mono text-emerald-500">{formatCurrency(irmaaStats.totalSaved)}</div>
-          <span className="text-[10px] text-muted-foreground block">Simulated guard-on vs guard-off difference</span>
+          <span className="text-[10px] text-muted-foreground block">Guardrail vs unguarded difference</span>
         </div>
       </div>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
           title="Medicare IRMAA Cliff Guardrail Controls"
-          description="Protect your retirement income from triggering costly Medicare Part B & D surcharge cliffs"
+          description="Protect retirement MAGI from Medicare Part B & D surcharge cliffs"
           icon={ShieldCheck}
           isCollapsed={isOverviewCollapsed}
           onToggle={() => setIsOverviewCollapsed(!isOverviewCollapsed)}
         />
         {!isOverviewCollapsed && (
-          <div className="p-5 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-4 rounded-xl border border-border text-xs">
+          <div className="p-5 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/20 p-4 rounded-xl border border-border text-xs">
               <div className="space-y-2">
-                <label className="font-bold text-foreground block">Enable Medicare IRMAA Cliff Guardrail</label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-foreground flex items-center gap-1.5">
+                    IRMAA Cliff Guardrail
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Automatically caps annual Roth conversions $1,000 below the nearest IRMAA threshold once you reach age 63 (the 2-year lookback for age 65 Medicare).
+                      </TooltipContent>
+                    </Tooltip>
+                  </label>
+                </div>
+                <div className="flex items-center gap-2 pt-0.5">
                   <input
                     type="checkbox"
                     id="avoidIrmaaToggle"
@@ -199,19 +212,17 @@ export function IrmaaTab({
                     }}
                     className="w-4 h-4 accent-primary rounded cursor-pointer"
                   />
-                  <label htmlFor="avoidIrmaaToggle" className="text-xs font-semibold text-muted-foreground cursor-pointer">
+                  <label htmlFor="avoidIrmaaToggle" className="text-xs font-semibold text-foreground cursor-pointer">
                     {avoidIrmaa
-                      ? 'Guardrail Active (Cap conversions under next IRMAA cliff at age 63+)'
-                      : 'No Guardrail (Risk cliff surcharges)'}
+                      ? 'Guardrail Active (Cap conversions at age 63+)'
+                      : 'No Guardrail'}
                   </label>
                 </div>
-                <p className="text-[11px] text-muted-foreground pt-1">
-                  When enabled, Roth conversions in the simulation are automatically capped $1,000 below the nearest IRMAA threshold once you reach age 63 (the 2-year lookback window).
-                </p>
               </div>
-              <div className="space-y-3 bg-card p-3.5 rounded-xl border border-border">
+
+              <div className="space-y-2 bg-card p-3.5 rounded-xl border border-border">
                 <div className="flex items-center justify-between">
-                  <label className="font-bold text-foreground">Interactive MAGI Surcharge Estimator</label>
+                  <span className="font-bold text-foreground">MAGI Surcharge Estimator</span>
                   <span className="font-mono text-primary font-bold">{formatCurrency(customTestMagi)}</span>
                 </div>
                 <Slider
@@ -235,23 +246,22 @@ export function IrmaaTab({
                   onChange={(val) => setCustomTestMagi(Math.round(val))}
                   ariaLabel="MAGI Surcharge Estimator"
                 />
-                <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+                <div className="flex items-center justify-between text-[11px] font-mono pt-0.5">
                   <span className="text-muted-foreground">
-                    Status: <strong className={testMagiCalc.tier > 0 ? 'text-amber-500' : 'text-emerald-500'}>
-                      {testMagiCalc.tier > 0 ? `Tier ${testMagiCalc.tier} Surcharge` : 'Standard Premium (No Surcharge)'}
+                    <strong className={testMagiCalc.tier > 0 ? 'text-amber-500' : 'text-emerald-500'}>
+                      {testMagiCalc.tier > 0 ? `Tier ${testMagiCalc.tier}` : 'Standard (No Surcharge)'}
                     </strong>
                   </span>
                   <span className="text-rose-400 font-bold">
-                    +{formatCurrency(testMagiCalc.monthlySurchargePerPerson)}/mo/person ({formatCurrency(testMagiCalc.annualHouseholdSurcharge)}/yr {isMfj ? 'MFJ' : 'Single'})
+                    +{formatCurrency(testMagiCalc.monthlySurchargePerPerson)}/mo/person ({formatCurrency(testMagiCalc.annualHouseholdSurcharge)}/yr)
                   </span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between pt-0.5">
               <div className="text-xs text-muted-foreground">
-                Lifetime Medicare Surcharges with active guardrail:{' '}
-                <strong className="text-foreground font-mono">{formatCurrency(irmaaStats.totalCostGuard)}</strong>
-                {' '}(vs {formatCurrency(irmaaStats.totalCostNoGuard)} without guardrail)
+                Lifetime Medicare Surcharges: <strong className="text-foreground font-mono">{formatCurrency(irmaaStats.totalCostGuard)}</strong>
+                {' '}(vs {formatCurrency(irmaaStats.totalCostNoGuard)} unguarded)
               </div>
             </div>
           </div>
@@ -260,8 +270,8 @@ export function IrmaaTab({
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
-          title="Retirement MAGI vs IRMAA Threshold Cliffs Timeline"
-          description="Track projected MAGI against all 4 statutory IRMAA surcharge cliffs, with 2-year lookback window (ages 63-64)"
+          title="Retirement MAGI vs IRMAA Cliffs Timeline"
+          description="Track projected MAGI against statutory IRMAA cliffs, with 2-year lookback window (ages 63-64)"
           icon={TrendingUp}
           isCollapsed={isTimelineCollapsed}
           onToggle={() => setIsTimelineCollapsed(!isTimelineCollapsed)}
@@ -287,7 +297,7 @@ export function IrmaaTab({
                     tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                     tickLine={false}
                   />
-                  <Tooltip content={<IrmaaTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
+                  <RechartsTooltip content={<IrmaaTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <ReferenceArea
                     x1={63}

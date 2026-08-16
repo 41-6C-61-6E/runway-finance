@@ -121,21 +121,21 @@ export function EngineRulesView({
   ];
 
   return (
-    <div className="@container space-y-8 animate-in fade-in duration-300">
+    <div className="@container space-y-6 animate-in fade-in duration-300">
       {/* ── HEADER BANNER ────────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-primary/10 via-emerald-500/10 to-blue-500/10 border border-primary/20 rounded-2xl p-6 shadow-sm flex flex-col @md:flex-row @md:items-center justify-between gap-4">
+      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col @md:flex-row @md:items-center justify-between gap-4">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <Database className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-extrabold text-foreground tracking-tight">
-              FIRE Calculation Engine: Data, Rules & Logic Architecture
+            <h3 className="text-lg font-bold text-foreground tracking-tight">
+              FIRE Calculation Engine: Rules & Parameters
             </h3>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-              AES-GCM Encrypted DB Sync
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              Active Ruleset
             </span>
           </div>
           <p className="text-xs text-muted-foreground max-w-3xl leading-relaxed">
-            Full operational transparency into statutory tax brackets, contribution limits, early withdrawal penalties, Medicare IRMAA tiers, ACA subsidies, SECURE Act RMD rules, and multi-asset drawdown logic. All engine parameters are customizable and reflected dynamically in plan projections.
+            Statutory tax brackets, contribution limits, early withdrawal penalties, Medicare IRMAA tiers, ACA subsidies, SECURE Act RMD rules, and multi-asset drawdown logic.
           </p>
         </div>
 
@@ -143,7 +143,7 @@ export function EngineRulesView({
           <button
             onClick={handleResetRules}
             disabled={savingRules}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-muted-foreground hover:text-foreground bg-card border border-border hover:bg-muted/50 rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted/30 border border-border hover:bg-muted/50 rounded-xl transition-all shadow-2xs cursor-pointer disabled:opacity-50"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Reset Defaults
@@ -151,14 +151,14 @@ export function EngineRulesView({
           <button
             onClick={() => handleSaveRules()}
             disabled={savingRules}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all shadow-xs cursor-pointer disabled:opacity-50"
           >
             {savingRules ? (
               <div className="w-3.5 h-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
             ) : (
               <Save className="w-3.5 h-3.5" />
             )}
-            Save Statutory Rules
+            Save Rules
           </button>
         </div>
       </div>
@@ -175,14 +175,14 @@ export function EngineRulesView({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
           <div>
             <h4 className="text-base font-bold text-foreground flex items-center gap-2">
-              <Play className="w-5 h-5 text-primary fill-primary/20" />
+              <Play className="w-4 h-4 text-primary fill-primary/20" />
               Interactive Scenario Rules Explorer
             </h4>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Select a financial life stage to inspect how the engine evaluates rules, computes taxes, enforces penalties, and executes drawdowns.
+              Select a financial life stage to inspect rules, tax evaluations, and drawdown execution.
             </p>
           </div>
-          <span className="text-[11px] font-semibold text-muted-foreground bg-muted/50 px-3 py-1 rounded-lg border border-border">
+          <span className="text-[11px] font-semibold text-muted-foreground bg-muted/40 px-3 py-1 rounded-lg border border-border">
             Filing Status: <strong className="text-foreground">{isMfj ? 'Married Filing Jointly (MFJ)' : 'Single'}</strong>
           </span>
         </div>
@@ -197,7 +197,7 @@ export function EngineRulesView({
                 onClick={() => setActiveScenario(sc.id)}
                 className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
                   isSelected
-                    ? 'bg-primary/10 border-primary shadow-sm ring-1 ring-primary'
+                    ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary'
                     : 'bg-muted/20 border-border hover:bg-muted/40'
                 }`}
               >
@@ -239,9 +239,9 @@ export function EngineRulesView({
                   </p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-foreground block">3. Surplus Routing Waterfall</span>
+                  <span className="font-bold text-foreground block">3. Defined Plan Contributions</span>
                   <p className="text-muted-foreground text-[11px]">
-                    401(k) Match &rarr; Max HSA &rarr; Max Roth IRA &rarr; Max 401(k) &rarr; Taxable Brokerage Account.
+                    Only defined per-account contributions (% or fixed $) and employer matches fund accounts. Unallocated cash is not swept.
                   </p>
                 </div>
               </div>
@@ -418,11 +418,11 @@ export function EngineRulesView({
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-5">
         <div className="border-b border-border pb-3">
           <h4 className="text-base font-bold text-foreground flex items-center gap-2">
-            <Layers className="w-5 h-5 text-emerald-500" />
+            <Layers className="w-4 h-4 text-emerald-500" />
             Annual Engine Execution Pipeline (9-Phase Projection Loop)
           </h4>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Every simulated year, the retirement projection engine runs the following sequential calculation pipeline in exact order:
+            Sequential calculation pipeline executed on each year of the simulation:
           </p>
         </div>
 
@@ -430,62 +430,62 @@ export function EngineRulesView({
           {[
             {
               step: 'Phase 1',
-              title: 'Gross Income & Payroll FICA',
-              desc: 'Sum salary, passive income, pension, & SS. Deduct FICA (7.65%) payroll taxes.',
-              color: 'border-l-4 border-l-blue-500 bg-blue-500/5',
+              title: 'Gross Income & FICA',
+              desc: 'Sum salary, passive income, pension, & SS. Compute 7.65% payroll taxes.',
+              color: 'bg-muted/20 border-border hover:border-blue-500/40',
             },
             {
               step: 'Phase 2',
               title: 'Pre-Tax Savings Waterfall',
               desc: 'Route employer match, HSA, & 401(k) pre-tax contributions before income tax.',
-              color: 'border-l-4 border-l-emerald-500 bg-emerald-500/5',
+              color: 'bg-muted/20 border-border hover:border-emerald-500/40',
             },
             {
               step: 'Phase 3',
               title: 'Tax Base & Provisional SS',
-              desc: 'Subtract standard deduction; compute SS provisional income (50%/85% tax tiers).',
-              color: 'border-l-4 border-l-purple-500 bg-purple-500/5',
+              desc: 'Subtract standard deduction; compute SS provisional income (50%/85% tiers).',
+              color: 'bg-muted/20 border-border hover:border-purple-500/40',
             },
             {
               step: 'Phase 4',
-              title: 'Deficit Drawdown / Surplus Savings',
-              desc: 'Execute withdrawal strategy (Textbook, Tax-Optimized, Proportional, Custom) or save surplus.',
-              color: 'border-l-4 border-l-amber-500 bg-amber-500/5',
+              title: 'SECURE Act RMD Draw & Offset',
+              desc: 'Enforce mandatory RMDs at age 73+; proceeds cover retirement living expenses first.',
+              color: 'bg-muted/20 border-border hover:border-indigo-500/40',
             },
             {
               step: 'Phase 5',
-              title: 'SECURE Act RMD Mandatory Draw',
-              desc: 'Enforce IRS Table III mandatory RMDs for age 73+ from Traditional balances.',
-              color: 'border-l-4 border-l-indigo-500 bg-indigo-500/5',
+              title: 'Deficit Drawdown / RMD Sweep',
+              desc: 'Draw remaining deficit via strategy, or sweep excess RMDs above expenses to specified account.',
+              color: 'bg-muted/20 border-border hover:border-amber-500/40',
             },
             {
               step: 'Phase 6',
-              title: 'Roth Conversion Ladder Engine',
+              title: 'Roth Conversion Ladder',
               desc: 'Convert pre-tax to Roth up to target tax bracket, capping at IRMAA cliff if enabled.',
-              color: 'border-l-4 border-l-pink-500 bg-pink-500/5',
+              color: 'bg-muted/20 border-border hover:border-pink-500/40',
             },
             {
               step: 'Phase 7',
-              title: 'Tax Stack & 3.8% NIIT Calculation',
+              title: 'Tax Stack & 3.8% NIIT',
               desc: 'Reconcile Ordinary Tax, CapGains, State Tax, NIIT surcharge, & early penalties.',
-              color: 'border-l-4 border-l-red-500 bg-red-500/5',
+              color: 'bg-muted/20 border-border hover:border-rose-500/40',
             },
             {
               step: 'Phase 8',
-              title: 'IRMAA 2-Yr Lag & ACA Subsidy',
-              desc: 'Compute MAGI; queue Year Y+2 Medicare IRMAA surcharge and calculate ACA subsidy.',
-              color: 'border-l-4 border-l-cyan-500 bg-cyan-500/5',
+              title: 'IRMAA Lag & ACA Subsidy',
+              desc: 'Compute MAGI; queue Year Y+2 Medicare surcharge and calculate ACA subsidy.',
+              color: 'bg-muted/20 border-border hover:border-cyan-500/40',
             },
             {
               step: 'Phase 9',
-              title: 'Asset Growth & Dividend Reinvestment',
+              title: 'Asset Growth & Yield',
               desc: 'Accrue stock/bond asset growth & dividend yield, update balances & cost basis for Year Y+1.',
-              color: 'border-l-4 border-l-teal-500 bg-teal-500/5',
+              color: 'bg-muted/20 border-border hover:border-teal-500/40',
             },
           ].map((item, idx) => (
-            <div key={idx} className={`p-3.5 rounded-xl border border-border ${item.color} space-y-1`}>
+            <div key={idx} className={`p-3.5 rounded-xl border transition-all ${item.color} space-y-1`}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   {item.step}
                 </span>
                 <span className="text-[10px] font-bold text-foreground bg-background px-1.5 py-0.5 rounded border">
@@ -503,11 +503,11 @@ export function EngineRulesView({
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
         <div className="border-b border-border pb-3">
           <h4 className="text-base font-bold text-foreground flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-purple-500" />
+            <BookOpen className="w-4 h-4 text-purple-500" />
             Detailed Engine Rules & Logic Reference
           </h4>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Comprehensive breakdown of the statutory constraints, penalty formulas, tax stacking, and drawdown algorithms embedded in the engine.
+            Statutory constraints, penalty formulas, tax stacking, and drawdown algorithms embedded in the engine.
           </p>
         </div>
 
@@ -517,7 +517,7 @@ export function EngineRulesView({
           <div className="border border-border rounded-xl overflow-hidden">
             <button
               onClick={() => setExpandedRuleTopic(expandedRuleTopic === 'penalties' ? null : 'penalties')}
-              className="w-full bg-muted/30 hover:bg-muted/50 p-4 text-left flex items-center justify-between text-xs font-bold text-foreground cursor-pointer"
+              className="w-full bg-muted/20 hover:bg-muted/40 p-4 text-left flex items-center justify-between text-xs font-bold text-foreground cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-amber-500" />
@@ -553,7 +553,7 @@ export function EngineRulesView({
           <div className="border border-border rounded-xl overflow-hidden">
             <button
               onClick={() => setExpandedRuleTopic(expandedRuleTopic === 'taxes' ? null : 'taxes')}
-              className="w-full bg-muted/30 hover:bg-muted/50 p-4 text-left flex items-center justify-between text-xs font-bold text-foreground cursor-pointer"
+              className="w-full bg-muted/20 hover:bg-muted/40 p-4 text-left flex items-center justify-between text-xs font-bold text-foreground cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Scale className="w-4 h-4 text-primary" />
@@ -589,7 +589,7 @@ export function EngineRulesView({
           <div className="border border-border rounded-xl overflow-hidden">
             <button
               onClick={() => setExpandedRuleTopic(expandedRuleTopic === 'drawdown' ? null : 'drawdown')}
-              className="w-full bg-muted/30 hover:bg-muted/50 p-4 text-left flex items-center justify-between text-xs font-bold text-foreground cursor-pointer"
+              className="w-full bg-muted/20 hover:bg-muted/40 p-4 text-left flex items-center justify-between text-xs font-bold text-foreground cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Calculator className="w-4 h-4 text-emerald-500" />
@@ -624,11 +624,11 @@ export function EngineRulesView({
       <div className="space-y-6">
         <div className="flex items-center justify-between border-b border-border pb-2">
           <h4 className="text-base font-bold text-foreground flex items-center gap-2">
-            <Database className="w-5 h-5 text-primary" />
+            <Database className="w-4 h-4 text-primary" />
             Editable Statutory Data & Tax Parameters
           </h4>
           <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg">
-            Tax Year {rules?.taxYear || 2026} Parameters
+            Tax Year {rules?.taxYear || 2026}
           </span>
         </div>
 

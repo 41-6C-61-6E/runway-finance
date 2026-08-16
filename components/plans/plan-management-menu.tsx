@@ -80,14 +80,6 @@ export function PlanManagementMenu({
         <ChevronDown className="w-3.5 h-3.5 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       </div>
 
-      {/* Default Badge */}
-      {isCurrentDefault && (
-        <span className="hidden md:inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md text-[10px] font-semibold">
-          <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-          Default Plan
-        </span>
-      )}
-
       {/* New Plan Button */}
       <button
         onClick={onOpenWizardNew}
