@@ -53,11 +53,14 @@ class MockDbQueryBuilder {
   private table: any;
   private accountQueryIndex = 0;
 
+  private isInsert = false;
+
   constructor(table?: any) {
     this.table = table;
   }
 
   select(...args: any[]) {
+    this.isInsert = false;
     return this;
   }
 
@@ -84,6 +87,7 @@ class MockDbQueryBuilder {
 
   insert(table: any) {
     this.table = table;
+    this.isInsert = true;
     return this;
   }
 
@@ -91,8 +95,13 @@ class MockDbQueryBuilder {
     return this;
   }
 
+  onConflictDoNothing(config?: any) {
+    return this;
+  }
+
   update(table: any) {
     this.table = table;
+    this.isInsert = false;
     return this;
   }
 
@@ -108,7 +117,9 @@ class MockDbQueryBuilder {
     let result: any[] = [];
     const tableName = getTableName(this.table);
 
-    if (tableName === 'custom_alert_rules') {
+    if (this.isInsert) {
+      result = [{ id: 'mock_inserted_id' }];
+    } else if (tableName === 'custom_alert_rules') {
       result = mockRulesResponse;
     } else if (tableName === 'accounts') {
       const idx = this.accountQueryIndex++;

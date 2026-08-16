@@ -6,7 +6,7 @@ import { encryptField } from '@/lib/crypto';
 import { parseCsv, parseDateField, determineTransactionSign } from '@/lib/utils/csv-parser';
 import { transactions, accountSnapshots, accounts, categories, importLog } from '@/lib/db/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots, formatToCents, roundToCents } from '@/lib/services/account-history';
 import { triggerUserSummariesRebuild } from '@/lib/services/sync';
 import { logger } from '@/lib/logger';
@@ -211,7 +211,6 @@ export async function POST(request: Request) {
             }
             const resolvedAccountId = resolved;
             const resolvedCategoryId = mapped.category ? categoryIdByName.get(mapped.category) : null;
-            const externalId = 'imported-' + randomUUID();
 
             if (importType === 'transactions') {
               const rawAmount = mapped.amount?.replace(/[^0-9.\-]/g, '') || '0';
@@ -222,7 +221,15 @@ export async function POST(request: Request) {
                 parsedAmount = determineTransactionSign(parsedAmount, mapped.type);
               }
 
-              const encryptedAmount = await encryptField(formatToCents(roundToCents(parsedAmount)), dek);
+              const formattedAmount = formatToCents(roundToCents(parsedAmount));
+              const dateVal = parseDateField(mapped.date);
+              const contentHash = createHash('sha256')
+                .update(`${resolvedAccountId}|${dateVal}|${formattedAmount}|${mapped.payee || ''}|${mapped.description || ''}|${mapped.memo || ''}`)
+                .digest('hex')
+                .substring(0, 32);
+              const externalId = `imported-${contentHash}`;
+
+              const encryptedAmount = await encryptField(formattedAmount, dek);
               const encryptedDescription = await encryptField(mapped.description || '', dek);
               const encryptedPayee = mapped.payee ? await encryptField(mapped.payee, dek) : null;
               const encryptedMemo = mapped.memo ? await encryptField(mapped.memo, dek) : null;
@@ -234,7 +241,7 @@ export async function POST(request: Request) {
                   userId: dataUserId,
                   accountId: resolvedAccountId,
                   externalId,
-                  date: parseDateField(mapped.date),
+                  date: dateVal,
                   amount: encryptedAmount,
                   description: encryptedDescription,
                   payee: encryptedPayee ?? undefined,
@@ -379,7 +386,10 @@ export async function POST(request: Request) {
         logger.info(`[import/execute] Inserting transactions chunk`, { count: transactionsToInsert.length, chunkSize: CHUNK_SIZE });
         for (let i = 0; i < transactionsToInsert.length; i += CHUNK_SIZE) {
           const chunk = transactionsToInsert.slice(i, i + CHUNK_SIZE);
-          await tx.insert(transactions).values(chunk);
+          await tx
+            .insert(transactions)
+            .values(chunk)
+            .onConflictDoNothing({ target: [transactions.accountId, transactions.externalId] });
         }
       }
 

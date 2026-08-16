@@ -22,15 +22,7 @@ let mockCategories: any[] = [];
 let mockTransactions: any[] = [];
 let insertedNotifications: any[] = [];
 
-function getTableName(table: any): string | null {
-  if (!table) return null;
-  if (table.key && typeof table.key.name === 'string') return table.key.name;
-  if (table._ && typeof table._.name === 'string') return table._.name;
-  const symbols = Object.getOwnPropertySymbols(table);
-  const nameSymbol = symbols.find((s) => s.toString() === 'Symbol(drizzle:Name)');
-  if (nameSymbol) return table[nameSymbol];
-  return null;
-}
+import { getTableName } from 'drizzle-orm';
 
 class MockDbQueryBuilder {
   private table: any;
@@ -53,6 +45,7 @@ class MockDbQueryBuilder {
     }
     return this;
   }
+  onConflictDoNothing(config?: any) { return this; }
   returning(...args: any[]) { return this; }
 
   then(onfulfilled?: (value: any) => any) {

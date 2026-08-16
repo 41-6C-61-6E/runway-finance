@@ -448,8 +448,6 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
 
-  await getDb().delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId));
-
   const insertValues = [];
   for (const catMap of Object.values(categoryByMonthAndAccount)) {
     for (const accountMap of Object.values(catMap)) {
@@ -466,20 +464,24 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     }
   }
 
-  if (insertValues.length > 0) {
-    const encryptedValues = await Promise.all(
-      insertValues.map((row) => encryptRow('category_spending_summary', row, dek))
-    );
-    await getDb()
-      .insert(categorySpendingSummary)
-      .values(encryptedValues)
-      .onConflictDoUpdate({
-        target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.accountId, categorySpendingSummary.yearMonth],
-        set: {
-          amount: sql`excluded.amount`,
-        },
-      });
-  }
+  const encryptedValues = insertValues.length > 0
+    ? await Promise.all(insertValues.map((row) => encryptRow('category_spending_summary', row, dek)))
+    : [];
+
+  await getDb().transaction(async (tx) => {
+    await tx.delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId));
+    if (encryptedValues.length > 0) {
+      await tx
+        .insert(categorySpendingSummary)
+        .values(encryptedValues)
+        .onConflictDoUpdate({
+          target: [categorySpendingSummary.userId, categorySpendingSummary.categoryId, categorySpendingSummary.accountId, categorySpendingSummary.yearMonth],
+          set: {
+            amount: sql`excluded.amount`,
+          },
+        });
+    }
+  });
 
   // Trigger budget threshold notifications
   const { checkBudgetsAndNotify } = await import('@/lib/services/notifications');
@@ -529,36 +531,27 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     .limit(1);
   const isPaystubEnabled = settings?.paystubEnabled ?? false;
 
-  const categoryByMonthAndAccount: Record<
-    string,
-    Record<
-      string,
-      Record<string, { amount: number; count: number; categoryId: string; accountId: string; yearMonth: string }>
-    >
-  > = {};
+  const categoryByMonthAndAccount: Record<string, Record<string, Record<string, { amount: number; count: number; categoryId: string; accountId: string; yearMonth: string }>>> = {};
   const uniqueCategories = new Set<string>();
 
   for (const tx of decryptedTxns) {
-    if (!tx.categoryId || tx.ignored) continue;
+    if (tx.ignored) continue;
     if (!isPaystubEnabled && tx.source === 'paystub') continue;
 
-    const category = catById.get(tx.categoryId.toString());
-    if (!category) continue;
-    if (category.categoryType === 'transfer') continue;
-    if (!category.isIncome && category.categoryType !== 'compound') continue;
+    const category = tx.categoryId ? catById.get(tx.categoryId.toString()) : undefined;
 
-    let excluded = category.excludeFromReports && category.categoryType !== 'compound';
-    if (!excluded && category.parentId && category.categoryType !== 'compound') {
-      const parent = catById.get(category.parentId.toString());
-      if (parent?.excludeFromReports) excluded = true;
+    let excluded = category?.excludeFromReports ?? false;
+    if (category && category.isIncome === false) {
+      excluded = true;
     }
     if (excluded) continue;
 
-    const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
-    const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-    const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
-    const catId = tx.categoryId.toString();
-    const accountId = tx.accountId.toString();
+    const rawAmount = parseFloat(tx.amount);
+    if (category?.categoryType !== 'compound' && rawAmount <= 0) continue;
+
+    const yearMonth = tx.date.substring(0, 7);
+    const catId = tx.categoryId ? tx.categoryId.toString() : 'uncategorized';
+    const accountId = tx.accountId ? tx.accountId.toString() : 'unknown';
 
     uniqueCategories.add(catId);
 
@@ -578,20 +571,18 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
       };
     }
 
-    const incVal = category.categoryType === 'compound'
+    const incVal = category?.categoryType === 'compound'
       ? Math.abs(parseFloat(tx.amount))
       : parseFloat(tx.amount);
     categoryByMonthAndAccount[yearMonth][catId][accountId].amount += incVal;
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
 
-  await getDb().delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, userId));
-
-  const insertValues = [];
+  const insertIncomeValues = [];
   for (const catMap of Object.values(categoryByMonthAndAccount)) {
     for (const accountMap of Object.values(catMap)) {
       for (const catData of Object.values(accountMap)) {
-        insertValues.push({
+        insertIncomeValues.push({
           userId,
           categoryId: catData.categoryId as any,
           accountId: catData.accountId as any,
@@ -603,24 +594,28 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     }
   }
 
-  if (insertValues.length > 0) {
-    const encryptedValues = await Promise.all(
-      insertValues.map((row) => encryptRow('category_income_summary', row, dek))
-    );
-    await getDb()
-      .insert(categoryIncomeSummary)
-      .values(encryptedValues)
-      .onConflictDoUpdate({
-        target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.accountId, categoryIncomeSummary.yearMonth],
-        set: {
-          amount: sql`excluded.amount`,
-          transactionCount: sql`excluded.transaction_count`,
-          updatedAt: new Date(),
-        },
-      });
-  }
+  const encryptedIncomeValues = insertIncomeValues.length > 0
+    ? await Promise.all(insertIncomeValues.map((row) => encryptRow('category_income_summary', row, dek)))
+    : [];
 
-  return { categoryRows: insertValues.length, categoriesCount: uniqueCategories.size };
+  await getDb().transaction(async (tx) => {
+    await tx.delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, userId));
+    if (encryptedIncomeValues.length > 0) {
+      await tx
+        .insert(categoryIncomeSummary)
+        .values(encryptedIncomeValues)
+        .onConflictDoUpdate({
+          target: [categoryIncomeSummary.userId, categoryIncomeSummary.categoryId, categoryIncomeSummary.accountId, categoryIncomeSummary.yearMonth],
+          set: {
+            amount: sql`excluded.amount`,
+            transactionCount: sql`excluded.transaction_count`,
+            updatedAt: new Date(),
+          },
+        });
+    }
+  });
+
+  return { categoryRows: insertIncomeValues.length, categoriesCount: uniqueCategories.size };
 }
 
 export async function deleteOldPendingTransactions(userId: string): Promise<void> {

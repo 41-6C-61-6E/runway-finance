@@ -101,6 +101,14 @@ class MockDbQueryBuilder {
     return this;
   }
 
+  async transaction(callback: (tx: any) => Promise<any>) {
+    return callback(this);
+  }
+
+  async execute(...args: any[]) {
+    return { rows: [] };
+  }
+
   async then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
     let result: any = null;
     const tableName = this.currentTable ? getTableName(this.currentTable) : 'unknown';

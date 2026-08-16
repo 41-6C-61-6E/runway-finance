@@ -105,10 +105,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const dek = await getSessionDEK();
   const { id } = await params;
 
+  const body = await request.json();
+  const parsed = PatchTransactionSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'invalid_data', message: 'Invalid transaction data', details: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const {
+    categoryId,
+    payee,
+    notes,
+    memo,
+    reviewed,
+    ignored,
+    description,
+    amount,
+    date,
+    postedDate,
+    pending,
+    tagIds,
+  } = parsed.data;
+
   const [existing] = await getDb()
     .select()
     .from(transactions)
-    .where(and(eq(transactions.id, id), eq(transactions.userId, dataUserId), eq(transactions.deleted, false)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, dataUserId)))
     .limit(1);
 
   if (!existing) {
@@ -119,29 +143,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'validation_error', message: 'Invalid request body' },
-      { status: 400 }
-    );
-  }
-
-  const parsed = PatchTransactionSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'validation_error', message: 'Invalid request body', details: parsed.error.flatten().fieldErrors },
-      { status: 400 }
-    );
-  }
-
-  const { categoryId, tagIds, payee, notes, memo, reviewed, ignored, description, amount, date, postedDate, pending } = parsed.data;
-
   const changedFields: string[] = [];
   if (categoryId !== undefined) changedFields.push('categoryId');
-  if (tagIds !== undefined) changedFields.push('tagIds');
   if (payee !== undefined) changedFields.push('payee');
   if (notes !== undefined) changedFields.push('notes');
   if (memo !== undefined) changedFields.push('memo');
@@ -156,22 +159,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // Sanitize and encrypt text fields
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
-  if (categoryId !== undefined) {
-    updateData.categoryId = categoryId;
-    updateData.categorizedByAi = false;
-
-    const childCheck = await getDb()
-      .select({ id: transactions.id })
-      .from(transactions)
-      .where(and(eq(transactions.parentId, id), eq(transactions.deleted, false)))
-      .limit(1);
-    if (childCheck.length > 0) {
-      await getDb()
-        .delete(transactions)
-        .where(eq(transactions.parentId, id));
-      updateData.ignored = false;
-    }
-  }
   if (payee !== undefined) updateData.payee = sanitizeText(payee, 200);
   if (notes !== undefined) updateData.notes = sanitizeText(notes, 2000);
   if (memo !== undefined) updateData.memo = sanitizeText(memo, 500);
@@ -183,33 +170,54 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (postedDate !== undefined) updateData.postedDate = postedDate;
   if (pending !== undefined) updateData.pending = pending;
 
-  const encrypted = await encryptRow('transactions', updateData, dek);
-  const [updated] = await getDb()
-    .update(transactions)
-    .set(encrypted)
-    .where(eq(transactions.id, id))
-    .returning();
+  let updated: any;
+  await getDb().transaction(async (tx) => {
+    if (categoryId !== undefined) {
+      updateData.categoryId = categoryId;
+      updateData.categorizedByAi = false;
 
-  // Replace tags if provided
-  if (tagIds !== undefined) {
-    await getDb().delete(transactionTags).where(eq(transactionTags.transactionId, id));
-    if (tagIds.length > 0) {
-      await getDb().insert(transactionTags).values(
-        tagIds.map((tagId) => ({ transactionId: id, tagId }))
-      );
+      const childCheck = await tx
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(and(eq(transactions.parentId, id), eq(transactions.deleted, false)))
+        .limit(1);
+      if (childCheck.length > 0) {
+        // Soft-delete split children when re-categorizing parent
+        await tx
+          .update(transactions)
+          .set({ deleted: true, updatedAt: new Date() })
+          .where(eq(transactions.parentId, id));
+        updateData.ignored = false;
+      }
     }
-  }
+
+    const encrypted = await encryptRow('transactions', updateData, dek);
+    const [res] = await tx
+      .update(transactions)
+      .set(encrypted)
+      .where(eq(transactions.id, id))
+      .returning();
+    updated = res;
+
+    // Replace tags if provided
+    if (tagIds !== undefined) {
+      await tx.delete(transactionTags).where(eq(transactionTags.transactionId, id));
+      if (tagIds.length > 0) {
+        await tx.insert(transactionTags).values(
+          tagIds.map((tagId) => ({ transactionId: id, tagId }))
+        );
+      }
+    }
+  });
 
   invalidateUserSearchCache(dataUserId);
 
-  // Rebuild summaries since categories/transactions changed (non-blocking background task)
-  Promise.all([
-    updateCategorySpendingSummaries(dataUserId, dek),
-    updateCategoryIncomeSummaries(dataUserId, dek),
-    updateMonthlyCashFlowSummaries(dataUserId, dek),
-  ]).catch((err) => {
-    logger.error('Background summaries rebuild failed', { userId, error: err });
-  });
+  // Rebuild summaries since categories/transactions changed (coalesced background task)
+  if (dek) {
+    triggerUserSummariesRebuild(dataUserId, dek).catch((err) => {
+      logger.error('Background summaries rebuild failed', { userId, error: err });
+    });
+  }
 
   return NextResponse.json(updated);
 }
@@ -244,23 +252,30 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     );
   }
 
-  const [updated] = await getDb()
-    .update(transactions)
-    .set({ deleted: true, updatedAt: new Date() })
-    .where(eq(transactions.id, id))
-    .returning();
+  let updated: any;
+  await getDb().transaction(async (tx) => {
+    // Soft-delete any child split transactions as well
+    await tx
+      .update(transactions)
+      .set({ deleted: true, updatedAt: new Date() })
+      .where(eq(transactions.parentId, id));
+
+    const [res] = await tx
+      .update(transactions)
+      .set({ deleted: true, updatedAt: new Date() })
+      .where(eq(transactions.id, id))
+      .returning();
+    updated = res;
+  });
 
   invalidateUserSearchCache(dataUserId);
 
-  // Rebuild summaries since categories/transactions changed (non-blocking background task)
-  Promise.all([
-    updateCategorySpendingSummaries(dataUserId, dek),
-    updateCategoryIncomeSummaries(dataUserId, dek),
-    updateMonthlyCashFlowSummaries(dataUserId, dek),
-  ]).catch((err) => {
-    logger.error('Background summaries rebuild failed after DELETE', { userId, error: err });
-  });
+  // Rebuild summaries since categories/transactions changed (coalesced background task)
+  if (dek) {
+    triggerUserSummariesRebuild(dataUserId, dek).catch((err) => {
+      logger.error('Background summaries rebuild failed after DELETE', { userId, error: err });
+    });
+  }
 
   return NextResponse.json(updated);
 }
-
