@@ -36,7 +36,10 @@ import AdvancedTab from '@/components/features/settings/AdvancedTab';
 import NotificationsTab from '@/components/features/settings/NotificationsTab';
 import AiTab from '@/components/features/settings/AiTab';
 import ImportExportTab from '@/components/features/settings/ImportExportTab';
+import { AppTabs } from '@/components/ui/app-tabs';
 import PayrollTab from '@/components/features/settings/PayrollTab';
+
+
 
 const SETTINGS_TABS = [
   { id: 'general' as const, label: 'General', description: 'Appearance, accent color, and layout preferences', icon: Settings },
@@ -201,26 +204,24 @@ function SettingsPageBody() {
             {activeTab === 'accounts' && (
               <>
                 {/* Sub-tab toggle */}
-                <div className="flex border-b border-border/60 w-full gap-2 sm:gap-6 mb-5 sm:mb-6">
-                  {(['connections', 'automatic', 'manual'] as const).map((sub) => (
-                    <button
-                      key={sub}
-                      onClick={() => {
-                        setAccountSubTab(sub);
-                        const params = new URLSearchParams(searchParams.toString());
-                        params.set('sub', sub);
-                        router.replace(`/settings?${params.toString()}`, { scroll: false });
-                      }}
-                      className={`flex-1 text-center justify-center pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer capitalize ${
-                        accountSubTab === sub
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {sub === 'automatic' ? 'Automatic Accounts' : sub === 'manual' ? 'Manual Accounts' : 'Connections'}
-                    </button>
-                  ))}
-                </div>
+                <AppTabs
+                  tabs={[
+                    { id: 'connections', label: 'Connections' },
+                    { id: 'automatic', label: 'Automatic Accounts' },
+                    { id: 'manual', label: 'Manual Accounts' },
+                  ]}
+                  activeTab={accountSubTab}
+                  onChange={(sub) => {
+                    setAccountSubTab(sub as any);
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set('sub', sub);
+                    router.replace(`/settings?${params.toString()}`, { scroll: false });
+                  }}
+                  fullWidth
+                  size="sm"
+                  className="mb-5 sm:mb-6"
+                />
+
 
                 {accountSubTab === 'manual' && <ManualAccountsSection />}
 

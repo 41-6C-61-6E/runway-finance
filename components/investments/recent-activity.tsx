@@ -5,7 +5,9 @@ import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { ArrowLeftRight, Landmark, Clock, ArrowRight, TrendingUp, TrendingDown, CircleDollarSign, Banknote, Minus, RefreshCw, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+
 import type { TransactionType } from '@/app/api/investments/income/route';
 
 interface ClassifiedTransaction {
@@ -69,22 +71,15 @@ export function RecentActivity({ transactions }: RecentActivityProps) {
         <div className="flex-1 flex flex-col p-4 sm:p-5 gap-3">
           {/* Type filter */}
           {transactions.length > 0 && (
-            <div className="flex border-b border-border w-full gap-6 overflow-x-auto scrollbar-none pb-0.5 mb-1">
-              {FILTER_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setFilter(opt.value)}
-                  className={`pb-2 px-1 text-xs font-semibold whitespace-nowrap transition-all border-b-2 -mb-px cursor-pointer ${
-                    filter === opt.value
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+            <AppTabs
+              tabs={FILTER_OPTIONS.map((opt) => ({ id: opt.value, label: opt.label }))}
+              activeTab={filter}
+              onChange={(val) => setFilter(val as any)}
+              size="sm"
+              className="mb-1"
+            />
           )}
+
 
           {transactions.length > 0 ? (
             <div className="flex-1 flex flex-col">

@@ -15,10 +15,26 @@ export function requireDeleteConfirmation(request: Request): void {
 export interface AuthContext {
   session: any;
   userId: string;
+  dataUserId: string;
 }
 
 export interface AuthDekContext extends AuthContext {
   dek: Uint8Array;
+}
+
+/**
+ * Safely extracts the user ID from a NextAuth session object.
+ */
+export function getUserId(session: any): string | null {
+  return session?.user?.id ?? null;
+}
+
+/**
+ * Safely extracts the data user ID from a NextAuth session object, falling back to user ID.
+ */
+export function getDataUserId(session: any): string | null {
+  if (!session?.user) return null;
+  return (session.user as any).dataUserId ?? session.user.id ?? null;
 }
 
 export function withAuth(
@@ -27,13 +43,15 @@ export function withAuth(
   return async (req: Request = new Request('http://localhost')): Promise<Response | NextResponse> => {
     try {
       const session = await auth();
-      if (!session?.user?.id) {
+      const userId = getUserId(session);
+      if (!userId) {
         return NextResponse.json(
           { error: 'Unauthorized', message: 'Authentication required' },
           { status: 401 }
         );
       }
-      return await handler(req, { session, userId: session.user.id });
+      const dataUserId = getDataUserId(session) ?? userId;
+      return await handler(req, { session, userId, dataUserId });
     } catch (error) {
       logger.error('API route error in withAuth', { error: error instanceof Error ? error.message : String(error) });
       return NextResponse.json(

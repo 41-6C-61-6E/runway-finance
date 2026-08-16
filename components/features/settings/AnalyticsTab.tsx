@@ -1,7 +1,9 @@
 'use client';
 
 import { Switch } from '@/components/ui/switch';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { useChartVisibility, CHARTS } from '@/lib/hooks/use-chart-visibility';
+
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { useImportedData } from '@/lib/hooks/use-imported-data';
 import { useChartDefaults, type ChartTimeRange, type ChartTypeOption } from '@/lib/hooks/use-chart-defaults';
@@ -129,24 +131,18 @@ export default function AnalyticsTab() {
   return (
     <div>
       {/* Sub-Tabs */}
-      <div className="flex border-b border-border/60 w-full gap-4 sm:gap-6 mb-6">
-        {([
-          { key: 'general' as const, label: 'General' },
-          { key: 'data' as const, label: 'Data Sources' },
-        ]).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveSubTab(tab.key)}
-            className={`flex-1 justify-center text-center pb-2 px-1 text-xs font-semibold transition-all border-b-2 -mb-px cursor-pointer ${
-              activeSubTab === tab.key
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <AppTabs
+        tabs={[
+          { id: 'general', label: 'General' },
+          { id: 'data', label: 'Data Sources' },
+        ]}
+        activeTab={activeSubTab}
+        onChange={(tab) => setActiveSubTab(tab as any)}
+        fullWidth
+        size="sm"
+        className="mb-6"
+      />
+
 
       {/* Tab: General */}
       {activeSubTab === 'general' && (

@@ -7,7 +7,9 @@ import { MortgagePaydownChart } from './mortgage-paydown-chart';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { cn } from '@/lib/utils';
+
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
   'single-family': 'Single Family',
@@ -179,31 +181,19 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
           <div>
             {/* Tabs Header */}
             {isPayoffVisible && (
-              <div className="flex border-b border-border/60 mb-4">
-                <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`flex-1 pb-2 text-center text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-                    currentTab === 'overview'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
-                  type="button"
-                >
-                  Overview
-                </button>
-                <button
-                  onClick={() => setActiveTab('payoff')}
-                  className={`flex-1 pb-2 text-center text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-                    currentTab === 'payoff'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
-                  type="button"
-                >
-                  Payoff Projections
-                </button>
-              </div>
+              <AppTabs
+                tabs={[
+                  { id: 'overview', label: 'Overview' },
+                  { id: 'payoff', label: 'Payoff Projections' },
+                ]}
+                activeTab={currentTab}
+                onChange={(tab) => setActiveTab(tab as any)}
+                fullWidth
+                size="sm"
+                className="mb-4"
+              />
             )}
+
 
             {currentTab === 'overview' ? (
               <>
