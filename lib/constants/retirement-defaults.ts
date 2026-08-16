@@ -102,12 +102,11 @@ export const DEFAULT_2026_RULES = {
   },
   niitThreshold: '200000',
   irmaaThresholds: [
-    { magiSingle: 0, magiJoint: 0, partBMonthly: 174.70, partDMonthly: 0.00 },
-    { magiSingle: 103000, magiJoint: 206000, partBMonthly: 244.60, partDMonthly: 12.90 },
-    { magiSingle: 129000, magiJoint: 258000, partBMonthly: 349.40, partDMonthly: 33.30 },
-    { magiSingle: 161000, magiJoint: 322000, partBMonthly: 454.20, partDMonthly: 53.80 },
-    { magiSingle: 193000, magiJoint: 386000, partBMonthly: 559.00, partDMonthly: 74.20 },
-    { magiSingle: 500000, magiJoint: 750000, partBMonthly: 594.00, partDMonthly: 81.00 },
+    { magiSingle: 0, magiJoint: 0, partBMonthly: 0.00, partDMonthly: 0.00 },
+    { magiSingle: 103000, magiJoint: 206000, partBMonthly: 69.90, partDMonthly: 12.90 },
+    { magiSingle: 129000, magiJoint: 258000, partBMonthly: 174.70, partDMonthly: 33.30 },
+    { magiSingle: 161000, magiJoint: 322000, partBMonthly: 279.50, partDMonthly: 53.80 },
+    { magiSingle: 193000, magiJoint: 386000, partBMonthly: 384.30, partDMonthly: 74.20 },
   ],
   ssTaxationThresholds: {
     single: { tier1: 25000, tier2: 34000 },

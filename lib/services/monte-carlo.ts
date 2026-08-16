@@ -105,7 +105,10 @@ export function runMonteCarloSimulation(
         const m = yearlyMarketData[yearOffset % yearlyMarketData.length] || { growth: 0.05, dividend: 0.02 };
         return { growth: m.growth, dividend: m.dividend };
       }
-      return { growth: (acc.expectedGrowthRate || 2.0) / 100, dividend: (acc.dividendYield || 0.0) / 100 };
+      return {
+        growth: (Number.isFinite(acc.expectedGrowthRate) ? acc.expectedGrowthRate : 2.0) / 100,
+        dividend: (Number.isFinite(acc.dividendYield) ? acc.dividendYield : 0.0) / 100,
+      };
     };
 
     const simRes = runRetirementSimulation(trialPlan, yearGrowthFn);

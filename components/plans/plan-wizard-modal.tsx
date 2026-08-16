@@ -346,8 +346,10 @@ export function PlanWizardModal({
 
     const pSalNum = parseFloat(String(primarySalary)) || 0;
     const sSalNum = parseFloat(String(spouseSalary)) || 0;
-    const computedPrimarySs = calculateSocialSecurityPIA(pSalNum) || parseFloat(String(primarySsMonthlyAmount)) || 2500;
-    const computedSpouseSs = calculateSocialSecurityPIA(sSalNum) || parseFloat(String(spouseSsMonthlyAmount)) || 2000;
+    const pSsNum = parseFloat(String(primarySsMonthlyAmount));
+    const sSsNum = parseFloat(String(spouseSsMonthlyAmount));
+    const computedPrimarySs = Number.isFinite(pSsNum) && pSsNum > 0 ? pSsNum : (pSalNum > 0 ? calculateSocialSecurityPIA(pSalNum) : 2500);
+    const computedSpouseSs = Number.isFinite(sSsNum) && sSsNum > 0 ? sSsNum : (sSalNum > 0 ? calculateSocialSecurityPIA(sSalNum) : 2000);
 
     setSaving(true);
     setErrorMsg(null);

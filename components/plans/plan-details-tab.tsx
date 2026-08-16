@@ -1399,7 +1399,6 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                       className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
                     >
                       <option value="pension">Pension / Guaranteed Annuity</option>
-                      <option value="social_security">Social Security Benefit</option>
                       <option value="passive">Passive / Rental / Business Income</option>
                       <option value="salary">Side Job / Other Pre-Retirement Wages</option>
                     </select>

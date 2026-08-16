@@ -78,20 +78,24 @@ export function FireProjectionsSidePanel({
   const [showAllMilestones, setShowAllMilestones] = useState(false);
 
   const activeStrategyLabel = useMemo(() => {
-    const method = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
+    const method = plan?.withdrawalMethod || plan?.settings?.withdrawalMethod || 'textbook';
     if (method === 'tax_optimized') return 'Tax-Bracket Shielding (Fill 12% Bracket)';
     if (method === 'proportional') return 'Proportional Drawdown';
+    if (method === 'tax_deferred_first') return 'Tax-Deferred Waterfall (Trad → Cash/Taxable → Roth)';
     if (method === 'custom_order') return 'Custom Priority Order';
     return 'Textbook Waterfall (Cash → Taxable → Trad → Roth)';
   }, [plan]);
 
   const strategyDescription = useMemo(() => {
-    const method = plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook';
+    const method = plan?.withdrawalMethod || plan?.settings?.withdrawalMethod || 'textbook';
     if (method === 'tax_optimized') {
       return 'Prioritizes taxable accounts while filling lower tax brackets with traditional withdrawals, preserving Roth assets for tax-free growth.';
     }
     if (method === 'proportional') {
       return 'Draws funds proportionally across taxable, tax-deferred, and tax-free accounts based on current balance ratios.';
+    }
+    if (method === 'tax_deferred_first') {
+      return 'Draws from pre-tax tax-deferred accounts first to reduce future RMD exposure and legacy tax burdens.';
     }
     if (method === 'custom_order') {
       return 'Draws funds according to your custom defined account withdrawal priority order.';
@@ -99,13 +103,20 @@ export function FireProjectionsSidePanel({
     return 'Standard waterfall order: Taxable Cash → Taxable Brokerage → Tax-Deferred (Traditional IRA/401k) → Tax-Free (Roth IRA).';
   }, [plan]);
 
-  // Coast FIRE Calculation (Metric 3.1)
+  // Coast FIRE Calculation with Real Plan Parameters
   const coastFireInfo = useMemo(() => {
-    const currentAge = plan?.currentAge || plan?.settings?.currentAge || 40;
+    const currentYear = new Date().getFullYear();
+    const currentAge = currentYear - (Number(plan?.primaryBirthYear) || 1985);
     const yearsToRetire = Math.max(1, localRetirementAge - currentAge);
-    const nominalReturn = plan?.settings?.investmentReturn ?? plan?.settings?.expectedReturn ?? 7;
-    const inflation = plan?.settings?.inflationRate ?? 2.5;
-    const realReturnRate = Math.max(1, nominalReturn - inflation); // e.g. 4.5%
+
+    const accs = Array.isArray(plan?.accounts) ? plan.accounts.filter((a: any) => a.isIncluded !== false) : [];
+    const totalBal = accs.reduce((s: number, a: any) => s + (parseFloat(a.balance) || 0), 0);
+    const weightedGrowth = totalBal > 0
+      ? accs.reduce((s: number, a: any) => s + ((parseFloat(a.balance) || 0) * (parseFloat(a.expectedGrowthRate) || 6.0)), 0) / totalBal
+      : 6.0;
+
+    const inflation = parseFloat(plan?.settings?.fixedInflationRate || '3.0');
+    const realReturnRate = Math.max(0.5, weightedGrowth - inflation);
     const coastTarget = fireNumber > 0 ? fireNumber / Math.pow(1 + realReturnRate / 100, yearsToRetire) : 0;
     const progress = coastTarget > 0 ? Math.min(100, (currentNetWorth / coastTarget) * 100) : 0;
     const isReached = currentNetWorth >= coastTarget && coastTarget > 0;
@@ -120,15 +131,30 @@ export function FireProjectionsSidePanel({
     };
   }, [plan, localRetirementAge, fireNumber, currentNetWorth]);
 
-  // Asset Allocation Glidepath Preview (Metric 3.3)
+  // Asset Allocation Glidepath Preview
   const glidepathInfo = useMemo(() => {
-    const currentEquityPct = plan?.settings?.currentEquityPct ?? 75;
-    const currentFixedPct = plan?.settings?.currentFixedPct ?? 15;
-    const currentCashPct = Math.max(0, 100 - currentEquityPct - currentFixedPct);
+    const accs = Array.isArray(plan?.accounts) ? plan.accounts.filter((a: any) => a.isIncluded !== false) : [];
+    const totalBal = accs.reduce((s: number, a: any) => s + (parseFloat(a.balance) || 0), 0);
 
-    const targetEquityPct = plan?.settings?.targetEquityPct ?? 60;
-    const targetFixedPct = plan?.settings?.targetFixedPct ?? 30;
-    const targetCashPct = Math.max(0, 100 - targetEquityPct - targetFixedPct);
+    let cashBal = 0;
+    let invBal = 0;
+    for (const a of accs) {
+      const b = parseFloat(a.balance) || 0;
+      const t = (a.type || '').toLowerCase();
+      if (t === 'cash' || t === 'checking' || t === 'savings' || t === 'emergency_fund') {
+        cashBal += b;
+      } else {
+        invBal += b;
+      }
+    }
+
+    const currentCashPct = totalBal > 0 ? Math.round((cashBal / totalBal) * 100) : 10;
+    const currentEquityPct = totalBal > 0 ? Math.round((invBal / totalBal) * 85) : 75;
+    const currentFixedPct = Math.max(0, 100 - currentCashPct - currentEquityPct);
+
+    const targetEquityPct = 60;
+    const targetFixedPct = 30;
+    const targetCashPct = 10;
 
     return {
       current: { equity: currentEquityPct, fixed: currentFixedPct, cash: currentCashPct },

@@ -14,6 +14,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   Legend,
+  ReferenceLine,
 } from 'recharts';
 import {
   HeartHandshake,
@@ -53,24 +54,30 @@ export function SocialSecurityTab({
   const [enableSpousal, setEnableSpousal] = useState<boolean>(plan?.enableSpousalSsBenefit !== false);
 
   // Editable Base Monthly Benefit (PIA at FRA) State
-  const [primaryMonthlyPIAInput, setPrimaryMonthlyPIAInput] = useState<string>(plan?.primarySsMonthlyAmount || '2500');
-  const [spouseMonthlyPIAInput, setSpouseMonthlyPIAInput] = useState<string>(plan?.spouseSsMonthlyAmount || '2000');
+  const [primaryMonthlyPIAInput, setPrimaryMonthlyPIAInput] = useState<string>(
+    plan?.primarySsMonthlyAmount !== undefined && plan?.primarySsMonthlyAmount !== null ? String(plan.primarySsMonthlyAmount) : '2500'
+  );
+  const [spouseMonthlyPIAInput, setSpouseMonthlyPIAInput] = useState<string>(
+    plan?.spouseSsMonthlyAmount !== undefined && plan?.spouseSsMonthlyAmount !== null ? String(plan.spouseSsMonthlyAmount) : '2000'
+  );
 
   useEffect(() => {
     if (plan) {
       setPrimaryAge(Number(plan.primarySsStartAge) || 67);
       setSpouseAge(Number(plan.spouseSsStartAge) || 67);
       setEnableSpousal(plan.enableSpousalSsBenefit !== false);
-      setPrimaryMonthlyPIAInput(plan.primarySsMonthlyAmount || '2500');
-      setSpouseMonthlyPIAInput(plan.spouseSsMonthlyAmount || '2000');
+      setPrimaryMonthlyPIAInput(
+        plan.primarySsMonthlyAmount !== undefined && plan.primarySsMonthlyAmount !== null ? String(plan.primarySsMonthlyAmount) : '2500'
+      );
+      setSpouseMonthlyPIAInput(
+        plan.spouseSsMonthlyAmount !== undefined && plan.spouseSsMonthlyAmount !== null ? String(plan.spouseSsMonthlyAmount) : '2000'
+      );
     }
   }, [plan]);
 
   const [isOverviewCollapsed, setIsOverviewCollapsed] = useCardCollapsed('ss_overview');
   const [isTrajectoryCollapsed, setIsTrajectoryCollapsed] = useCardCollapsed('ss_trajectory');
   const [isTaxabilityCollapsed, setIsTaxabilityCollapsed] = useCardCollapsed('ss_taxability');
-
-  const [appliedMsg, setAppliedMsg] = useState<string>('');
 
   const primaryMonthlyPIA = parseFloat(primaryMonthlyPIAInput) || 0;
   const spouseMonthlyPIA = parseFloat(spouseMonthlyPIAInput) || 0;
@@ -101,16 +108,20 @@ export function SocialSecurityTab({
   };
 
   const primaryMonthlyAmount = primaryMonthlyPIA * getSsMult(primaryAge);
-  const spouseMonthlyAmount = spouseMonthlyPIA * getSsMult(spouseAge);
+  const effectiveSpousePIA = (enableSpousal && isMfj && primaryMonthlyPIA > 0)
+    ? Math.max(primaryMonthlyPIA * 0.5, spouseMonthlyPIA)
+    : spouseMonthlyPIA;
+  const spouseMonthlyAmount = effectiveSpousePIA * getSsMult(spouseAge);
   const totalAnnualHouseholdSS = (primaryMonthlyAmount + (isMfj ? spouseMonthlyAmount : 0)) * 12;
 
   // Run simulations for trajectories
   const simSelected = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(primaryAge, spouseAge)), [primaryAge, spouseAge, enableSpousal, primaryMonthlyPIA, spouseMonthlyPIA, plan]);
-  const sim62 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(62, 62)), [primaryMonthlyPIA, spouseMonthlyPIA, plan]);
-  const sim67 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(67, 67)), [primaryMonthlyPIA, spouseMonthlyPIA, plan]);
-  const sim70 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(70, 70)), [primaryMonthlyPIA, spouseMonthlyPIA, plan]);
+  const sim62 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(62, 62)), [primaryMonthlyPIA, spouseMonthlyPIA, enableSpousal, plan]);
+  const sim67 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(67, 67)), [primaryMonthlyPIA, spouseMonthlyPIA, enableSpousal, plan]);
+  const sim70 = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(70, 70)), [primaryMonthlyPIA, spouseMonthlyPIA, enableSpousal, plan]);
 
   const chartData = useMemo(() => {
+    const inflationRate = (plan?.settings?.fixedInflationRate ?? 3.0) / 100;
     const years62 = sim62.yearlyResults;
     const years67 = sim67.yearlyResults;
     const years70 = sim70.yearlyResults;
@@ -122,10 +133,11 @@ export function SocialSecurityTab({
     let cumSel = 0;
 
     return yearsSelected.map((y, idx) => {
-      cum62 += years62[idx]?.ssIncome || 0;
-      cum67 += years67[idx]?.ssIncome || 0;
-      cum70 += years70[idx]?.ssIncome || 0;
-      cumSel += y.ssIncome || 0;
+      const discountFactor = dollarMode === 'real' ? Math.pow(1 + inflationRate, idx) : 1;
+      cum62 += (years62[idx]?.ssIncome || 0) / discountFactor;
+      cum67 += (years67[idx]?.ssIncome || 0) / discountFactor;
+      cum70 += (years70[idx]?.ssIncome || 0) / discountFactor;
+      cumSel += (y.ssIncome || 0) / discountFactor;
 
       return {
         age: y.primaryAge,
@@ -135,7 +147,7 @@ export function SocialSecurityTab({
         selected: Math.round(cumSel),
       };
     });
-  }, [sim62, sim67, sim70, simSelected]);
+  }, [sim62, sim67, sim70, simSelected, dollarMode, plan]);
 
   const updatePlanParameters = (overrides?: Partial<{
     primarySsMonthlyAmount: string;
@@ -391,6 +403,28 @@ export function SocialSecurityTab({
                   />
                   <Tooltip content={<SocialSecurityTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <ReferenceLine
+                    x={78}
+                    stroke="#3b82f6"
+                    strokeDasharray="3 3"
+                    label={{
+                      value: '62 vs 67 (78.6)',
+                      position: 'insideTopLeft',
+                      fontSize: 10,
+                      fill: '#3b82f6',
+                    }}
+                  />
+                  <ReferenceLine
+                    x={80}
+                    stroke="#10b981"
+                    strokeDasharray="3 3"
+                    label={{
+                      value: '67 vs 70 (80.4)',
+                      position: 'insideTopRight',
+                      fontSize: 10,
+                      fill: '#10b981',
+                    }}
+                  />
                   <Line type="monotone" dataKey="claim62" name="Claim at Age 62" stroke="#f59e0b" strokeWidth={1.5} dot={false} />
                   <Line type="monotone" dataKey="claim67" name="Claim at Age 67 (FRA)" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
                   <Line type="monotone" dataKey="claim70" name="Claim at Age 70 (Delayed)" stroke="#10b981" strokeWidth={1.5} dot={false} />
