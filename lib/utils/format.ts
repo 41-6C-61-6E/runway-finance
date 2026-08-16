@@ -63,3 +63,14 @@ export function formatDate(date: Date | string, locale = 'en-US'): string {
   }
   return d.toLocaleDateString(locale);
 }
+
+/**
+ * Safely rounds a number or numeric string to 2 decimal places (cents)
+ */
+export function roundToCents(val: number | string | null | undefined): number {
+  if (val === null || val === undefined) return 0;
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  if (isNaN(num)) return 0;
+  return Math.round(num * 100) / 100;
+}
+

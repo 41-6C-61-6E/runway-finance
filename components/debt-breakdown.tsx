@@ -9,7 +9,9 @@ import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { AppTabs } from '@/components/ui/app-tabs';
 import { TrendingDown } from 'lucide-react';
+
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 
 const CHART_COLOR_MAP = [
@@ -257,28 +259,17 @@ export function DebtBreakdown() {
             </div>
           </CollapsibleFilterPanel>
           <div className="px-3 sm:px-5 py-4">
-          <div className="flex border-b border-border w-full gap-6 mb-5 sm:mb-6">
-            <button
-              onClick={() => setActiveTab('assets')}
-              className={`pb-2 px-1 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
-                activeTab === 'assets'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Assets
-            </button>
-            <button
-              onClick={() => setActiveTab('debt')}
-              className={`pb-2 px-1 text-xs font-semibold transition-all duration-200 cursor-pointer border-b-2 -mb-px ${
-                activeTab === 'debt'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Debt
-            </button>
-          </div>
+          <AppTabs
+            tabs={[
+              { id: 'assets', label: 'Assets' },
+              { id: 'debt', label: 'Debt' },
+            ]}
+            activeTab={activeTab}
+            onChange={(tab) => setActiveTab(tab as any)}
+            size="sm"
+            className="mb-5 sm:mb-6"
+          />
+
 
           <div className="text-center mb-4">
             <p className="text-xs text-muted-foreground mb-0.5">

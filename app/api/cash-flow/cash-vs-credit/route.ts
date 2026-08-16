@@ -7,44 +7,11 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
 import { filterReportableAccounts } from '@/lib/utils/account-scope';
-
-type TimeFrame = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
+import { getDateRange, type TimeFrame } from '@/lib/utils/timeframe';
 
 const CASH_TYPES = ['checking', 'savings', 'other'];
 const CREDIT_TYPES = ['credit'];
 
-function getDateRange(timeframe: TimeFrame): [Date, Date] {
-  const endDate = new Date();
-  const startDate = new Date();
-
-  switch (timeframe) {
-    case '1m':
-      startDate.setMonth(startDate.getMonth() - 1);
-      break;
-    case '3m':
-      startDate.setMonth(startDate.getMonth() - 3);
-      break;
-    case '6m':
-      startDate.setMonth(startDate.getMonth() - 6);
-      break;
-    case '1y':
-      startDate.setFullYear(startDate.getFullYear() - 1);
-      break;
-    case '5y':
-      startDate.setFullYear(startDate.getFullYear() - 5);
-      break;
-    case 'ytd': {
-      const now = new Date();
-      startDate.setFullYear(now.getFullYear(), 0, 1);
-      break;
-    }
-    case 'all':
-      startDate.setFullYear(1900);
-      break;
-  }
-
-  return [startDate, endDate];
-}
 
 function formatInTimezone(date: Date, tz: string): string {
   const formatter = new Intl.DateTimeFormat('en-US', {

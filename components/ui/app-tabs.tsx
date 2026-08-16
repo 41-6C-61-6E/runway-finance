@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 export interface TabItem {
@@ -14,15 +15,22 @@ export interface TabItem {
 
 export interface AppTabsProps {
   tabs: TabItem[];
-  activeTab: string;
-  onChange: (tabId: string) => void;
+  activeTab?: string;
+  onChange?: (tabId: string) => void;
   variant?: 'underline' | 'pills';
   size?: 'sm' | 'md';
   className?: string;
   fullWidth?: boolean;
+  urlParam?: string;
+  'aria-label'?: string;
 }
 
-export function AppTabs({
+interface AppTabsInnerProps extends AppTabsProps {
+  activeTab: string;
+  onChange: (tabId: string) => void;
+}
+
+function AppTabsInner({
   tabs,
   activeTab,
   onChange,
@@ -30,7 +38,28 @@ export function AppTabs({
   size = 'md',
   className,
   fullWidth = false,
-}: AppTabsProps) {
+  'aria-label': ariaLabel,
+}: AppTabsInnerProps) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+
+    const enabledTabs = tabs.filter((t) => !t.disabled);
+    const currentIndex = enabledTabs.findIndex((t) => t.id === activeTab);
+    if (currentIndex === -1) return;
+
+    let nextIndex = currentIndex;
+    if (e.key === 'ArrowRight') {
+      nextIndex = (currentIndex + 1) % enabledTabs.length;
+    } else if (e.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + enabledTabs.length) % enabledTabs.length;
+    }
+
+    const nextTab = enabledTabs[nextIndex];
+    if (nextTab) {
+      onChange(nextTab.id);
+    }
+  };
+
   if (variant === 'pills') {
     return (
       <div
@@ -40,6 +69,8 @@ export function AppTabs({
           className
         )}
         role="tablist"
+        aria-label={ariaLabel}
+        onKeyDown={handleKeyDown}
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -49,6 +80,9 @@ export function AppTabs({
               key={tab.id}
               role="tab"
               aria-selected={isActive}
+              aria-controls={`tabpanel-${tab.id}`}
+              id={`tab-${tab.id}`}
+              tabIndex={isActive ? 0 : -1}
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onChange(tab.id)}
               className={cn(
@@ -98,6 +132,8 @@ export function AppTabs({
         className
       )}
       role="tablist"
+      aria-label={ariaLabel}
+      onKeyDown={handleKeyDown}
     >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
@@ -107,6 +143,9 @@ export function AppTabs({
             key={tab.id}
             role="tab"
             aria-selected={isActive}
+            aria-controls={`tabpanel-${tab.id}`}
+            id={`tab-${tab.id}`}
+            tabIndex={isActive ? 0 : -1}
             disabled={tab.disabled}
             onClick={() => !tab.disabled && onChange(tab.id)}
             className={cn(
@@ -140,4 +179,35 @@ export function AppTabs({
       })}
     </div>
   );
+}
+
+function AppTabsWithUrlSync({ urlParam, ...props }: AppTabsProps & { urlParam: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const activeTabFromUrl = searchParams ? searchParams.get(urlParam) : null;
+  const activeTab = props.activeTab ?? activeTabFromUrl ?? props.tabs[0]?.id;
+
+  const handleTabChange = (tabId: string) => {
+    if (searchParams && pathname) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(urlParam, tabId);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+    props.onChange?.(tabId);
+  };
+
+  return <AppTabsInner {...props} activeTab={activeTab} onChange={handleTabChange} />;
+}
+
+export function AppTabs({ urlParam, activeTab: controlledActiveTab, onChange, ...props }: AppTabsProps) {
+  if (urlParam) {
+    return <AppTabsWithUrlSync {...props} urlParam={urlParam} activeTab={controlledActiveTab} onChange={onChange} />;
+  }
+
+  const activeTab = controlledActiveTab ?? props.tabs[0]?.id;
+  const handleChange = onChange ?? (() => {});
+
+  return <AppTabsInner {...props} activeTab={activeTab} onChange={handleChange} />;
 }
