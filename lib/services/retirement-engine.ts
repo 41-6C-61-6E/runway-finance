@@ -405,14 +405,14 @@ export function runRetirementSimulation(
     if (plan.primarySsMonthlyAmount && primaryAge >= (plan.primarySsStartAge || 67)) {
       const baseMonthly = plan.primarySsMonthlyAmount;
       const startAgeOpt = plan.primarySsStartAge || 67;
-      const claimingMult = getSsClaimingMultiplier(startAgeOpt);
+      const claimingMult = getSsClaimingMultiplier(startAgeOpt, rules);
       primarySsIncome = baseMonthly * 12 * claimingMult * compoundInflation;
     }
 
     if (isMfj && plan.spouseSsMonthlyAmount && spouseAge !== undefined && spouseAge >= (plan.spouseSsStartAge || 67)) {
       const spouseMonthly = plan.spouseSsMonthlyAmount;
       const spouseStartOpt = plan.spouseSsStartAge || 67;
-      let spouseMult = getSsClaimingMultiplier(spouseStartOpt);
+      let spouseMult = getSsClaimingMultiplier(spouseStartOpt, rules);
 
       if (plan.enableSpousalSsBenefit !== false && plan.primarySsMonthlyAmount) {
         const halfPrimary = plan.primarySsMonthlyAmount * 0.5;
@@ -817,14 +817,17 @@ export function runRetirementSimulation(
     const wouldIncurPenalty = (acc: EngineAccount): boolean => {
       const accOwnerAge = acc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
       const accOwnerRetirementAge = acc.owner === 'spouse' && plan.spouseRetirementAge ? plan.spouseRetirementAge : plan.retirementAge;
-      if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') {
-        const isRuleOf55 = acc.type === 'traditional_401k' && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
+      const cat = getAccountCategory(acc.type);
+      const is401k = acc.type.includes('401k') || acc.type.includes('403b');
+
+      if (cat === 'taxDeferred') {
+        const isRuleOf55 = is401k && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
         return accOwnerAge < ira401kPenAge && !isRuleOf55;
       }
-      if (acc.type === 'roth_ira' || acc.type === 'roth_401k') {
+      if (cat === 'taxFree') {
         return accOwnerAge < ira401kPenAge && acc.balance > (acc.costBasis || 0);
       }
-      if (acc.type === 'hsa') return accOwnerAge < hsaPenAge;
+      if (cat === 'hsa') return accOwnerAge < hsaPenAge;
       return false;
     };
 
@@ -833,16 +836,18 @@ export function runRetirementSimulation(
       let maxAvail = acc.balance;
       const accOwnerAge = acc.owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
       const accOwnerRetirementAge = acc.owner === 'spouse' && plan.spouseRetirementAge ? plan.spouseRetirementAge : plan.retirementAge;
+      const cat = getAccountCategory(acc.type);
+      const is401k = acc.type.includes('401k') || acc.type.includes('403b');
 
       if (!allowPenalty) {
-        if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k' || acc.type.includes('403b')) {
-          const isRuleOf55 = (acc.type.includes('401k') || acc.type.includes('403b')) && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
+        if (cat === 'taxDeferred') {
+          const isRuleOf55 = is401k && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
           if (accOwnerAge < ira401kPenAge && !isRuleOf55) {
             maxAvail = 0;
           }
-        } else if ((acc.type === 'roth_ira' || acc.type === 'roth_401k' || acc.type.includes('roth')) && accOwnerAge < ira401kPenAge) {
+        } else if (cat === 'taxFree' && accOwnerAge < ira401kPenAge) {
           maxAvail = Math.min(acc.balance, Math.max(0, acc.costBasis || 0));
-        } else if (acc.type === 'hsa' && accOwnerAge < hsaPenAge) {
+        } else if (cat === 'hsa' && accOwnerAge < hsaPenAge) {
           maxAvail = 0;
         }
       }
@@ -851,8 +856,8 @@ export function runRetirementSimulation(
       if (actual <= 0) return 0;
 
       // Early Withdrawal Penalty check for Traditional accounts before ira401kPenAge
-      if (acc.type === 'traditional_ira' || acc.type === 'traditional_401k') {
-        const isRuleOf55 = acc.type === 'traditional_401k' && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
+      if (cat === 'taxDeferred') {
+        const isRuleOf55 = is401k && accOwnerAge >= ruleOf55PenAge && accOwnerRetirementAge >= ruleOf55PenAge;
         if (accOwnerAge < ira401kPenAge && !isRuleOf55) {
           const penalty = actual * ira401kPenRate;
           earlyPenaltyTax += penalty;
@@ -864,7 +869,7 @@ export function runRetirementSimulation(
       }
 
       // Roth IRA / Roth 401(k) Ordering Rules
-      if ((acc.type === 'roth_ira' || acc.type === 'roth_401k') && accOwnerAge < ira401kPenAge) {
+      if (cat === 'taxFree' && accOwnerAge < ira401kPenAge) {
         const availableBasis = Math.max(0, acc.costBasis || 0);
         if (actual > availableBasis) {
           const earningsWithdrawn = actual - availableBasis;
@@ -877,12 +882,12 @@ export function runRetirementSimulation(
           earlyPenaltyDetails.push({ age: accOwnerAge, accountId: acc.id, accountName: acc.name, accountType: acc.type, amount: earningsWithdrawn, penalty });
         }
         acc.costBasis = Math.max(0, availableBasis - actual);
-      } else if (acc.costBasis > 0) {
+      } else if (acc.costBasis && acc.costBasis > 0) {
         acc.costBasis = Math.max(0, acc.costBasis - actual);
       }
 
       // Penalty for non-medical HSA withdrawals before hsaPenAge
-      if (acc.type === 'hsa' && accOwnerAge < hsaPenAge) {
+      if (cat === 'hsa' && accOwnerAge < hsaPenAge) {
         const penalty = actual * hsaPenRate;
         earlyPenaltyTax += penalty;
         earlyWithdrawalWarnings.push(
@@ -892,7 +897,6 @@ export function runRetirementSimulation(
       }
 
       // Track capital gains for taxable account withdrawals
-      const cat = getAccountCategory(acc.type);
       if (cat === 'taxable' && acc.balance > 0) {
         const costBasis = Math.max(0, acc.costBasis || 0);
         const gainRatio = Math.max(0, (acc.balance - costBasis) / acc.balance);
@@ -1160,7 +1164,7 @@ export function runRetirementSimulation(
 
         // Only fill 12% bracket with traditional accounts if allowed or non-penalized
         const tradAccs = Object.values(accountsState).filter(
-          (a) => (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional')) && a.balance > 0
+          (a) => getAccountCategory(a.type) === 'taxDeferred' && a.balance > 0
         );
         const tradHasPenaltyRisk = tradAccs.some((a) => wouldIncurPenalty(a));
 
@@ -1175,10 +1179,16 @@ export function runRetirementSimulation(
         }
 
         if (deficit > 0) {
-          const remOrder = ['cash', 'taxable', 'crypto', 'roth_ira', 'roth_401k', 'hsa'];
+          const categoryPriority: Record<string, number> = {
+            cash: 1,
+            taxable: 2,
+            taxFree: 3,
+            hsa: 4,
+            taxDeferred: 5,
+          };
           const sortedAccs = Object.values(accountsState)
-            .filter((a) => a.balance > 0 && remOrder.includes(a.type))
-            .sort((a, b) => remOrder.indexOf(a.type) - remOrder.indexOf(b.type));
+            .filter((a) => a.balance > 0 && getAccountCategory(a.type) !== 'taxDeferred')
+            .sort((a, b) => (categoryPriority[getAccountCategory(a.type)] || 99) - (categoryPriority[getAccountCategory(b.type)] || 99));
           for (const acc of sortedAccs) {
             if (deficit <= 0) break;
             const w = withdrawFromAcc(acc, deficit, allowPenalty);
@@ -1196,30 +1206,24 @@ export function runRetirementSimulation(
               accountsState[`${id}_roth`],
             ]).filter((a): a is EngineAccount => Boolean(a));
           }
-          const orderMap: Record<string, number> =
+          const categoryOrder: Record<string, number> =
             method === 'tax_deferred_first'
               ? {
                   cash: 1,
-                  traditional_ira: 2,
-                  traditional_401k: 2,
+                  taxDeferred: 2,
                   taxable: 3,
-                  crypto: 3,
-                  roth_ira: 4,
-                  roth_401k: 4,
+                  taxFree: 4,
                   hsa: 5,
                 }
               : {
                   cash: 1,
                   taxable: 2,
-                  crypto: 2,
-                  traditional_ira: 3,
-                  traditional_401k: 3,
-                  roth_ira: 4,
-                  roth_401k: 4,
+                  taxDeferred: 3,
+                  taxFree: 4,
                   hsa: 5,
                 };
           return accountsList
-            .sort((a, b) => (orderMap[a.type] ?? 9) - (orderMap[b.type] ?? 9));
+            .sort((a, b) => (categoryOrder[getAccountCategory(a.type)] ?? 9) - (categoryOrder[getAccountCategory(b.type)] ?? 9));
         };
 
         const orderedAccounts = getDrawdownOrder();
@@ -1369,14 +1373,14 @@ export function runRetirementSimulation(
         for (const owner of ownersToConvert) {
           const tradAccs = Object.values(accountsState).filter(
             (a) => (a.owner === owner || (!a.owner && owner === 'primary')) &&
-              (a.type === 'traditional_ira' || a.type === 'traditional_401k' || a.type.includes('traditional')) &&
+              getAccountCategory(a.type) === 'taxDeferred' &&
               a.balance > 0
           );
           if (tradAccs.length === 0) continue;
 
           let rothAcc = Object.values(accountsState).find(
             (a) => (a.owner === owner || (!a.owner && owner === 'primary')) &&
-              (a.type === 'roth_ira' || a.type === 'roth_401k' || a.type.includes('roth'))
+              getAccountCategory(a.type) === 'taxFree'
           );
 
           if (!rothAcc && tradAccs.length > 0) {

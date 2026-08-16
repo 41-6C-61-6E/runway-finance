@@ -185,16 +185,16 @@
       },
       "swatch": "#398b72"
     },
-    "rose": {
+    "amber": {
       "primary": {
-        "light": "oklch(0.40 0.12 5)",
-        "dark": "oklch(0.68 0.12 10)"
+        "light": "oklch(0.55 0.12 80)",
+        "dark": "oklch(0.75 0.13 85)"
       },
       "accent": {
-        "light": "oklch(0.89 0.06 10)",
-        "dark": "oklch(0.22 0.03 5)"
+        "light": "oklch(0.92 0.06 90)",
+        "dark": "oklch(0.30 0.05 85)"
       },
-      "swatch": "#96455b"
+      "swatch": "#b07d2a"
     },
     "sapphire": {
       "primary": {

@@ -8,14 +8,14 @@ import { ACCENT_NAMES, applyAccent } from '@/lib/utils/apply-accent';
 const SWATCH_COLORS: Record<string, string> = {
   violet: ACCENTS.violet.swatch,
   teal: ACCENTS.teal.swatch,
-  rose: ACCENTS.rose.swatch,
+  amber: ACCENTS.amber.swatch,
   sapphire: ACCENTS.sapphire.swatch,
 };
 
 const SWATCH_LABELS: Record<string, string> = {
   violet: 'Violet',
   teal: 'Teal',
-  rose: 'Rose',
+  amber: 'Amber',
   sapphire: 'Sapphire',
 };
 

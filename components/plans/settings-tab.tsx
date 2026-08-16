@@ -247,7 +247,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
   const settingsSubTabs = [
     { id: 'milestones', label: 'Profile', icon: Flag },
     { id: 'details', label: 'Plan Details', icon: ListChecks },
-    { id: 'rates_estate', label: 'Inflation & Rates', icon: TrendingUp },
+    { id: 'rates_estate', label: 'Assumptions & Strategy', icon: TrendingUp },
     { id: 'engine_rules', label: 'Engine Rules', icon: Database },
   ];
 

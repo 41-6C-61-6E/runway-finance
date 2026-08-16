@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
+import { runRetirementSimulation } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
@@ -14,10 +14,10 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   Legend,
+  ReferenceArea,
 } from 'recharts';
 import {
   ShieldCheck,
-  CheckCircle2,
   Calendar,
   DollarSign,
   TrendingUp,
@@ -28,7 +28,6 @@ import {
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-
 import { ProjectionOptionsPopover } from './projection-options-popover';
 
 interface IrmaaTabProps {
@@ -43,26 +42,26 @@ interface IrmaaTabProps {
 export function IrmaaTab({
   plan,
   onUpdatePlan,
-  dollarMode = 'real',
-  onToggleDollarMode = () => {},
+  dollarMode = 'nominal',
+  onToggleDollarMode,
   viewMode = 'deterministic',
-  onToggleViewMode = () => {},
+  onToggleViewMode,
 }: IrmaaTabProps) {
   const [avoidIrmaa, setAvoidIrmaa] = useState<boolean>(plan?.settings?.avoidIrmaaCliffs !== false);
-  const [customTestMagi, setCustomTestMagi] = useState<number>(120000);
+  const isMfj = plan?.filingStatus === 'married_joint' || Boolean(plan?.hasSpouse);
+  const [customTestMagi, setCustomTestMagi] = useState<number>(isMfj ? 240000 : 120000);
 
   const [isOverviewCollapsed, setIsOverviewCollapsed] = useCardCollapsed('irmaa_overview');
   const [isTimelineCollapsed, setIsTimelineCollapsed] = useCardCollapsed('irmaa_timeline');
   const [isTableCollapsed, setIsTableCollapsed] = useCardCollapsed('irmaa_table');
 
-  const [appliedMsg, setAppliedMsg] = useState<string>('');
-
-  const isMfj = plan?.filingStatus === 'married_joint' || Boolean(plan?.hasSpouse);
   const rules = plan?.rules || DEFAULT_2026_RULES;
-  const irmaaList = rules?.irmaaThresholds || [];
-  const tier1Limit = irmaaList[0] ? (isMfj ? irmaaList[0].magiJoint : irmaaList[0].magiSingle) : 103000;
+  const irmaaList = rules?.irmaaThresholds || DEFAULT_2026_RULES.irmaaThresholds;
+  
+  const tier1Limit = irmaaList[1]
+    ? (isMfj ? irmaaList[1].magiJoint : irmaaList[1].magiSingle)
+    : (isMfj ? 206000 : 103000);
 
-  // Helper to convert DB plan to EnginePlan object
   const buildEnginePlanHelper = (irmaaGuard: boolean) => {
     return buildEnginePlan(plan, {
       avoidIrmaaCliffs: irmaaGuard,
@@ -72,6 +71,8 @@ export function IrmaaTab({
   const simNoGuard = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(false)), [plan]);
   const simGuard = useMemo(() => runRetirementSimulation(buildEnginePlanHelper(true)), [plan]);
 
+  const inflationRate = (plan?.settings?.fixedInflationRate ?? 3.0) / 100;
+
   const irmaaStats = useMemo(() => {
     const yearsNoGuard = simNoGuard.yearlyResults.filter((y) => y.primaryAge >= 65);
     const yearsGuard = simGuard.yearlyResults.filter((y) => y.primaryAge >= 65);
@@ -80,28 +81,34 @@ export function IrmaaTab({
     const totalCostGuard = yearsGuard.reduce((sum, y) => sum + (y.irmaaSurchargeAnnual || 0), 0);
     const totalSaved = Math.max(0, totalCostNoGuard - totalCostGuard);
 
-    const maxTierNoGuard = Math.max(0, ...yearsNoGuard.map((y) => y.irmaaTier || 0));
-    const maxTierGuard = Math.max(0, ...yearsGuard.map((y) => y.irmaaTier || 0));
-
-    return { totalCostNoGuard, totalCostGuard, totalSaved, maxTierNoGuard, maxTierGuard };
+    return { totalCostNoGuard, totalCostGuard, totalSaved };
   }, [simNoGuard, simGuard]);
 
   const timelineChartData = useMemo(() => {
-    const tier1Limit = irmaaList[0] ? (isMfj ? irmaaList[0].magiJoint : irmaaList[0].magiSingle) : 103000;
-    const tier2Limit = irmaaList[1] ? (isMfj ? irmaaList[1].magiJoint : irmaaList[1].magiSingle) : 129000;
+    const t1 = irmaaList[1] ? (isMfj ? irmaaList[1].magiJoint : irmaaList[1].magiSingle) : (isMfj ? 206000 : 103000);
+    const t2 = irmaaList[2] ? (isMfj ? irmaaList[2].magiJoint : irmaaList[2].magiSingle) : (isMfj ? 258000 : 129000);
+    const t3 = irmaaList[3] ? (isMfj ? irmaaList[3].magiJoint : irmaaList[3].magiSingle) : (isMfj ? 322000 : 161000);
+    const t4 = irmaaList[4] ? (isMfj ? irmaaList[4].magiJoint : irmaaList[4].magiSingle) : (isMfj ? 386000 : 193000);
 
-    return simGuard.yearlyResults.map((y) => ({
-      age: y.primaryAge,
-      magi: Math.round(y.magi || 0),
-      surcharge: Math.round(y.irmaaSurchargeAnnual || 0),
-      tier1Cliff: tier1Limit,
-      tier2Cliff: tier2Limit,
-    }));
-  }, [simGuard, irmaaList, isMfj]);
+    return simGuard.yearlyResults.map((y, idx) => {
+      const discountFactor = dollarMode === 'real' ? Math.pow(1 + inflationRate, idx) : 1;
+      const unguardedMagi = simNoGuard.yearlyResults[idx]?.magi || 0;
 
-  // Calculate surcharge for custom test MAGI
+      return {
+        age: y.primaryAge,
+        magi: Math.round((y.magi || 0) / discountFactor),
+        magiUnguarded: Math.round(unguardedMagi / discountFactor),
+        surcharge: Math.round((y.irmaaSurchargeAnnual || 0) / discountFactor),
+        tier1Cliff: Math.round(t1 / discountFactor),
+        tier2Cliff: Math.round(t2 / discountFactor),
+        tier3Cliff: Math.round(t3 / discountFactor),
+        tier4Cliff: Math.round(t4 / discountFactor),
+      };
+    });
+  }, [simGuard, simNoGuard, irmaaList, isMfj, dollarMode, inflationRate]);
+
   const testMagiCalc = useMemo(() => {
-    for (let idx = irmaaList.length - 1; idx >= 0; idx--) {
+    for (let idx = irmaaList.length - 1; idx >= 1; idx--) {
       const tierObj = irmaaList[idx];
       const limit = isMfj ? tierObj.magiJoint : tierObj.magiSingle;
       if (customTestMagi >= limit && limit > 0) {
@@ -110,8 +117,13 @@ export function IrmaaTab({
         return { tier: idx, monthlySurchargePerPerson, annualHouseholdSurcharge, limit };
       }
     }
-    return { tier: 0, monthlySurchargePerPerson: 0, annualHouseholdSurcharge: 0, limit: irmaaList[0] ? (isMfj ? irmaaList[0].magiJoint : irmaaList[0].magiSingle) : 103000 };
-  }, [customTestMagi, irmaaList, isMfj]);
+    return {
+      tier: 0,
+      monthlySurchargePerPerson: 0,
+      annualHouseholdSurcharge: 0,
+      limit: tier1Limit,
+    };
+  }, [customTestMagi, irmaaList, isMfj, tier1Limit]);
 
   const updatePlanSettings = (avoidVal: boolean) => {
     if (!onUpdatePlan) return;
@@ -123,64 +135,45 @@ export function IrmaaTab({
     });
   };
 
+  const sliderMax = isMfj ? 750000 : 400000;
+  const sliderMin = isMfj ? 150000 : 80000;
+
   return (
     <div className="space-y-6">
-      {/* Header KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Medicare Age Status</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Medicare Age</span>
             <Calendar className="w-4 h-4 text-primary" />
           </div>
-          <div className="text-xl font-bold font-mono text-foreground">
-            Age {rules.medicareAge || 65}
-          </div>
-          <span className="text-[10px] text-muted-foreground block">
-            Medicare Part B & D eligibility start
-          </span>
+          <div className="text-xl font-bold font-mono text-foreground">Age {rules.medicareAge || 65}</div>
         </div>
-
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Lookback MAGI Start</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Lookback Period</span>
             <ShieldCheck className="w-4 h-4 text-indigo-500" />
           </div>
           <div className="text-xl font-bold font-mono text-indigo-500">
-            Age {(rules.medicareAge || 65) - (rules.irmaaLookbackYears || 2)}
+            {rules.irmaaLookbackYears || 2} Years
           </div>
-          <span className="text-[10px] text-muted-foreground block">
-            2-year tax return lookback rule applies
-          </span>
         </div>
-
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Tier 1 MAGI Threshold</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Tier 1 Threshold</span>
             <DollarSign className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-xl font-bold font-mono text-foreground">
-            {formatCurrency(tier1Limit)}
-          </div>
-          <span className="text-[10px] text-muted-foreground block">
-            {isMfj ? 'Married Filing Jointly limit' : 'Single Filer limit'}
-          </span>
+          <div className="text-xl font-bold font-mono text-foreground">{formatCurrency(tier1Limit)}</div>
         </div>
-
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">Lifetime Guardrail Savings</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">Lifetime Savings</span>
             <Sparkles className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-xl font-bold font-mono text-emerald-500">
-            {formatCurrency(irmaaStats.totalSaved)}
-          </div>
-          <span className="text-[10px] text-muted-foreground block">
-            Surcharges avoided via cliff guard
-          </span>
+          <div className="text-xl font-bold font-mono text-emerald-500">{formatCurrency(irmaaStats.totalSaved)}</div>
+          <span className="text-[10px] text-muted-foreground block">Simulated guard-on vs guard-off difference</span>
         </div>
       </div>
 
-      {/* SECTION 1: Medicare IRMAA GUARDRAIL CONTROLS */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
           title="Medicare IRMAA Cliff Guardrail Controls"
@@ -189,11 +182,9 @@ export function IrmaaTab({
           isCollapsed={isOverviewCollapsed}
           onToggle={() => setIsOverviewCollapsed(!isOverviewCollapsed)}
         />
-
         {!isOverviewCollapsed && (
           <div className="p-5 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-4 rounded-xl border border-border text-xs">
-              {/* Avoid IRMAA Cliffs Toggle */}
               <div className="space-y-2">
                 <label className="font-bold text-foreground block">Enable Medicare IRMAA Cliff Guardrail</label>
                 <div className="flex items-center gap-3">
@@ -209,54 +200,68 @@ export function IrmaaTab({
                     className="w-4 h-4 accent-primary rounded cursor-pointer"
                   />
                   <label htmlFor="avoidIrmaaToggle" className="text-xs font-semibold text-muted-foreground cursor-pointer">
-                    {avoidIrmaa ? 'Guardrail Active (Cap conversions $1,000 below Tier 1 cliff)' : 'No Guardrail (Risk cliff surcharges)'}
+                    {avoidIrmaa
+                      ? 'Guardrail Active (Cap conversions under next IRMAA cliff at age 63+)'
+                      : 'No Guardrail (Risk cliff surcharges)'}
                   </label>
                 </div>
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  When enabled, Roth conversions in the simulation are automatically capped $1,000 below the nearest IRMAA threshold once you reach age 63 (the 2-year lookback window).
+                </p>
               </div>
-
-              {/* MAGI Surcharge Estimator Tool */}
               <div className="space-y-3 bg-card p-3.5 rounded-xl border border-border">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-foreground">Interactive MAGI Surcharge Estimator</label>
                   <span className="font-mono text-primary font-bold">{formatCurrency(customTestMagi)}</span>
                 </div>
                 <Slider
-                  min={80000}
-                  max={400000}
+                  min={sliderMin}
+                  max={sliderMax}
                   step={5000}
                   value={customTestMagi}
-                  ticks={[
-                    { value: 80000, label: '$80k' },
-                    { value: 200000, label: '$200k' },
-                    { value: 400000, label: '$400k' },
-                  ]}
+                  ticks={
+                    isMfj
+                      ? [
+                          { value: 150000, label: '$150k' },
+                          { value: 450000, label: '$450k' },
+                          { value: 750000, label: '$750k' },
+                        ]
+                      : [
+                          { value: 80000, label: '$80k' },
+                          { value: 240000, label: '$240k' },
+                          { value: 400000, label: '$400k' },
+                        ]
+                  }
                   onChange={(val) => setCustomTestMagi(Math.round(val))}
                   ariaLabel="MAGI Surcharge Estimator"
                 />
-                <div className="flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-muted-foreground">Result: <strong>Tier {testMagiCalc.tier}</strong></span>
+                <div className="flex items-center justify-between text-[11px] font-mono pt-1">
+                  <span className="text-muted-foreground">
+                    Status: <strong className={testMagiCalc.tier > 0 ? 'text-amber-500' : 'text-emerald-500'}>
+                      {testMagiCalc.tier > 0 ? `Tier ${testMagiCalc.tier} Surcharge` : 'Standard Premium (No Surcharge)'}
+                    </strong>
+                  </span>
                   <span className="text-rose-400 font-bold">
-                    +{formatCurrency(testMagiCalc.monthlySurchargePerPerson)}/mo/person ({formatCurrency(testMagiCalc.annualHouseholdSurcharge)}/yr household)
+                    +{formatCurrency(testMagiCalc.monthlySurchargePerPerson)}/mo/person ({formatCurrency(testMagiCalc.annualHouseholdSurcharge)}/yr {isMfj ? 'MFJ' : 'Single'})
                   </span>
                 </div>
               </div>
             </div>
-
-            {/* Active Status Bar */}
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-1">
               <div className="text-xs text-muted-foreground">
-                Lifetime Medicare Surcharges with active guardrail: <strong className="text-foreground font-mono">{formatCurrency(irmaaStats.totalCostGuard)}</strong>
+                Lifetime Medicare Surcharges with active guardrail:{' '}
+                <strong className="text-foreground font-mono">{formatCurrency(irmaaStats.totalCostGuard)}</strong>
+                {' '}(vs {formatCurrency(irmaaStats.totalCostNoGuard)} without guardrail)
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* SECTION 2: MAGI VS IRMAA CLIFFS TIMELINE CHART */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
           title="Retirement MAGI vs IRMAA Threshold Cliffs Timeline"
-          description="Track projected MAGI from age 63+ against Tier 1 and Tier 2 IRMAA surcharge cliffs"
+          description="Track projected MAGI against all 4 statutory IRMAA surcharge cliffs, with 2-year lookback window (ages 63-64)"
           icon={TrendingUp}
           isCollapsed={isTimelineCollapsed}
           onToggle={() => setIsTimelineCollapsed(!isTimelineCollapsed)}
@@ -269,12 +274,11 @@ export function IrmaaTab({
             />
           }
         />
-
         {!isTimelineCollapsed && (
           <div className="p-5 space-y-6">
-            <div className="h-72 w-full pt-2">
+            <div className="h-80 w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timelineChartData}>
+                <LineChart data={timelineChartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                   <XAxis dataKey="age" stroke="#888888" fontSize={11} tickLine={false} />
                   <YAxis
@@ -285,9 +289,24 @@ export function IrmaaTab({
                   />
                   <Tooltip content={<IrmaaTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                  <Line type="monotone" dataKey="magi" name="Projected MAGI" stroke="#3b82f6" strokeWidth={3} dot={false} />
+                  <ReferenceArea
+                    x1={63}
+                    x2={65}
+                    fill="#6366f1"
+                    fillOpacity={0.08}
+                    label={{
+                      value: '2-Yr Lookback (63-64)',
+                      position: 'insideTopLeft',
+                      fill: '#818cf8',
+                      fontSize: 10,
+                    }}
+                  />
+                  <Line type="monotone" dataKey="magi" name="Projected MAGI (Guarded)" stroke="#3b82f6" strokeWidth={3} dot={false} />
+                  <Line type="monotone" dataKey="magiUnguarded" name="Projected MAGI (Unguarded)" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
                   <Line type="monotone" dataKey="tier1Cliff" name="IRMAA Tier 1 Cliff" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
-                  <Line type="monotone" dataKey="tier2Cliff" name="IRMAA Tier 2 Cliff" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                  <Line type="monotone" dataKey="tier2Cliff" name="IRMAA Tier 2 Cliff" stroke="#f97316" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                  <Line type="monotone" dataKey="tier3Cliff" name="IRMAA Tier 3 Cliff" stroke="#ef4444" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                  <Line type="monotone" dataKey="tier4Cliff" name="IRMAA Tier 4 Cliff" stroke="#b91c1c" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -295,16 +314,14 @@ export function IrmaaTab({
         )}
       </div>
 
-      {/* SECTION 3: 2026 MEDICARE IRMAA BRACKET REFERENCE TABLE */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <CollapsibleCardHeader
-          title="2026 Statutory Medicare Part B & Part D IRMAA Bracket Schedule"
-          description="Official Medicare IRMAA surcharge rates by income bracket for Single and Married Filing Jointly tax filers"
+          title="Modeled Medicare Part B & Part D IRMAA Surcharge Schedule"
+          description="Medicare IRMAA surcharge rates by income bracket for Single and Married Filing Jointly tax filers (editable in Rules)"
           icon={Info}
           isCollapsed={isTableCollapsed}
           onToggle={() => setIsTableCollapsed(!isTableCollapsed)}
         />
-
         {!isTableCollapsed && (
           <div className="p-5">
             <div className="border border-border rounded-xl overflow-hidden shadow-sm">
@@ -316,24 +333,33 @@ export function IrmaaTab({
                     <th className="px-3 py-2.5">MFJ MAGI Threshold</th>
                     <th className="px-3 py-2.5 text-right">Part B Surcharge/mo</th>
                     <th className="px-3 py-2.5 text-right">Part D Surcharge/mo</th>
-                    <th className="px-3 py-2.5 text-right">Combined Annual (MFJ)</th>
+                    <th className="px-3 py-2.5 text-right">Combined Annual ({isMfj ? 'MFJ' : 'Single'})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40 font-mono">
                   {irmaaList.map((tier: any, idx: number) => {
-                    const annualMfj = (tier.partBMonthly + tier.partDMonthly) * 12 * 2;
+                    const annualCost = (tier.partBMonthly + tier.partDMonthly) * 12 * (isMfj ? 2 : 1);
+                    const isStandard = tier.magiSingle === 0 && tier.magiJoint === 0;
                     return (
                       <tr key={idx} className="hover:bg-muted/40">
-                        <td className="px-3 py-2 font-bold text-foreground font-sans">Tier {idx}</td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {tier.magiSingle === 0 ? 'Standard Rate' : `> ${formatCurrency(tier.magiSingle)}`}
+                        <td className="px-3 py-2 font-bold text-foreground font-sans">
+                          {isStandard ? 'Standard (Base)' : `Tier ${idx}`}
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">
-                          {tier.magiJoint === 0 ? 'Standard Rate' : `> ${formatCurrency(tier.magiJoint)}`}
+                          {isStandard ? '≤ $103,000' : `> ${formatCurrency(tier.magiSingle)}`}
                         </td>
-                        <td className="px-3 py-2 text-right text-rose-400">+{formatCurrency(tier.partBMonthly)}/mo</td>
-                        <td className="px-3 py-2 text-right text-purple-400">+{formatCurrency(tier.partDMonthly)}/mo</td>
-                        <td className="px-3 py-2 text-right font-bold text-rose-500">{formatCurrency(annualMfj)}/yr</td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {isStandard ? '≤ $206,000' : `> ${formatCurrency(tier.magiJoint)}`}
+                        </td>
+                        <td className="px-3 py-2 text-right text-rose-400">
+                          {isStandard ? '$0.00/mo' : `+${formatCurrency(tier.partBMonthly)}/mo`}
+                        </td>
+                        <td className="px-3 py-2 text-right text-purple-400">
+                          {isStandard ? '$0.00/mo' : `+${formatCurrency(tier.partDMonthly)}/mo`}
+                        </td>
+                        <td className={`px-3 py-2 text-right font-bold ${isStandard ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {isStandard ? '$0/yr (No Surcharge)' : `+${formatCurrency(annualCost)}/yr`}
+                        </td>
                       </tr>
                     );
                   })}
@@ -354,28 +380,43 @@ function IrmaaTooltip({ active, payload }: any) {
   const magi = Number(data.magi || 0);
   const tier1 = Number(data.tier1Cliff || 0);
   const tier2 = Number(data.tier2Cliff || 0);
+  const tier3 = Number(data.tier3Cliff || 0);
+  const tier4 = Number(data.tier4Cliff || 0);
 
-  const breachesTier1 = magi > tier1 && tier1 > 0;
-  const breachesTier2 = magi > tier2 && tier2 > 0;
+  let badgeLabel = '✅ Standard Premium';
+  let badgeColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+  let hasBreach = false;
+
+  if (tier4 > 0 && magi > tier4) {
+    badgeLabel = '⚠️ Tier 4 Cliff';
+    badgeColor = 'bg-red-500/10 text-red-500 border-red-500/20';
+    hasBreach = true;
+  } else if (tier3 > 0 && magi > tier3) {
+    badgeLabel = '⚠️ Tier 3 Cliff';
+    badgeColor = 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+    hasBreach = true;
+  } else if (tier2 > 0 && magi > tier2) {
+    badgeLabel = '⚠️ Tier 2 Cliff';
+    badgeColor = 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+    hasBreach = true;
+  } else if (tier1 > 0 && magi > tier1) {
+    badgeLabel = '⚠️ Tier 1 Cliff';
+    badgeColor = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+    hasBreach = true;
+  }
 
   return (
-    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[260px] max-w-[320px] z-50">
+    <div className="bg-background/95 backdrop-blur-md border border-border rounded-xl p-3.5 shadow-xl text-xs space-y-2.5 min-w-[280px] max-w-[340px] z-50">
       <div className="flex items-center justify-between border-b border-border pb-1.5 font-bold">
         <span className="text-foreground font-mono">Age {age}</span>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-sans ${
-          breachesTier2
-            ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-            : breachesTier1
-            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-            : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-        }`}>
-          {breachesTier2 ? '⚠️ Tier 2 Cliff' : breachesTier1 ? '⚠️ Tier 1 Cliff' : '✅ Standard Premium'}
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border font-sans ${badgeColor}`}>
+          {badgeLabel}
         </span>
       </div>
 
       <div className="space-y-1.5 font-mono">
         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-sans pb-0.5 border-b border-border/50">
-          MAGI & IRMAA Thresholds
+          MAGI & IRMAA Cliffs
         </div>
         <div className="space-y-1 text-[11px] font-sans">
           {payload.map((entry: any) => {
@@ -387,7 +428,7 @@ function IrmaaTooltip({ active, payload }: any) {
                   isMagi ? 'bg-blue-500/10 font-medium' : ''
                 }`}
               >
-                <span className="flex items-center gap-1.5 truncate max-w-[180px]" style={{ color: entry.color }}>
+                <span className="flex items-center gap-1.5 truncate max-w-[190px]" style={{ color: entry.color }}>
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
                   <span className="truncate">{entry.name}</span>
                 </span>
@@ -400,7 +441,7 @@ function IrmaaTooltip({ active, payload }: any) {
         </div>
       </div>
 
-      {(breachesTier1 || breachesTier2) && (
+      {hasBreach && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 space-y-0.5 font-sans">
           <div className="flex items-center gap-1.5 font-bold text-amber-500 text-[11px]">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />

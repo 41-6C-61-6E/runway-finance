@@ -43,9 +43,17 @@ export function buildEnginePlan(plan: any, options: BuildEnginePlanOptions = {})
     spouseName: plan?.spouseName || 'Spouse / Partner',
     spouseRetirementAge: options.spouseRetirementAge ?? (plan?.spouseRetirementAge ? Number(plan.spouseRetirementAge) : 60),
     spouseLifeExpectancyAge: plan?.spouseLifeExpectancyAge ? Number(plan.spouseLifeExpectancyAge) : 100,
-    primarySsMonthlyAmount: options.primarySsMonthlyAmount ?? (plan?.primarySsMonthlyAmount ? parseFloat(plan.primarySsMonthlyAmount) : 2500),
+    primarySsMonthlyAmount: options.primarySsMonthlyAmount !== undefined
+      ? options.primarySsMonthlyAmount
+      : (plan?.primarySsMonthlyAmount !== undefined && plan?.primarySsMonthlyAmount !== null && plan?.primarySsMonthlyAmount !== ''
+          ? parseFloat(plan.primarySsMonthlyAmount)
+          : undefined),
     primarySsStartAge: options.primarySsStartAge ?? (plan?.primarySsStartAge ? Number(plan.primarySsStartAge) : 67),
-    spouseSsMonthlyAmount: options.spouseSsMonthlyAmount ?? (plan?.spouseSsMonthlyAmount ? parseFloat(plan.spouseSsMonthlyAmount) : 2000),
+    spouseSsMonthlyAmount: options.spouseSsMonthlyAmount !== undefined
+      ? options.spouseSsMonthlyAmount
+      : (plan?.spouseSsMonthlyAmount !== undefined && plan?.spouseSsMonthlyAmount !== null && plan?.spouseSsMonthlyAmount !== ''
+          ? parseFloat(plan.spouseSsMonthlyAmount)
+          : undefined),
     spouseSsStartAge: options.spouseSsStartAge ?? (plan?.spouseSsStartAge ? Number(plan.spouseSsStartAge) : 67),
     enableSpousalSsBenefit: options.enableSpousalSsBenefit ?? (plan?.enableSpousalSsBenefit !== false),
     filingStatus: plan?.filingStatus || 'single',
@@ -61,25 +69,29 @@ export function buildEnginePlan(plan: any, options: BuildEnginePlanOptions = {})
     spouseSalaryYear: Number(plan?.spouseSalaryYear) || currentYear,
     spouseSalaryRaisePct: parseFloat(plan?.spouseSalaryRaisePct) || 0,
     spouseSalaryOverrides: plan?.spouseSalaryOverrides && typeof plan?.spouseSalaryOverrides === 'object' ? plan.spouseSalaryOverrides : undefined,
-    accounts: activeAccounts.map((a: any) => ({
-      id: a.id,
-      name: a.name,
-      type: a.type,
-      owner: a.owner || 'primary',
-      balance: parseFloat(a.balance) || 0,
-      costBasis: parseFloat(a.costBasis) || 0,
-      expectedGrowthRate: options.expectedGrowthRate ?? (parseFloat(a.expectedGrowthRate) || 6.0),
-      dividendYield: parseFloat(a.dividendYield) || 2.0,
-      reinvestDividends: a.reinvestDividends !== false,
-      qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
-      rothPercentage: a.rothPercentage,
-      contributionMode: (a.contributionMode as any) || 'none',
-      contributionValue: a.contributionValue ? parseFloat(a.contributionValue) : undefined,
-      contributionSalarySource: (a.contributionSalarySource as any) || undefined,
-      companyMatchRate: a.companyMatchRate ? parseFloat(a.companyMatchRate) : undefined,
-      companyMatchLimit: a.companyMatchLimit ? parseFloat(a.companyMatchLimit) : undefined,
-      isSurplusDestination: Boolean(a.isSurplusDestination),
-    })),
+    accounts: activeAccounts.map((a: any) => {
+      const parsedGrowth = parseFloat(a.expectedGrowthRate);
+      const parsedYield = parseFloat(a.dividendYield);
+      return {
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        owner: a.owner || 'primary',
+        balance: parseFloat(a.balance) || 0,
+        costBasis: parseFloat(a.costBasis) || 0,
+        expectedGrowthRate: options.expectedGrowthRate ?? (Number.isFinite(parsedGrowth) ? parsedGrowth : 6.0),
+        dividendYield: Number.isFinite(parsedYield) ? parsedYield : 2.0,
+        reinvestDividends: a.reinvestDividends !== false,
+        qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
+        rothPercentage: a.rothPercentage,
+        contributionMode: (a.contributionMode as any) || 'none',
+        contributionValue: a.contributionValue ? parseFloat(a.contributionValue) : undefined,
+        contributionSalarySource: (a.contributionSalarySource as any) || undefined,
+        companyMatchRate: a.companyMatchRate ? parseFloat(a.companyMatchRate) : undefined,
+        companyMatchLimit: a.companyMatchLimit ? parseFloat(a.companyMatchLimit) : undefined,
+        isSurplusDestination: Boolean(a.isSurplusDestination),
+      };
+    }),
     liabilities: planLiabilitiesList.map((l: any) => ({
       id: l.id,
       name: l.name,
@@ -137,7 +149,7 @@ export function buildEnginePlan(plan: any, options: BuildEnginePlanOptions = {})
       withdrawalMethod: options.withdrawalMethod || plan?.settings?.withdrawalMethod || plan?.withdrawalMethod || 'textbook',
       enableRothConversions: options.enableRothConversions ?? Boolean(plan?.settings?.enableRothConversions),
       rothConversionTargetCeiling: options.rothConversionTargetCeiling || plan?.settings?.rothConversionTargetCeiling || 'top_of_12',
-      avoidIrmaaCliffs: options.avoidIrmaaCliffs ?? Boolean(plan?.settings?.avoidIrmaaCliffs),
+      avoidIrmaaCliffs: options.avoidIrmaaCliffs ?? (plan?.settings?.avoidIrmaaCliffs !== false),
       allowPenaltyWithdrawals: options.allowPenaltyWithdrawals ?? (plan?.settings?.allowPenaltyWithdrawals !== false),
     },
     rules: plan?.rules || DEFAULT_2026_RULES,

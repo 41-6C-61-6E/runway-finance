@@ -214,21 +214,25 @@ export function ScenariosTab({
 
   // Combined Chart Data for all 5 strategies
   const strategyChartData = useMemo(() => {
+    const inflationRate = (plan?.settings?.fixedInflationRate ?? 3.0) / 100;
     const textRes = strategiesList.find((s) => s.id === 'textbook')?.summary.yearlyResults || [];
     const propRes = strategiesList.find((s) => s.id === 'proportional')?.summary.yearlyResults || [];
     const defRes = strategiesList.find((s) => s.id === 'tax_deferred_first')?.summary.yearlyResults || [];
     const optRes = strategiesList.find((s) => s.id === 'tax_optimized')?.summary.yearlyResults || [];
     const rothRes = strategiesList.find((s) => s.id === 'roth_ladder')?.summary.yearlyResults || [];
 
-    return textRes.map((y: any, idx: number) => ({
-      age: y.primaryAge ?? y.age,
-      textbook: Math.round(y.netWorth),
-      proportional: Math.round(propRes[idx]?.netWorth || 0),
-      tax_deferred_first: Math.round(defRes[idx]?.netWorth || 0),
-      tax_optimized: Math.round(optRes[idx]?.netWorth || 0),
-      roth_ladder: Math.round(rothRes[idx]?.netWorth || 0),
-    }));
-  }, [strategiesList]);
+    return textRes.map((y: any, idx: number) => {
+      const discountFactor = dollarMode === 'real' ? Math.pow(1 + inflationRate, idx) : 1;
+      return {
+        age: y.primaryAge ?? y.age,
+        textbook: Math.round(y.netWorth / discountFactor),
+        proportional: Math.round((propRes[idx]?.netWorth || 0) / discountFactor),
+        tax_deferred_first: Math.round((defRes[idx]?.netWorth || 0) / discountFactor),
+        tax_optimized: Math.round((optRes[idx]?.netWorth || 0) / discountFactor),
+        roth_ladder: Math.round((rothRes[idx]?.netWorth || 0) / discountFactor),
+      };
+    });
+  }, [strategiesList, dollarMode, plan]);
 
   const subTabs = [
     { id: 'withdraw' as const, label: 'Withdrawal', icon: Layers },
@@ -239,6 +243,8 @@ export function ScenariosTab({
 
   const handleApplyStrategy = (strat: any) => {
     if (!onUpdatePlan) return;
+    const wasRothEnabled = Boolean(plan?.settings?.enableRothConversions);
+
     if (strat.enableRoth) {
       onUpdatePlan({
         withdrawalMethod: strat.method,
@@ -250,6 +256,7 @@ export function ScenariosTab({
           avoidIrmaaCliffs: true,
         },
       });
+      setAppliedMsg(`Applied ${strat.name} with Top of 12% Bracket & IRMAA Guardrail.`);
     } else {
       onUpdatePlan({
         withdrawalMethod: strat.method,
@@ -259,10 +266,14 @@ export function ScenariosTab({
           enableRothConversions: false,
         },
       });
+      setAppliedMsg(
+        wasRothEnabled
+          ? `Applied ${strat.name}. Roth conversions set to inactive.`
+          : `Applied ${strat.name} strategy to active plan!`
+      );
     }
 
-    setAppliedMsg(`Applied ${strat.name} strategy to active plan!`);
-    setTimeout(() => setAppliedMsg(''), 4000);
+    setTimeout(() => setAppliedMsg(''), 5000);
   };
 
   return (
@@ -278,7 +289,7 @@ export function ScenariosTab({
       {appliedMsg && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-between animate-in fade-in">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
             <span>{appliedMsg}</span>
           </div>
         </div>
@@ -385,12 +396,7 @@ export function ScenariosTab({
                             <td colSpan={6} className="p-0">
                               {/* Main Strategy Header Row */}
                               <div
-                                onClick={() => {
-                                  if (!isCurrentActive) {
-                                    handleApplyStrategy(strat);
-                                  }
-                                  setExpandedStrategyId(isExpanded ? null : strat.id);
-                                }}
+                                onClick={() => setExpandedStrategyId(isExpanded ? null : strat.id)}
                                 className={`flex flex-wrap items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
                                   isCurrentActive ? 'bg-primary/10 font-medium border-l-4 border-l-primary' : 'hover:bg-muted/30'
                                 }`}
@@ -433,14 +439,18 @@ export function ScenariosTab({
                                   <div className="text-center min-w-[120px]">
                                     {isCurrentActive ? (
                                       <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-xs">
-                                        <Check className="w-3.5 h-3.5" /> Active Strategy
-                                      </span>
-                                    ) : isHighestNW ? (
-                                      <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded-full hover:bg-emerald-500/20">
-                                        <Sparkles className="w-3 h-3" /> Highest Value
+                                        <Check className="w-3.5 h-3.5" /> Active
                                       </span>
                                     ) : (
-                                      <span className="text-muted-foreground text-[10px] hover:text-foreground">Click to Activate</span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleApplyStrategy(strat);
+                                        }}
+                                        className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                                      >
+                                        Apply Strategy
+                                      </button>
                                     )}
                                   </div>
                                 </div>

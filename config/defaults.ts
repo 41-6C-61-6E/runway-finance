@@ -191,7 +191,7 @@ export type SettingDefinition = {
 export const SETTING_DEFINITIONS: SettingDefinition[] = [
   // ── General ──
   { key: 'theme', label: 'Theme', description: 'Color theme: light, moonlight, or dark', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.theme },
-  { key: 'accentColor', label: 'Accent Color', description: 'Accent color preset or hex value (e.g. violet, indigo, #ff6600)', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.accentColor },
+  { key: 'accentColor', label: 'Accent Color', description: 'Accent color preset or hex value (e.g. violet, amber, #ff6600)', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.accentColor },
   { key: 'currency', label: 'Currency', description: 'ISO currency code for formatting', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.currency },
   { key: 'locale', label: 'Locale', description: 'Locale string for date/number formatting', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.locale },
   { key: 'timezone', label: 'Timezone', description: 'IANA timezone identifier', type: 'string', group: 'General', defaultValue: GENERAL_DEFAULTS.timezone },

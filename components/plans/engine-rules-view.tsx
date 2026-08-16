@@ -950,19 +950,21 @@ export function EngineRulesView({
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/40 text-muted-foreground font-semibold border-b border-border">
                   <tr>
+                    <th className="p-2.5">Tier</th>
                     <th className="p-2.5">Single MAGI ($)</th>
                     <th className="p-2.5">Joint MAGI ($)</th>
-                    <th className="p-2.5">Part B Monthly ($)</th>
-                    <th className="p-2.5">Part D Surcharge ($)</th>
+                    <th className="p-2.5">Part B Surcharge/mo ($)</th>
+                    <th className="p-2.5">Part D Surcharge/mo ($)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-mono">
                   {(rules?.irmaaThresholds || []).map((t: any, idx: number) => (
                     <tr key={idx} className="hover:bg-muted/20">
-                      <td className="p-2.5 font-bold">${t.magiSingle.toLocaleString()}</td>
-                      <td className="p-2.5 font-bold">${t.magiJoint.toLocaleString()}</td>
-                      <td className="p-2.5 text-emerald-500 font-bold">${t.partBMonthly.toFixed(2)}</td>
-                      <td className="p-2.5 text-blue-500 font-bold">${t.partDMonthly.toFixed(2)}</td>
+                      <td className="p-2.5 font-sans font-bold">{idx === 0 ? 'Standard' : `Tier ${idx}`}</td>
+                      <td className="p-2.5 font-bold">{t.magiSingle === 0 ? '≤ $103,000' : `> $${t.magiSingle.toLocaleString()}`}</td>
+                      <td className="p-2.5 font-bold">{t.magiJoint === 0 ? '≤ $206,000' : `> $${t.magiJoint.toLocaleString()}`}</td>
+                      <td className="p-2.5 text-emerald-500 font-bold">{t.partBMonthly > 0 ? `+$${t.partBMonthly.toFixed(2)}` : '$0.00'}</td>
+                      <td className="p-2.5 text-blue-500 font-bold">{t.partDMonthly > 0 ? `+$${t.partDMonthly.toFixed(2)}` : '$0.00'}</td>
                     </tr>
                   ))}
                 </tbody>

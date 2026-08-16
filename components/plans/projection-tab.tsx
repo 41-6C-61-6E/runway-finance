@@ -893,11 +893,11 @@ export function ProjectionTab({
               />
                 <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)} />
                 <Tooltip content={<MonteCarloTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
-                <Area type="monotone" dataKey="p90" stroke="#f59e0b" strokeWidth={1} fill="url(#mcBandGrad)" name="90th Percentile" />
+                <Area type="monotone" dataKey="p90" stroke="#f59e0b" strokeWidth={1} fill="url(#mcBandGrad)" name="90th Percentile (Optimistic)" />
                 <Area type="monotone" dataKey="p75" stroke="#3b82f6" strokeWidth={1.5} fill="none" name="75th Percentile" />
                 <Area type="monotone" dataKey="p50" stroke="#10b981" strokeWidth={2.5} fill="none" name="Median (P50)" />
                 <Area type="monotone" dataKey="p25" stroke="#a855f7" strokeWidth={1.5} fill="none" name="25th Percentile" />
-                <Area type="monotone" dataKey="p10" stroke="#f43f5e" strokeWidth={1.5} fill="none" name="10th Percentile (Worst Case)" />
+                <Area type="monotone" dataKey="p10" stroke="#f43f5e" strokeWidth={1.5} fill="none" name="10th Percentile (Conservative / 90% Confidence)" />
               </AreaChart>
             )}
           </ResponsiveContainer>
@@ -1153,7 +1153,13 @@ export function ProjectionTab({
         })()}
 
         {!isYearlyTableCollapsed && (
-          <div className="border-t border-border overflow-x-auto max-h-[550px] overflow-y-auto">
+          <div>
+            <div className="px-4 py-2 bg-muted/30 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1.5 font-medium">
+                <span>💡 Click any row below to open the complete 4-section Year Breakdown Modal (Tax Waterfall, Cash Flow, Account Balances &amp; Rules Engine).</span>
+              </span>
+            </div>
+            <div className="border-t border-border overflow-x-auto max-h-[550px] overflow-y-auto">
             <table className="w-full text-xs text-left border-collapse">
               <thead className="bg-muted/60 text-muted-foreground font-semibold sticky top-0 bg-card z-20">
                 <tr>
@@ -1227,6 +1233,7 @@ export function ProjectionTab({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>
@@ -1482,7 +1489,7 @@ function MonteCarloTooltip({ active, payload }: any) {
           <div className="flex justify-between items-center">
             <span className="text-amber-500 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              90th Percentile (Best):
+              90th Percentile (Optimistic):
             </span>
             <span className="font-bold text-foreground font-mono">{formatCurrency(data.p90)}</span>
           </div>
@@ -1510,7 +1517,7 @@ function MonteCarloTooltip({ active, payload }: any) {
           <div className="flex justify-between items-center">
             <span className="text-rose-500 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-              10th Percentile (Worst):
+              10th Percentile (Conservative / 90% Confidence):
             </span>
             <span className="font-bold text-foreground font-mono">{formatCurrency(data.p10)}</span>
           </div>
@@ -1661,12 +1668,17 @@ function DrawdownTooltip({ active, payload }: any) {
               </div>
             )}
             {data.rothConversionAmount > 0 && (
-              <div className="flex justify-between items-center pt-0.5">
-                <span className="text-amber-400 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  Roth Conversion:
-                </span>
-                <span className="font-bold text-amber-400 font-mono">{formatCurrency(data.rothConversionAmount)}</span>
+              <div className="pt-2 border-t border-border/40 mt-1 space-y-1">
+                <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider font-sans">
+                  Tax Optimization Conversions
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-muted-foreground flex items-center gap-1.5 font-sans">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    Traditional → Roth Ladder:
+                  </span>
+                  <span className="font-bold text-amber-400 font-mono">{formatCurrency(data.rothConversionAmount)}</span>
+                </div>
               </div>
             )}
           </div>
