@@ -1044,8 +1044,6 @@ export function runRetirementSimulation(
             } else {
               requestedAlloc = surplus;
             }
-          } else if (flow.ruleType === 'save_leftover') {
-            requestedAlloc = surplus;
           }
 
           let capLimit = surplus;

@@ -156,6 +156,7 @@ export default function AutomaticAccountsSection({
   const [plaidSecret, setPlaidSecret] = useState('');
   const [plaidEnvironment, setPlaidEnvironment] = useState('sandbox');
   const [savingPlaidCredentials, setSavingPlaidCredentials] = useState(false);
+  const [plaidDialogError, setPlaidDialogError] = useState('');
   const [dismissedPlaidHourlyWarnings, setDismissedPlaidHourlyWarnings] = useState<string[]>([]);
   const [isPricingExpanded, setIsPricingExpanded] = useState(false);
   const [isAddConnectionExpanded, setIsAddConnectionExpanded] = useState(true);
@@ -171,6 +172,48 @@ export default function AutomaticAccountsSection({
   const [manageSyncSaving, setManageSyncSaving] = useState(false);
   const [manageSyncError, setManageSyncError] = useState('');
   const [tempDisabledAccounts, setTempDisabledAccounts] = useState<string[]>([]);
+
+  const [isSimpleFinRotateDialogOpen, setIsSimpleFinRotateDialogOpen] = useState(false);
+  const [simpleFinRotateConn, setSimpleFinRotateConn] = useState<SettingsConnection | null>(null);
+  const [simpleFinRotateToken, setSimpleFinRotateToken] = useState('');
+  const [simpleFinRotateLoading, setSimpleFinRotateLoading] = useState(false);
+  const [simpleFinRotateError, setSimpleFinRotateError] = useState('');
+
+  const openRotateSimpleFin = (conn: SettingsConnection) => {
+    setSimpleFinRotateConn(conn);
+    setSimpleFinRotateToken('');
+    setSimpleFinRotateError('');
+    setIsSimpleFinRotateDialogOpen(true);
+  };
+
+  const handleRotateSimpleFin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!simpleFinRotateConn) return;
+    setSimpleFinRotateLoading(true);
+    setSimpleFinRotateError('');
+    try {
+      const res = await fetch(`/api/connections/${simpleFinRotateConn.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          setupToken: simpleFinRotateToken.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Failed to update SimpleFIN access URL');
+      }
+      setIsSimpleFinRotateDialogOpen(false);
+      setSuccess('SimpleFIN access URL updated successfully!');
+      await fetchConnections();
+      invalidateAllFinanceQueries();
+    } catch (err: any) {
+      setSimpleFinRotateError(err.message || 'Failed to update SimpleFIN access URL');
+    } finally {
+      setSimpleFinRotateLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -299,6 +342,7 @@ export default function AutomaticAccountsSection({
   const handleResetPlaidKeys = async () => {
     setPlaidLinkError('');
     setPlaidLinkSuccess('');
+    setPlaidDialogError('');
     try {
       const settingsRes = await fetch('/api/user-settings', { credentials: 'include' });
       if (settingsRes.ok) {
@@ -314,9 +358,28 @@ export default function AutomaticAccountsSection({
   const handleSavePlaidCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingPlaidCredentials(true);
+    setPlaidDialogError('');
     setPlaidLinkError('');
     setPlaidLinkSuccess('');
     try {
+      // 1. Validate credentials with Plaid validate endpoint
+      const validateRes = await fetch('/api/plaid/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          clientId: plaidClientId.trim(),
+          secret: plaidSecret.trim(),
+          environment: plaidEnvironment,
+        }),
+      });
+
+      const validateData = await validateRes.json();
+      if (!validateRes.ok || !validateData.valid) {
+        throw new Error(validateData.error || 'Invalid Plaid credentials');
+      }
+
+      // 2. Save valid credentials to user settings
       const settingsRes = await fetch('/api/user-settings', { credentials: 'include' });
       if (!settingsRes.ok) throw new Error('Failed to retrieve current settings');
       const settingsData = await settingsRes.json();
@@ -342,12 +405,9 @@ export default function AutomaticAccountsSection({
       }
 
       setIsPlaidCredentialsDialogOpen(false);
-      setPlaidLinkSuccess('Plaid credentials saved successfully.');
-      
-      setTimeout(() => {
-        handleConnectPlaid();
-      }, 300);
+      setPlaidLinkSuccess('Plaid API credentials saved and validated successfully. They will be used for future sync operations.');
     } catch (err: any) {
+      setPlaidDialogError(err.message || 'Failed to save Plaid credentials');
       setPlaidLinkError(err.message || 'Failed to save Plaid credentials');
     } finally {
       setSavingPlaidCredentials(false);
@@ -835,32 +895,41 @@ export default function AutomaticAccountsSection({
               {/* Option B: SimpleFIN */}
               <div className="p-4 bg-muted/20 border border-border rounded-lg flex flex-col justify-between space-y-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Connect via SimpleFIN (MX)</h3>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-foreground">Connect via SimpleFIN (MX)</h3>
+                    {hasMySimpleFin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const conn = connections.find((c) => c.userId === currentUserId && c.provider === 'simplefin');
+                          if (conn) openRotateSimpleFin(conn);
+                        }}
+                        className="text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted px-2 py-0.5 rounded-md transition-colors flex-shrink-0 cursor-pointer"
+                      >
+                        Edit Keys
+                      </button>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Import transactions from your bank using a SimpleFIN setup token/API key.
                   </p>
                 </div>
                 {hasMySimpleFin ? (
-                  <div className="space-y-3">
-                    <div className="text-[11px] text-muted-foreground font-medium bg-muted/40 border border-border/50 px-2.5 py-1.5 rounded-lg">
-                      SimpleFIN connection already linked. Delete it first if you need to reconnect.
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const conn = connections.find((c) => c.userId === currentUserId && c.provider === 'simplefin');
-                        if (conn) openManageSync(conn);
-                      }}
-                      className="w-full px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      Manage SimpleFIN (MX) Institutions
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const conn = connections.find((c) => c.userId === currentUserId && c.provider === 'simplefin');
+                      if (conn) openManageSync(conn);
+                    }}
+                    className="w-full px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 disabled:opacity-50 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    Manage SimpleFIN (MX) Institutions
+                  </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setShowSimpleFinForm(!showSimpleFinForm)}
-                    className={`w-full px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+                    className={`w-full px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
                       showSimpleFinForm
                         ? 'text-foreground bg-muted hover:bg-accent border border-border'
                         : 'text-primary-foreground bg-primary hover:opacity-90 disabled:opacity-50'
@@ -1222,12 +1291,18 @@ export default function AutomaticAccountsSection({
             </DialogTitle>
             <DialogDescription>
               {connections.some((c) => c.provider === 'plaid')
-                ? 'Update your stored Plaid API keys. New credentials will be used for all future sync operations.'
+                ? 'Update your stored Plaid API keys. New credentials will be validated and saved for future sync operations.'
                 : 'Enter your Plaid API keys to link bank accounts securely. Credentials are encrypted at rest.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSavePlaidCredentials} className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {plaidDialogError && (
+                <div className="p-3 bg-destructive/15 border border-destructive/25 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive leading-normal">{plaidDialogError}</p>
+                </div>
+              )}
               <div>
                 <label htmlFor="plaidClientId" className="block text-sm font-medium text-foreground mb-1">
                   Plaid Client ID
@@ -1272,16 +1347,70 @@ export default function AutomaticAccountsSection({
               <button
                 type="button"
                 onClick={() => setIsPlaidCredentialsDialogOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={savingPlaidCredentials}
-                className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+                className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >
-                {savingPlaidCredentials ? 'Saving...' : connections.some((c) => c.provider === 'plaid') ? 'Save Keys' : 'Save & Link'}
+                {savingPlaidCredentials ? 'Validating & Saving...' : 'Save Keys'}
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* SimpleFIN Rotate Access URL Dialog */}
+      <Dialog open={isSimpleFinRotateDialogOpen} onOpenChange={setIsSimpleFinRotateDialogOpen}>
+        <DialogContent className="max-w-md max-h-[90dvh] sm:max-h-[85dvh] flex flex-col gap-0 p-0">
+          <DialogHeader className="p-4 sm:p-6 pb-4 border-b border-border shrink-0">
+            <DialogTitle>Rotate SimpleFIN Access URL</DialogTitle>
+            <DialogDescription>
+              Update or replace your SimpleFIN access URL or setup token. Stored accounts and transaction history will remain intact.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRotateSimpleFin} className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {simpleFinRotateError && (
+                <div className="p-3 bg-destructive/15 border border-destructive/25 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive leading-normal">{simpleFinRotateError}</p>
+                </div>
+              )}
+              <div>
+                <label htmlFor="rotateSetupToken" className="block text-sm font-medium text-foreground mb-1">
+                  New SimpleFIN Setup Token or Access URL
+                </label>
+                <Input
+                  id="rotateSetupToken"
+                  value={simpleFinRotateToken}
+                  onChange={(e) => setSimpleFinRotateToken(e.target.value)}
+                  placeholder="Paste setup token or https://... access URL"
+                  required
+                  autoFocus
+                />
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Generate a setup token on beta-bridge.simplefin.org or paste your full SimpleFIN access URL.
+                </p>
+              </div>
+            </div>
+            <DialogFooter className="p-6 pt-4 border-t border-border bg-muted/10 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSimpleFinRotateDialogOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={simpleFinRotateLoading || !simpleFinRotateToken.trim()}
+                className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                {simpleFinRotateLoading ? 'Updating URL...' : 'Update Access URL'}
               </button>
             </DialogFooter>
           </form>
@@ -1332,7 +1461,22 @@ export default function AutomaticAccountsSection({
                   <div className="mt-1 text-foreground text-sm">{new Date(detailsConn.createdAt).toLocaleDateString()}</div>
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground font-medium">Access URL</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-muted-foreground font-medium">Access URL</label>
+                    {detailsConn.provider === 'simplefin' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const c = detailsConn;
+                          setDetailsConn(null);
+                          openRotateSimpleFin(c);
+                        }}
+                        className="text-[10px] font-semibold text-primary hover:underline cursor-pointer"
+                      >
+                        Rotate / Update URL
+                      </button>
+                    )}
+                  </div>
                   <div className="mt-1 text-muted-foreground text-sm font-mono truncate">{maskAccessUrl(detailsConn)}</div>
                 </div>
                 {detailsConn.lastSyncError && (
@@ -1348,7 +1492,7 @@ export default function AutomaticAccountsSection({
             <button
               type="button"
               onClick={() => setDetailsConn(null)}
-              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors cursor-pointer"
             >
               Close
             </button>
