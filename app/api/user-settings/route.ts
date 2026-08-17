@@ -133,6 +133,10 @@ export async function GET() {
     notifyAiProposals: settings[0].notifyAiProposals ?? DEFAULTS.notifyAiProposals,
     maxNotificationsPerPeriod: settings[0].maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: settings[0].notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
+    recurringExclusions: settings[0].recurringExclusions ?? DEFAULTS.recurringExclusions,
+    notifyRecurringPriceChanges: settings[0].notifyRecurringPriceChanges ?? DEFAULTS.notifyRecurringPriceChanges,
+    notifyUpcomingBills: settings[0].notifyUpcomingBills ?? DEFAULTS.notifyUpcomingBills,
+    upcomingBillsLeadDays: settings[0].upcomingBillsLeadDays ?? DEFAULTS.upcomingBillsLeadDays,
     deletePendingOlderThan30Days: settings[0].deletePendingOlderThan30Days ?? DEFAULTS.deletePendingOlderThan30Days,
     deletePendingDays: settings[0].deletePendingDays ?? DEFAULTS.deletePendingDays,
   });
@@ -190,6 +194,10 @@ export async function PATCH(request: Request) {
 	const notificationLimiterPeriodMinutes = body.notificationLimiterPeriodMinutes;
 	const deletePendingOlderThan30Days = body.deletePendingOlderThan30Days;
 	const deletePendingDays = body.deletePendingDays;
+	const recurringExclusions = body.recurringExclusions;
+	const notifyRecurringPriceChanges = body.notifyRecurringPriceChanges;
+	const notifyUpcomingBills = body.notifyUpcomingBills;
+	const upcomingBillsLeadDays = body.upcomingBillsLeadDays;
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -389,6 +397,29 @@ export async function PATCH(request: Request) {
 	if (notificationLimiterPeriodMinutes !== undefined && (typeof notificationLimiterPeriodMinutes !== 'number' || notificationLimiterPeriodMinutes <= 0)) {
 		return Response.json({ error: 'Invalid notificationLimiterPeriodMinutes value' }, { status: 400 });
 	}
+	if (notifyRecurringPriceChanges !== undefined && typeof notifyRecurringPriceChanges !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyRecurringPriceChanges value' }, { status: 400 });
+	}
+	if (notifyUpcomingBills !== undefined && typeof notifyUpcomingBills !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyUpcomingBills value' }, { status: 400 });
+	}
+	if (upcomingBillsLeadDays !== undefined && (typeof upcomingBillsLeadDays !== 'number' || !Number.isInteger(upcomingBillsLeadDays) || upcomingBillsLeadDays < 1 || upcomingBillsLeadDays > 14)) {
+		return Response.json({ error: 'Invalid upcomingBillsLeadDays value (must be 1-14)' }, { status: 400 });
+	}
+	if (recurringExclusions !== undefined) {
+		if (typeof recurringExclusions !== 'object' || recurringExclusions === null || Array.isArray(recurringExclusions)) {
+			return Response.json({ error: 'Invalid recurringExclusions value' }, { status: 400 });
+		}
+		if (recurringExclusions.categoryIds !== undefined && (!Array.isArray(recurringExclusions.categoryIds) || !recurringExclusions.categoryIds.every((id: unknown) => typeof id === 'string'))) {
+			return Response.json({ error: 'Invalid recurringExclusions.categoryIds value' }, { status: 400 });
+		}
+		if (recurringExclusions.accountIds !== undefined && (!Array.isArray(recurringExclusions.accountIds) || !recurringExclusions.accountIds.every((id: unknown) => typeof id === 'string'))) {
+			return Response.json({ error: 'Invalid recurringExclusions.accountIds value' }, { status: 400 });
+		}
+		if (recurringExclusions.merchantPatterns !== undefined && (!Array.isArray(recurringExclusions.merchantPatterns) || !recurringExclusions.merchantPatterns.every((pattern: unknown) => typeof pattern === 'string'))) {
+			return Response.json({ error: 'Invalid recurringExclusions.merchantPatterns value' }, { status: 400 });
+		}
+	}
 
 	const db = getDb();
 
@@ -446,6 +477,10 @@ export async function PATCH(request: Request) {
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
+      recurringExclusions: created?.recurringExclusions ?? DEFAULTS.recurringExclusions,
+      notifyRecurringPriceChanges: created?.notifyRecurringPriceChanges ?? DEFAULTS.notifyRecurringPriceChanges,
+      notifyUpcomingBills: created?.notifyUpcomingBills ?? DEFAULTS.notifyUpcomingBills,
+      upcomingBillsLeadDays: created?.upcomingBillsLeadDays ?? DEFAULTS.upcomingBillsLeadDays,
     });
   }
 
@@ -495,6 +530,13 @@ export async function PATCH(request: Request) {
       tagIds: budgetExclusions.tagIds ?? existingEx.tagIds ?? [],
     };
   }
+  if (recurringExclusions !== undefined) {
+    updates.recurringExclusions = {
+      categoryIds: recurringExclusions.categoryIds ?? [],
+      accountIds: recurringExclusions.accountIds ?? [],
+      merchantPatterns: recurringExclusions.merchantPatterns ?? [],
+    };
+  }
 	if (notifySyncErrors !== undefined) updates.notifySyncErrors = notifySyncErrors;
 	if (notifyBudgetAlerts !== undefined) updates.notifyBudgetAlerts = notifyBudgetAlerts;
 	if (notifyLargeTransactions !== undefined) updates.notifyLargeTransactions = notifyLargeTransactions;
@@ -507,6 +549,9 @@ export async function PATCH(request: Request) {
 	if (notifyWeeklyNetWorthChange !== undefined) updates.notifyWeeklyNetWorthChange = notifyWeeklyNetWorthChange;
 	if (weeklyNetWorthAlertDay !== undefined) updates.weeklyNetWorthAlertDay = weeklyNetWorthAlertDay.toLowerCase();
 	if (notifyAiProposals !== undefined) updates.notifyAiProposals = notifyAiProposals;
+	if (notifyRecurringPriceChanges !== undefined) updates.notifyRecurringPriceChanges = notifyRecurringPriceChanges;
+	if (notifyUpcomingBills !== undefined) updates.notifyUpcomingBills = notifyUpcomingBills;
+	if (upcomingBillsLeadDays !== undefined) updates.upcomingBillsLeadDays = upcomingBillsLeadDays;
 	if (maxNotificationsPerPeriod !== undefined) updates.maxNotificationsPerPeriod = maxNotificationsPerPeriod;
 	if (notificationLimiterPeriodMinutes !== undefined) updates.notificationLimiterPeriodMinutes = notificationLimiterPeriodMinutes;
 	if (deletePendingOlderThan30Days !== undefined) updates.deletePendingOlderThan30Days = deletePendingOlderThan30Days;
@@ -719,5 +764,9 @@ export async function PATCH(request: Request) {
     notifyAiProposals: updated.notifyAiProposals,
     maxNotificationsPerPeriod: updated.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: updated.notificationLimiterPeriodMinutes,
+    recurringExclusions: updated.recurringExclusions ?? DEFAULTS.recurringExclusions,
+    notifyRecurringPriceChanges: updated.notifyRecurringPriceChanges ?? DEFAULTS.notifyRecurringPriceChanges,
+    notifyUpcomingBills: updated.notifyUpcomingBills ?? DEFAULTS.notifyUpcomingBills,
+    upcomingBillsLeadDays: updated.upcomingBillsLeadDays ?? DEFAULTS.upcomingBillsLeadDays,
   });
 }

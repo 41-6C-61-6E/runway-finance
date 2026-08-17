@@ -575,6 +575,13 @@
       "when": 1786910000000,
       "tag": "0081_add_missing_schema_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1786995061343,
+      "tag": "0082_spotty_lady_ursula",
+      "breakpoints": true
     }
   ]
 }

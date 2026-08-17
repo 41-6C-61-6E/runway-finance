@@ -60,8 +60,17 @@ export default function NotificationsTab() {
   const weeklyNetWorthAlertDay = (settings.weeklyNetWorthAlertDay as string) || 'sunday';
   const userTimezone = (settings.timezone as string) || 'America/New_York';
   const notifyAiProposals = settings.notifyAiProposals !== false;
+  const notifyRecurringPriceChanges = settings.notifyRecurringPriceChanges !== false;
+  const notifyUpcomingBills = settings.notifyUpcomingBills ?? false;
+  const upcomingBillsLeadDays = settings.upcomingBillsLeadDays ?? 3;
   const maxNotificationsPerPeriod = settings.maxNotificationsPerPeriod ?? 5;
   const notificationLimiterPeriodMinutes = settings.notificationLimiterPeriodMinutes ?? 60;
+
+  const [leadDaysDraft, setLeadDaysDraft] = useState<string>(String(upcomingBillsLeadDays));
+
+  useEffect(() => {
+    setLeadDaysDraft(String(upcomingBillsLeadDays));
+  }, [upcomingBillsLeadDays]);
 
   const checkDeviceSubscription = async () => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -228,6 +237,18 @@ export default function NotificationsTab() {
       toast.success('Preference updated successfully.');
     } catch (err) {
       toast.error('Failed to save preference.');
+    }
+  };
+
+  const commitLeadDays = () => {
+    const parsed = parseInt(leadDaysDraft, 10);
+    if (Number.isNaN(parsed) || parsed < 1 || parsed > 14) {
+      setLeadDaysDraft(String(upcomingBillsLeadDays));
+    } else if (parsed !== upcomingBillsLeadDays) {
+      handleUpdateSetting('upcomingBillsLeadDays', parsed);
+      setLeadDaysDraft(String(parsed));
+    } else {
+      setLeadDaysDraft(String(parsed));
     }
   };
 
@@ -567,6 +588,61 @@ export default function NotificationsTab() {
                 onCheckedChange={(checked) => handleUpdateSetting('notifyAiProposals', checked)}
               />
             </div>
+
+            {/* Recurring Subscription Price Increases */}
+            <div className="flex items-center justify-between py-4">
+              <div className="space-y-1 pr-4">
+                <Label htmlFor="notify-recurring-price" className="font-medium text-sm text-foreground cursor-pointer">Subscription Price Increase Alerts</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Receive an alert whenever a recurring subscription charge increases by more than 5%.
+                </p>
+              </div>
+              <Switch
+                id="notify-recurring-price"
+                checked={notifyRecurringPriceChanges}
+                onCheckedChange={(checked) => handleUpdateSetting('notifyRecurringPriceChanges', checked)}
+              />
+            </div>
+
+            {/* Upcoming Bills Reminders */}
+            <div className="py-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1 pr-4">
+                  <Label htmlFor="notify-upcoming-bills" className="font-medium text-sm text-foreground cursor-pointer">Upcoming Bill Reminders</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Receive reminders when recurring bills are due within a set number of days.
+                  </p>
+                </div>
+                <Switch
+                  id="notify-upcoming-bills"
+                  checked={notifyUpcomingBills}
+                  onCheckedChange={(checked) => handleUpdateSetting('notifyUpcomingBills', checked)}
+                />
+              </div>
+              {notifyUpcomingBills && (
+                <div className="flex items-center gap-3 pl-4 max-w-sm">
+                  <Label htmlFor="upcoming-lead-days" className="text-xs text-muted-foreground whitespace-nowrap">
+                    Lead time (days before due date)
+                  </Label>
+                  <Input
+                    id="upcoming-lead-days"
+                    type="number"
+                    min="1"
+                    max="14"
+                    value={leadDaysDraft}
+                    onChange={(e) => setLeadDaysDraft(e.target.value)}
+                    onBlur={commitLeadDays}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        commitLeadDays();
+                      }
+                    }}
+                    className="h-8 max-w-[100px]"
+                  />
+                </div>
+              )}
+            </div>
+
 
             {/* Monthly Finance Summary Toggle */}
             <div className="flex items-center justify-between py-4">

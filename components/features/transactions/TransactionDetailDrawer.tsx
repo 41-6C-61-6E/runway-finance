@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
-import { Search, Sparkles, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Sparkles, Plus, Repeat, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 
@@ -223,6 +224,79 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     ]);
     setSplitError(null);
   }, [transaction]);
+
+  const [matchingRecurring, setMatchingRecurring] = useState<any>(null);
+  const [markingRecurring, setMarkingRecurring] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<'weekly' | 'monthly' | 'quarterly' | 'annual'>('monthly');
+
+  useEffect(() => {
+    if (transaction && open) {
+      const desc = (transaction.payee || transaction.description || '').trim();
+      if (desc) {
+        fetch(`/api/recurring?search=${encodeURIComponent(desc)}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data?.items?.length > 0) {
+              const matched = data.items.find((i: any) =>
+                desc.toLowerCase().includes((i.matchPattern || i.merchantName).toLowerCase()) ||
+                (i.matchPattern || i.merchantName).toLowerCase().includes(desc.toLowerCase())
+              );
+              setMatchingRecurring(matched || data.items[0]);
+            } else {
+              setMatchingRecurring(null);
+            }
+          })
+          .catch(() => setMatchingRecurring(null));
+      } else {
+        setMatchingRecurring(null);
+      }
+    }
+  }, [transaction, open]);
+
+  const handleMarkAsRecurring = async () => {
+    if (!transaction) return;
+    setMarkingRecurring(true);
+    try {
+      const merchantName = transaction.payee || transaction.description || '';
+
+      const checkRes = await fetch(`/api/recurring?status=active&search=${encodeURIComponent(merchantName)}`);
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        if (Array.isArray(checkData?.items) && checkData.items.length > 0) {
+          toast.warning('Already tracked as a recurring item');
+          return;
+        }
+      }
+
+      const amt = Math.abs(parseFloat(transaction.amount || '0') || 0);
+      const isIncome = (parseFloat(transaction.amount || '0') || 0) > 0;
+      const res = await fetch('/api/recurring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchantName,
+          amount: amt,
+          frequency: recurringFrequency,
+          categoryId: transaction.categoryId || null,
+          accountId: transaction.accountId || null,
+          lastDate: transaction.date,
+          flowType: isIncome ? 'income' : 'expense',
+          isConfirmed: true,
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setMatchingRecurring(created);
+        toast.success('Marked as recurring transaction');
+      } else {
+        toast.error('Failed to mark as recurring');
+      }
+    } catch {
+      toast.error('Failed to mark as recurring');
+    } finally {
+      setMarkingRecurring(false);
+    }
+  };
 
   const fetchCategories = useCallback(async () => {
     setCategoriesLoading(true);
@@ -567,6 +641,52 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                     className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground resize-none"
                     placeholder="Add notes"
                   />
+                </div>
+
+                {/* Recurring Status Banner / Action */}
+                <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Repeat className="w-4 h-4 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-foreground truncate">
+                        {matchingRecurring
+                          ? `Recurring: ${matchingRecurring.displayName}`
+                          : 'Recurring Status'}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {matchingRecurring
+                          ? `${matchingRecurring.frequency} • Next: ${matchingRecurring.nextExpectedDate || 'N/A'}`
+                          : 'Not tracked as recurring'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {!matchingRecurring && mode === 'edit' && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <select
+                        value={recurringFrequency}
+                        onChange={(e) => setRecurringFrequency(e.target.value as 'weekly' | 'monthly' | 'quarterly' | 'annual')}
+                        aria-label="Recurring frequency"
+                        className="h-7 text-xs bg-background border border-input rounded-lg px-1.5 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="annual">Annual</option>
+                      </select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleMarkAsRecurring}
+                        disabled={markingRecurring}
+                        className="h-7 text-xs px-2.5 shrink-0 font-medium"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {markingRecurring ? 'Marking...' : 'Mark Recurring'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4 pt-1">

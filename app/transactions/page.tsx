@@ -3,12 +3,17 @@
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Receipt, LayoutList, Columns2, X } from 'lucide-react';
+import { Sparkles, Receipt, LayoutList, Columns2, X, Repeat } from 'lucide-react';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';
 import TransactionDetailDrawer from '@/components/features/transactions/TransactionDetailDrawer';
 import AiSuggestionsModal from '@/components/features/ai/AiSuggestionsModal';
+import RecurringView from '@/components/features/transactions/RecurringView';
+import { UpcomingBills } from '@/components/cash-flow/upcoming-bills';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { AppTabs } from '@/components/ui/app-tabs';
+import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 import PageContent from '@/components/page-content';
 import { PageHeader } from '@/components/page-header';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
@@ -91,6 +96,72 @@ function TransactionsContent() {
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
   const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
 
+  const [activeView, setActiveView] = useState<'all' | 'recurring' | 'calendar'>(() => {
+    const v = searchParams.get('view');
+    return v === 'recurring' ? 'recurring' : v === 'calendar' ? 'calendar' : 'all';
+  });
+  const [recurringCount, setRecurringCount] = useState<number | undefined>(undefined);
+  const [upcomingWeekCount, setUpcomingWeekCount] = useState<number | undefined>(undefined);
+
+  const fetchRecurringCount = useCallback(() => {
+    fetch('/api/recurring?status=active&countOnly=true')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.counts?.total != null) {
+          setRecurringCount(d.counts.total);
+        } else if (d?.items) {
+          setRecurringCount(d.items.length);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchRecurringCount();
+  }, [fetchRecurringCount, refreshKey]);
+
+  // Fetch upcoming bills count for next 7 days for the tab badge
+  const fetchUpcomingBadge = useCallback(() => {
+    fetch('/api/recurring/upcoming?days=7&flowType=expense&countOnly=true')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.count != null) {
+          setUpcomingWeekCount(d.count);
+        } else if (d?.bills) {
+          setUpcomingWeekCount(d.bills.length);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchUpcomingBadge();
+  }, [fetchUpcomingBadge]);
+
+  const handleViewChange = (v: string) => {
+    const nextView = (v === 'recurring' || v === 'calendar' ? v : 'all') as
+      | 'all'
+      | 'recurring'
+      | 'calendar';
+    setActiveView(nextView);
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextView === 'all') {
+      params.delete('view');
+    } else {
+      params.set('view', nextView);
+    }
+    router.replace(`/transactions${params.toString() ? '?' + params.toString() : ''}`);
+  };
+
+  useEffect(() => {
+    const v = searchParams.get('view');
+    const fromUrl = (v === 'recurring' ? 'recurring' : v === 'calendar' ? 'calendar' : 'all') as
+      | 'all'
+      | 'recurring'
+      | 'calendar';
+    setActiveView((prev) => (prev === fromUrl ? prev : fromUrl));
+  }, [searchParams]);
+
   const fetchPendingAi = useCallback(() => {
     fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
       .then(r => r.json())
@@ -109,7 +180,8 @@ function TransactionsContent() {
   const handleProposalsUpdated = useCallback(() => {
     setRefreshKey((k) => k + 1);
     fetchPendingAi();
-  }, [fetchPendingAi]);
+    fetchRecurringCount();
+  }, [fetchPendingAi, fetchRecurringCount]);
 
   const handleApplyPreset = useCallback((preset: TransactionPreset) => {
     setFilters({
@@ -379,6 +451,12 @@ function TransactionsContent() {
     setRefreshKey((k) => k + 1);
   }, []);
 
+  const availableTabs = [
+    { id: 'all', label: 'Transactions' },
+    { id: 'recurring', label: 'Recurring', count: recurringCount },
+    { id: 'calendar', label: 'Calendar', count: upcomingWeekCount },
+  ];
+
   return (
     <div className="min-h-screen w-full overflow-visible page-transition-enter">
       <PageHeader
@@ -386,62 +464,91 @@ function TransactionsContent() {
         icon={Receipt}
       />
       <PageContent maxWidth="max-w-[1920px]">
-        <FilterBar 
-          filters={filters} 
-          onChange={updateFilter} 
-          onClearAll={clearAllFilters}
-          customPresets={customPresets}
-          onApplyPreset={handleApplyPreset}
-          onSavePreset={handleSavePreset}
-          onDeletePreset={handleDeletePreset}
-          compactView={compactView}
-          onCompactViewChange={setCompactView}
-          pendingAiCount={pendingAiCount}
-          aiSuggestionsDismissed={isSuggestionsDismissed}
-          onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
-          onOpenAiSuggestions={() => setAiModalOpen(true)}
-        />
+        <MobileTabSwipeContainer
+          tabs={availableTabs}
+          activeTabId={activeView}
+          onTabChange={(tabId) => handleViewChange(tabId)}
+        >
+          <div className="hidden md:block mb-5 sm:mb-6">
+            <AppTabs
+              tabs={availableTabs}
+              activeTab={activeView}
+              onChange={(tabId) => handleViewChange(tabId)}
+              variant="underline"
+            />
+          </div>
 
-        <div className="min-w-0">
-          {(selectedIds.size > 0 || selectAllMatching) && (
-            <BulkActionsToolbar
-              selectedIds={Array.from(selectedIds)}
-              onClear={handleBulkActionComplete}
-              totalCount={totalCount}
-              selectAllMatching={selectAllMatching}
-              onSelectAllMatching={handleSelectAllMatching}
-              filters={filters}
+          {activeView === 'recurring' ? (
+            <RecurringView
+              onSelectTransaction={(txId) => {
+                // Can open transaction detail drawer if clicked from recurring
+              }}
             />
+          ) : activeView === 'calendar' ? (
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
+              <UpcomingBills />
+            </Suspense>
+          ) : (
+            <>
+              <FilterBar 
+                filters={filters} 
+                onChange={updateFilter} 
+                onClearAll={clearAllFilters}
+                customPresets={customPresets}
+                onApplyPreset={handleApplyPreset}
+                onSavePreset={handleSavePreset}
+                onDeletePreset={handleDeletePreset}
+                compactView={compactView}
+                onCompactViewChange={setCompactView}
+                pendingAiCount={pendingAiCount}
+                aiSuggestionsDismissed={isSuggestionsDismissed}
+                onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
+                onOpenAiSuggestions={() => setAiModalOpen(true)}
+              />
+
+              <div className="min-w-0">
+                {(selectedIds.size > 0 || selectAllMatching) && (
+                  <BulkActionsToolbar
+                    selectedIds={Array.from(selectedIds)}
+                    onClear={handleBulkActionComplete}
+                    totalCount={totalCount}
+                    selectAllMatching={selectAllMatching}
+                    onSelectAllMatching={handleSelectAllMatching}
+                    filters={filters}
+                  />
+                )}
+                <TransactionTable
+                  key={refreshKey}
+                  filters={filters}
+                  onSelectAll={handleSelectAll}
+                  onTransactionClick={handleTransactionClick}
+                  onTotalChange={handleTotalChange}
+                  onAddTransaction={handleAddTransaction}
+                  compactView={compactView}
+                  onCompactViewChange={setCompactView}
+                  pendingAiCount={pendingAiCount}
+                  aiSuggestionsDismissed={isSuggestionsDismissed}
+                  onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
+                  onOpenAiSuggestions={() => setAiModalOpen(true)}
+                />
+                {(selectedTransaction || drawerMode === 'create') && (
+                  <TransactionDetailDrawer
+                    transaction={selectedTransaction || undefined}
+                    open={drawerOpen}
+                    onClose={handleDrawerClose}
+                    onSuccess={handleDrawerSuccess}
+                    mode={drawerMode}
+                  />
+                )}
+                <AiSuggestionsModal
+                  open={aiModalOpen}
+                  onOpenChange={setAiModalOpen}
+                  onProposalsUpdated={handleProposalsUpdated}
+                />
+              </div>
+            </>
           )}
-          <TransactionTable
-            key={refreshKey}
-            filters={filters}
-            onSelectAll={handleSelectAll}
-            onTransactionClick={handleTransactionClick}
-            onTotalChange={handleTotalChange}
-            onAddTransaction={handleAddTransaction}
-            compactView={compactView}
-            onCompactViewChange={setCompactView}
-            pendingAiCount={pendingAiCount}
-            aiSuggestionsDismissed={isSuggestionsDismissed}
-            onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
-            onOpenAiSuggestions={() => setAiModalOpen(true)}
-          />
-          {(selectedTransaction || drawerMode === 'create') && (
-            <TransactionDetailDrawer
-              transaction={selectedTransaction || undefined}
-              open={drawerOpen}
-              onClose={handleDrawerClose}
-              onSuccess={handleDrawerSuccess}
-              mode={drawerMode}
-            />
-          )}
-          <AiSuggestionsModal
-            open={aiModalOpen}
-            onOpenChange={setAiModalOpen}
-            onProposalsUpdated={handleProposalsUpdated}
-          />
-        </div>
+        </MobileTabSwipeContainer>
       </PageContent>
     </div>
   );

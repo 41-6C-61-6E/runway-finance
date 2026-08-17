@@ -18,6 +18,8 @@ import { resolveDataUserId } from '@/lib/sharing';
 
 const LOG_TAG = '[sync]';
 
+const activeDetectionUsers = new Set<string>();
+
 function ms(start: number): number {
   return Date.now() - start;
 }
@@ -1285,11 +1287,35 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     const summariesReady = triggerUserSummariesRebuild(dataUserId, dek);
 
     // Trigger custom cash flow alerts check
-    const { checkCashFlowAlerts } = await import('@/lib/services/notifications');
+    const { checkCashFlowAlerts, checkRecurringPriceChangesAndNotify, checkUpcomingBillsAndNotify } = await import('@/lib/services/notifications');
     await summariesReady;
     checkCashFlowAlerts(dataUserId, dek).catch((e) => {
       logger.error('[sync] Failed to check cash flow alerts:', e);
     });
+
+    // Run recurring transaction detection, price alerts & bill reminders (non-fatal)
+    if (transactionsNew + transactionsUpdated > 0) {
+      if (activeDetectionUsers.has(dataUserId)) {
+        logger.info(`${LOG_TAG} Skipping recurring detection (concurrent sync already running)`, { userId: dataUserId });
+      } else {
+        try {
+          const { detectRecurringTransactions } = await import('@/lib/services/recurring-detection');
+          activeDetectionUsers.add(dataUserId);
+          detectRecurringTransactions(dataUserId, dek)
+            .then(() => checkRecurringPriceChangesAndNotify(dataUserId, dek))
+            .then(() => checkUpcomingBillsAndNotify(dataUserId, dek))
+            .catch((err) => {
+              logger.warn(`${LOG_TAG} Recurring detection failed (non-fatal):`, err);
+            })
+            .finally(() => {
+              activeDetectionUsers.delete(dataUserId);
+            });
+        } catch (err) {
+          activeDetectionUsers.delete(dataUserId);
+          logger.warn(`${LOG_TAG} Failed to load recurring detection:`, err);
+        }
+      }
+    }
 
 
 

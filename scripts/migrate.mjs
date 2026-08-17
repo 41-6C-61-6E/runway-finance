@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import 'dotenv/config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.resolve(__dirname, '..', 'drizzle');
@@ -43,7 +44,11 @@ async function runSelfHealingChecks(client) {
       { name: 'notify_weekly_net_worth_change', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'weekly_net_worth_alert_day', type: "TEXT NOT NULL DEFAULT 'sunday'" },
       { name: 'delete_pending_days', type: 'INTEGER NOT NULL DEFAULT 10' },
-      { name: 'budget_exclusions', type: "JSONB DEFAULT '{\"categoryIds\":[],\"tagIds\":[]}'::jsonb" }
+      { name: 'budget_exclusions', type: "JSONB DEFAULT '{\"categoryIds\":[],\"tagIds\":[]}'::jsonb" },
+      { name: 'recurring_exclusions', type: "JSONB DEFAULT '{\"categoryIds\":[],\"accountIds\":[],\"merchantPatterns\":[]}'::jsonb" },
+      { name: 'notify_recurring_price_changes', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'notify_upcoming_bills', type: 'BOOLEAN NOT NULL DEFAULT FALSE' },
+      { name: 'upcoming_bills_lead_days', type: 'INTEGER NOT NULL DEFAULT 3' }
     ];
 
     for (const col of columnsToCheck) {
@@ -420,7 +425,45 @@ async function runSelfHealingChecks(client) {
       ON custom_alert_rules (user_id)
     `);
 
-    // 10. Drop FK constraints that reference the "user" table
+    // 10. Check if recurring_transactions table exists
+    const tableCheckRec = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'recurring_transactions'
+    `);
+    if (tableCheckRec.rows.length === 0) {
+      console.log('[migrate] [self-heal] Creating missing recurring_transactions table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS recurring_transactions (
+          id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id            TEXT NOT NULL,
+          merchant_name      TEXT NOT NULL,
+          match_pattern      TEXT NOT NULL,
+          category_id        UUID REFERENCES categories(id) ON DELETE SET NULL,
+          account_id         UUID REFERENCES accounts(id) ON DELETE CASCADE,
+          frequency          TEXT NOT NULL,
+          average_amount     TEXT NOT NULL,
+          last_amount        TEXT NOT NULL,
+          last_date          DATE NOT NULL,
+          next_expected_date DATE,
+          flow_type          TEXT NOT NULL DEFAULT 'expense',
+          is_confirmed       BOOLEAN NOT NULL DEFAULT FALSE,
+          is_dismissed       BOOLEAN NOT NULL DEFAULT FALSE,
+          is_paused          BOOLEAN NOT NULL DEFAULT FALSE,
+          custom_name        TEXT,
+          notes              TEXT,
+          occurrence_count   INTEGER NOT NULL DEFAULT 0,
+          confidence         INTEGER NOT NULL DEFAULT 0,
+          created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS recurring_txn_user_idx ON recurring_transactions (user_id)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS recurring_txn_user_account_idx ON recurring_transactions (user_id, account_id)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS recurring_txn_next_date_idx ON recurring_transactions (user_id, next_expected_date)`);
+      console.log('[migrate] [self-heal] Created recurring_transactions table and indexes');
+    }
+
+    // 11. Drop FK constraints that reference the "user" table
     await client.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_user_id_fk`);
     await client.query(`ALTER TABLE push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_user_id_fkey`);
     await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_user_id_fk`);

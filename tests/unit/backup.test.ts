@@ -123,7 +123,7 @@ describe('CSV Backup Export ID Decoding', () => {
   });
 
   it('should successfully append decoded columns to CSV rows', async () => {
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/backup/export-csv'));
     expect(response.status).toBe(200);
 
     // Let's verify the captured CSV files in mockAppends
