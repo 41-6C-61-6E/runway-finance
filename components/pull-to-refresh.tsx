@@ -45,6 +45,25 @@ export function PullToRefresh({ children }: PullToRefreshProps) {
       // Only allow pull-to-refresh when scrolled to the absolute top of the page
       if (window.scrollY > 0) return;
 
+      const target = e.target as HTMLElement;
+      if (
+        target.closest('.touch-pan-y') ||
+        target.closest('.scroll-contain-x') ||
+        target.closest('input') ||
+        target.closest('textarea') ||
+        target.closest('select') ||
+        target.closest('[role="dialog"]') ||
+        target.closest('[role="tooltip"]') ||
+        target.closest('.no-swipe') ||
+        target.closest('[data-no-swipe]') ||
+        target.closest('.recharts-wrapper') ||
+        target.closest('.recharts-tooltip-wrapper')
+      ) {
+        startYRef.current = null;
+        startXRef.current = null;
+        return;
+      }
+
       startYRef.current = e.touches[0].clientY;
       startXRef.current = e.touches[0].clientX;
     };
@@ -116,16 +135,26 @@ export function PullToRefresh({ children }: PullToRefreshProps) {
       }
     };
 
+    const handleTouchCancel = () => {
+      startYRef.current = null;
+      startXRef.current = null;
+      setStatus('idle');
+      setPullDistance(0);
+    };
+
     el.addEventListener('touchstart', handleTouchStart, { passive: true });
     el.addEventListener('touchmove', handleTouchMove, { passive: false });
     el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', handleTouchCancel, { passive: true });
 
     return () => {
       el.removeEventListener('touchstart', handleTouchStart);
       el.removeEventListener('touchmove', handleTouchMove);
       el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('touchcancel', handleTouchCancel);
     };
   }, [queryClient, router]);
+
 
   const showIndicator = status !== 'idle' && pullDistance > 10;
 

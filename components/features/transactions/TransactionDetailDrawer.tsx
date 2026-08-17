@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Search, Sparkles, Plus } from 'lucide-react';
+import { toast } from 'sonner';
+
+
 
 type Transaction = {
   id: string;
@@ -324,8 +327,12 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
           }),
         });
         if (res.ok) {
+          toast.success('Transaction created');
           onSuccess();
           onClose();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          toast.error(errData.message || errData.error || 'Failed to create transaction');
         }
       } else if (transaction) {
         const res = await fetch(`/api/transactions/${transaction.id}`, {
@@ -347,9 +354,21 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
           }),
         });
         if (res.ok) {
+          toast.success('Transaction updated');
           onSuccess();
           onClose();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          toast.error(errData.message || errData.error || 'Failed to update transaction');
         }
+      }
+    } catch (err: any) {
+      console.error('Failed to save transaction:', err);
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+      if (isOffline) {
+        toast.error('You are offline. Transactions cannot be saved without a network connection.');
+      } else {
+        toast.error('Network error saving transaction. Please try again.');
       }
     } finally {
       setSaving(false);
@@ -369,16 +388,22 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
           credentials: 'include',
         });
         if (res.ok) {
+          toast.success('Transaction deleted');
           onSuccess();
           onClose();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          toast.error(errData.message || errData.error || 'Failed to delete transaction');
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to delete transaction:', err);
+      toast.error('Network error deleting transaction.');
     } finally {
       setDeleting(false);
     }
   }, [transaction?.id, confirmDelete, onSuccess, onClose]);
+
 
   const toggleReviewed = async () => {
     setReviewed(!reviewed);

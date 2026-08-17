@@ -11,9 +11,7 @@ import { AccountSubheadingsProvider } from '@/components/account-subheadings-pro
 import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
 import { UserSettingsProvider } from '@/components/user-settings-provider';
 import { MobileNav } from '@/components/mobile-nav';
-import { SwipeNavProvider } from '@/components/swipe-nav-provider';
 import { PullToRefresh } from '@/components/pull-to-refresh';
-import { OfflineBanner } from '@/components/offline-banner';
 import { ReactNode, useState, useEffect } from 'react';
 
 import { MobileSubNavProvider } from '@/components/mobile-subnav-context';
@@ -27,7 +25,8 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const isOfflinePage = pathname === '/offline';
 
   useEffect(() => {
-    if (status === 'unauthenticated' && !isAuthPage && !isOfflinePage) {
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    if (status === 'unauthenticated' && !isAuthPage && !isOfflinePage && !isOffline) {
       router.push('/signin');
     } else if (status === 'authenticated' && isAuthPage) {
       router.push('/');
@@ -49,7 +48,8 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  if (status === 'unauthenticated') {
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  if (status === 'unauthenticated' && !isOffline) {
     return null;
   }
 
@@ -92,21 +92,17 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
     : `${COLLAPSED_WIDTH + accountsWidth}px`;
 
   return (
-    <>
-      <div 
-        style={{ 
-          '--sidebar-margin-left': desktopMarginLeft 
-        } as React.CSSProperties} 
-        className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] pb-28 md:pb-0"
-      >
-        <OfflineBanner />
-        <SwipeNavProvider>
-          <PullToRefresh>
-            {children}
-          </PullToRefresh>
-        </SwipeNavProvider>
-      </div>
-    </>
+    <div 
+      style={{ 
+        '--sidebar-margin-left': desktopMarginLeft 
+      } as React.CSSProperties} 
+      className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] pb-28 md:pb-0"
+    >
+      <PullToRefresh>
+        {children}
+      </PullToRefresh>
+    </div>
   );
 }
+
 

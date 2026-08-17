@@ -284,6 +284,9 @@ export async function DELETE(request: Request) {
       }
       await tx.delete(userSettings).where(eq(userSettings.userId, userId));
       await tx.delete(aiProviders).where(eq(aiProviders.userId, userId));
+      await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+      await tx.delete(userNotifications).where(eq(userNotifications.userId, userId));
+      await tx.delete(sentNotifications).where(eq(sentNotifications.userId, userId));
       await tx.delete(nextAuthSession).where(eq(nextAuthSession.userId, userId));
       await tx.delete(nextAuthAccount).where(eq(nextAuthAccount.userId, userId));
       await tx.delete(nextAuthUser).where(eq(nextAuthUser.id, userId));
@@ -304,13 +307,11 @@ export async function DELETE(request: Request) {
         await tx.delete(plans).where(eq(plans.userId, userId));
         await tx.delete(retirementRules).where(eq(retirementRules.userId, userId));
 
-        // 2. Notifications, alert rules, job logs, issues
-        await tx.delete(userNotifications).where(eq(userNotifications.userId, userId));
+        // 2. Alert rules, job logs, issues
         await tx.delete(customAlertRules).where(eq(customAlertRules.userId, userId));
-        await tx.delete(sentNotifications).where(eq(sentNotifications.userId, userId));
-        await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
         await tx.delete(schedulerJobLogs).where(eq(schedulerJobLogs.userId, userId));
         await tx.delete(issues).where(eq(issues.userId, userId));
+
 
         // 3. Goal allocation history (must precede financialGoals and accounts)
         await tx.delete(goalAllocationHistory).where(eq(goalAllocationHistory.userId, userId));

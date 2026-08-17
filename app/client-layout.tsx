@@ -10,6 +10,7 @@ import { ChangelogModal } from '@/components/changelog-modal';
 import { Analytics } from '@vercel/analytics/next';
 import { ChartColorSchemeInitializer } from '@/components/chart-color-scheme-initializer';
 import { ClientErrorReporter } from '@/components/client-error-reporter';
+import { OfflineBanner } from '@/components/offline-banner';
 import { Toaster } from 'sonner';
 import { useTheme } from 'next-themes';
 
@@ -28,6 +29,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
           <TooltipProvider delayDuration={300}>
             <ClientErrorReporter>
               <ThemedToaster />
+              <OfflineBanner />
               <ChartColorSchemeInitializer />
               <div className="min-h-[100dvh] flex flex-col">
                 <Suspense fallback={null}>
@@ -44,3 +46,4 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     </ReactQueryProvider>
   );
 }
+

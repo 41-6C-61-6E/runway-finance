@@ -79,6 +79,7 @@ export function MobileNav() {
   const [isScrollingDown, setIsScrollingDown] = useState(false);
   const lastScrollYRef = useRef(0);
   const subNavTouchStartXRef = useRef<number | null>(null);
+  const subNavTouchStartYRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -98,23 +99,30 @@ export function MobileNav() {
   const handleSubNavTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       subNavTouchStartXRef.current = e.touches[0].clientX;
+      subNavTouchStartYRef.current = e.touches[0].clientY;
     }
   };
 
   const handleSubNavTouchEnd = (e: React.TouchEvent) => {
-    if (subNavTouchStartXRef.current === null) return;
+    if (subNavTouchStartXRef.current === null || subNavTouchStartYRef.current === null) return;
     const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
     const deltaX = touchEndX - subNavTouchStartXRef.current;
+    const deltaY = touchEndY - subNavTouchStartYRef.current;
     subNavTouchStartXRef.current = null;
+    subNavTouchStartYRef.current = null;
 
-    if (deltaX < -35) {
-      haptic.light();
-      nextTab();
-    } else if (deltaX > 35) {
-      haptic.light();
-      prevTab();
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 35) {
+      if (deltaX < -35) {
+        haptic.light();
+        nextTab();
+      } else if (deltaX > 35) {
+        haptic.light();
+        prevTab();
+      }
     }
   };
+
 
   // Custom home items (minimized bottom nav items)
   const [homeItemIds, setHomeItemIds] = useState<string[]>(['net-worth', 'accounts', 'transactions', 'cash-flow']);
@@ -191,7 +199,7 @@ export function MobileNav() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === 4) {
+        if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 4) {
           setHomeItemIds(parsed);
         }
       } catch (e) {
@@ -199,6 +207,7 @@ export function MobileNav() {
       }
     }
   }, []);
+
 
   const updateHomeItems = (newIds: string[]) => {
     setHomeItemIds(newIds);
@@ -498,9 +507,9 @@ export function MobileNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
               onClick={() => setPendingHref(item.href)}
-              onTouchStart={() => {}}
-              className={`flex flex-col items-center justify-center p-2.5 rounded-full transition-all duration-200 active:scale-95 group ${
+              className={`flex flex-col items-center justify-center p-2.5 min-w-[44px] min-h-[44px] rounded-full transition-all duration-200 active:scale-95 group ${
                 active
                   ? 'text-primary bg-primary/20 font-semibold shadow-xs'
                   : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
@@ -513,8 +522,10 @@ export function MobileNav() {
 
         {/* Hamburger Menu Toggle Button */}
         <button
+          type="button"
+          aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex flex-col items-center justify-center p-2.5 rounded-full transition-all duration-200 active:scale-95 group ${
+          className={`flex flex-col items-center justify-center p-2.5 min-w-[44px] min-h-[44px] rounded-full transition-all duration-200 active:scale-95 group cursor-pointer ${
             isOpen
               ? 'text-primary bg-primary/20 font-semibold shadow-xs'
               : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
@@ -529,7 +540,7 @@ export function MobileNav() {
 
       {/* Slide-up Menu Drawer */}
       <div 
-        className={drawerClasses} 
+        className={`${drawerClasses} max-h-[85vh] overflow-y-auto overscroll-contain`} 
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -540,9 +551,10 @@ export function MobileNav() {
             ? `translateY(${dragOffset}px)` 
             : 'translateY(100%)',
           transition: isDragging ? 'none' : 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-          touchAction: 'none'
+          touchAction: isDragging ? 'none' : 'pan-y'
         }}
       >
+
         {/* Drag handle pill */}
         <div className="w-12 h-1 bg-muted-foreground/20 rounded-full mx-auto mb-4" />
 

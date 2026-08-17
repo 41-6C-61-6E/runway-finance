@@ -1,25 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WifiOff, Wifi } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(false);
   const [showReconnected, setShowReconnected] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handleOffline = () => {
       setIsOffline(true);
       setShowReconnected(false);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
 
     const handleOnline = () => {
       setIsOffline(false);
       setShowReconnected(true);
-      const timer = setTimeout(() => {
+
+      // Automatically refetch active queries upon reconnection
+      queryClient.refetchQueries().catch((err) => {
+        console.warn('Failed to refetch queries after reconnecting:', err);
+      });
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+      timerRef.current = setTimeout(() => {
         setShowReconnected(false);
+        timerRef.current = null;
       }, 3000);
-      return () => clearTimeout(timer);
     };
 
     if (typeof window !== 'undefined') {
@@ -32,8 +48,11 @@ export function OfflineBanner() {
     return () => {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
     };
-  }, []);
+  }, [queryClient]);
 
   if (!isOffline && !showReconnected) return null;
 
@@ -48,14 +67,15 @@ export function OfflineBanner() {
       {isOffline ? (
         <>
           <WifiOff className="w-3.5 h-3.5 shrink-0" />
-          <span>You are offline — showing cached data</span>
+          <span>You are offline — showing offline data</span>
         </>
       ) : (
         <>
           <Wifi className="w-3.5 h-3.5 shrink-0" />
-          <span>Back online</span>
+          <span>Back online — data refreshed</span>
         </>
       )}
     </div>
   );
 }
+

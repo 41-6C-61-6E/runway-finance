@@ -51,30 +51,7 @@ export async function sendPushNotification(
 
   const finalKey = key || `generic:${Date.now()}:${Math.random().toString(36).substring(2, 7)}`;
 
-  // 1. Deduplication & Sent Log Insert (Atomic)
-  try {
-    const inserted = await db
-      .insert(sentNotifications)
-      .values({
-        userId,
-        type,
-        key: finalKey,
-      })
-      .onConflictDoNothing({ target: [sentNotifications.userId, sentNotifications.key] })
-      .returning({ id: sentNotifications.id });
-
-    if (key && inserted.length === 0) {
-      logger.debug('[notifications-service] Duplicate notification suppressed.', { key });
-      return { sent: false, reason: 'Duplicate notification suppressed.' };
-    }
-  } catch (err) {
-    logger.error('[notifications-service] Error logging sent notification / dedup check:', err);
-    if (key) {
-      return { sent: false, reason: 'Duplicate notification suppressed.' };
-    }
-  }
-
-  // 2. Rate Limiting Check
+  // 1. Rate Limiting Check (evaluated before consuming rate quota)
   try {
     const [settings] = await db
       .select({
@@ -113,6 +90,29 @@ export async function sendPushNotification(
     logger.error('[notifications-service] Error checking rate limit:', err);
   }
 
+  // 2. Deduplication & Sent Log Insert (Atomic)
+  try {
+    const inserted = await db
+      .insert(sentNotifications)
+      .values({
+        userId,
+        type,
+        key: finalKey,
+      })
+      .onConflictDoNothing({ target: [sentNotifications.userId, sentNotifications.key] })
+      .returning({ id: sentNotifications.id });
+
+    if (key && inserted.length === 0) {
+      logger.debug('[notifications-service] Duplicate notification suppressed.', { key });
+      return { sent: false, reason: 'Duplicate notification suppressed.' };
+    }
+  } catch (err) {
+    logger.error('[notifications-service] Error logging sent notification / dedup check:', err);
+    if (key) {
+      return { sent: false, reason: 'Duplicate notification suppressed.' };
+    }
+  }
+
   // 3. Save notification to userNotifications inbox table
   let dbNotificationId: string | undefined = undefined;
   try {
@@ -131,7 +131,7 @@ export async function sendPushNotification(
     logger.error('[notifications-service] Failed to save in-app notification to DB:', dbErr);
   }
 
-  // 5. Send push notification to all active devices (if configured)
+  // 4. Send push notification to all active devices (if configured)
   if (!ensureVapidInitialized()) {
     logger.warn('[notifications-service] VAPID keys missing. Saved in-app notification only.');
     return { sent: true, reason: 'VAPID keys not configured. Saved in-app only.' };
@@ -152,7 +152,14 @@ export async function sendPushNotification(
     title,
     body,
     url: urlPath || '/',
+    tag: type,
   });
+
+  const isUrgent = type.includes('budget') || type.includes('error') || type.includes('large_transaction');
+  const pushOptions = {
+    TTL: 86400, // 24 hours
+    urgency: isUrgent ? ('high' as const) : ('normal' as const),
+  };
 
   let sentSuccessfully = false;
 
@@ -168,7 +175,7 @@ export async function sendPushNotification(
       };
 
       const timeoutMs = 10000;
-      const pushPromise = webpush.sendNotification(pushSubscription, payload);
+      const pushPromise = webpush.sendNotification(pushSubscription, payload, pushOptions);
       await Promise.race([
         pushPromise,
         new Promise<never>((_, reject) =>
@@ -177,10 +184,11 @@ export async function sendPushNotification(
       ]);
       sentSuccessfully = true;
     } catch (err: any) {
-      if (err.statusCode === 410 || err.statusCode === 404) {
-        logger.info('[notifications-service] Deleting expired or invalid push subscription', {
+      if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
+        logger.info('[notifications-service] Deleting expired/invalid push subscription', {
           id: sub.id,
           endpoint: sub.endpoint,
+          statusCode: err.statusCode,
         });
         await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
       } else {
@@ -200,6 +208,7 @@ export async function sendPushNotification(
 
   return { sent: true, reason: 'All push subscription endpoints failed/expired. Saved in-app only.' };
 }
+
 
 export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
   try {

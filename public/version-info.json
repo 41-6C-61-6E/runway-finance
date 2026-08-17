@@ -1,9 +1,15 @@
 {
-  "buildNumber": "26.08.1786847124297",
-  "buildTime": "2026-08-16T02:25:24.297Z",
-  "hash": "efe8cd6",
-  "fullHash": "efe8cd6b486445b5d24fd1f930509286dde2b978",
+  "buildNumber": "26.08.1786927755097",
+  "buildTime": "2026-08-17T00:49:15.097Z",
+  "hash": "b85db49",
+  "fullHash": "b85db495d447f30df6c1786244b351fb61929f78",
   "commits": [
+    "test: implement comprehensive unit and integration test suites with CI workflow and mock infrastructure",
+    "refactor: improve account deletion workflow, add deduplication to notifications, and fix transaction splitting logic",
+    "feat: add ActionAlert component, standardize tab navigation, and implement modular Sankey chart components with new utility hooks and types.",
+    "feat: add Roth Conversion Ladder strategy and refactor CollapsibleCardHeader to use icon and description props",
+    "feat: implement SimpleFIN credential rotation and add UI state for filtered transaction status",
+    "refactor: remove asset allocation glidepath and drawdown strategy previews from FIRE side panel",
     "style: standardize border radii, button styles, and tooltip delay across components while introducing AppTabs for layout navigation.",
     "feat: add tax-deferred withdrawal strategy and enhance FIRE/glidepath calculations with real plan data",
     "refactor: extract currency logic to constants, implement system tax rules, and improve goal allocation and chart aggregation reliability.",
@@ -197,23 +203,65 @@
     "wealth flow improvements",
     "net worth flow",
     "alerts updates",
-    "bug fix",
-    "bug fix",
-    "re chart improvements",
-    "net-worth improvements",
-    "better goals",
-    "better goals cards",
-    "better ai suggestions"
+    "bug fix"
   ],
   "history": [
+    {
+      "hash": "b85db49",
+      "fullHash": "b85db495d447f30df6c1786244b351fb61929f78",
+      "author": "Alan Racek",
+      "date": "2026-08-16T15:33:35-07:00",
+      "message": "test: implement comprehensive unit and integration test suites with CI workflow and mock infrastructure",
+      "type": "test",
+      "buildNumber": "26.08.1786927755097"
+    },
+    {
+      "hash": "02a0384",
+      "fullHash": "02a0384adf1f0ad48ffbfc309046c72a04702b9b",
+      "author": "Alan Racek",
+      "date": "2026-08-16T13:38:05-07:00",
+      "message": "refactor: improve account deletion workflow, add deduplication to notifications, and fix transaction splitting logic",
+      "type": "refactor"
+    },
+    {
+      "hash": "34d96c5",
+      "fullHash": "34d96c554bad77970b850a437b21f5d68a4c18db",
+      "author": "Alan Racek",
+      "date": "2026-08-16T09:10:25-07:00",
+      "message": "feat: add ActionAlert component, standardize tab navigation, and implement modular Sankey chart components with new utility hooks and types.",
+      "type": "feat"
+    },
+    {
+      "hash": "6dac2a6",
+      "fullHash": "6dac2a612c4ed53d7d15e93c215cc6c16e66727a",
+      "author": "Alan Racek",
+      "date": "2026-08-15T21:46:07-07:00",
+      "message": "feat: add Roth Conversion Ladder strategy and refactor CollapsibleCardHeader to use icon and description props",
+      "type": "feat"
+    },
+    {
+      "hash": "115258b",
+      "fullHash": "115258b37d06d632fd8aede46a329a72ad8cff1d",
+      "author": "Alan Racek",
+      "date": "2026-08-15T20:57:46-07:00",
+      "message": "feat: implement SimpleFIN credential rotation and add UI state for filtered transaction status",
+      "type": "feat"
+    },
+    {
+      "hash": "37f5297",
+      "fullHash": "37f5297c835d10b36de21fb4b29a80e8fac4c358",
+      "author": "Alan Racek",
+      "date": "2026-08-15T20:33:49-07:00",
+      "message": "refactor: remove asset allocation glidepath and drawdown strategy previews from FIRE side panel",
+      "type": "refactor"
+    },
     {
       "hash": "efe8cd6",
       "fullHash": "efe8cd6b486445b5d24fd1f930509286dde2b978",
       "author": "Alan Racek",
       "date": "2026-08-15T18:23:49-07:00",
       "message": "style: standardize border radii, button styles, and tooltip delay across components while introducing AppTabs for layout navigation.",
-      "type": "style",
-      "buildNumber": "26.08.1786847124297"
+      "type": "style"
     },
     {
       "hash": "d9026dd",
@@ -1757,54 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-06-30T20:07:45-07:00",
       "message": "bug fix",
-      "type": "other"
-    },
-    {
-      "hash": "e047fea",
-      "fullHash": "e047feaf38a7f00c22b1854836ffea0a93d21abe",
-      "author": "Alan Racek",
-      "date": "2026-06-30T10:13:18-07:00",
-      "message": "bug fix",
-      "type": "other"
-    },
-    {
-      "hash": "b984c9b",
-      "fullHash": "b984c9beb6e049f69b37e9b88753ac575c5bc26c",
-      "author": "Alan Racek",
-      "date": "2026-06-29T15:50:51-07:00",
-      "message": "re chart improvements",
-      "type": "other"
-    },
-    {
-      "hash": "6bb29e5",
-      "fullHash": "6bb29e516612ff09baaa3a2828ccdfa76291d03b",
-      "author": "Alan Racek",
-      "date": "2026-06-29T15:26:20-07:00",
-      "message": "net-worth improvements",
-      "type": "other"
-    },
-    {
-      "hash": "b819f4f",
-      "fullHash": "b819f4f1b2b53654fc456fc70d37ee95989e0137",
-      "author": "Alan Racek",
-      "date": "2026-06-29T15:02:58-07:00",
-      "message": "better goals",
-      "type": "other"
-    },
-    {
-      "hash": "8df64be",
-      "fullHash": "8df64be86578c8611d6fccc049c21d11c9bae1d0",
-      "author": "Alan Racek",
-      "date": "2026-06-29T14:48:15-07:00",
-      "message": "better goals cards",
-      "type": "other"
-    },
-    {
-      "hash": "c35ea78",
-      "fullHash": "c35ea78326b995c778462a70c4bb95f69b8fe022",
-      "author": "Alan Racek",
-      "date": "2026-06-29T14:33:33-07:00",
-      "message": "better ai suggestions",
       "type": "other"
     }
   ]
