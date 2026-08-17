@@ -2,6 +2,8 @@ const CACHE_NAME = "personal-finance-{{BUILD_NUMBER}}";
 const STATIC_ASSETS = [
   "/",
   "/offline",
+  "/favicon.svg",
+  "/manifest.json",
 ];
 
 self.addEventListener("install", (event) => {
@@ -11,7 +13,13 @@ self.addEventListener("install", (event) => {
       await cache.addAll(STATIC_ASSETS);
     })(),
   );
-  self.skipWaiting();
+  // Do NOT call self.skipWaiting() automatically to avoid breaking running clients
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("activate", (event) => {
@@ -32,13 +40,19 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Bypass API requests
-  if (url.pathname.startsWith("/api/")) {
+  // Only handle GET requests for caching
+  if (request.method !== "GET") {
     return;
   }
 
-  // Only handle GET requests for caching
-  if (request.method !== "GET") {
+  // Offline support for session: Network-first with cache fallback for NextAuth session
+  if (url.pathname === "/api/auth/session") {
+    event.respondWith(networkFirstWithFallback(request));
+    return;
+  }
+
+  // Bypass other API requests (data queries are persisted in IndexedDB)
+  if (url.pathname.startsWith("/api/")) {
     return;
   }
 
@@ -47,9 +61,21 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/_next/static") ||
     url.pathname.startsWith("/icons/") ||
     url.pathname === "/manifest.json" ||
-    url.pathname === "/sw.js"
+    url.pathname === "/sw.js" ||
+    url.pathname === "/favicon.svg"
   ) {
     event.respondWith(cacheFirst(request));
+    return;
+  }
+
+  // Handle Next.js RSC Flight requests (network-first so fresh data is served when online)
+  const isRSC =
+    url.searchParams.has("_rsc") ||
+    request.headers.get("RSC") === "1" ||
+    request.headers.get("Accept")?.includes("text/x-component");
+
+  if (isRSC) {
+    event.respondWith(networkFirstWithFallback(request));
     return;
   }
 
@@ -98,23 +124,53 @@ async function networkFirstWithFallback(request) {
 self.addEventListener("push", (event) => {
   if (!event.data) return;
   try {
-    const data = event.data.json();
+    let data = {};
+    try {
+      data = event.data.json();
+    } catch {
+      data = { body: event.data.text() || "New notification from Personal Finance" };
+    }
+
     const options = {
       body: data.body,
       icon: data.icon || "/icons/icon-192x192.png",
       badge: data.badge || "/icons/icon-96x96.png",
+      tag: data.tag || data.type || "finance-alert",
       vibrate: data.vibrate || [100, 50, 100],
       data: {
         id: data.id,
         url: data.url || "/"
       }
     };
+
     event.waitUntil(
       self.registration.showNotification(data.title || "Personal Finance", options)
     );
   } catch (err) {
     console.error("Error displaying push notification:", err);
   }
+});
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const sub = await self.registration.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/notifications/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              subscription: sub.toJSON(),
+              userAgent: self.navigator.userAgent,
+            }),
+          });
+        }
+      } catch (err) {
+        console.error("Failed to re-sync push subscription on change:", err);
+      }
+    })()
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
@@ -136,14 +192,12 @@ self.addEventListener("notificationclick", (event) => {
 
   // Open or focus window
   const navigatePromise = clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-    // If there is an existing client matching this origin/URL, focus it
     for (let i = 0; i < windowClients.length; i++) {
       const client = windowClients[i];
       if (client.url === urlToOpen && "focus" in client) {
         return client.focus();
       }
     }
-    // If not, open a new window
     if (clients.openWindow) {
       return clients.openWindow(urlToOpen);
     }
@@ -152,4 +206,5 @@ self.addEventListener("notificationclick", (event) => {
 
   event.waitUntil(Promise.all(promises));
 });
+
 

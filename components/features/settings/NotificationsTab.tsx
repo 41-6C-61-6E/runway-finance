@@ -81,12 +81,23 @@ export default function NotificationsTab() {
       setIsSWActive(true);
       const sub = await reg.pushManager.getSubscription();
       setIsSubscribed(!!sub);
+      if (sub && Notification.permission === 'granted') {
+        fetch('/api/notifications/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: sub.toJSON(),
+            userAgent: navigator.userAgent,
+          }),
+        }).catch((e) => console.warn('Auto-sync of push subscription failed:', e));
+      }
     } catch (err) {
       console.error('Error checking device push subscription:', err);
     } finally {
       setCheckingSubscription(false);
     }
   };
+
 
   useEffect(() => {
     checkDeviceSubscription();

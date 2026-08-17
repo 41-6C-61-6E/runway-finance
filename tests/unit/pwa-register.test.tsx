@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, cleanup } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PWARegister } from '@/components/pwa-register';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 vi.mock('sonner', () => ({
   toast: {
     info: vi.fn(),
+    dismiss: vi.fn(),
   },
 }));
 
@@ -22,10 +23,12 @@ describe('PWARegister Component', () => {
   });
 
   afterEach(() => {
+    cleanup();
     // @ts-ignore
     process.env.NODE_ENV = originalEnv;
     vi.restoreAllMocks();
   });
+
 
   it('triggers update toast with only delta commits when installed build hash is matched in history', async () => {
     localStorage.setItem('pf_installed_hash', 'hash-v1');

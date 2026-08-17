@@ -46,8 +46,11 @@ import {
   Plus,
   Columns2,
   X,
+  AlertCircle,
+  RotateCcw,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+
 
 type Transaction = {
   id: string;
@@ -225,6 +228,8 @@ export default function TransactionTable({
   const effectiveCompactView = isMobile || compactView;
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isFetchError, setIsFetchError] = useState(false);
+
 
   const flattenedTransactions = useMemo(() => {
     const list: (Transaction & { isSplitChild?: boolean; parentTxId?: string })[] = [];
@@ -676,6 +681,7 @@ export default function TransactionTable({
     const signal = abortController.signal;
 
     setLoading(true);
+    setIsFetchError(false);
     try {
       const params = new URLSearchParams();
       params.set("limit", String(limit));
@@ -755,16 +761,14 @@ export default function TransactionTable({
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       console.error("Failed to fetch transactions", err);
-      setTransactions([]);
-      setTotal(0);
-      setTotalAmount(0);
-      onTotalChange?.(0);
+      setIsFetchError(true);
     } finally {
       if (abortControllerRef.current === abortController) {
         setLoading(false);
       }
     }
   }, [filters, page, sorting]);
+
 
   const handleCreateRule = useCallback(async () => {
     if (!proposedRule) return;
@@ -1686,7 +1690,27 @@ export default function TransactionTable({
               </div>
             </div>
 
-            {transactions.length === 0 ? (
+            {isFetchError && transactions.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="mx-auto w-12 h-12 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center mb-3">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <p className="text-foreground font-semibold text-base mb-1">
+                  Unable to load transactions
+                </p>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Please check your network connection and try again.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => fetchTransactions()}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Retry
+                </button>
+              </div>
+            ) : transactions.length === 0 ? (
               <div className="p-12 text-center">
                 <p className="text-muted-foreground text-base mb-4">
                   No transactions found.
@@ -1699,6 +1723,7 @@ export default function TransactionTable({
                 </a>
               </div>
             ) : (
+
               <>
             {effectiveCompactView ? (
               <div className="divide-y divide-border/50">

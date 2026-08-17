@@ -1,15 +1,25 @@
 'use client';
 
-import { WifiOff, RotateCw } from 'lucide-react';
+import { WifiOff, RotateCw, ArrowLeft } from 'lucide-react';
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function OfflinePage() {
   const [isReloading, setIsReloading] = useState(false);
+  const router = useRouter();
 
   const handleRetry = () => {
     setIsReloading(true);
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      window.location.reload();
+    }
+  };
+
+  const handleGoBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/');
     }
   };
 
@@ -29,8 +39,15 @@ export default function OfflinePage() {
           </p>
         </div>
 
-        {/* Action Button */}
-        <div className="pt-2">
+        {/* Action Buttons */}
+        <div className="pt-2 flex items-center justify-center gap-3">
+          <button
+            onClick={handleGoBack}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border border-border bg-card hover:bg-muted active:scale-98 transition-all cursor-pointer shadow-sm text-foreground"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Go Back
+          </button>
           <button
             onClick={handleRetry}
             disabled={isReloading}
@@ -44,3 +61,4 @@ export default function OfflinePage() {
     </div>
   );
 }
+

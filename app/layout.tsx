@@ -1,10 +1,10 @@
 import type React from "react";
 import type { Metadata, Viewport } from "next";
 import palette from "@/lib/colors/palette.json";
-import { ReactQueryProvider } from "@/lib/query-client";
 import ClientLayout from "@/app/client-layout";
 import { AuthenticatedLayout } from "@/components/authenticated-layout";
 import "../styles/globals.css";
+
 
 export const metadata: Metadata = {
   title: "Personal Finance",
@@ -40,12 +40,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-background text-foreground" suppressHydrationWarning>
-        <ReactQueryProvider>
-          <ClientLayout>
-            <AuthenticatedLayout>{children}</AuthenticatedLayout>
-          </ClientLayout>
-        </ReactQueryProvider>
+        <ClientLayout>
+          <AuthenticatedLayout>{children}</AuthenticatedLayout>
+        </ClientLayout>
       </body>
     </html>
   );
 }
+
