@@ -7,5 +7,5 @@ export const CreateIssueSchema = z.object({
 });
 
 export const UpdateIssueStatusSchema = z.object({
-  status: z.string().min(1, 'Status is required').max(50, 'Status cannot exceed 50 characters'),
+  status: z.enum(['reported', 'requested', 'in_progress', 'resolved', 'closed', 'dismissed']),
 });

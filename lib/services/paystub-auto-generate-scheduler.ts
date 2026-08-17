@@ -12,20 +12,21 @@ const LOG_TAG = '[paystub-auto-generate-scheduler]';
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 class PaystubAutoGenerateScheduler extends BaseScheduler<string> {
-  private timer: ReturnType<typeof setTimeout> | null = null;
-
   async init(): Promise<void> {
+    if (this._isInitialized) return;
+    this._lastInitAt = new Date();
     this._isRunning = true;
+    this._isInitialized = true;
     logger.info(`${LOG_TAG} Scheduler initialized`);
     await this.execute();
   }
 
   private scheduleCheck(): void {
-    this.timer = setTimeout(() => this.execute(), CHECK_INTERVAL_MS);
+    this.startTimer('main', () => this.execute(), CHECK_INTERVAL_MS);
   }
 
   private async execute(): Promise<void> {
-    this.timer = null;
+    this.cancel('main');
 
     try {
       const db = getDb();
@@ -79,12 +80,7 @@ class PaystubAutoGenerateScheduler extends BaseScheduler<string> {
   }
 
   shutdown(): void {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
-    this._isRunning = false;
-    logger.info(`${LOG_TAG} Scheduler shut down`);
+    super.shutdown();
   }
 }
 

@@ -7,6 +7,7 @@ import { DataExplorerQuerySchema, DataExplorerFilterSchema } from '@/lib/validat
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { ENCRYPTED_FIELDS, decryptRows } from '@/lib/crypto';
+import { handleApiError } from '@/lib/api/response';
 
 type PgTable = any;
 type ColumnMeta = {
@@ -658,7 +659,7 @@ export async function GET(request: Request) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
     logger.error('Data Explorer query failed', { table: tableKey, error: errMsg, stack: errStack });
-    return NextResponse.json({ error: 'query_failed', message: errMsg }, { status: 500 });
+    return handleApiError(error, 'Data Explorer query failed. Please check table parameters.');
   }
 }
 
@@ -706,16 +707,16 @@ export async function DELETE(request: Request) {
     }
 
     // Perform delete query
-    const result = (await db.delete(table).where(and(...conditions)).returning()) as any[];
+    const result = (await db.delete(table).where(and(...conditions)).returning({ id: idCol })) as any[];
 
     if (!result || result.length === 0) {
       return NextResponse.json({ error: 'not_found', message: 'Record not found or not owned by user' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, deleted: result[0] });
+    return NextResponse.json({ success: true, deletedId: id });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     logger.error('Data Explorer delete failed', { table: tableKey, id, error: errMsg });
-    return NextResponse.json({ error: 'delete_failed', message: errMsg }, { status: 500 });
+    return handleApiError(error, 'Data Explorer delete failed');
   }
 }

@@ -50,6 +50,9 @@ async function extractSyncFrequency(accountRow: any, dek: Uint8Array): Promise<s
 class ManualAccountScheduler extends BaseScheduler<string> {
 
   async init(): Promise<void> {
+    if (this._isInitialized) return;
+    this._lastInitAt = new Date();
+
     const db = getDb();
     const serverDekMap = new Map<string, Uint8Array>();
 
@@ -99,6 +102,7 @@ class ManualAccountScheduler extends BaseScheduler<string> {
     }
 
     this._isRunning = true;
+    this._isInitialized = true;
     logger.info(`${LOG_TAG} Scheduler initialized`, { total: accountRows.length, scheduled, skipped });
   }
 
@@ -120,8 +124,7 @@ class ManualAccountScheduler extends BaseScheduler<string> {
     const nextSyncTime = lastSyncTime + interval;
     const delay = Math.max(0, nextSyncTime - now);
 
-    const timer = setTimeout(() => this.execute(id, userId), delay);
-    this.timers.set(id, timer);
+    this.startTimer(id, () => this.execute(id, userId), delay);
 
     logger.info(`${LOG_TAG} Scheduled`, {
       accountId: id,
@@ -231,25 +234,20 @@ class ManualAccountScheduler extends BaseScheduler<string> {
       if (syncSuccess) {
         await this.schedule(id, updated.userId, syncFrequency, updated.balanceDate);
       } else {
-        const timer = setTimeout(() => this.execute(id, updated.userId), RETRY_DELAY_MS);
-        this.timers.set(id, timer);
+        this.startTimer(id, () => this.execute(id, updated.userId), RETRY_DELAY_MS);
         logger.info(`${LOG_TAG} Retry scheduled in 30m`, { accountId: id });
       }
     } catch (err) {
-      logger.error(`${LOG_TAG} Failed to reschedule`, {
+      logger.error(`${LOG_TAG} Failed to reschedule, will retry in 30m`, {
         accountId: id,
         error: err instanceof Error ? err.message : String(err),
       });
+      this.startTimer(id, () => this.execute(id, userId), RETRY_DELAY_MS);
     }
   }
 
   shutdown(): void {
-    for (const [id, timer] of this.timers) {
-      clearTimeout(timer);
-    }
-    this.timers.clear();
-    this._isRunning = false;
-    logger.info(`${LOG_TAG} Scheduler shut down`);
+    super.shutdown();
   }
 }
 

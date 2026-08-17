@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, jsonb, index } from 'drizzle-orm/pg-core';
 
 // ── Background Job Execution Logs ────────────────────────────────────────────
 // Tracks execution runs, durations, and outputs of automated scheduler jobs
@@ -11,4 +11,7 @@ export const schedulerJobLogs = pgTable('scheduler_job_logs', {
   status: text('status').notNull(), // 'success' | 'failed'
   errorMessage: text('error_message'),
   details: jsonb('details'),
-});
+}, (table) => [
+  index('scheduler_job_logs_user_started_idx').on(table.userId, table.startedAt),
+  index('scheduler_job_logs_started_at_idx').on(table.startedAt),
+]);

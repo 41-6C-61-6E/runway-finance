@@ -242,7 +242,7 @@ export function InvestmentsSummary({
     {
       label: 'Cost Basis',
       value: totalCostBasis != null ? formatCurrency(totalCostBasis) : '—',
-      subValue: totalCostBasis != null && totalBalance > 0
+      subValue: totalCostBasis != null && totalCostBasis > 0 && totalBalance > 0
         ? `${((totalBalance / totalCostBasis - 1) * 100).toFixed(1)}% growth`
         : 'No basis data',
       icon: DollarSign,

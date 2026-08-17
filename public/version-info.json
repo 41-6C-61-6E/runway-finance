@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1786927755097",
-  "buildTime": "2026-08-17T00:49:15.097Z",
-  "hash": "b85db49",
-  "fullHash": "b85db495d447f30df6c1786244b351fb61929f78",
+  "buildNumber": "26.08.1786936691066",
+  "buildTime": "2026-08-17T03:18:11.066Z",
+  "hash": "df03e2e",
+  "fullHash": "df03e2e63bc2047c700c383fd76f39d76d207b75",
   "commits": [
+    "feat: implement PWA service worker lifecycle management, auto-update mechanisms, and expanded test coverage with new component units.",
     "test: implement comprehensive unit and integration test suites with CI workflow and mock infrastructure",
     "refactor: improve account deletion workflow, add deduplication to notifications, and fix transaction splitting logic",
     "feat: add ActionAlert component, standardize tab navigation, and implement modular Sankey chart components with new utility hooks and types.",
@@ -202,18 +203,25 @@
     "bug fix",
     "wealth flow improvements",
     "net worth flow",
-    "alerts updates",
-    "bug fix"
+    "alerts updates"
   ],
   "history": [
+    {
+      "hash": "df03e2e",
+      "fullHash": "df03e2e63bc2047c700c383fd76f39d76d207b75",
+      "author": "Alan Racek",
+      "date": "2026-08-16T17:56:39-07:00",
+      "message": "feat: implement PWA service worker lifecycle management, auto-update mechanisms, and expanded test coverage with new component units.",
+      "type": "feat",
+      "buildNumber": "26.08.1786936691066"
+    },
     {
       "hash": "b85db49",
       "fullHash": "b85db495d447f30df6c1786244b351fb61929f78",
       "author": "Alan Racek",
       "date": "2026-08-16T15:33:35-07:00",
       "message": "test: implement comprehensive unit and integration test suites with CI workflow and mock infrastructure",
-      "type": "test",
-      "buildNumber": "26.08.1786927755097"
+      "type": "test"
     },
     {
       "hash": "02a0384",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-07-01T07:55:34-07:00",
       "message": "alerts updates",
-      "type": "other"
-    },
-    {
-      "hash": "7da0598",
-      "fullHash": "7da05989093e28994462fd6dab385ec2c01199de",
-      "author": "Alan Racek",
-      "date": "2026-06-30T20:07:45-07:00",
-      "message": "bug fix",
       "type": "other"
     }
   ]

@@ -450,6 +450,9 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       CREATE INDEX IF NOT EXISTS net_worth_snapshots_user_date_idx ON net_worth_snapshots (user_id, snapshot_date);
       CREATE INDEX IF NOT EXISTS monthly_cash_flow_user_ym_idx ON monthly_cash_flow (user_id, year_month);
       CREATE INDEX IF NOT EXISTS ai_proposals_user_status_idx ON ai_proposals (user_id, status);
+      CREATE INDEX IF NOT EXISTS scheduler_job_logs_user_started_idx ON scheduler_job_logs (user_id, started_at);
+      CREATE INDEX IF NOT EXISTS scheduler_job_logs_started_at_idx ON scheduler_job_logs (started_at);
+      CREATE INDEX IF NOT EXISTS issues_user_created_idx ON issues (user_id, created_at);
     `);
 
     // 10. Drop FK constraints that reference the "user" table — the app uses

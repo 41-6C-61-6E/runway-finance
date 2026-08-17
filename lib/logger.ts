@@ -8,7 +8,20 @@ export function isDevMode(): boolean {
   return _devMode;
 }
 
-const DEBUG_ENABLED = process.env.DEBUG === 'true';
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+const LOG_LEVELS: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+};
+
+function getActiveLogLevel(): number {
+  if (process.env.DEBUG === 'true') return LOG_LEVELS.debug;
+  const envLevel = (process.env.LOG_LEVEL || 'info').toLowerCase() as LogLevel;
+  return LOG_LEVELS[envLevel] ?? LOG_LEVELS.info;
+}
 
 function ts(): string {
   return new Date().toISOString();
@@ -156,40 +169,46 @@ function formatMetadata(metadata?: Record<string, unknown>): string {
 
 export const logger = {
   info(message: string, metadata?: Record<string, unknown>) {
-    const formattedMeta = formatMetadata(metadata);
-    const logLineConsole = `[INFO ${ts()}] ${message}`;
-    const logLineFile = `[${ts()}] [INFO] ${message}${formattedMeta}`;
+    if (getActiveLogLevel() <= LOG_LEVELS.info) {
+      const formattedMeta = formatMetadata(metadata);
+      const logLineConsole = `[INFO ${ts()}] ${message}`;
+      const logLineFile = `[${ts()}] [INFO] ${message}${formattedMeta}`;
 
-    console.log('%s', logLineConsole, metadata ?? '');
-    if (fileLogger) {
-      fileLogger.write(logLineFile);
+      console.log('%s', logLineConsole, metadata ?? '');
+      if (fileLogger) {
+        fileLogger.write(logLineFile);
+      }
     }
   },
 
   warn(message: string, metadata?: Record<string, unknown>) {
-    const formattedMeta = formatMetadata(metadata);
-    const logLineConsole = `[WARN ${ts()}] ${message}`;
-    const logLineFile = `[${ts()}] [WARN] ${message}${formattedMeta}`;
+    if (getActiveLogLevel() <= LOG_LEVELS.warn) {
+      const formattedMeta = formatMetadata(metadata);
+      const logLineConsole = `[WARN ${ts()}] ${message}`;
+      const logLineFile = `[${ts()}] [WARN] ${message}${formattedMeta}`;
 
-    console.warn('%s', logLineConsole, metadata ?? '');
-    if (fileLogger) {
-      fileLogger.write(logLineFile);
+      console.warn('%s', logLineConsole, metadata ?? '');
+      if (fileLogger) {
+        fileLogger.write(logLineFile);
+      }
     }
   },
 
   error(message: string, metadata?: Record<string, unknown>) {
-    const formattedMeta = formatMetadata(metadata);
-    const logLineConsole = `[ERROR ${ts()}] ${message}`;
-    const logLineFile = `[${ts()}] [ERROR] ${message}${formattedMeta}`;
+    if (getActiveLogLevel() <= LOG_LEVELS.error) {
+      const formattedMeta = formatMetadata(metadata);
+      const logLineConsole = `[ERROR ${ts()}] ${message}`;
+      const logLineFile = `[${ts()}] [ERROR] ${message}${formattedMeta}`;
 
-    console.error('%s', logLineConsole, metadata ?? '');
-    if (fileLogger) {
-      fileLogger.write(logLineFile);
+      console.error('%s', logLineConsole, metadata ?? '');
+      if (fileLogger) {
+        fileLogger.write(logLineFile);
+      }
     }
   },
 
   debug(message: string, metadata?: Record<string, unknown>) {
-    if (DEBUG_ENABLED) {
+    if (getActiveLogLevel() <= LOG_LEVELS.debug) {
       const formattedMeta = formatMetadata(metadata);
       const logLineConsole = `[DEBUG ${ts()}] ${message}`;
       const logLineFile = `[${ts()}] [DEBUG] ${message}${formattedMeta}`;

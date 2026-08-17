@@ -484,7 +484,7 @@ export async function POST(request: Request) {
     } catch (postImportError) {
       const msg = postImportError instanceof Error ? postImportError.message : String(postImportError);
       logger.error(`[import/execute] Error in post-import snapshot/summary updates`, { error: msg });
-      warnings.push(`Post-import processing warning: ${msg}. Snapshots and summaries may be stale. You can recalculate them from Settings > Analytics > Data Sources.`);
+      warnings.push(`Post-import snapshot/summary update encountered an issue. You can recalculate snapshots from Settings > Analytics.`);
     }
 
     if (transactionsToInsert.length > 0) {
@@ -509,8 +509,10 @@ export async function POST(request: Request) {
 
     // Classify common Postgres errors into user-friendly messages
     let cleanMessage: string;
+    let statusCode = 500;
     if (rawMessage.includes('Failed query:')) {
       if (rawMessage.includes('violates foreign key constraint')) {
+        statusCode = 409;
         if (rawMessage.includes('user_id')) {
           cleanMessage = 'Import failed: Your user account reference is invalid. This is a system configuration issue — please contact support.';
         } else if (rawMessage.includes('account_id')) {
@@ -521,21 +523,24 @@ export async function POST(request: Request) {
           cleanMessage = 'Import failed: A reference in your data is invalid. Make sure all accounts and categories are properly mapped.';
         }
       } else if (rawMessage.includes('violates unique constraint') || rawMessage.includes('duplicate key')) {
+        statusCode = 409;
         cleanMessage = 'Import failed: Duplicate records detected. Some of these transactions may have already been imported. Check for duplicates in your CSV.';
       } else if (rawMessage.includes('invalid input syntax for type date') || rawMessage.includes('date/time')) {
+        statusCode = 400;
         cleanMessage = 'Import failed: Some dates in your CSV could not be understood. Make sure dates are in a supported format (e.g. "May 23, 2026" or "YYYY-MM-DD").';
       } else if (rawMessage.includes('invalid input syntax for type uuid')) {
+        statusCode = 400;
         cleanMessage = 'Import failed: A UUID value in your data is invalid. This may indicate a corrupt account or category reference.';
       } else {
         cleanMessage = 'Import failed: A database error occurred. Check that all required columns are mapped and your CSV data is valid.';
       }
     } else {
-      cleanMessage = rawMessage;
+      cleanMessage = 'Import failed: An unexpected error occurred while processing records. Please check your data and try again.';
     }
 
     return NextResponse.json(
-      { error: 'Import failed', message: cleanMessage, errorDetails: cleanMessage },
-      { status: 500 }
+      { error: 'import_failed', message: cleanMessage },
+      { status: statusCode }
     );
   }
 }

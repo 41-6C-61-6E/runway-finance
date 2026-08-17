@@ -81,94 +81,105 @@ const USER_TABLES: { table: any; dbName: string }[] = [
   { table: planLiabilities, dbName: 'plan_liabilities' },
 ];
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+import { apiUnauthorized, apiTooManyRequests, handleApiError } from '@/lib/api/response';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+export async function GET(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return apiUnauthorized();
+    }
+
+    const userId = session.user.id;
+    if (!checkRateLimit(`backup-export:${userId}`, 10, 60_000)) {
+      return apiTooManyRequests('Too many export requests. Please wait a moment.');
+    }
+
+    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+    const db = getDb();
+    const dek = await getSessionDEK();
+
+    const data: Record<string, unknown[]> = {};
+
+    for (const { table, dbName } of USER_TABLES) {
+      const isPersonalTable = dbName === 'ai_providers' || dbName === 'simplefin_connections' || dbName === 'plaid_connections';
+      const targetUserId = isPersonalTable ? userId : dataUserId;
+      const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
+      const decrypted = await Promise.all(
+        rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
+      );
+      data[dbName] = decrypted;
+    }
+
+    // Export tag join tables by joining with user's tags
+    const transactionTagsExport = await db
+      .select({
+        transactionId: transactionTags.transactionId,
+        tagId: transactionTags.tagId,
+      })
+      .from(transactionTags)
+      .innerJoin(tags, eq(transactionTags.tagId, tags.id))
+      .where(eq(tags.userId, dataUserId));
+    data.transaction_tags = transactionTagsExport;
+
+    const accountTagsExport = await db
+      .select({
+        accountId: accountTags.accountId,
+        tagId: accountTags.tagId,
+      })
+      .from(accountTags)
+      .innerJoin(tags, eq(accountTags.tagId, tags.id))
+      .where(eq(tags.userId, dataUserId));
+    data.account_tags = accountTagsExport;
+
+    const budgetTagsExport = await db
+      .select({
+        budgetId: budgetTags.budgetId,
+        tagId: budgetTags.tagId,
+      })
+      .from(budgetTags)
+      .innerJoin(tags, eq(budgetTags.tagId, tags.id))
+      .where(eq(tags.userId, dataUserId));
+    data.budget_tags = budgetTagsExport;
+
+    const goalTagsExport = await db
+      .select({
+        goalId: goalTags.goalId,
+        tagId: goalTags.tagId,
+      })
+      .from(goalTags)
+      .innerJoin(tags, eq(goalTags.tagId, tags.id))
+      .where(eq(tags.userId, dataUserId));
+    data.goal_tags = goalTagsExport;
+
+    const [settings] = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (settings) {
+      const decryptedSettings = await decryptRow('user_settings', settings as Record<string, unknown>, dek);
+      data.user_settings = [decryptedSettings];
+    }
+
+    const backup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data,
+    };
+
+    const json = JSON.stringify(backup, null, 2);
+    const filename = `personal-finance-backup-${new Date().toISOString().split('T')[0]}.json`;
+
+    return new NextResponse(json, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (err) {
+    return handleApiError(err, 'Failed to export backup');
   }
-
-  const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-  const db = getDb();
-  const dek = await getSessionDEK();
-
-  const data: Record<string, unknown[]> = {};
-
-  for (const { table, dbName } of USER_TABLES) {
-    const isPersonalTable = dbName === 'ai_providers' || dbName === 'simplefin_connections' || dbName === 'plaid_connections';
-    const targetUserId = isPersonalTable ? userId : dataUserId;
-    const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
-    const decrypted = await Promise.all(
-      rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
-    );
-    data[dbName] = decrypted;
-  }
-
-  // Export tag join tables by joining with user's tags
-  const transactionTagsExport = await db
-    .select({
-      transactionId: transactionTags.transactionId,
-      tagId: transactionTags.tagId,
-    })
-    .from(transactionTags)
-    .innerJoin(tags, eq(transactionTags.tagId, tags.id))
-    .where(eq(tags.userId, dataUserId));
-  data.transaction_tags = transactionTagsExport;
-
-  const accountTagsExport = await db
-    .select({
-      accountId: accountTags.accountId,
-      tagId: accountTags.tagId,
-    })
-    .from(accountTags)
-    .innerJoin(tags, eq(accountTags.tagId, tags.id))
-    .where(eq(tags.userId, dataUserId));
-  data.account_tags = accountTagsExport;
-
-  const budgetTagsExport = await db
-    .select({
-      budgetId: budgetTags.budgetId,
-      tagId: budgetTags.tagId,
-    })
-    .from(budgetTags)
-    .innerJoin(tags, eq(budgetTags.tagId, tags.id))
-    .where(eq(tags.userId, dataUserId));
-  data.budget_tags = budgetTagsExport;
-
-  const goalTagsExport = await db
-    .select({
-      goalId: goalTags.goalId,
-      tagId: goalTags.tagId,
-    })
-    .from(goalTags)
-    .innerJoin(tags, eq(goalTags.tagId, tags.id))
-    .where(eq(tags.userId, dataUserId));
-  data.goal_tags = goalTagsExport;
-
-  const [settings] = await db
-    .select()
-    .from(userSettings)
-    .where(eq(userSettings.userId, userId))
-    .limit(1);
-
-  if (settings) {
-    const decryptedSettings = await decryptRow('user_settings', settings as Record<string, unknown>, dek);
-    data.user_settings = [decryptedSettings];
-  }
-
-  const backup = {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    data,
-  };
-
-  const json = JSON.stringify(backup, null, 2);
-  const filename = `personal-finance-backup-${new Date().toISOString().split('T')[0]}.json`;
-
-  return new NextResponse(json, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-    },
-  });
 }

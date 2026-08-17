@@ -25,6 +25,20 @@ export class ChartErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error(`[ChartErrorBoundary] ${this.props.name} crashed:`, error, errorInfo);
+    try {
+      fetch('/api/logs/client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          errorName: `ChartError: ${this.props.name}`,
+          errorMessage: error?.message || 'Chart rendering failure',
+          errorStack: error?.stack || errorInfo?.componentStack,
+          url: typeof window !== 'undefined' ? window.location.pathname : '',
+        }),
+      }).catch(() => {});
+    } catch {
+      // Ignored
+    }
   }
 
   render() {

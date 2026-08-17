@@ -7,6 +7,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
 import { isSimilarDescription } from '@/lib/utils/description-matching';
 import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api/response';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -140,6 +141,6 @@ export async function GET(request: Request) {
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     logger.error('Duplicate detection query failed', { error: errMsg });
-    return NextResponse.json({ error: 'query_failed', message: errMsg }, { status: 500 });
+    return handleApiError(error, 'Duplicate detection query failed');
   }
 }
