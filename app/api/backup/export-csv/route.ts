@@ -23,8 +23,10 @@ import {
   importLog,
   paystubs,
 } from '@/lib/db/schema';
-import { ZipArchive } from 'archiver';
 import { toCsv } from '@/lib/utils/export-formatter';
+import { ZipArchive } from 'archiver';
+import { apiUnauthorized, apiTooManyRequests, handleApiError } from '@/lib/api/response';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: accounts, dbName: 'accounts', label: 'accounts' },
@@ -43,146 +45,152 @@ const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: aiProviders, dbName: 'ai_providers', label: 'ai_providers' },
 ];
 
+export async function GET(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return apiUnauthorized();
+    }
 
+    const userId = session.user.id;
+    if (!checkRateLimit(`backup-export-csv:${userId}`, 10, 60_000)) {
+      return apiTooManyRequests('Too many export requests. Please wait a moment.');
+    }
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+    const db = getDb();
+    const dek = await getSessionDEK();
 
-  const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-  const db = getDb();
-  const dek = await getSessionDEK();
-
-  // Load lookup tables to decode IDs
-  const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
-  const decryptedAccounts = await Promise.all(
-    accountsRaw.map((row) => decryptRow('accounts', row as Record<string, unknown>, dek)),
-  );
-  const accountMap = new Map<string, string>(
-    decryptedAccounts.map((a) => [a.id as string, a.name as string]),
-  );
-
-  const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, dataUserId));
-  const decryptedCategories = await Promise.all(
-    categoriesRaw.map((row) => decryptRow('categories', row as Record<string, unknown>, dek)),
-  );
-  const categoryMap = new Map<string, string>(
-    decryptedCategories.map((c) => [c.id as string, c.name as string]),
-  );
-
-  const connectionsRaw = await db.select().from(simplifinConnections).where(eq(simplifinConnections.userId, dataUserId));
-  const connectionMap = new Map<string, string>(
-    connectionsRaw.map((c) => [c.id as string, c.label as string]),
-  );
-
-  const importsRaw = await db.select().from(importLog).where(eq(importLog.userId, dataUserId));
-  const importMap = new Map<string, string>(
-    importsRaw.map((i) => [i.id as string, i.fileName as string]),
-  );
-
-  const tagsRaw = await db.select().from(tags).where(eq(tags.userId, dataUserId));
-  const decryptedTags = await Promise.all(
-    tagsRaw.map((row) => decryptRow('tags', row as Record<string, unknown>, dek)),
-  );
-  const tagMap = new Map<string, string>(
-    decryptedTags.map((t) => [t.id as string, t.name as string]),
-  );
-
-  const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, dataUserId));
-  const paystubMap = new Map<string, string>(
-    paystubsRaw.map((p) => [p.id as string, `${p.employerName} (${p.checkDate})`]),
-  );
-
-  const ID_DECODERS: Record<string, Array<{ key: string; decodeKey: string; map: Map<string, string> }>> = {
-    accounts: [
-      { key: 'connectionId', decodeKey: 'connectionLabel', map: connectionMap },
-    ],
-    categories: [
-      { key: 'parentId', decodeKey: 'parentCategoryName', map: categoryMap },
-      { key: 'expenseParentId', decodeKey: 'expenseParentCategoryName', map: categoryMap },
-    ],
-    transactions: [
-      { key: 'accountId', decodeKey: 'accountName', map: accountMap },
-      { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
-      { key: 'importId', decodeKey: 'importFileName', map: importMap },
-      { key: 'paystubId', decodeKey: 'paystubDescription', map: paystubMap },
-    ],
-    category_rules: [
-      { key: 'setCategoryId', decodeKey: 'setCategoryName', map: categoryMap },
-      { key: 'setTagId', decodeKey: 'setTagName', map: tagMap },
-    ],
-    budgets: [
-      { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
-      { key: 'fundingAccountId', decodeKey: 'fundingAccountName', map: accountMap },
-    ],
-    financial_goals: [
-      { key: 'linkedAccountId', decodeKey: 'linkedAccountName', map: accountMap },
-    ],
-    account_snapshots: [
-      { key: 'accountId', decodeKey: 'accountName', map: accountMap },
-      { key: 'importId', decodeKey: 'importFileName', map: importMap },
-    ],
-    category_spending_summary: [
-      { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
-      { key: 'accountId', decodeKey: 'accountName', map: accountMap },
-    ],
-    category_income_summary: [
-      { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
-      { key: 'accountId', decodeKey: 'accountName', map: accountMap },
-    ],
-  };
-
-  const archive = new ZipArchive({ zlib: { level: 6 } });
-  const chunks: Buffer[] = [];
-
-  archive.on('data', (chunk: Buffer) => chunks.push(chunk));
-
-  const streamPromise = new Promise<void>((resolve, reject) => {
-    archive.on('end', resolve);
-    archive.on('error', reject);
-  });
-
-  for (const { table, dbName, label } of CSV_TABLES) {
-    const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
-    const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
-    const decrypted = await Promise.all(
-      rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
+    // Load lookup tables to decode IDs
+    const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
+    const decryptedAccounts = await Promise.all(
+      accountsRaw.map((row) => decryptRow('accounts', row as Record<string, unknown>, dek)),
+    );
+    const accountMap = new Map<string, string>(
+      decryptedAccounts.map((a) => [a.id as string, a.name as string]),
     );
 
-    const decoders = ID_DECODERS[dbName] || [];
-    const enriched = decrypted.map((row) => {
-      const newRow: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(row)) {
-        newRow[k] = v;
-        const decoder = decoders.find((d) => d.key === k);
-        if (decoder) {
-          const idVal = String(v ?? '');
-          newRow[decoder.decodeKey] = idVal ? (decoder.map.get(idVal) ?? '') : '';
-        }
-      }
-      return newRow;
+    const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, dataUserId));
+    const decryptedCategories = await Promise.all(
+      categoriesRaw.map((row) => decryptRow('categories', row as Record<string, unknown>, dek)),
+    );
+    const categoryMap = new Map<string, string>(
+      decryptedCategories.map((c) => [c.id as string, c.name as string]),
+    );
+
+    const connectionsRaw = await db.select().from(simplifinConnections).where(eq(simplifinConnections.userId, dataUserId));
+    const connectionMap = new Map<string, string>(
+      connectionsRaw.map((c) => [c.id as string, c.label as string]),
+    );
+
+    const importsRaw = await db.select().from(importLog).where(eq(importLog.userId, dataUserId));
+    const importMap = new Map<string, string>(
+      importsRaw.map((i) => [i.id as string, i.fileName as string]),
+    );
+
+    const tagsRaw = await db.select().from(tags).where(eq(tags.userId, dataUserId));
+    const decryptedTags = await Promise.all(
+      tagsRaw.map((row) => decryptRow('tags', row as Record<string, unknown>, dek)),
+    );
+    const tagMap = new Map<string, string>(
+      decryptedTags.map((t) => [t.id as string, t.name as string]),
+    );
+
+    const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, dataUserId));
+    const paystubMap = new Map<string, string>(
+      paystubsRaw.map((p) => [p.id as string, `${p.employerName} (${p.checkDate})`]),
+    );
+
+    const ID_DECODERS: Record<string, Array<{ key: string; decodeKey: string; map: Map<string, string> }>> = {
+      accounts: [
+        { key: 'connectionId', decodeKey: 'connectionLabel', map: connectionMap },
+      ],
+      categories: [
+        { key: 'parentId', decodeKey: 'parentCategoryName', map: categoryMap },
+        { key: 'expenseParentId', decodeKey: 'expenseParentCategoryName', map: categoryMap },
+      ],
+      transactions: [
+        { key: 'accountId', decodeKey: 'accountName', map: accountMap },
+        { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
+        { key: 'importId', decodeKey: 'importFileName', map: importMap },
+        { key: 'paystubId', decodeKey: 'paystubDescription', map: paystubMap },
+      ],
+      category_rules: [
+        { key: 'setCategoryId', decodeKey: 'setCategoryName', map: categoryMap },
+        { key: 'setTagId', decodeKey: 'setTagName', map: tagMap },
+      ],
+      budgets: [
+        { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
+        { key: 'fundingAccountId', decodeKey: 'fundingAccountName', map: accountMap },
+      ],
+      financial_goals: [
+        { key: 'linkedAccountId', decodeKey: 'linkedAccountName', map: accountMap },
+      ],
+      account_snapshots: [
+        { key: 'accountId', decodeKey: 'accountName', map: accountMap },
+        { key: 'importId', decodeKey: 'importFileName', map: importMap },
+      ],
+      category_spending_summary: [
+        { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
+        { key: 'accountId', decodeKey: 'accountName', map: accountMap },
+      ],
+      category_income_summary: [
+        { key: 'categoryId', decodeKey: 'categoryName', map: categoryMap },
+        { key: 'accountId', decodeKey: 'accountName', map: accountMap },
+      ],
+    };
+
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+    const chunks: Buffer[] = [];
+
+    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+    const streamPromise = new Promise<void>((resolve, reject) => {
+      archive.on('end', resolve);
+      archive.on('error', reject);
     });
 
-    const csv = toCsv(enriched);
-    if (csv) {
-      archive.append(csv, { name: `${label}.csv` });
+    for (const { table, dbName, label } of CSV_TABLES) {
+      const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
+      const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
+      const decrypted = await Promise.all(
+        rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
+      );
+
+      const decoders = ID_DECODERS[dbName] || [];
+      const enriched = decrypted.map((row) => {
+        const newRow: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(row)) {
+          newRow[k] = v;
+          const decoder = decoders.find((d) => d.key === k);
+          if (decoder) {
+            const idVal = String(v ?? '');
+            newRow[decoder.decodeKey] = idVal ? (decoder.map.get(idVal) ?? '') : '';
+          }
+        }
+        return newRow;
+      });
+
+      const csv = toCsv(enriched);
+      if (csv) {
+        archive.append(csv, { name: `${label}.csv` });
+      }
     }
+
+    await archive.finalize();
+    await streamPromise;
+
+    const buffer = Buffer.concat(chunks);
+    const filename = `personal-finance-export-${new Date().toISOString().split('T')[0]}.zip`;
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': String(buffer.length),
+      },
+    });
+  } catch (err) {
+    return handleApiError(err, 'Failed to export CSV archive');
   }
-
-  await archive.finalize();
-  await streamPromise;
-
-  const buffer = Buffer.concat(chunks);
-  const filename = `personal-finance-export-${new Date().toISOString().split('T')[0]}.zip`;
-
-  return new NextResponse(buffer, {
-    headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': String(buffer.length),
-    },
-  });
 }

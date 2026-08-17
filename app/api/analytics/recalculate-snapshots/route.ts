@@ -3,15 +3,13 @@ import { auth } from '@/lib/auth';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { runBackgroundRecalculation, recalculationStatus } from '@/lib/services/startup-recalculation';
 import { logger } from '@/lib/logger';
+import { apiUnauthorized, handleApiError } from '@/lib/api/response';
 
 export async function GET() {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'unauthenticated', message: 'Authentication required' },
-        { status: 401 }
-      );
+      return apiUnauthorized();
     }
 
     return NextResponse.json({
@@ -19,12 +17,10 @@ export async function GET() {
       status: recalculationStatus,
     });
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    logger.error('Error fetching recalculation status', { error: errorMsg });
-    return NextResponse.json(
-      { error: 'status_fetch_failed', message: errorMsg },
-      { status: 500 }
-    );
+    logger.error('Error fetching recalculation status', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return handleApiError(error, 'Failed to fetch recalculation status');
   }
 }
 
@@ -32,10 +28,7 @@ export async function POST(request: Request) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'unauthenticated', message: 'Authentication required' },
-        { status: 401 }
-      );
+      return apiUnauthorized();
     }
 
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
@@ -64,11 +57,9 @@ export async function POST(request: Request) {
       status: 'running',
     });
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    logger.error('Error starting snapshot recalculation', { error: errorMsg });
-    return NextResponse.json(
-      { error: 'recalculation_failed', message: errorMsg },
-      { status: 500 }
-    );
+    logger.error('Error starting snapshot recalculation', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return handleApiError(error, 'Failed to start snapshot recalculation');
   }
 }

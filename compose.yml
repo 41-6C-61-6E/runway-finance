@@ -27,6 +27,11 @@ services:
       retries: 5
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   finance-app:
     container_name: finance-app
@@ -35,6 +40,11 @@ services:
       - "3001:3000"
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     env_file:
       - .env
     environment:

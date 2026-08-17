@@ -318,7 +318,9 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
       const cost = h.costBasis;
       const gain = cost != null && cost > 0 ? val - cost : '';
       const retPct = cost != null && cost > 0 ? ((val - cost) / cost) * 100 : '';
-      const weight = totalLivePortfolioValue > 0 ? ((val / totalLivePortfolioValue) * 100).toFixed(2) : h.portfolioWeight.toFixed(2);
+      const weight = totalLivePortfolioValue > 0 
+        ? ((val / totalLivePortfolioValue) * 100).toFixed(2) 
+        : (h.portfolioWeight != null ? h.portfolioWeight.toFixed(2) : '0.00');
 
       return [
         h.ticker || '',

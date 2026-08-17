@@ -5,18 +5,19 @@ import { issues } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { UpdateIssueStatusSchema } from '@/lib/validations/issue';
 import { logger } from '@/lib/logger';
+import { apiNotFound, apiUnauthorized, apiValidation, handleApiError } from '@/lib/api/response';
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   if (process.env.BUG_REPORTING !== 'true') {
-    return NextResponse.json({ error: 'Feature disabled' }, { status: 404 });
+    return apiNotFound('Feature disabled');
   }
 
   const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  if (!session?.user?.id) {
+    return apiUnauthorized();
   }
 
   const { id } = await params;
@@ -25,15 +26,12 @@ export async function PATCH(
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    return NextResponse.json({ error: 'bad_request', message: 'Invalid request body' }, { status: 400 });
   }
 
   const parsed = UpdateIssueStatusSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'validation_error', details: parsed.error.flatten().fieldErrors },
-      { status: 400 }
-    );
+    return apiValidation(parsed.error.flatten().fieldErrors, 'Validation failed');
   }
 
   const { status } = parsed.data;
@@ -54,7 +52,7 @@ export async function PATCH(
       .returning();
 
     if (!updated) {
-      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+      return apiNotFound('Issue not found');
     }
 
     logger.info('PATCH /api/bug-reporting/[id] - updated status', {
@@ -68,7 +66,7 @@ export async function PATCH(
     logger.error('PATCH /api/bug-reporting/[id] failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json({ error: 'internal_server_error' }, { status: 500 });
+    return handleApiError(error, 'Failed to update issue status');
   }
 }
 
@@ -77,12 +75,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   if (process.env.BUG_REPORTING !== 'true') {
-    return NextResponse.json({ error: 'Feature disabled' }, { status: 404 });
+    return apiNotFound('Feature disabled');
   }
 
   const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  if (!session?.user?.id) {
+    return apiUnauthorized();
   }
 
   const { id } = await params;
@@ -99,7 +97,7 @@ export async function DELETE(
       .returning();
 
     if (!deleted) {
-      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+      return apiNotFound('Issue not found');
     }
 
     logger.info('DELETE /api/bug-reporting/[id] - deleted', {
@@ -112,6 +110,6 @@ export async function DELETE(
     logger.error('DELETE /api/bug-reporting/[id] failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json({ error: 'internal_server_error' }, { status: 500 });
+    return handleApiError(error, 'Failed to delete issue');
   }
 }

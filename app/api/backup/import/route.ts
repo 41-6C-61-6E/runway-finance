@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptRow } from '@/lib/crypto';
 import { eq, sql } from 'drizzle-orm';
+import { apiUnauthorized, apiForbidden, apiBadRequest, apiTooManyRequests, handleApiError } from '@/lib/api/response';
 import {
   accounts,
   categories,
@@ -128,7 +129,7 @@ const INSERT_ORDER: { table: any; dbName: string }[] = [
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return apiUnauthorized();
   }
 
   const userId = session.user.id;
@@ -136,7 +137,12 @@ export async function POST(request: Request) {
   const isMember = dataUserId !== userId;
 
   if (isMember) {
-    return NextResponse.json({ error: 'Forbidden', message: 'Sharing members cannot import backups over household financial data' }, { status: 403 });
+    return apiForbidden('Sharing members cannot import backups over household financial data');
+  }
+
+  const { checkRateLimit } = await import('@/lib/rate-limit');
+  if (!checkRateLimit(`backup-import:${userId}`, 5, 60_000)) {
+    return apiTooManyRequests('Too many backup import requests. Please wait a moment.');
   }
 
   const db = getDb();
@@ -146,15 +152,15 @@ export async function POST(request: Request) {
   try {
     backup = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    return apiBadRequest('Invalid JSON payload');
   }
 
   if (!backup.version || !backup.data || typeof backup.data !== 'object') {
-    return NextResponse.json({ error: 'Invalid backup format' }, { status: 400 });
+    return apiBadRequest('Invalid backup format');
   }
 
   if (backup.version !== 1) {
-    return NextResponse.json({ error: `Unsupported backup version: ${backup.version}` }, { status: 400 });
+    return apiBadRequest(`Unsupported backup version: ${backup.version}`);
   }
 
   try {
@@ -232,8 +238,7 @@ export async function POST(request: Request) {
       message: 'Backup restored successfully. You may want to refresh the page to see updated data.',
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to restore backup';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, 'Failed to restore backup');
   }
 }
 

@@ -11,20 +11,21 @@ const LOG_TAG = '[weekly-networth-scheduler]';
 const CHECK_INTERVAL_MS = 15 * 60 * 1000; // Check every 15 minutes
 
 class WeeklyNetWorthScheduler extends BaseScheduler<string> {
-  private timer: ReturnType<typeof setTimeout> | null = null;
-
   async init(): Promise<void> {
+    if (this._isInitialized) return;
+    this._lastInitAt = new Date();
     this._isRunning = true;
+    this._isInitialized = true;
     logger.info(`${LOG_TAG} Weekly Net Worth Alert Scheduler initialized`);
     this.scheduleCheck();
   }
 
   private scheduleCheck(): void {
-    this.timer = setTimeout(() => this.execute(), CHECK_INTERVAL_MS);
+    this.startTimer('main', () => this.execute(), CHECK_INTERVAL_MS);
   }
 
   private async execute(): Promise<void> {
-    this.timer = null;
+    this.cancel('main');
 
     try {
       const db = getDb();
@@ -70,12 +71,7 @@ class WeeklyNetWorthScheduler extends BaseScheduler<string> {
   }
 
   shutdown(): void {
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
-    this._isRunning = false;
-    logger.info(`${LOG_TAG} Scheduler shut down`);
+    super.shutdown();
   }
 }
 

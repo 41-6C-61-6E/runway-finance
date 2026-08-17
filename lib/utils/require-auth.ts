@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { logger } from '@/lib/logger';
+import { getDb } from '@/lib/db';
+import { simplifinConnections, plaidConnections } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { apiNotFound, apiForbidden } from '@/lib/api/response';
 
 export function requireDeleteConfirmation(request: Request): void {
   if (request.headers.get('X-Confirm-Delete') !== 'true') {
@@ -10,6 +14,44 @@ export function requireDeleteConfirmation(request: Request): void {
       { status: 400 }
     );
   }
+}
+
+export async function getOwnedConnection(connectionId: string, requestingUserId: string): Promise<{
+  connection: any;
+  isSimplefin: boolean;
+  errorResponse?: NextResponse;
+}> {
+  const db = getDb();
+  let isSimplefin = true;
+  let [connection] = await db
+    .select()
+    .from(simplifinConnections)
+    .where(eq(simplifinConnections.id, connectionId))
+    .limit(1);
+
+  if (!connection) {
+    isSimplefin = false;
+    const [plaidConn] = await db
+      .select()
+      .from(plaidConnections)
+      .where(eq(plaidConnections.id, connectionId))
+      .limit(1);
+    connection = plaidConn as any;
+  }
+
+  if (!connection) {
+    return { connection: null, isSimplefin, errorResponse: apiNotFound('Connection not found') };
+  }
+
+  const { resolveDataUserId } = await import('@/lib/sharing');
+  const requestingDataUserId = await resolveDataUserId(requestingUserId);
+  const connectionDataUserId = await resolveDataUserId(connection.userId);
+
+  if (connectionDataUserId !== requestingDataUserId) {
+    return { connection: null, isSimplefin, errorResponse: apiForbidden('You do not own this connection') };
+  }
+
+  return { connection, isSimplefin };
 }
 
 export interface AuthContext {

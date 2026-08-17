@@ -72,5 +72,10 @@ export const authConfig = {
       return false;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-secret-change-in-production'),
+  secret: (() => {
+    if (process.env.NODE_ENV === 'production' && !process.env.NEXTAUTH_SECRET) {
+      throw new Error('[FATAL] NEXTAUTH_SECRET environment variable is missing in production.');
+    }
+    return process.env.NEXTAUTH_SECRET || 'dev-secret-change-in-production';
+  })(),
 } satisfies NextAuthConfig;

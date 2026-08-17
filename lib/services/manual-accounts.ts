@@ -470,17 +470,17 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
       const unconfirmed = BigInt(data.unconfirmedBalance ?? '0');
       const totalSats = Number(confirmed + unconfirmed);
 
-      logger.info(`${LOG_TAG} Bitcoin parsed [${host}/${fmt}]: balance=${data.balance}, unconfirmed=${data.unconfirmedBalance}, totalSats=${totalSats}`);
+      logger.debug(`${LOG_TAG} Bitcoin parsed [${host}/${fmt}]`);
 
       if (isNaN(totalSats)) {
-        lastError = `parse error (NaN)\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}\n  raw balance: ${data.balance}, unconfirmed: ${data.unconfirmedBalance}`;
+        lastError = `parse error (NaN)\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}`;
         continue;
       }
 
       const btc = totalSats / 1e8;
 
       if (btc === 0 && fmt !== xpubFormats[xpubFormats.length - 1]) {
-        logger.info(`${LOG_TAG} BTC returned 0 for ${fmt} on ${host}, will retry with next format`);
+        logger.debug(`${LOG_TAG} BTC returned 0 for ${fmt} on ${host}, will retry with next format`);
         lastError = `got 0 BTC for ${fmt} on ${host}`;
         break;
       }
@@ -495,12 +495,12 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
     throw new Error(`Bitcoin fetch failed (${xpubFormats.length} formats x ${hostList.length} hosts)\n  last: ${lastError}`);
   }
 
-  logger.info(`${LOG_TAG} BTC wallet balance: ${btcAmount} BTC`);
+  logger.debug(`${LOG_TAG} BTC wallet balance fetched successfully`);
 
   const btcPrice = await fetchBtcPrice(apiConfig);
   const usdValue = btcAmount * btcPrice;
 
-  logger.info(`${LOG_TAG} BTC value: ${btcAmount} BTC x $${btcPrice} = $${usdValue}`);
+  logger.debug(`${LOG_TAG} BTC value computed successfully`);
 
   return usdValue;
 }
@@ -735,7 +735,7 @@ export async function syncManualAccount(
   }
 
   const delta = newValue - oldBalance;
-  logger.info(`${LOG_TAG} Sync comparison for ${accountId} (${account.type}): oldBalance=${oldBalance}, newValue=${newValue}, delta=${delta}`);
+  logger.debug(`${LOG_TAG} Sync comparison for ${accountId} (${account.type}): changed=${Math.abs(delta) > 0.0001}`);
 
   const accountUpdate: any = {
     balance: dek ? await encryptField(formatToCents(newValue), dek) : formatToCents(newValue),
@@ -815,7 +815,7 @@ export async function syncManualAccount(
   }
 
   const changed = Math.abs(delta) > 0.0001;
-  logger.info(`${LOG_TAG} Account synced`, { accountId, type: account.type, oldBalance, newValue, changed });
+  logger.info(`${LOG_TAG} Account synced`, { accountId, type: account.type, changed });
 
   if (changed) {
     invalidateUserSearchCache(userId);
@@ -917,7 +917,7 @@ export async function adjustManualAccountValue(
   await updateNetWorthSnapshot(userId, dek);
 
   const changed = Math.abs(delta) > 0.0001;
-  logger.info(`${LOG_TAG} Account value adjusted`, { accountId, type: account.type, oldBalance, newValue: finalNewValue, changed, note });
+  logger.info(`${LOG_TAG} Account value adjusted`, { accountId, type: account.type, changed });
 
   if (changed) {
     invalidateUserSearchCache(userId);

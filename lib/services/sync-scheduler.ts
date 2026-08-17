@@ -48,6 +48,9 @@ import { BaseScheduler } from '@/lib/services/base-scheduler';
 class SyncScheduler extends BaseScheduler<string> {
 
   async init(): Promise<void> {
+    if (this._isInitialized) return;
+    this._lastInitAt = new Date();
+
     // 1. Fetch SimpleFIN connections
     const sfConnections = await getDb()
       .select({
@@ -91,6 +94,7 @@ class SyncScheduler extends BaseScheduler<string> {
     }
 
     this._isRunning = true;
+    this._isInitialized = true;
     logger.info(`${LOG_TAG} Scheduler initialized`, { total: allConnections.length, scheduled, skipped });
   }
 
@@ -109,50 +113,26 @@ class SyncScheduler extends BaseScheduler<string> {
 
     const now = Date.now();
     const lastSyncTime = lastSyncAt ? lastSyncAt.getTime() : 0;
-    let delay = 0;
+    let delay: number;
 
     if (syncFrequency === 'daily') {
-      let finalUserId = userId;
-      if (!finalUserId) {
-        const db = getDb();
-        const [sfConn] = await db
-          .select({ userId: simplifinConnections.userId })
-          .from(simplifinConnections)
-          .where(eq(simplifinConnections.id, id))
-          .limit(1);
-        if (sfConn) {
-          finalUserId = sfConn.userId;
-        } else {
-          const [pConn] = await db
-            .select({ userId: plaidConnections.userId })
-            .from(plaidConnections)
-            .where(eq(plaidConnections.id, id))
+      // Find the user's timezone and preferred daily sync hour (default: midnight / 0)
+      let userTz = 'America/New_York';
+      let targetHour = 0; // 00:00 (midnight)
+      let targetMinute = 0;
+
+      if (userId) {
+        try {
+          const [settings] = await getDb()
+            .select({ timezone: userSettings.timezone })
+            .from(userSettings)
+            .where(eq(userSettings.userId, userId))
             .limit(1);
-          if (pConn) {
-            finalUserId = pConn.userId;
+          if (settings?.timezone) {
+            userTz = settings.timezone;
           }
-        }
-      }
+        } catch {}
 
-      if (finalUserId) {
-        const db = getDb();
-        const [settings] = await db
-          .select({ timezone: userSettings.timezone })
-          .from(userSettings)
-          .where(eq(userSettings.userId, finalUserId))
-          .limit(1);
-        const userTz = settings?.timezone || 'America/New_York';
-        const alertTime = '18:00';
-        const [alertHour, alertMinute] = alertTime.split(':').map(Number);
-
-        // Target time is 1 hour before the alert time
-        let targetHour = alertHour - 1;
-        let targetMinute = alertMinute;
-        if (targetHour < 0) {
-          targetHour += 24;
-        }
-
-        // Determine current date in user's timezone
         const formatter = new Intl.DateTimeFormat('en-US', {
           timeZone: userTz,
           year: 'numeric',
@@ -164,16 +144,13 @@ class SyncScheduler extends BaseScheduler<string> {
           hour12: false,
         });
         const parts = formatter.formatToParts(new Date(now));
-        const y = parseInt(parts.find(p => p.type === 'year')!.value, 10);
-        const m = parseInt(parts.find(p => p.type === 'month')!.value, 10) - 1;
-        const d = parseInt(parts.find(p => p.type === 'day')!.value, 10);
+        const currentYear = parseInt(parts.find(p => p.type === 'year')!.value, 10);
+        const currentMonth = parseInt(parts.find(p => p.type === 'month')!.value, 10) - 1;
+        const currentDay = parseInt(parts.find(p => p.type === 'day')!.value, 10);
 
-        const targetTimeToday = getUtcTimestamp(y, m, d, targetHour, targetMinute, userTz);
-        let targetTime = targetTimeToday;
+        let targetTime = getUtcTimestamp(currentYear, currentMonth, currentDay, targetHour, targetMinute, userTz);
 
-        // If target time has already passed today OR it is too close to the last sync (within 12 hours)
-        if (targetTime <= now || (lastSyncTime > 0 && targetTime - lastSyncTime < 12 * 60 * 60 * 1000)) {
-          // Schedule for tomorrow instead
+        if (targetTime <= now) {
           const tomorrow = new Date(now + 24 * 60 * 60 * 1000);
           const partsTomorrow = formatter.formatToParts(tomorrow);
           const yt = parseInt(partsTomorrow.find(p => p.type === 'year')!.value, 10);
@@ -184,7 +161,6 @@ class SyncScheduler extends BaseScheduler<string> {
 
         delay = Math.max(0, targetTime - now);
       } else {
-        // Fallback if userId cannot be found
         const nextSyncTime = lastSyncTime + interval;
         delay = Math.max(0, nextSyncTime - now);
       }
@@ -194,8 +170,7 @@ class SyncScheduler extends BaseScheduler<string> {
       delay = Math.max(0, nextSyncTime - now);
     }
 
-    const timer = setTimeout(() => this.execute(id), delay);
-    this.timers.set(id, timer);
+    this.startTimer(id, () => this.execute(id), delay);
 
     logger.info(`${LOG_TAG} Scheduled`, {
       connectionId: id,
@@ -350,25 +325,21 @@ class SyncScheduler extends BaseScheduler<string> {
       if (syncSuccess) {
         await this.schedule(id, refreshed.syncFrequency, refreshed.lastSyncAt, userId);
       } else {
-        const timer = setTimeout(() => this.execute(id), RETRY_DELAY_MS);
-        this.timers.set(id, timer);
+        this.startTimer(id, () => this.execute(id), RETRY_DELAY_MS);
         logger.info(`${LOG_TAG} Retry scheduled in 30m`, { connectionId: id });
       }
     } catch (err) {
-      logger.error(`${LOG_TAG} Failed to reschedule`, {
+      logger.error(`${LOG_TAG} Failed to reschedule, will retry in 30m`, {
         connectionId: id,
         error: err instanceof Error ? err.message : String(err),
       });
+      // Do not permanently drop the timer on a transient Postgres blip
+      this.startTimer(id, () => this.execute(id), RETRY_DELAY_MS);
     }
   }
 
   shutdown(): void {
-    for (const [id, timer] of this.timers) {
-      clearTimeout(timer);
-    }
-    this.timers.clear();
-    this._isRunning = false;
-    logger.info(`${LOG_TAG} Scheduler shut down`);
+    super.shutdown();
   }
 }
 

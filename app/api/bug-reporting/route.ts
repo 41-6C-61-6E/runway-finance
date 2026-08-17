@@ -5,15 +5,17 @@ import { issues, users } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { CreateIssueSchema } from '@/lib/validations/issue';
 import { logger } from '@/lib/logger';
+import { apiNotFound, apiUnauthorized, apiValidation, apiTooManyRequests, handleApiError } from '@/lib/api/response';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function GET() {
   if (process.env.BUG_REPORTING !== 'true') {
-    return NextResponse.json({ error: 'Feature disabled' }, { status: 404 });
+    return apiNotFound('Feature disabled');
   }
 
   const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  if (!session?.user?.id) {
+    return apiUnauthorized();
   }
 
   try {
@@ -39,33 +41,35 @@ export async function GET() {
     logger.error('GET /api/bug-reporting failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json({ error: 'internal_server_error' }, { status: 500 });
+    return handleApiError(error, 'Failed to fetch reported issues');
   }
 }
 
 export async function POST(request: Request) {
   if (process.env.BUG_REPORTING !== 'true') {
-    return NextResponse.json({ error: 'Feature disabled' }, { status: 404 });
+    return apiNotFound('Feature disabled');
   }
 
   const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  if (!session?.user?.id) {
+    return apiUnauthorized();
+  }
+
+  const userId = session.user.id;
+  if (!checkRateLimit(`bug-report:${userId}`, 10, 60_000)) {
+    return apiTooManyRequests('Too many issue submissions. Please wait a moment.');
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    return NextResponse.json({ error: 'bad_request', message: 'Invalid request body' }, { status: 400 });
   }
 
   const parsed = CreateIssueSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'validation_error', details: parsed.error.flatten().fieldErrors },
-      { status: 400 }
-    );
+    return apiValidation(parsed.error.flatten().fieldErrors, 'Validation failed');
   }
 
   const { type, title, description } = parsed.data;
@@ -75,7 +79,7 @@ export async function POST(request: Request) {
     const [newIssue] = await getDb()
       .insert(issues)
       .values({
-        userId: session.user.id,
+        userId,
         type,
         title,
         description,
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
       .returning();
 
     logger.info('POST /api/bug-reporting - created', {
-      userId: session.user.id,
+      userId,
       issueId: newIssue.id,
       type,
     });
@@ -94,6 +98,6 @@ export async function POST(request: Request) {
     logger.error('POST /api/bug-reporting failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json({ error: 'internal_server_error' }, { status: 500 });
+    return handleApiError(error, 'Failed to create issue report');
   }
 }

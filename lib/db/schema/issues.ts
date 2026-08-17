@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, index } from 'drizzle-orm/pg-core';
 
 export const issues = pgTable('issues', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -9,4 +9,6 @@ export const issues = pgTable('issues', {
   status: text('status').notNull().default('reported'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index('issues_user_created_idx').on(table.userId, table.createdAt),
+]);

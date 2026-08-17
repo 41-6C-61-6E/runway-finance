@@ -177,7 +177,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             id: user.username,
             name: user.username,
             email: user.email,
-            dek: bytesToHex(dek),
             dataUserId,
           };
         }
@@ -223,7 +222,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        token.dek = (user as any).dek;
         (token as any).dataUserId = (user as any).dataUserId ?? user.id;
       }
       return token;

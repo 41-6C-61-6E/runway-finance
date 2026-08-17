@@ -241,7 +241,8 @@ export async function POST(request: Request) {
       failedCount,
     });
   } catch (error: any) {
-    logger.error('Sync all internal error', { error: error.message });
-    return NextResponse.json({ error: 'internal_error', message: error.message || 'Failed to sync' }, { status: 500 });
+    logger.error('Sync all internal error', { error: error?.message });
+    const { handleApiError } = await import('@/lib/api/response');
+    return handleApiError(error, 'Failed to complete synchronization');
   }
 }

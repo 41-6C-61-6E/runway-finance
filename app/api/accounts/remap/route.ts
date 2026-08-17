@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { accounts, transactions, accountSnapshots, simplifinConnections, plaidConnections } from '@/lib/db/schema';
 import { eq, and, isNotNull, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { handleApiError } from '@/lib/api/response';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, encryptRow } from '@/lib/crypto';
 import {
@@ -246,12 +247,6 @@ export async function POST(request: Request) {
       error: error instanceof Error ? error.message : String(error),
     });
 
-    return NextResponse.json(
-      {
-        error: 'internal_error',
-        message: error instanceof Error ? error.message : 'An unexpected error occurred during account remapping',
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, 'An unexpected error occurred during account remapping');
   }
 }
