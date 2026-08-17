@@ -97,4 +97,12 @@ export const queryKeys = {
   userSettings: {
     all: ['user-settings'] as const,
   },
+
+  recurring: {
+    all: ['recurring'] as const,
+    list: (filters?: Record<string, any>) => ['recurring', 'list', filters || {}] as const,
+    detail: (id: string) => ['recurring', 'detail', id] as const,
+    upcoming: (days?: number, flowType?: string) => ['recurring', 'upcoming', { days: days || 30, flowType: flowType || 'all' }] as const,
+    summary: ['recurring', 'summary'] as const,
+  },
 } as const;

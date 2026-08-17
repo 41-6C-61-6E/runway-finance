@@ -82,7 +82,7 @@ describe('JSON Backup Export / Import API', () => {
   });
 
   it('should export all tables including importLog fileContent and join tables', async () => {
-    const response = await exportGET();
+    const response = await exportGET(new Request('http://localhost/api/backup/export'));
     expect(response.status).toBe(200);
 
     const backup = await response.json();

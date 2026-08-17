@@ -28,6 +28,11 @@ export const GENERAL_DEFAULTS = {
     categoryIds: [],
     tagIds: [],
   },
+  recurringExclusions: {
+    categoryIds: [],
+    accountIds: [],
+    merchantPatterns: [],
+  },
   deletePendingOlderThan30Days: true,
   deletePendingDays: 10,
 } as const;
@@ -85,6 +90,9 @@ export const NOTIFICATION_DEFAULTS = {
   notifyWeeklyNetWorthChange: true,
   weeklyNetWorthAlertDay: 'sunday',
   notifyAiProposals: true,
+  notifyRecurringPriceChanges: true,
+  notifyUpcomingBills: false,
+  upcomingBillsLeadDays: 3,
   maxNotificationsPerPeriod: 5,
   notificationLimiterPeriodMinutes: 60,
 } as const;
