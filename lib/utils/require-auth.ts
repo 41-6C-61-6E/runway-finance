@@ -3,9 +3,72 @@ import { auth } from '@/lib/auth';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { logger } from '@/lib/logger';
 import { getDb } from '@/lib/db';
-import { simplifinConnections, plaidConnections } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { simplifinConnections, plaidConnections, accountShareMembers, userEncryptionKeys } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
 import { apiNotFound, apiForbidden } from '@/lib/api/response';
+
+// ── Share roles ───────────────────────────────────────────────────────────────
+
+export type ShareRole = 'primary' | 'admin' | 'member';
+
+const ROLE_RANK: Record<ShareRole, number> = {
+  member: 1,
+  admin: 2,
+  primary: 3,
+};
+
+export function roleAtLeast(role: ShareRole, minRole: ShareRole): boolean {
+  return ROLE_RANK[role] >= ROLE_RANK[minRole];
+}
+
+/**
+ * Effective share role for a user:
+ * - primary (owns their own data) → 'primary'
+ * - active member → role from account_share_members ('admin' | 'member')
+ * - unknown/removed → 'member' (safe default: no destructive permissions)
+ */
+export async function getEffectiveRole(userId: string): Promise<ShareRole> {
+  const db = getDb();
+  const [keyRow] = await db
+    .select({ primaryUserId: userEncryptionKeys.primaryUserId })
+    .from(userEncryptionKeys)
+    .where(eq(userEncryptionKeys.userId, userId))
+    .limit(1);
+
+  if (!keyRow) {
+    return 'member';
+  }
+
+  if (keyRow.primaryUserId === null || keyRow.primaryUserId === userId) {
+    return 'primary';
+  }
+
+  const [row] = await db
+    .select({ role: accountShareMembers.role })
+    .from(accountShareMembers)
+    .where(
+      and(
+        eq(accountShareMembers.primaryUserId, keyRow.primaryUserId),
+        eq(accountShareMembers.memberUserId, userId),
+        eq(accountShareMembers.status, 'active')
+      )
+    )
+    .limit(1);
+
+  return row?.role === 'admin' ? 'admin' : 'member';
+}
+
+/**
+ * Gate destructive shared-group actions by role.
+ * Returns a 403 response when the user's role is below minRole, otherwise null.
+ */
+export async function requireMinRole(minRole: ShareRole, userId: string): Promise<NextResponse | null> {
+  const role = await getEffectiveRole(userId);
+  if (roleAtLeast(role, minRole)) {
+    return null;
+  }
+  return apiForbidden('You do not have permission to perform this action');
+}
 
 export function requireDeleteConfirmation(request: Request): void {
   if (request.headers.get('X-Confirm-Delete') !== 'true') {

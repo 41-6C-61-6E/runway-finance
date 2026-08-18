@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { revokeInvitation } from '@/lib/sharing';
+import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { logger } from '@/lib/logger';
 
 export async function DELETE(
@@ -22,6 +23,7 @@ export async function DELETE(
     if (result.error) {
       return NextResponse.json({ message: result.error }, { status: 400 });
     }
+    await logShareAudit(session.user.id, session.user.id, SHARE_AUDIT_ACTIONS.INVITATION_REVOKED, 'account_sharing_invitations', id);
     logger.info('[sharing] Invitation revoked via API', { userId: session.user.id, invitationId: id });
     return NextResponse.json({ success: true });
   } catch (err) {

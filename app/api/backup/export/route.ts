@@ -92,7 +92,7 @@ export async function GET(request: Request) {
     }
 
     const userId = session.user.id;
-    if (!checkRateLimit(`backup-export:${userId}`, 10, 60_000)) {
+    if (!(await checkRateLimit(`backup-export:${userId}`, 10, 60_000))) {
       return apiTooManyRequests('Too many export requests. Please wait a moment.');
     }
 

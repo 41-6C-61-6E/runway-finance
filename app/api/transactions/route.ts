@@ -42,6 +42,7 @@ import {
   updateMonthlyCashFlowSummaries,
 } from "@/lib/services/sync";
 import { getSearchMatchingTransactionIds, invalidateUserSearchCache } from "@/lib/services/search-cache";
+import { getHiddenAccountIdsForUser, isAccountHiddenFromUser } from "@/lib/data-visibility";
 
 const UNCATEGORIZED_CATEGORY_IDS = new Set([
   "uncategorized",
@@ -344,6 +345,12 @@ export async function GET(request: Request) {
     eq(transactions.deleted, false),
     isNull(transactions.parentId),
   ];
+
+  // Sensitive accounts are hidden from plain sharing members (server-side).
+  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
+  if (hiddenAccountIds.length > 0) {
+    whereConditions.push(notInArray(transactions.accountId, hiddenAccountIds));
+  }
 
   if (filters.search) {
     const matchingSearchIds = await getSearchMatchingTransactionIds(dataUserId, dek, filters.search);
@@ -1241,6 +1248,12 @@ export async function PATCH(request: Request) {
       eq(transactions.deleted, false),
     ];
 
+    // Sensitive accounts are hidden from plain sharing members (server-side).
+    const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
+    if (hiddenAccountIds.length > 0) {
+      whereConditions.push(notInArray(transactions.accountId, hiddenAccountIds));
+    }
+
     if (!isImportTransactionsEnabled) {
       whereConditions.push(eq(transactions.isImported, false));
     }
@@ -1486,6 +1499,14 @@ export async function POST(request: Request) {
     );
   }
 
+  // Sensitive accounts are invisible to plain sharing members (same 404 as missing).
+  if (await isAccountHiddenFromUser(userId, dataUserId, accountId)) {
+    return NextResponse.json(
+      { error: "not_found", message: "Account not found" },
+      { status: 404 },
+    );
+  }
+
   const externalId = crypto.randomUUID();
 
   const txData = {
@@ -1606,6 +1627,12 @@ export async function DELETE(request: Request) {
       ),
       eq(transactions.deleted, false),
     ];
+
+    // Sensitive accounts are hidden from plain sharing members (server-side).
+    const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
+    if (hiddenAccountIds.length > 0) {
+      whereConditions.push(notInArray(transactions.accountId, hiddenAccountIds));
+    }
 
     if (!isImportTransactionsEnabled) {
       whereConditions.push(eq(transactions.isImported, false));

@@ -3,6 +3,7 @@
   "description": "Self-hosted personal finance dashboard for net worth, cash flow, budgets, goals, real estate, and FIRE planning.",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.23.0",
   "engines": {
     "node": ">=20.0.0"
   },

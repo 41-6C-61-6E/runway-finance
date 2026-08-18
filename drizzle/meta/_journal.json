@@ -582,6 +582,48 @@
       "when": 1786995061343,
       "tag": "0082_spotty_lady_ursula",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1787000001000,
+      "tag": "0083_sharing_invitation_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1787000002000,
+      "tag": "0084_sharing_dek_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1787000003000,
+      "tag": "0085_sharing_roles_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1787000004000,
+      "tag": "0086_sharing_join_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1787000005000,
+      "tag": "0087_accounts_sensitive",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1787000006000,
+      "tag": "0088_rate_limits",
+      "breakpoints": true
     }
   ]
 }

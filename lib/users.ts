@@ -1,9 +1,14 @@
 import bcrypt from 'bcryptjs';
+import type { PoolClient } from 'pg';
 import { getPool } from './db';
 import { deriveKeyFromPassword, unwrapKey, wrapKey, generateDEK, getServerKey } from './crypto';
 import { getDb } from './db';
-import { userEncryptionKeys } from './db/schema';
-import { eq } from 'drizzle-orm';
+import { userEncryptionKeys, dekVersions, dekVersionWraps } from './db/schema';
+import { and, eq } from 'drizzle-orm';
+
+// Drizzle instance type (without the concrete $client brand, so a db bound to
+// a transactional PoolClient is also assignable).
+type Db = Omit<ReturnType<typeof getDb>, '$client'>;
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -37,21 +42,34 @@ export async function getUsers(): Promise<Omit<User, 'password_hash'>[]> {
   }
 }
 
-export async function addUser(user: { username: string; password: string; email?: string }): Promise<User> {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not available');
-
+export async function addUser(
+  user: { username: string; password: string; email?: string },
+  client?: PoolClient
+): Promise<User> {
   const password_hash = await bcrypt.hash(user.password, 12);
 
-  const client = await pool.connect();
-  try {
-    const { rows } = await client.query(
+  const insert = async (c: PoolClient): Promise<User> => {
+    const { rows } = await c.query(
       'INSERT INTO users (username, password_hash, email) VALUES ($1, $2, $3) RETURNING username, password_hash, email',
       [user.username, password_hash, user.email || null]
     );
     return rows[0];
+  };
+
+  // When a caller-provided client is passed, run on it directly (the caller
+  // owns the transaction and the release); otherwise keep the legacy behavior.
+  if (client) {
+    return insert(client);
+  }
+
+  const pool = getPool();
+  if (!pool) throw new Error('Database not available');
+
+  const c = await pool.connect();
+  try {
+    return await insert(c);
   } finally {
-    client.release();
+    c.release();
   }
 }
 
@@ -105,11 +123,22 @@ export async function updatePassword(username: string, currentPassword: string, 
       if (keyRow) {
         const salt = hexToBytes(keyRow.salt);
         const oldKek = await deriveKeyFromPassword(currentPassword, salt);
-        const dek = await unwrapKey({
-          ciphertext: keyRow.wrappedDek,
-          iv: keyRow.wrappingIv,
-          tag: keyRow.wrappingTag,
-        }, oldKek);
+        let dek: Uint8Array;
+        if (keyRow.serverWrappedDek && keyRow.serverWrappingIv) {
+          // The server wrap is authoritative — the password wrap may predate a
+          // household DEK rotation that only refreshed the server-side copies.
+          dek = await unwrapKey({
+            ciphertext: keyRow.serverWrappedDek,
+            iv: keyRow.serverWrappingIv,
+            tag: keyRow.serverWrappingTag ?? '',
+          }, getServerKey());
+        } else {
+          dek = await unwrapKey({
+            ciphertext: keyRow.wrappedDek,
+            iv: keyRow.wrappingIv,
+            tag: keyRow.wrappingTag,
+          }, oldKek);
+        }
 
         const newSalt = crypto.getRandomValues(new Uint8Array(32));
         const newKek = await deriveKeyFromPassword(newPassword, newSalt);
@@ -129,6 +158,40 @@ export async function updatePassword(username: string, currentPassword: string, 
           salt: bytesToHex(newSalt),
           updatedAt: new Date(),
         }).where(eq(userEncryptionKeys.userId, username));
+
+        // Refresh this user's wrap of the household's current DEK version under
+        // the new KEK so the version chain stays readable after the change.
+        const householdId = keyRow.primaryUserId ?? username;
+        const versionRows = await db
+          .select({
+            id: dekVersions.id,
+            version: dekVersions.version,
+            dekWrappedServer: dekVersions.dekWrappedServer,
+            wrappingIv: dekVersions.wrappingIv,
+            wrappingTag: dekVersions.wrappingTag,
+          })
+          .from(dekVersions)
+          .where(eq(dekVersions.primaryUserId, householdId));
+
+        if (versionRows.length > 0) {
+          const latest = versionRows.reduce((a, b) => ((b.version ?? 0) > (a.version ?? 0) ? b : a));
+          const versionDek = await unwrapKey({
+            ciphertext: latest.dekWrappedServer,
+            iv: latest.wrappingIv,
+            tag: latest.wrappingTag,
+          }, serverKey);
+          const versionWrap = await wrapKey(versionDek, newKek);
+          await db
+            .delete(dekVersionWraps)
+            .where(and(eq(dekVersionWraps.versionId, latest.id), eq(dekVersionWraps.memberUserId, username)));
+          await db.insert(dekVersionWraps).values({
+            versionId: latest.id,
+            memberUserId: username,
+            wrappedDek: versionWrap.ciphertext,
+            wrappingIv: versionWrap.iv,
+            wrappingTag: versionWrap.tag,
+          });
+        }
       }
     } catch (err: any) {
       return { success: false, error: `Password updated but key re-wrap failed: ${err.message}` };
@@ -173,10 +236,9 @@ export async function createUserEncryptionKeys(username: string, password: strin
 export async function rewrapDekForUser(
   newUsername: string,
   newPassword: string,
-  primaryUsername: string
+  primaryUsername: string,
+  db: Db = getDb()
 ): Promise<void> {
-  const db = getDb();
-
   // Retrieve the primary's server-wrapped DEK
   const [primaryKeyRow] = await db
     .select()
@@ -216,4 +278,23 @@ export async function rewrapDekForUser(
     salt: bytesToHex(salt),
     primaryUserId: primaryUsername,
   });
+
+  // Record this member's wrap of the household's current DEK version so they
+  // can decrypt via the version chain on their next login. Legacy households
+  // have no version rows, so this is a no-op for them.
+  const versionRows = await db
+    .select({ id: dekVersions.id, version: dekVersions.version })
+    .from(dekVersions)
+    .where(eq(dekVersions.primaryUserId, primaryUsername));
+
+  if (versionRows.length > 0) {
+    const latest = versionRows.reduce((a, b) => ((b.version ?? 0) > (a.version ?? 0) ? b : a));
+    await db.insert(dekVersionWraps).values({
+      versionId: latest.id,
+      memberUserId: newUsername,
+      wrappedDek: pwdWrapped.ciphertext,
+      wrappingIv: pwdWrapped.iv,
+      wrappingTag: pwdWrapped.tag,
+    });
+  }
 }

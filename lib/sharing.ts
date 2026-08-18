@@ -17,7 +17,8 @@
  *   actual session user ID — never the data user ID.
  */
 
-import { getDb } from './db';
+import { getDb, getPool } from './db';
+import * as schema from './db/schema';
 import {
   accountShareMembers,
   accountSharingInvitations,
@@ -26,10 +27,19 @@ import {
   plaidConnections,
   accounts,
   syncLogs,
+  dekVersions,
+  dekVersionWraps,
 } from './db/schema';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, ne, or } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { createHash, randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { logger } from './logger';
+import { generateDEK, wrapKey, getServerKey } from './crypto';
+
+// Drizzle instance type (without the concrete $client brand, so a db bound to
+// a transactional PoolClient is also assignable).
+type Db = Omit<ReturnType<typeof getDb>, '$client'>;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -56,6 +66,12 @@ export interface ShareGroupInfo {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 export const MAX_SHARE_GROUP_SIZE = 4; // including the primary
+
+/** After this many failed PIN attempts a pending invitation is auto-revoked. */
+export const MAX_INVITATION_ATTEMPTS = 20;
+
+/** Pending invitations are valid for 7 days (evaluated lazily at validation). */
+const INVITATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ── Core Helpers ──────────────────────────────────────────────────────────────
 
@@ -172,13 +188,27 @@ export function generateSharePin(): string {
 }
 
 /**
+ * Generate a cryptographically random 256-bit single-use join token
+ * (43 chars in base64url).
+ */
+export function generateJoinToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/** sha256 of a secret, as a lowercase hex digest (for at-rest storage). */
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+/**
  * Create a new sharing invitation.
- * Returns the invitation ID and the plaintext PIN (show once to the user).
+ * Returns the invitation ID plus the plaintext PIN and join token
+ * (each shown once to the user; only hashes are persisted).
  */
 export async function createInvitation(
   inviterUserId: string,
   inviteeEmail: string
-): Promise<{ invitationId: string; pin: string } | { error: string }> {
+): Promise<{ invitationId: string; pin: string; token: string } | { error: string }> {
   const db = getDb();
 
   // Check group size limit
@@ -208,6 +238,7 @@ export async function createInvitation(
 
   const pin = generateSharePin();
   const pinHash = await bcrypt.hash(pin, 12);
+  const token = generateJoinToken();
 
   const [created] = await db
     .insert(accountSharingInvitations)
@@ -216,12 +247,13 @@ export async function createInvitation(
       inviteeEmail,
       pinHash,
       pin: null, // Never persist plaintext PIN
+      joinTokenHash: sha256Hex(token), // Never persist the plaintext token
     })
     .returning({ id: accountSharingInvitations.id });
 
   logger.info('[sharing] Invitation created', { inviterUserId, inviteeEmail, invitationId: created.id });
 
-  return { invitationId: created.id, pin };
+  return { invitationId: created.id, pin, token };
 }
 
 /**
@@ -262,7 +294,6 @@ export async function validateInvitation(
   | { valid: false; error: string }
 > {
   const db = getDb();
-  const INVITATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
   const invitations = await db
     .select()
@@ -287,31 +318,154 @@ export async function validateInvitation(
     if (match) {
       return { valid: true, invitationId: inv.id, inviterUserId: inv.inviterUserId };
     }
+
+    // Wrong PIN for a live invitation: record the attempt. (No increment when
+    // no invitation exists for this email — that would enable enumeration.)
+    const attempts = (inv.attempts ?? 0) + 1;
+    if (attempts >= MAX_INVITATION_ATTEMPTS) {
+      await db
+        .update(accountSharingInvitations)
+        .set({ attempts, status: 'revoked', updatedAt: new Date() })
+        .where(eq(accountSharingInvitations.id, inv.id));
+    } else {
+      await db
+        .update(accountSharingInvitations)
+        .set({ attempts, updatedAt: new Date() })
+        .where(eq(accountSharingInvitations.id, inv.id));
+    }
   }
 
   return { valid: false, error: 'No matching invitation found for that email and PIN.' };
 }
 
 /**
+ * Validate a one-time join token (the secret embedded in shareable join links).
+ *
+ * The token is 256-bit random and single-use — `acceptInvitation` flips the
+ * invitation to 'accepted', consuming it — so failed attempts are NOT counted
+ * here; brute force is handled by route-level rate limiting.
+ *
+ * The error is deliberately generic: an unknown token, an expired invitation,
+ * and a consumed invitation all produce the same response (no oracle).
+ */
+export async function validateJoinToken(
+  token: string,
+  db: Db = getDb()
+): Promise<
+  | { valid: true; invitationId: string; inviterUserId: string; inviteeEmail: string }
+  | { valid: false; error: string }
+> {
+  const tokenHash = sha256Hex(token);
+
+  const [inv] = await db
+    .select()
+    .from(accountSharingInvitations)
+    .where(eq(accountSharingInvitations.joinTokenHash, tokenHash))
+    .limit(1);
+
+  if (!inv || inv.status !== 'pending') {
+    return { valid: false, error: 'Invalid or expired join link.' };
+  }
+
+  // Lazy expiry, mirroring the PIN path: persist 'expired' when encountered.
+  if (Date.now() - new Date(inv.createdAt).getTime() > INVITATION_EXPIRY_MS) {
+    await db
+      .update(accountSharingInvitations)
+      .set({ status: 'expired', updatedAt: new Date() })
+      .where(eq(accountSharingInvitations.id, inv.id));
+    return { valid: false, error: 'Invalid or expired join link.' };
+  }
+
+  return {
+    valid: true,
+    invitationId: inv.id,
+    inviterUserId: inv.inviterUserId,
+    inviteeEmail: inv.inviteeEmail,
+  };
+}
+
+/**
  * Accept an invitation: mark it accepted and create the share-member record.
+ *
+ * Re-validates the invitation and re-checks the group size limit on the (possibly
+ * transactional) db handle so a concurrent join cannot push the group past
+ * MAX_SHARE_GROUP_SIZE between validation and acceptance.
+ *
+ * Returns `{ error }` on a re-check failure (before any writes) and `void` on
+ * success.
  */
 export async function acceptInvitation(
   invitationId: string,
   inviterUserId: string,
-  newMemberUserId: string
-): Promise<void> {
-  const db = getDb();
+  newMemberUserId: string,
+  db: Db = getDb()
+): Promise<void | { error: string }> {
+  // Re-select the invitation on the provided handle and assert it is still pending
+  const [inv] = await db
+    .select()
+    .from(accountSharingInvitations)
+    .where(eq(accountSharingInvitations.id, invitationId))
+    .limit(1);
+
+  if (!inv || inv.status !== 'pending') {
+    return { error: 'Invitation is not pending.' };
+  }
+
+  // Re-check the group size limit the same way createInvitation does
+  const activeMembers = await db
+    .select({ memberUserId: accountShareMembers.memberUserId })
+    .from(accountShareMembers)
+    .where(
+      and(
+        eq(accountShareMembers.primaryUserId, inviterUserId),
+        eq(accountShareMembers.status, 'active')
+      )
+    );
+
+  const pendingInvites = await db
+    .select({ id: accountSharingInvitations.id })
+    .from(accountSharingInvitations)
+    .where(
+      and(
+        eq(accountSharingInvitations.inviterUserId, inviterUserId),
+        eq(accountSharingInvitations.status, 'pending')
+      )
+    );
+
+  // After acceptance the group holds the primary + (activeMembers + 1) members
+  // and (pendingInvites - 1) outstanding invitations (the one being accepted).
+  const projectedSize = 1 + activeMembers.length + 1 + (pendingInvites.length - 1);
+  if (projectedSize > MAX_SHARE_GROUP_SIZE) {
+    return { error: `Share groups are limited to ${MAX_SHARE_GROUP_SIZE} users.` };
+  }
 
   await db
     .update(accountSharingInvitations)
     .set({ status: 'accepted', updatedAt: new Date() })
     .where(eq(accountSharingInvitations.id, invitationId));
 
-  await db.insert(accountShareMembers).values({
-    primaryUserId: inviterUserId,
-    memberUserId: newMemberUserId,
-    invitationId,
-  });
+  // Upsert on the permanent (primaryUserId, memberUserId) unique constraint so
+  // re-inviting a previously REMOVED member reactivates the existing row
+  // instead of failing with a unique-violation.
+  await db
+    .insert(accountShareMembers)
+    .values({
+      primaryUserId: inviterUserId,
+      memberUserId: newMemberUserId,
+      invitationId,
+      role: 'member',
+    })
+    .onConflictDoUpdate({
+      target: [accountShareMembers.primaryUserId, accountShareMembers.memberUserId],
+      set: {
+        status: 'active',
+        invitationId,
+        role: 'member',
+        removedAt: null,
+        removedBy: null,
+        joinedAt: new Date(),
+      },
+    });
 
   logger.info('[sharing] Invitation accepted', { inviterUserId, newMemberUserId, invitationId });
 }
@@ -348,102 +502,203 @@ export async function removeMember(
     return { error: 'Not authorised to remove this member.' };
   }
 
-  // Mark the member record as removed
-  await db
-    .update(accountShareMembers)
-    .set({
-      status: 'removed',
-      removedAt: new Date(),
-      removedBy: requestingUserId,
-    })
-    .where(
-      and(
-        eq(accountShareMembers.primaryUserId, primaryUserId),
-        eq(accountShareMembers.memberUserId, memberUserId),
-        eq(accountShareMembers.status, 'active')
-      )
-    );
+  // Run the whole mutation sequence in ONE transaction so a crash cannot leave
+  // a "removed" member whose user_encryption_keys row still points at the
+  // primary (the key row is the data-access gate).
+  const client = await getPool().connect();
+  let rotatedVersion: number | null = null;
+  try {
+    await client.query('BEGIN');
+    const txDb = drizzle(client, { schema });
 
-  // Detach the member's encryption key — clear primaryUserId and invalidate
-  // their DEK wrapping so they can no longer decrypt the primary's data.
-  // On next login they'll get a brand new DEK.
-  await db
-    .update(userEncryptionKeys)
-    .set({
-      primaryUserId: null,
-      // Wipe the wrapped DEK so a new one must be generated on next login
-      wrappedDek: '',
-      wrappingIv: '',
-      wrappingTag: '',
-      serverWrappedDek: null,
-      serverWrappingIv: null,
-      serverWrappingTag: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(userEncryptionKeys.userId, memberUserId));
+    // Mark the member record as removed
+    await txDb
+      .update(accountShareMembers)
+      .set({
+        status: 'removed',
+        removedAt: new Date(),
+        removedBy: requestingUserId,
+      })
+      .where(
+        and(
+          eq(accountShareMembers.primaryUserId, primaryUserId),
+          eq(accountShareMembers.memberUserId, memberUserId),
+          eq(accountShareMembers.status, 'active')
+        )
+      );
 
-  // Delete the leaving member's connections from the shared group
-  // but disconnect their accounts first so they are kept for the primary user.
-  const memberConnections = await db
-    .select({ id: simplifinConnections.id })
-    .from(simplifinConnections)
-    .where(eq(simplifinConnections.userId, memberUserId));
+    // Rotate the household DEK: the leaver's key row wrapped this DEK, so move
+    // the household to a fresh DEK they have no wrap for. Runs inside the same
+    // transaction — a failed rotation rolls back the whole removal.
+    const [primaryKeyRow] = await txDb
+      .select()
+      .from(userEncryptionKeys)
+      .where(eq(userEncryptionKeys.userId, primaryUserId))
+      .limit(1);
 
-  for (const conn of memberConnections) {
-    // Disconnect accounts from this connection so they survive deletion for the primary user
-    await db
-      .update(accounts)
-      .set({ connectionId: null })
-      .where(eq(accounts.connectionId, conn.id));
+    if (!primaryKeyRow?.serverWrappedDek || !primaryKeyRow.serverWrappingIv) {
+      logger.warn('[sharing] Primary key row missing server wrap; skipping DEK rotation', {
+        primaryUserId,
+        memberUserId,
+      });
+    } else {
+      const versionRows = await txDb
+        .select({ version: dekVersions.version })
+        .from(dekVersions)
+        .where(eq(dekVersions.primaryUserId, primaryUserId));
+      const currentMaxVersion = versionRows.reduce((max, r) => Math.max(max, r.version ?? 0), 0);
 
-    // Remove dependent sync logs
-    await db.delete(syncLogs).where(eq(syncLogs.connectionId, conn.id));
-    
-    // Cancel any scheduled sync
-    try {
-      const { syncScheduler } = await import('@/lib/services/sync-scheduler');
-      syncScheduler.cancel(conn.id);
-    } catch (e) {
-      logger.warn('[sharing] Failed to cancel sync scheduler for removed member connection', { connectionId: conn.id, error: e });
+      const newDek = generateDEK();
+      const newWrap = await wrapKey(newDek, getServerKey());
+
+      if (currentMaxVersion === 0) {
+        // Anchor the pre-rotation DEK as version 1 so existing member wraps
+        // of it remain decryptable through the chain.
+        await txDb.insert(dekVersions).values({
+          primaryUserId,
+          version: 1,
+          dekWrappedServer: primaryKeyRow.serverWrappedDek,
+          wrappingIv: primaryKeyRow.serverWrappingIv,
+          wrappingTag: primaryKeyRow.serverWrappingTag ?? '',
+        });
+      }
+
+      rotatedVersion = currentMaxVersion === 0 ? 2 : currentMaxVersion + 1;
+      await txDb.insert(dekVersions).values({
+        primaryUserId,
+        version: rotatedVersion,
+        dekWrappedServer: newWrap.ciphertext,
+        wrappingIv: newWrap.iv,
+        wrappingTag: newWrap.tag,
+      });
+
+      // Re-wrap the new DEK for the primary and all remaining members
+      await txDb
+        .update(userEncryptionKeys)
+        .set({
+          serverWrappedDek: newWrap.ciphertext,
+          serverWrappingIv: newWrap.iv,
+          serverWrappingTag: newWrap.tag,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            or(eq(userEncryptionKeys.userId, primaryUserId), eq(userEncryptionKeys.primaryUserId, primaryUserId)),
+            ne(userEncryptionKeys.userId, memberUserId)
+          )
+        );
+
+      // Cryptographic revocation: drop the leaver's per-version wraps
+      await txDb.delete(dekVersionWraps).where(eq(dekVersionWraps.memberUserId, memberUserId));
     }
-  }
 
-  if (memberConnections.length > 0) {
-    await db
-      .delete(simplifinConnections)
+    // Detach the member's encryption key — clear primaryUserId and invalidate
+    // their DEK wrapping so they can no longer decrypt the primary's data.
+    // On next login they'll get a brand new DEK.
+    await txDb
+      .update(userEncryptionKeys)
+      .set({
+        primaryUserId: null,
+        // Wipe the wrapped DEK so a new one must be generated on next login
+        wrappedDek: '',
+        wrappingIv: '',
+        wrappingTag: '',
+        serverWrappedDek: null,
+        serverWrappingIv: null,
+        serverWrappingTag: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(userEncryptionKeys.userId, memberUserId));
+
+    // Delete the leaving member's connections from the shared group
+    // but disconnect their accounts first so they are kept for the primary user.
+    const memberConnections = await txDb
+      .select({ id: simplifinConnections.id })
+      .from(simplifinConnections)
       .where(eq(simplifinConnections.userId, memberUserId));
-  }
 
-  // Delete the leaving member's Plaid connections from the shared group
-  // but disconnect their accounts first so they are kept for the primary user.
-  const memberPlaidConnections = await db
-    .select({ id: plaidConnections.id })
-    .from(plaidConnections)
-    .where(eq(plaidConnections.userId, memberUserId));
+    for (const conn of memberConnections) {
+      // Disconnect accounts from this connection so they survive deletion for the primary user
+      await txDb
+        .update(accounts)
+        .set({ connectionId: null })
+        .where(eq(accounts.connectionId, conn.id));
 
-  for (const conn of memberPlaidConnections) {
-    // Disconnect accounts from this connection so they survive deletion for the primary user
-    await db
-      .update(accounts)
-      .set({ plaidConnectionId: null })
-      .where(eq(accounts.plaidConnectionId, conn.id));
+      // Remove dependent sync logs
+      await txDb.delete(syncLogs).where(eq(syncLogs.connectionId, conn.id));
 
-    // Remove dependent sync logs
-    await db.delete(syncLogs).where(eq(syncLogs.plaidConnectionId, conn.id));
-
-    // Cancel any scheduled sync
-    try {
-      const { syncScheduler } = await import('@/lib/services/sync-scheduler');
-      syncScheduler.cancel(conn.id);
-    } catch (e) {
-      logger.warn('[sharing] Failed to cancel sync scheduler for removed member Plaid connection', { connectionId: conn.id, error: e });
+      // Cancel any scheduled sync
+      try {
+        const { syncScheduler } = await import('@/lib/services/sync-scheduler');
+        syncScheduler.cancel(conn.id);
+      } catch (e) {
+        logger.warn('[sharing] Failed to cancel sync scheduler for removed member connection', { connectionId: conn.id, error: e });
+      }
     }
+
+    if (memberConnections.length > 0) {
+      await txDb
+        .delete(simplifinConnections)
+        .where(eq(simplifinConnections.userId, memberUserId));
+    }
+
+    // Delete the leaving member's Plaid connections from the shared group
+    // but disconnect their accounts first so they are kept for the primary user.
+    const memberPlaidConnections = await txDb
+      .select({ id: plaidConnections.id })
+      .from(plaidConnections)
+      .where(eq(plaidConnections.userId, memberUserId));
+
+    for (const conn of memberPlaidConnections) {
+      // Disconnect accounts from this connection so they survive deletion for the primary user
+      await txDb
+        .update(accounts)
+        .set({ plaidConnectionId: null })
+        .where(eq(accounts.plaidConnectionId, conn.id));
+
+      // Remove dependent sync logs
+      await txDb.delete(syncLogs).where(eq(syncLogs.plaidConnectionId, conn.id));
+
+      // Cancel any scheduled sync
+      try {
+        const { syncScheduler } = await import('@/lib/services/sync-scheduler');
+        syncScheduler.cancel(conn.id);
+      } catch (e) {
+        logger.warn('[sharing] Failed to cancel sync scheduler for removed member Plaid connection', { connectionId: conn.id, error: e });
+      }
+    }
+
+    if (memberPlaidConnections.length > 0) {
+      await txDb
+        .delete(plaidConnections)
+        .where(eq(plaidConnections.userId, memberUserId));
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 
-  if (memberPlaidConnections.length > 0) {
-    await db
-      .delete(plaidConnections)
-      .where(eq(plaidConnections.userId, memberUserId));
+  if (rotatedVersion !== null) {
+    // Deferred import: crypto-context transitively loads the auth module (and
+    // next/server), which is unavailable in the unit-test runtime.
+    try {
+      const { invalidateUserDEKCache } = await import('./crypto-context');
+      invalidateUserDEKCache();
+    } catch (err) {
+      logger.warn('[sharing] Failed to invalidate DEK cache after rotation', {
+        primaryUserId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    logger.info('[sharing] Household DEK rotated after member removal', {
+      primaryUserId,
+      memberUserId,
+      version: rotatedVersion,
+    });
   }
 
   logger.info('[sharing] Member removed', { primaryUserId, memberUserId, removedBy: requestingUserId });

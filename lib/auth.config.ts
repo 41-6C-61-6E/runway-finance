@@ -1,5 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
-import { checkRateLimit } from "./rate-limit";
+import { checkRateLimit, getClientIp } from "./rate-limit";
 
 export const authConfig = {
   pages: {
@@ -37,7 +37,7 @@ export const authConfig = {
   },
   providers: [],
   callbacks: {
-    authorized({ auth, request }) {
+    async authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
 
@@ -49,10 +49,8 @@ export const authConfig = {
           !pathname.startsWith("/api/auth/providers")) ||
         pathname.startsWith("/api/register")
       ) {
-        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-                  ?? request.headers.get("x-real-ip")
-                  ?? "unknown";
-        if (!checkRateLimit(`rl:${pathname}:${ip}`, 10, 60_000)) {
+        const ip = getClientIp(request);
+        if (!(await checkRateLimit(`rl:${pathname}:${ip}`, 10, 60_000))) {
           return Response.json({ error: "Too many requests" }, { status: 429 });
         }
       }

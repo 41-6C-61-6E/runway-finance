@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, accountTags, tags } from '@/lib/db/schema';
-import { eq, and, asc, or, like, inArray } from 'drizzle-orm';
+import { eq, and, asc, or, like, inArray, notInArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
 import { filterReportableAccounts, isReportableAccount } from '@/lib/utils/account-scope';
+import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -45,6 +46,12 @@ export async function GET(request: Request) {
 
   if (typeFilter) {
     whereConditions.push(eq(accounts.type, typeFilter));
+  }
+
+  // Sensitive accounts are hidden from plain sharing members (server-side).
+  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
+  if (hiddenAccountIds.length > 0) {
+    whereConditions.push(notInArray(accounts.id, hiddenAccountIds));
   }
 
   const result = await getDb()

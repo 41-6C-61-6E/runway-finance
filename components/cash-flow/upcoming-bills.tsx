@@ -38,11 +38,19 @@ export function UpcomingBills() {
     dueThisMonth: number;
     paidThisMonth: number;
     totalUpcoming: number;
+    incomeThisWeek?: number;
+    incomeThisMonth?: number;
+    totalUpcomingIncome?: number;
+    netThisMonth?: number;
   }>({
     dueThisWeek: 0,
     dueThisMonth: 0,
     paidThisMonth: 0,
     totalUpcoming: 0,
+    incomeThisWeek: 0,
+    incomeThisMonth: 0,
+    totalUpcomingIncome: 0,
+    netThisMonth: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -442,8 +450,7 @@ export function UpcomingBills() {
         collapseDirection="horizontal"
         title={
           <div className="flex items-center gap-2">
-            <CalendarClock className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-bold text-foreground">Cash Outflow Forecast</span>
+            <span className="font-bold text-foreground">Overview</span>
           </div>
         }
         className="border-b border-sidebar-border/60 bg-sidebar"
@@ -451,18 +458,30 @@ export function UpcomingBills() {
 
       {!collapsed && (
         <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
-          {/* Section 1: Due in Next 7 Days */}
-          <div className="py-4 first:pt-0 last:pb-0 space-y-1">
+          {/* Section 1: Next 7 Days Rollups */}
+          <div className="py-4 first:pt-0 last:pb-0 space-y-2">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
               Due in Next 7 Days
             </span>
-            <div
-              className={cn(
-                'text-2xl sm:text-3xl font-extrabold font-mono text-foreground tracking-tight',
-                privacyMode && 'blur-sm select-none'
+            <div className="flex items-baseline justify-between gap-2">
+              <div
+                className={cn(
+                  'text-xl sm:text-2xl font-extrabold font-mono text-foreground tracking-tight',
+                  privacyMode && 'blur-sm select-none'
+                )}
+              >
+                -{formatCurrency(stats.dueThisWeek)}
+              </div>
+              {(stats.incomeThisWeek || 0) > 0 && (
+                <div
+                  className={cn(
+                    'text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400',
+                    privacyMode && 'blur-xs select-none'
+                  )}
+                >
+                  +{formatCurrency(stats.incomeThisWeek || 0)} in
+                </div>
               )}
-            >
-              {formatCurrency(stats.dueThisWeek)}
             </div>
           </div>
 
@@ -472,40 +491,78 @@ export function UpcomingBills() {
               Current Month Breakdown
             </span>
             <div className="grid grid-cols-2 gap-2.5">
-              <div className="p-3 rounded-xl bg-card border border-border/60 space-y-0.5">
-                <span className="text-[11px] text-muted-foreground font-medium">Due This Month</span>
+              <div className="p-2.5 rounded-xl bg-card border border-border/60 space-y-0.5">
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Outflow</span>
                 <div
                   className={cn(
-                    'text-base font-bold font-mono text-foreground',
+                    'text-sm sm:text-base font-bold font-mono text-foreground',
                     privacyMode && 'blur-xs select-none'
                   )}
                 >
-                  {formatCurrency(stats.dueThisMonth)}
+                  -{formatCurrency(stats.dueThisMonth)}
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-card border border-border/60 space-y-0.5">
-                <span className="text-[11px] text-muted-foreground font-medium">Paid This Month</span>
-                <div className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  {stats.paidThisMonth} bills
+              <div className="p-2.5 rounded-xl bg-card border border-border/60 space-y-0.5">
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wider">Inflow</span>
+                <div
+                  className={cn(
+                    'text-sm sm:text-base font-bold font-mono text-emerald-600 dark:text-emerald-400',
+                    privacyMode && 'blur-xs select-none'
+                  )}
+                >
+                  +{formatCurrency(stats.incomeThisMonth || 0)}
                 </div>
               </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground font-medium">Net Monthly Flow:</span>
+              <span
+                className={cn(
+                  'font-bold font-mono',
+                  (stats.netThisMonth || 0) >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400',
+                  privacyMode && 'blur-xs select-none'
+                )}
+              >
+                {(stats.netThisMonth || 0) >= 0 ? '+' : ''}
+                {formatCurrency(stats.netThisMonth || 0)}
+              </span>
             </div>
           </div>
 
           {/* Section 3: Total in Horizon */}
           <div className="py-4 first:pt-0 last:pb-0 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Total in Horizon ({daysHorizon}d):</span>
-              <span
-                className={cn(
-                  'font-bold font-mono text-foreground',
-                  privacyMode && 'blur-xs select-none'
-                )}
-              >
-                {formatCurrency(stats.totalUpcoming)}
-              </span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+              Total in Horizon ({daysHorizon}d)
+            </span>
+            <div className="space-y-1.5 text-xs font-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-sans">Upcoming Outflows:</span>
+                <span
+                  className={cn(
+                    'font-bold text-foreground',
+                    privacyMode && 'blur-xs select-none'
+                  )}
+                >
+                  -{formatCurrency(stats.totalUpcoming)}
+                </span>
+              </div>
+              {(stats.totalUpcomingIncome || 0) > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground font-sans">Upcoming Inflows:</span>
+                  <span
+                    className={cn(
+                      'font-bold text-emerald-600 dark:text-emerald-400',
+                      privacyMode && 'blur-xs select-none'
+                    )}
+                  >
+                    +{formatCurrency(stats.totalUpcomingIncome || 0)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -516,7 +573,7 @@ export function UpcomingBills() {
               Projections vs Cleared
             </div>
             <p className="leading-relaxed">
-              Projections are computed from your historical cadence. When your bank syncs the actual charge, it automatically clears into &ldquo;Paid This Month&rdquo;.
+              Projections are computed from your recurring schedules. Actual cleared transactions automatically reconcile against future dates.
             </p>
           </div>
         </div>

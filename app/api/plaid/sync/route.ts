@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { getDb } from '@/lib/db';
+import { plaidConnections } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { resolveDataUserId } from '@/lib/sharing';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { syncPlaidConnection } from '@/lib/services/plaid-sync';
 import { logger } from '@/lib/logger';
@@ -26,6 +30,26 @@ export async function POST(request: Request) {
     const { connectionId } = body;
     if (!connectionId) {
       return NextResponse.json({ error: 'validation_error', message: 'connectionId is required' }, { status: 400 });
+    }
+
+    // Pre-check ownership before invoking the sync service: the service only
+    // validates ownership AFTER inserting a `running` sync log row, and its
+    // error path writes lastSyncStatus='error' onto the connection row —
+    // both are cross-tenant side effects for a foreign connectionId.
+    const [connection] = await getDb()
+      .select({ userId: plaidConnections.userId })
+      .from(plaidConnections)
+      .where(eq(plaidConnections.id, connectionId))
+      .limit(1);
+
+    if (!connection) {
+      return NextResponse.json({ error: 'not_found', message: 'Plaid connection not found' }, { status: 404 });
+    }
+
+    const dataUserId = await resolveDataUserId(userId);
+    const connectionDataUserId = await resolveDataUserId(connection.userId);
+    if (connectionDataUserId !== dataUserId) {
+      return NextResponse.json({ error: 'not_found', message: 'Plaid connection not found' }, { status: 404 });
     }
 
     const result = await syncPlaidConnection(connectionId, userId, dek);

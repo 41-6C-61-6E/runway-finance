@@ -51,6 +51,7 @@ import {
 import { eq, or, and, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getShareGroup } from '@/lib/sharing';
+import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { logger } from '@/lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
@@ -76,6 +77,19 @@ export async function DELETE(request: Request) {
     const group = await getShareGroup(userId);
     const isOwner = group && group.primaryUserId === userId;
     const isMember = group && group.primaryUserId !== userId;
+
+    // An owner with active members must transfer ownership first: deleting
+    // the account would wipe the household data the members share.
+    if (isOwner && group.members.length > 0) {
+      await logShareAudit(userId, userId, SHARE_AUDIT_ACTIONS.ACCOUNT_DELETION_BLOCKED);
+      return NextResponse.json(
+        {
+          error: 'transfer_required',
+          message: 'This account has shared members. Transfer ownership to another member before deleting it.',
+        },
+        { status: 409 }
+      );
+    }
 
     // 2. Fetch connections and accounts to cancel timers after the transaction
     const connectionsToCancel = await db
