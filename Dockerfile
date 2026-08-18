@@ -25,10 +25,10 @@ RUN DISABLE_WORKER_THREADS=true pnpm build
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV UV_THREADPOOL_SIZE 16
+ENV NODE_ENV=production
+ENV UV_THREADPOOL_SIZE=16
 # Uncomment the following line in case you want to disable telemetry during runtime.
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN apk add --no-cache bash
 RUN apk add --no-cache netcat-openbsd
@@ -62,8 +62,8 @@ EXPOSE 3000
 # Healthcheck for Docker
 #HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD wget -q --spider http://localhost:3000/ || exit 1
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output

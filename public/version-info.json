@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1787008956735",
-  "buildTime": "2026-08-17T23:22:36.735Z",
-  "hash": "e4a9bd9",
-  "fullHash": "e4a9bd95ad50e83074c780f5b28fa9d9cd3a1a48",
+  "buildNumber": "26.08.1787070359150",
+  "buildTime": "2026-08-18T16:25:59.150Z",
+  "hash": "c8c6123",
+  "fullHash": "c8c61230294e7b9efb36239534fb4e6f89271c02",
   "commits": [
+    "feat: implement sharing security enhancements including data visibility, rate limiting, and audit logs with database schema migrations",
+    "feat: implement recurring transaction management system with detection, recurring bills view, and merge capabilities",
     "refactor: implement global error handling, optimize scheduler logic, and improve session management",
     "feat: implement PWA service worker lifecycle management, auto-update mechanisms, and expanded test coverage with new component units.",
     "test: implement comprehensive unit and integration test suites with CI workflow and mock infrastructure",
@@ -201,19 +203,33 @@
     "refactor: calculate average of price and range bounds for valuation methods and update corresponding unit tests",
     "refactor: introduce centralized chart formatting utilities and apply them to standardise axis labels and tick generation across all financial charts",
     "dev server change",
-    "bug fix",
-    "wealth flow improvements",
-    "net worth flow"
+    "bug fix"
   ],
   "history": [
+    {
+      "hash": "c8c6123",
+      "fullHash": "c8c61230294e7b9efb36239534fb4e6f89271c02",
+      "author": "Alan Racek",
+      "date": "2026-08-18T07:07:14-07:00",
+      "message": "feat: implement sharing security enhancements including data visibility, rate limiting, and audit logs with database schema migrations",
+      "type": "feat",
+      "buildNumber": "26.08.1787070359150"
+    },
+    {
+      "hash": "f4163db",
+      "fullHash": "f4163db5d3e3e273aee3c093bc3b284064e74aea",
+      "author": "Alan Racek",
+      "date": "2026-08-17T16:38:02-07:00",
+      "message": "feat: implement recurring transaction management system with detection, recurring bills view, and merge capabilities",
+      "type": "feat"
+    },
     {
       "hash": "e4a9bd9",
       "fullHash": "e4a9bd95ad50e83074c780f5b28fa9d9cd3a1a48",
       "author": "Alan Racek",
       "date": "2026-08-16T20:19:33-07:00",
       "message": "refactor: implement global error handling, optimize scheduler logic, and improve session management",
-      "type": "refactor",
-      "buildNumber": "26.08.1787008956735"
+      "type": "refactor"
     },
     {
       "hash": "df03e2e",
@@ -1789,22 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-07-02T08:09:53-07:00",
       "message": "bug fix",
-      "type": "other"
-    },
-    {
-      "hash": "bc1fb55",
-      "fullHash": "bc1fb553fac193e5d3d1b756f7bf5ef9526223d2",
-      "author": "Alan Racek",
-      "date": "2026-07-01T16:48:00-07:00",
-      "message": "wealth flow improvements",
-      "type": "other"
-    },
-    {
-      "hash": "9f265a0",
-      "fullHash": "9f265a06a7953ad2e3c9ac25281d5a9c56d2feba",
-      "author": "Alan Racek",
-      "date": "2026-07-01T15:49:19-07:00",
-      "message": "net worth flow",
       "type": "other"
     }
   ]
