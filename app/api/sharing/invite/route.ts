@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { createInvitation } from '@/lib/sharing';
+import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
@@ -36,8 +37,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: result.error }, { status: 400 });
     }
 
+    await logShareAudit(userId, userId, SHARE_AUDIT_ACTIONS.INVITATION_CREATED, 'account_sharing_invitations', result.invitationId);
     logger.info('[sharing] Invitation created via API', { userId, inviteeEmail });
-    return NextResponse.json({ invitationId: result.invitationId, pin: result.pin }, { status: 201 });
+    return NextResponse.json({ invitationId: result.invitationId, pin: result.pin, token: result.token }, { status: 201 });
   } catch (err) {
     logger.error('[sharing] POST /api/sharing/invite failed', { error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

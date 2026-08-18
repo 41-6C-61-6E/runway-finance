@@ -7,8 +7,9 @@ vi.mock('@/lib/auth', () => ({
   auth: vi.fn().mockResolvedValue(null),
 }));
 
-// Mock database
+// Mock database (no pool in unit tests -> rate limiter uses memory fallback)
 vi.mock('@/lib/db', () => ({
+  getPool: vi.fn().mockReturnValue(null),
   getDb: vi.fn().mockReturnValue({
     insert: vi.fn().mockReturnThis(),
     values: vi.fn().mockResolvedValue({}),
@@ -26,6 +27,7 @@ vi.mock('@/lib/users', () => ({
 // Mock sharing operations
 vi.mock('@/lib/sharing', () => ({
   validateInvitation: vi.fn().mockResolvedValue({ valid: true, invitationId: '1', inviterUserId: 'primary' }),
+  validateJoinToken: vi.fn().mockResolvedValue({ valid: false, error: 'Invalid or expired join link.' }),
   acceptInvitation: vi.fn().mockResolvedValue(undefined),
 }));
 

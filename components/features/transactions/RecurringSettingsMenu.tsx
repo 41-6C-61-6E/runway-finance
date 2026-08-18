@@ -9,9 +9,8 @@ import {
   Trash2,
   Loader2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { IconTip } from '@/components/ui/icon-tip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import { RecurringExclusionsDialog } from './RecurringExclusionsDialog';
 import { toast } from 'sonner';
@@ -76,81 +75,132 @@ export function RecurringSettingsMenu({
   };
 
   return (
-    <>
+    <TooltipProvider delayDuration={150}>
       <Popover open={showMenu} onOpenChange={setShowMenu}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            aria-label="Recurring settings & options"
-            className="inline-flex items-center justify-center h-8 w-8 text-xs font-medium text-foreground bg-card hover:bg-accent border border-border rounded-xl transition-all shrink-0 cursor-pointer focus:outline-none shadow-2xs"
-          >
-            {scanning || actionLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            ) : (
-              <Settings className="w-4 h-4 shrink-0 text-muted-foreground hover:text-foreground" />
-            )}
-          </button>
-        </PopoverTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Recurring detection settings and tools"
+                className="inline-flex items-center justify-center h-8 w-8 text-xs font-medium text-foreground bg-card hover:bg-accent border border-border rounded-xl transition-all shrink-0 cursor-pointer focus:outline-none shadow-2xs"
+              >
+                {scanning || actionLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                ) : (
+                  <Settings className="w-4 h-4 shrink-0 text-muted-foreground hover:text-foreground" />
+                )}
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            Recurring settings & tools
+          </TooltipContent>
+        </Tooltip>
 
-        <PopoverContent align="end" className="w-64 p-1.5 z-50">
-          <button
-            type="button"
-            onClick={() => {
-              setShowMenu(false);
-              setShowExclusionsDialog(true);
-            }}
-            className="w-full px-3 py-2 text-xs text-foreground hover:bg-accent rounded-lg flex items-center gap-2 transition-colors cursor-pointer text-left"
-          >
-            <IconTip content="Configure accounts, categories, and merchant patterns to ignore">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-primary shrink-0" />
-            </IconTip>
-            <span>Recurring Exclusions</span>
-          </button>
+        <PopoverContent align="end" className="w-72 p-1.5 z-50 space-y-1">
+          {/* 1. Recurring Exclusions */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowExclusionsDialog(true);
+                }}
+                className="w-full p-2 text-xs text-foreground hover:bg-accent rounded-lg flex items-start gap-2.5 transition-colors cursor-pointer text-left"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-foreground">Recurring Exclusions</div>
+                  <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    Ignore accounts, categories, or payee keywords from detection.
+                  </div>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="text-xs max-w-xs">
+              Configure accounts, categories, or keywords (e.g. ATM, Venmo, Zelle) to skip during automatic scans.
+            </TooltipContent>
+          </Tooltip>
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowMenu(false);
-              onScan();
-            }}
-            disabled={scanning}
-            className="w-full px-3 py-2 text-xs text-foreground hover:bg-accent rounded-lg flex items-center gap-2 transition-colors cursor-pointer text-left"
-          >
-            <IconTip content="Run a fresh scan over your transaction history">
-              <RefreshCw className="w-3.5 h-3.5 text-primary shrink-0" />
-            </IconTip>
-            <span>Re-scan Transactions</span>
-          </button>
+          {/* 2. Re-scan Transactions */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  onScan();
+                }}
+                disabled={scanning}
+                className="w-full p-2 text-xs text-foreground hover:bg-accent rounded-lg flex items-start gap-2.5 transition-colors cursor-pointer text-left disabled:opacity-50"
+              >
+                <RefreshCw className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-foreground">Re-scan Transactions</div>
+                  <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    Run detection across recent transactions to find new subscriptions.
+                  </div>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="text-xs max-w-xs">
+              Scans your historical charges with recency thresholds to detect repeating subscriptions and bills.
+            </TooltipContent>
+          </Tooltip>
 
           <div className="h-px bg-border/40 my-1" />
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowMenu(false);
-              setDismissAllConfirmOpen(true);
-            }}
-            className="w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg flex items-center gap-2 transition-colors cursor-pointer text-left"
-          >
-            <IconTip content="Dismiss all unconfirmed recurring suggestions">
-              <EyeOff className="w-3.5 h-3.5 shrink-0" />
-            </IconTip>
-            <span>Dismiss All Pending Review</span>
-          </button>
+          {/* 3. Dismiss All Pending Review */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  setDismissAllConfirmOpen(true);
+                }}
+                className="w-full p-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg flex items-start gap-2.5 transition-colors cursor-pointer text-left"
+              >
+                <EyeOff className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-foreground">Dismiss All Pending</div>
+                  <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    Mark all unconfirmed suggestions as dismissed.
+                  </div>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="text-xs max-w-xs">
+              Hides all review suggestions. They will not regenerate on future scans and remain accessible in the Dismissed tab.
+            </TooltipContent>
+          </Tooltip>
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowMenu(false);
-              setResetConfirmOpen(true);
-            }}
-            className="w-full px-3 py-2 text-xs text-destructive hover:bg-destructive/10 rounded-lg flex items-center gap-2 transition-colors cursor-pointer text-left"
-          >
-            <IconTip content="Permanently remove unconfirmed suggestions to start clean">
-              <Trash2 className="w-3.5 h-3.5 text-destructive shrink-0" />
-            </IconTip>
-            <span>Clear Unconfirmed Items</span>
-          </button>
+          {/* 4. Clear Unconfirmed Items */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  setResetConfirmOpen(true);
+                }}
+                className="w-full p-2 text-xs text-destructive hover:bg-destructive/10 rounded-lg flex items-start gap-2.5 transition-colors cursor-pointer text-left"
+              >
+                <Trash2 className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-destructive">Clear Unconfirmed Items</div>
+                  <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    Permanently delete suggestions to start fresh.
+                  </div>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="text-xs max-w-xs">
+              Permanently removes unconfirmed detected suggestions. Confirmed active subscriptions are never deleted.
+            </TooltipContent>
+          </Tooltip>
         </PopoverContent>
       </Popover>
 
@@ -179,6 +229,6 @@ export function RecurringSettingsMenu({
         busy={actionLoading}
         onConfirm={handleResetUnconfirmed}
       />
-    </>
+    </TooltipProvider>
   );
 }

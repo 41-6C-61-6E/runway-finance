@@ -4,7 +4,8 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { removeMember } from '@/lib/sharing';
+import { removeMember, resolveDataUserId } from '@/lib/sharing';
+import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { logger } from '@/lib/logger';
 
 export async function DELETE(
@@ -19,10 +20,14 @@ export async function DELETE(
   const { memberId } = await params;
 
   try {
+    // Resolve the group's data owner BEFORE the mutation: removing a member
+    // wipes their key row, after which they would resolve to themselves.
+    const dataUserId = await resolveDataUserId(session.user.id);
     const result = await removeMember(memberId, session.user.id);
     if (result.error) {
       return NextResponse.json({ message: result.error }, { status: 400 });
     }
+    await logShareAudit(dataUserId, session.user.id, SHARE_AUDIT_ACTIONS.MEMBER_REMOVED, 'account_share_members', memberId);
     logger.info('[sharing] Member removed via API', { requestingUserId: session.user.id, memberId });
     return NextResponse.json({ success: true });
   } catch (err) {

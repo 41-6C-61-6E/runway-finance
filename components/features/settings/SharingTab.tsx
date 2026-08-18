@@ -81,7 +81,7 @@ function WhatIsSharedPanel() {
         </div>
       </div>
       <p className="text-[11px] text-muted-foreground/80 border-t border-border pt-2">
-        All data is encrypted end-to-end. Each account uses its own key to encrypt the same shared database — there is no duplicate data.
+        Shared data is encrypted at rest in your database. Everyone in your household can see and manage the same financial data — there is no duplicate data.
         If sharing is removed, the account owner retains all data; the removed member starts fresh with an empty account.
       </p>
     </div>
@@ -99,6 +99,11 @@ export default function SharingTab() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState('');
+
+  // One-time PIN + join token reveal (shown exactly once, right after creating an invitation)
+  const [revealedPin, setRevealedPin] = useState<string | null>(null);
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
+  const [revealedInviteEmail, setRevealedInviteEmail] = useState<string | null>(null);
 
 
   // Copy helper for pending list
@@ -119,6 +124,8 @@ export default function SharingTab() {
   const [confirmRevoke, setConfirmRevoke] = useState<PendingInvitation | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ShareMember | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmTransfer, setConfirmTransfer] = useState<ShareMember | null>(null);
+  const [transferError, setTransferError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchGroup = useCallback(async () => {
@@ -171,6 +178,11 @@ export default function SharingTab() {
       if (!res.ok) {
         setInviteError(data.message || 'Failed to create invitation');
       } else {
+        const pin = typeof data.pin === 'string' && data.pin ? data.pin : null;
+        const token = typeof data.token === 'string' && data.token ? data.token : null;
+        setRevealedInviteEmail(inviteEmail.trim());
+        setRevealedPin(pin);
+        setRevealedToken(token);
         setInviteEmail('');
         await fetchGroup();
       }
@@ -215,6 +227,33 @@ export default function SharingTab() {
     }
   };
 
+  // ── Transfer ownership (primary only) ───────────────────────────────────────
+
+  const handleTransfer = async () => {
+    if (!confirmTransfer) return;
+    setActionLoading(true);
+    setTransferError('');
+    try {
+      const res = await fetch('/api/sharing/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ newPrimaryUserId: confirmTransfer.memberUserId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTransferError(data.message || 'Failed to transfer ownership');
+      } else {
+        await fetchGroup();
+      }
+    } catch {
+      setTransferError('An unexpected error occurred');
+    } finally {
+      setActionLoading(false);
+      setConfirmTransfer(null);
+    }
+  };
+
   // ── Leave (self-remove as member) ───────────────────────────────────────────
 
   const handleLeave = async () => {
@@ -235,6 +274,82 @@ export default function SharingTab() {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  // ── One-time PIN reveal dialog ──────────────────────────────────────────────
+
+  const closePinReveal = () => {
+    setRevealedPin(null);
+    setRevealedToken(null);
+    setRevealedInviteEmail(null);
+  };
+
+  const revealedJoinUrl = revealedToken && origin ? `${origin}/signin?mode=join&token=${revealedToken}` : null;
+
+  const pinRevealDialog = (
+    <AlertDialog open={!!revealedPin || !!revealedToken} onOpenChange={(o) => { if (!o) closePinReveal(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Invitation Ready</AlertDialogTitle>
+          <AlertDialogDescription>
+            {revealedInviteEmail ? (
+              <>The invitation for <strong>{revealedInviteEmail}</strong> is ready. Send them the join link below — it works on its own. The PIN is a backup for sharing out-of-band (e.g. a text message).</>
+            ) : (
+              'Your invitation is ready. Send the invitee the join link below — it works on its own. The PIN is a backup for sharing out-of-band (e.g. a text message).'
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {revealedJoinUrl && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-foreground">Join link (one-time, self-contained)</p>
+            <div className="flex items-center gap-2">
+              <code className="select-all flex-1 overflow-x-auto whitespace-nowrap rounded-lg border border-border bg-muted/40 px-3 py-2 font-mono text-xs text-foreground">
+                {revealedJoinUrl}
+              </code>
+              <button
+                onClick={() => handleCopyText(revealedJoinUrl, 'reveal-link')}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all shrink-0"
+              >
+                {copiedTextId === 'reveal-link' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedTextId === 'reveal-link' ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+        )}
+        {revealedPin && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-foreground">Backup PIN (share out-of-band)</p>
+            <div className="flex items-center justify-center gap-2 sm:gap-3">
+              <code className="select-all rounded-lg border border-border bg-muted/40 px-4 py-2 font-mono text-xl font-semibold tracking-[0.3em] text-foreground sm:text-2xl">
+                {revealedPin}
+              </code>
+              <button
+                onClick={() => handleCopyText(revealedPin, 'reveal-pin')}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all"
+              >
+                {copiedTextId === 'reveal-pin' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedTextId === 'reveal-pin' ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+          <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+          <p className="text-xs text-destructive">
+            The join link and PIN are shown only once and can each be used only one time. Save them now — they cannot be retrieved later.
+          </p>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={closePinReveal}>Close</AlertDialogCancel>
+          <button
+            onClick={closePinReveal}
+            className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
+          >
+            I&apos;ve Saved It
+          </button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 
   if (loading) {
     return (
@@ -265,8 +380,8 @@ export default function SharingTab() {
             <h3 className="text-sm font-semibold text-foreground">Invite Someone</h3>
           </div>
           <p className="text-xs text-muted-foreground">
-            Enter the email address of the person you want to invite. A unique 8-digit PIN will be generated.
-            Share the PIN with them out-of-band (e.g., text message). They will use it when creating their account.
+            Enter the email address of the person you want to invite. A one-time join link and a backup 8-digit PIN
+            will be generated and shown once. Send the link to them, or share the PIN out-of-band (e.g., text message).
           </p>
 
           {inviteError && (
@@ -301,6 +416,8 @@ export default function SharingTab() {
             </button>
           </form>
         </div>
+
+        {pinRevealDialog}
       </div>
     );
   }
@@ -379,6 +496,19 @@ export default function SharingTab() {
                   {currentUser === m.memberUserId ? <LogOut className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
                 </button>
               )}
+              {/* Transfer ownership (primary only) */}
+              {isPrimary && (
+                <button
+                  onClick={() => {
+                    setTransferError('');
+                    setConfirmTransfer(m);
+                  }}
+                  className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded"
+                  title="Transfer ownership"
+                >
+                  <Crown className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))}
 
@@ -409,7 +539,8 @@ export default function SharingTab() {
             <p className="text-xs text-muted-foreground">No pending invitations.</p>
           ) : (
             <div className="space-y-2">
-              {group.pendingInvitations.map((inv) => (
+              {group.pendingInvitations.map((inv) => {
+                return (
                 <div key={inv.id} className="flex items-start gap-3 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
                   <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0 mt-0.5">
                     <UserPlus className="w-4 h-4 text-amber-500" />
@@ -426,42 +557,18 @@ export default function SharingTab() {
                       </button>
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-0.5">Created {formatDate(inv.createdAt)} · Awaiting sign-up</p>
-                    
-                    {/* Share Link and Code details */}
+
+                    {/* The join link / PIN were shown once at creation and can't be re-issued */}
                     <div className="mt-2 space-y-1 bg-background/50 border border-border/40 p-2 rounded-lg text-xs">
-                      {inv.pin && (
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-muted-foreground">
-                            Code: <strong className="font-mono text-foreground">{inv.pin}</strong>
-                          </span>
-                          <button
-                            onClick={() => handleCopyText(inv.pin || '', `pin-${inv.id}`)}
-                            className="text-[10px] text-primary hover:underline font-semibold flex items-center gap-1"
-                          >
-                            {copiedTextId === `pin-${inv.id}` ? 'Copied!' : 'Copy Code'}
-                          </button>
-                        </div>
-                      )}
-                      {(() => {
-                        const directUrl = `${origin}/signin?mode=join&email=${encodeURIComponent(inv.inviteeEmail)}` + (inv.pin ? `&pin=${encodeURIComponent(inv.pin)}` : '');
-                        return (
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-muted-foreground truncate max-w-[200px] sm:max-w-xs" title={directUrl}>
-                              Link: <span className="font-mono text-foreground select-all">{origin}/signin?mode=join...</span>
-                            </span>
-                            <button
-                              onClick={() => handleCopyText(directUrl, `link-${inv.id}`)}
-                              className="text-[10px] text-primary hover:underline font-semibold flex items-center gap-1 shrink-0"
-                            >
-                              {copiedTextId === `link-${inv.id}` ? 'Copied!' : 'Copy Direct Link'}
-                            </button>
-                          </div>
-                        );
-                      })()}
+                      <p className="text-muted-foreground">
+                        The one-time join link was shown when this invitation was created and can&apos;t be re-issued.
+                        Revoke and re-invite to generate a new link.
+                      </p>
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -557,6 +664,38 @@ export default function SharingTab() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Confirm: transfer ownership */}
+      <AlertDialog open={!!confirmTransfer} onOpenChange={(o) => { if (!o) setConfirmTransfer(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Transfer Ownership?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{confirmTransfer?.memberUserId}</strong> will become the account owner. All financial data,
+              members and invitations move to them, and you will no longer be the data owner.
+              They will need to sign out and back in to pick up the change.
+              <br /><br />
+              <strong>This action cannot be undone.</strong>
+              {transferError && (
+                <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg mt-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+                  <p className="text-xs text-destructive">{transferError}</p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <button
+              onClick={handleTransfer}
+              disabled={actionLoading}
+              className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
+            >
+              {actionLoading ? 'Transferring...' : 'Transfer Ownership'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Confirm: leave (self) */}
       <AlertDialog open={confirmLeave} onOpenChange={(o) => { if (!o) setConfirmLeave(false); }}>
         <AlertDialogContent>
@@ -582,6 +721,8 @@ export default function SharingTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {pinRevealDialog}
     </div>
   );
 }

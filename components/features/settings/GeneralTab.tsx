@@ -142,6 +142,7 @@ export default function GeneralTab() {
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-foreground">Privacy Mode</h3>
               <p className="text-xs text-muted-foreground mt-1">Pixelate financial data when showing the app to others</p>
+              <p className="text-xs text-muted-foreground mt-1">Visually hides amounts on this device only. It does not hide data from other household members.</p>
             </div>
             <Switch
               checked={privacyMode ?? false}

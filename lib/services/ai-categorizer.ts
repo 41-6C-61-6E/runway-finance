@@ -86,24 +86,44 @@ export async function analyzeUncategorized(
     const dek = await getSessionDEK();
 
     onLog?.('Resolving active AI provider configuration...');
-    const providerRows = await db
+    // ai_providers is a per-user table: prefer the session user's own
+    // provider config (their API key), falling back to the household's.
+    const ownProviderRows = await db
       .select()
       .from(aiProviders)
       .where(
         and(
-          eq(aiProviders.userId, dataUserId),
+          eq(aiProviders.userId, userId),
           eq(aiProviders.isActive, true)
         )
       )
       .limit(1);
 
-    if (!providerRows.length) {
-      const msg = 'No active AI provider configured';
-      onLog?.(`Error: ${msg}`);
-      return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
-    }
+    let activeProvider;
+    if (ownProviderRows.length) {
+      activeProvider = ownProviderRows[0];
+      logger.info(`${LOG_TAG} AI provider resolved from own config`, { userId });
+    } else {
+      const householdProviderRows = await db
+        .select()
+        .from(aiProviders)
+        .where(
+          and(
+            eq(aiProviders.userId, dataUserId),
+            eq(aiProviders.isActive, true)
+          )
+        )
+        .limit(1);
 
-    const activeProvider = providerRows[0];
+      if (!householdProviderRows.length) {
+        const msg = 'No active AI provider configured';
+        onLog?.(`Error: ${msg}`);
+        return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
+      }
+
+      activeProvider = householdProviderRows[0];
+      logger.info(`${LOG_TAG} AI provider fell back to household primary config`, { userId, dataUserId });
+    }
     const endpoint = activeProvider.endpoint;
     const model = activeProvider.model;
     const jsonMode = activeProvider.jsonMode ?? false;

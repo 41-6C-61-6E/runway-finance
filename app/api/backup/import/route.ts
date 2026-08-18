@@ -141,7 +141,7 @@ export async function POST(request: Request) {
   }
 
   const { checkRateLimit } = await import('@/lib/rate-limit');
-  if (!checkRateLimit(`backup-import:${userId}`, 5, 60_000)) {
+  if (!(await checkRateLimit(`backup-import:${userId}`, 5, 60_000))) {
     return apiTooManyRequests('Too many backup import requests. Please wait a moment.');
   }
 

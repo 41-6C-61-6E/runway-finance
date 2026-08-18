@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
-import { eq, and, or, sql, asc, desc, inArray, like, gte, lte, gt, lt, not, isNull, isNotNull, ne } from 'drizzle-orm';
+import { eq, and, or, sql, asc, desc, inArray, notInArray, like, gte, lte, gt, lt, not, isNull, isNotNull, ne } from 'drizzle-orm';
 import { DataExplorerQuerySchema, DataExplorerFilterSchema } from '@/lib/validations/data-explorer';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { ENCRYPTED_FIELDS, decryptRows } from '@/lib/crypto';
 import { handleApiError } from '@/lib/api/response';
+import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 type PgTable = any;
 type ColumnMeta = {
@@ -353,6 +354,7 @@ export async function GET(request: Request) {
   const userId = session.user.id;
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const isMember = dataUserId !== userId;
+  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
@@ -406,6 +408,15 @@ export async function GET(request: Request) {
     const encryptedFields = ENCRYPTED_FIELDS[tableKey];
 
     const pushdownConditions = [...baseConditions];
+
+    // Sensitive accounts are hidden from plain sharing members (server-side).
+    if (hiddenAccountIds.length > 0) {
+      const sensitiveFilterCol = tableCols['accountId'] || (table as any).accountId || tableCols['id'];
+      if (sensitiveFilterCol) {
+        pushdownConditions.push(notInArray(sensitiveFilterCol, hiddenAccountIds));
+      }
+    }
+
     const inMemoryFilters: typeof parsedFilters = [];
 
     for (const f of parsedFilters) {

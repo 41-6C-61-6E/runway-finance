@@ -989,6 +989,10 @@ export async function getUpcomingBills(
     dueThisMonth: number;
     paidThisMonth: number;
     totalUpcoming: number;
+    incomeThisWeek?: number;
+    incomeThisMonth?: number;
+    totalUpcomingIncome?: number;
+    netThisMonth?: number;
   };
 }> {
   const list = (await getRecurringTransactions(userId, dek, {
@@ -1093,14 +1097,16 @@ export async function getUpcomingBills(
 
   const currentMonth = todayStr.slice(0, 7);
 
-  const statFlow = flowType === 'all' ? 'expense' : flowType;
-
   let dueThisWeek = 0;
   let dueThisMonth = 0;
   let totalUpcoming = 0;
 
+  let incomeThisWeek = 0;
+  let incomeThisMonth = 0;
+  let totalUpcomingIncome = 0;
+
   for (const b of upcomingBills) {
-    if (b.flowType === statFlow) {
+    if (b.flowType === 'expense') {
       if (b.expectedDate <= oneWeekAheadStr && !b.isOverdue) {
         dueThisWeek += b.amount;
       }
@@ -1108,6 +1114,14 @@ export async function getUpcomingBills(
         dueThisMonth += b.amount;
       }
       totalUpcoming += b.amount;
+    } else {
+      if (b.expectedDate <= oneWeekAheadStr && !b.isOverdue) {
+        incomeThisWeek += b.amount;
+      }
+      if (b.expectedDate.startsWith(currentMonth)) {
+        incomeThisMonth += b.amount;
+      }
+      totalUpcomingIncome += b.amount;
     }
   }
 
@@ -1129,6 +1143,8 @@ export async function getUpcomingBills(
       );
 
     const decryptedMonthTxns = await decryptRows('transactions', monthTxns, dek);
+
+    const statFlow = flowType === 'income' ? 'income' : 'expense';
 
     // Count each recurring item at most once
     for (const item of list) {
@@ -1152,6 +1168,10 @@ export async function getUpcomingBills(
       dueThisMonth: Math.round(dueThisMonth * 100) / 100,
       paidThisMonth: paidThisMonthCount,
       totalUpcoming: Math.round(totalUpcoming * 100) / 100,
+      incomeThisWeek: Math.round(incomeThisWeek * 100) / 100,
+      incomeThisMonth: Math.round(incomeThisMonth * 100) / 100,
+      totalUpcomingIncome: Math.round(totalUpcomingIncome * 100) / 100,
+      netThisMonth: Math.round((incomeThisMonth - dueThisMonth) * 100) / 100,
     },
   };
 }
@@ -1162,19 +1182,24 @@ export async function getUpcomingBills(
 export function computeRecurringSummaryFromItems(items: RecurringItem[]) {
   const active = items.filter((r) => !r.isPaused && !r.isDismissed);
   const needsReview = items.filter((r) => !r.isConfirmed && !r.isDismissed && !r.isPaused);
+  const paused = items.filter((r) => r.isPaused && !r.isDismissed);
 
   let monthlyExpenses = 0;
   let monthlyIncome = 0;
   let annualExpenses = 0;
   let annualIncome = 0;
+  let expenseCount = 0;
+  let incomeCount = 0;
 
   for (const item of active) {
     if (item.flowType === 'expense') {
       monthlyExpenses += item.monthlyAmount;
       annualExpenses += item.annualAmount;
+      expenseCount++;
     } else {
       monthlyIncome += item.monthlyAmount;
       annualIncome += item.annualAmount;
+      incomeCount++;
     }
   }
 
@@ -1184,6 +1209,9 @@ export function computeRecurringSummaryFromItems(items: RecurringItem[]) {
     annualExpenses: Math.round(annualExpenses * 100) / 100,
     annualIncome: Math.round(annualIncome * 100) / 100,
     activeCount: active.length,
+    expenseCount,
+    incomeCount,
+    pausedCount: paused.length,
     needsReviewCount: needsReview.length,
     totalCount: items.length,
   };

@@ -13,6 +13,7 @@ import {
   updateCategorySpendingSummaries,
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
+import { getEffectiveRole, roleAtLeast } from '@/lib/utils/require-auth';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -41,6 +42,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         { error: 'not_found', message: 'Account not found' },
         { status: 404 }
       );
+    }
+
+    // Sensitive accounts are invisible to plain sharing members (same 404 as missing).
+    if (account.sensitive) {
+      const role = await getEffectiveRole(userId);
+      if (role === 'member') {
+        return NextResponse.json(
+          { error: 'not_found', message: 'Account not found' },
+          { status: 404 }
+        );
+      }
     }
 
     const decrypted = await decryptRow('accounts', account as Record<string, unknown>, dek);
@@ -119,6 +131,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.metadata !== undefined) updateData.metadata = body.metadata;
   if (body.connectionId !== undefined) updateData.connectionId = body.connectionId;
   if (body.plaidConnectionId !== undefined) updateData.plaidConnectionId = body.plaidConnectionId;
+  if (body.sensitive !== undefined) {
+    // Only admins/primary may change the sensitive flag; strip it for members.
+    const role = await getEffectiveRole(userId);
+    if (roleAtLeast(role, 'admin')) {
+      updateData.sensitive = Boolean(body.sensitive);
+    }
+  }
 
   const hasTagUpdate = body.tagIds !== undefined;
 

@@ -145,7 +145,7 @@ export async function POST(request: Request) {
 
     // Schedule auto-sync if the account has a sync frequency
     const syncFrequency = (body.metadata?.syncFrequency as string) || 'manual';
-    await manualAccountScheduler.schedule(account.id, userId, syncFrequency, account.balanceDate);
+    await manualAccountScheduler.schedule(account.id, dataUserId, syncFrequency, account.balanceDate);
 
     return NextResponse.json({ ...account, tags: attachedTags }, { status: 201 });
   } catch (err) {

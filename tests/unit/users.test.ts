@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 
 const mockUsers: any[] = [];
 const mockEncryptionKeys: any[] = [];
+const mockDekVersions: any[] = [];
+const mockDekVersionWraps: any[] = [];
 
 // Mock deriveKeyFromPassword to avoid 600k PBKDF2 iteration CPU timeouts in unit tests
 vi.mock('@/lib/crypto', async (importOriginal) => {
@@ -14,7 +16,9 @@ vi.mock('@/lib/crypto', async (importOriginal) => {
   };
 });
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', async () => {
+  const { dekVersions, dekVersionWraps } = await import('@/lib/db/schema');
+  return {
   getPool: () => ({
     connect: async () => ({
       query: async (sql: string, params: any[]) => {
@@ -44,7 +48,13 @@ vi.mock('@/lib/db', () => ({
       limit: vi.fn(() => chain),
       insert: vi.fn((t: any) => ({
         values: vi.fn((val: any) => {
-          mockEncryptionKeys.push({ ...val });
+          if (t === dekVersionWraps) {
+            mockDekVersionWraps.push({ ...val });
+          } else if (t === dekVersions) {
+            mockDekVersions.push({ ...val });
+          } else {
+            mockEncryptionKeys.push({ ...val });
+          }
           return Promise.resolve();
         }),
       })),
@@ -58,12 +68,14 @@ vi.mock('@/lib/db', () => ({
         })),
       })),
       then: (resolve: (v: any) => any) => {
-        return Promise.resolve(mockEncryptionKeys).then(resolve);
+        const rows = chain._table === dekVersions ? mockDekVersions : mockEncryptionKeys;
+        return Promise.resolve(rows).then(resolve);
       },
     };
     return chain;
   },
-}));
+  };
+});
 
 describe('User Lifecycle & Key Management (lib/users.ts)', () => {
   beforeAll(() => {
@@ -74,6 +86,8 @@ describe('User Lifecycle & Key Management (lib/users.ts)', () => {
     vi.clearAllMocks();
     mockUsers.length = 0;
     mockEncryptionKeys.length = 0;
+    mockDekVersions.length = 0;
+    mockDekVersionWraps.length = 0;
   });
 
   it('creates valid user encryption keys with both password and server wrapping', async () => {
@@ -134,5 +148,20 @@ describe('User Lifecycle & Key Management (lib/users.ts)', () => {
     expect(memberKey.primaryUserId).toBe('primary_user');
     expect(memberKey.wrappedDek).toBeDefined();
     expect(memberKey.serverWrappedDek).toBeDefined();
+    expect(mockDekVersionWraps.length).toBe(0);
+  });
+
+  it('rewrapDekForUser records the joiner wrap for the current DEK version', async () => {
+    await createUserEncryptionKeys('primary_user', 'primaryPass123');
+    mockDekVersions.push({ id: 'dv_1', version: 1 });
+
+    await rewrapDekForUser('member_user', 'memberPass456', 'primary_user');
+
+    expect(mockEncryptionKeys.length).toBe(2);
+    expect(mockDekVersionWraps.length).toBe(1);
+    const versionWrap = mockDekVersionWraps[0];
+    expect(versionWrap.versionId).toBe('dv_1');
+    expect(versionWrap.memberUserId).toBe('member_user');
+    expect(versionWrap.wrappedDek).toBeDefined();
   });
 });

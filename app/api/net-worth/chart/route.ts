@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, netWorthSnapshots, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, notInArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
@@ -50,6 +51,12 @@ export async function GET(request: Request) {
     .limit(1);
   const userTz = userSettingsList[0]?.timezone || 'America/New_York';
   const baseCurrency = userSettingsList[0]?.currency || 'USD';
+
+  // Sensitive accounts are excluded from live balance math for plain members.
+  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
+  const accountsWhere = hiddenAccountIds.length > 0
+    ? and(eq(accounts.userId, dataUserId), notInArray(accounts.id, hiddenAccountIds))
+    : eq(accounts.userId, dataUserId);
 
   let [startDate, endDate] = getDateRange(timeframe);
   if (explicitStart && explicitEnd) {
@@ -113,7 +120,7 @@ export async function GET(request: Request) {
       const userAccounts = await getDb()
         .select()
         .from(accounts)
-        .where(eq(accounts.userId, dataUserId));
+        .where(accountsWhere);
 
       const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
       const reportableAccounts = filterReportableAccounts(decryptedAccounts);
@@ -196,7 +203,7 @@ export async function GET(request: Request) {
       const userAccounts = await getDb()
         .select()
         .from(accounts)
-        .where(eq(accounts.userId, dataUserId));
+        .where(accountsWhere);
 
       const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
       const reportableAccounts = filterReportableAccounts(decryptedAccounts);

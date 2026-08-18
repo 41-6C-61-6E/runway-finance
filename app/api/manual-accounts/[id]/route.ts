@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { requireMinRole } from '@/lib/utils/require-auth';
+import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { getDb } from '@/lib/db';
 import { accounts, accountTags, tags } from '@/lib/db/schema';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
@@ -167,7 +169,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const decrypted = await decryptRow('accounts', updated, dek);
     const meta = typeof decrypted.metadata === 'string' ? JSON.parse(decrypted.metadata) : (decrypted.metadata || {});
     const syncFrequency = (meta.syncFrequency as string) || 'manual';
-    await manualAccountScheduler.schedule(id, userId, syncFrequency, decrypted.balanceDate);
+    await manualAccountScheduler.schedule(id, dataUserId, syncFrequency, decrypted.balanceDate);
 
     // Regenerate synthetic history snapshots if the account type is supported
     const SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
@@ -236,8 +238,14 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
+  const forbidden = await requireMinRole('admin', userId);
+  if (forbidden) {
+    return forbidden;
+  }
+
   await deleteManualAccount(id, dataUserId, false, dek);
   manualAccountScheduler.cancel(id);
+  await logShareAudit(dataUserId, userId, SHARE_AUDIT_ACTIONS.ACCOUNT_DELETED, 'accounts', id);
 
   logger.info('DELETE /api/manual-accounts/[id]', { userId, id });
   return NextResponse.json({ success: true });

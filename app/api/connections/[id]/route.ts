@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { requireDeleteConfirmation } from '@/lib/utils/require-auth';
+import { requireDeleteConfirmation, requireMinRole } from '@/lib/utils/require-auth';
 import { getDb } from '@/lib/db';
 import { simplifinConnections, plaidConnections, accounts, syncLogs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -237,6 +238,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
+  // Deleting a connection affects the whole share group, so plain members
+  // are not allowed.
+  const forbidden = await requireMinRole('admin', userId);
+  if (forbidden) {
+    return forbidden;
+  }
+
   if (isSimplefin) {
     if (keepData) {
       await getDb()
@@ -258,6 +266,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   syncScheduler.cancel(id);
+  await logShareAudit(requestingDataUserId, userId, SHARE_AUDIT_ACTIONS.CONNECTION_DELETED, isSimplefin ? 'simplefin_connections' : 'plaid_connections', id);
   logger.info('Connection deleted', { connectionId: id, keepData, isSimplefin });
   return new NextResponse(null, { status: 204 });
 }

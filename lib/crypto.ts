@@ -1,5 +1,6 @@
 import { logger } from '@/lib/logger';
 import { Buffer } from 'node:buffer';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 export type EncryptedPayload = { ciphertext: string; iv: string; tag: string };
 
@@ -27,6 +28,32 @@ function bytesFromBase64(b64: string): Uint8Array {
 function toBufferSource(data: Uint8Array): BufferSource {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return data as any;
+}
+
+// ── DEK fallback context (key-version chain) ─────────────────────────
+// When a user's current DEK cannot decrypt data (e.g. data written before a
+// key rotation), callers can register older household DEKs so that decrypt()
+// retries with them. The context is scoped to the current async execution.
+export interface DekFallbackContext {
+  fallbackDeks: Uint8Array[];
+}
+
+const dekFallbackStore = new AsyncLocalStorage<DekFallbackContext>();
+
+export function setDekFallbacks(fallbackDeks: Uint8Array[]): void {
+  dekFallbackStore.enterWith({ fallbackDeks });
+}
+
+// Enter a mutable fallback context for the current async execution, to be
+// filled in after the DEKs are loaded. The context is anchored before any
+// await so it is visible to the caller's continuation; Node 20 does not
+// reliably propagate a store entered after an await in an async function.
+export function enterDekFallbackContext(ctx: DekFallbackContext): void {
+  dekFallbackStore.enterWith(ctx);
+}
+
+export function getDekFallbacks(): Uint8Array[] {
+  return dekFallbackStore.getStore()?.fallbackDeks ?? [];
 }
 
 // ── Server Recovery Key (for cron sync / password reset) ──────────────
@@ -75,7 +102,7 @@ export async function encrypt(plaintext: string, key: Uint8Array): Promise<Encry
   };
 }
 
-export async function decrypt({ ciphertext, iv }: EncryptedPayload, key: Uint8Array): Promise<string> {
+async function importDecryptKey(key: Uint8Array): Promise<CryptoKey> {
   const keyHex = bytesToHex(key);
   let cryptoKey = decryptKeyCache.get(keyHex);
   if (!cryptoKey) {
@@ -88,6 +115,11 @@ export async function decrypt({ ciphertext, iv }: EncryptedPayload, key: Uint8Ar
     );
     decryptKeyCache.set(keyHex, cryptoKey);
   }
+  return cryptoKey;
+}
+
+export async function decrypt({ ciphertext, iv }: EncryptedPayload, key: Uint8Array): Promise<string> {
+  const cryptoKey = await importDecryptKey(key);
   try {
     const ivBytes = hexToBytes(iv);
     const ciphertextBytes = bytesFromBase64(ciphertext);
@@ -98,6 +130,21 @@ export async function decrypt({ ciphertext, iv }: EncryptedPayload, key: Uint8Ar
     );
     return new TextDecoder().decode(decrypted);
   } catch {
+    for (const fallbackKey of getDekFallbacks()) {
+      try {
+        const fallbackCryptoKey = await importDecryptKey(fallbackKey);
+        const ivBytes = hexToBytes(iv);
+        const ciphertextBytes = bytesFromBase64(ciphertext);
+        const decrypted = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: toBufferSource(ivBytes) },
+          fallbackCryptoKey,
+          toBufferSource(ciphertextBytes),
+        );
+        return new TextDecoder().decode(decrypted);
+      } catch {
+        // try next fallback
+      }
+    }
     throw new Error('Decryption failed: invalid ciphertext or tampered data');
   }
 }

@@ -53,6 +53,7 @@ export const accounts = pgTable(
     institution: text('institution'),
     isHidden: boolean('is_hidden').notNull().default(false),
     isExcludedFromNetWorth: boolean('is_excluded_from_net_worth').notNull().default(false),
+    sensitive: boolean('sensitive').notNull().default(false),
     displayOrder: integer('display_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

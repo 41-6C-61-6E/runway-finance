@@ -7,6 +7,8 @@ import {
   Calendar as CalendarIcon,
   List,
   LayoutGrid,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppTabs } from '@/components/ui/app-tabs';
@@ -53,6 +55,8 @@ export function BillCalendarGrid({
     dateStr: string;
     dayFormatted: string;
     bills: UpcomingBill[];
+    totalInflow: number;
+    totalOutflow: number;
   } | null>(null);
 
   const year = currentDate.getFullYear();
@@ -84,7 +88,7 @@ export function BillCalendarGrid({
     return map;
   }, [bills]);
 
-  // Compute 42 calendar grid cells (6 rows x 7 days)
+  // Compute calendar grid cells (prev month trailing, current month, next month leading)
   const calendarCells = useMemo(() => {
     const firstDayOfMonth = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -179,7 +183,9 @@ export function BillCalendarGrid({
     return cells;
   }, [year, month, billsByDate]);
 
-  const handleCellClick = (cell: typeof calendarCells[0]) => {
+
+
+  const handleCellClick = (cell: (typeof calendarCells)[0]) => {
     if (cell.bills.length > 0) {
       const dateObj = new Date(cell.dateStr + 'T00:00:00');
       const formatted = isNaN(dateObj.getTime())
@@ -195,6 +201,8 @@ export function BillCalendarGrid({
         dateStr: cell.dateStr,
         dayFormatted: formatted,
         bills: cell.bills,
+        totalInflow: cell.totalInflow,
+        totalOutflow: cell.totalOutflow,
       });
     }
   };
@@ -225,6 +233,7 @@ export function BillCalendarGrid({
               </div>,
             ] : undefined
           }
+
           rightActions={
             <div className="flex items-center gap-2">
               <Button
@@ -346,11 +355,11 @@ export function BillCalendarGrid({
                   hasBills && 'cursor-pointer hover:bg-muted/30'
                 )}
               >
-                {/* Cell Header: Day Number */}
-                <div className="flex items-center justify-between">
+                {/* Cell Header: Day Number & Positive/Negative Rollups */}
+                <div className="flex items-start justify-between gap-1">
                   <span
                     className={cn(
-                      'text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center',
+                      'text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center shrink-0',
                       cell.isToday
                         ? 'bg-primary text-primary-foreground font-bold'
                         : cell.isCurrentMonth
@@ -361,16 +370,31 @@ export function BillCalendarGrid({
                     {cell.dayNumber}
                   </span>
 
-                  {cell.totalOutflow > 0 && (
-                    <span
-                      className={cn(
-                        'text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400 hidden sm:inline',
-                        privacyMode && 'blur-xs select-none'
-                      )}
-                    >
-                      -{formatCurrency(cell.totalOutflow)}
-                    </span>
-                  )}
+                  {/* Top-Right Rollup Badges (both positive income & negative outflow) */}
+                  <div className="flex flex-col items-end leading-none gap-0.5 min-w-0">
+                    {cell.totalInflow > 0 && (
+                      <span
+                        className={cn(
+                          'text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate',
+                          privacyMode && 'blur-xs select-none'
+                        )}
+                        title={`Total Inflow: +${formatCurrency(cell.totalInflow)}`}
+                      >
+                        +{formatCurrency(cell.totalInflow)}
+                      </span>
+                    )}
+                    {cell.totalOutflow > 0 && (
+                      <span
+                        className={cn(
+                          'text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400 truncate',
+                          privacyMode && 'blur-xs select-none'
+                        )}
+                        title={`Total Outflow: -${formatCurrency(cell.totalOutflow)}`}
+                      >
+                        -{formatCurrency(cell.totalOutflow)}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Scheduled Bills in Day Cell */}
@@ -416,19 +440,8 @@ export function BillCalendarGrid({
                   )}
                 </div>
 
-                {/* Mobile Bottom Total */}
-                <div className="sm:hidden text-right">
-                  {cell.totalOutflow > 0 && (
-                    <span
-                      className={cn(
-                        'text-[9px] font-mono font-bold text-rose-600 dark:text-rose-400',
-                        privacyMode && 'blur-xs select-none'
-                      )}
-                    >
-                      -{formatCurrency(cell.totalOutflow)}
-                    </span>
-                  )}
-                </div>
+                {/* Bottom spacer for clean alignment */}
+                <div className="h-0.5" />
               </div>
             );
           })}
@@ -445,9 +458,23 @@ export function BillCalendarGrid({
       <Dialog open={!!selectedDayBills} onOpenChange={(open) => !open && setSelectedDayBills(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <CalendarIcon className="w-4 h-4 text-primary" />
-              <span>{selectedDayBills?.dayFormatted}</span>
+            <DialogTitle className="flex items-center justify-between gap-2 text-base">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-primary" />
+                <span>{selectedDayBills?.dayFormatted}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs font-mono">
+                {selectedDayBills && selectedDayBills.totalInflow > 0 && (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                    +{formatCurrency(selectedDayBills.totalInflow)}
+                  </span>
+                )}
+                {selectedDayBills && selectedDayBills.totalOutflow > 0 && (
+                  <span className="text-rose-600 dark:text-rose-400 font-bold">
+                    -{formatCurrency(selectedDayBills.totalOutflow)}
+                  </span>
+                )}
+              </div>
             </DialogTitle>
           </DialogHeader>
 

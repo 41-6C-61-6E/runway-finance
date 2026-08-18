@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
-  if (!checkRateLimit(`bug-report:${userId}`, 10, 60_000)) {
+  if (!(await checkRateLimit(`bug-report:${userId}`, 10, 60_000))) {
     return apiTooManyRequests('Too many issue submissions. Please wait a moment.');
   }
 

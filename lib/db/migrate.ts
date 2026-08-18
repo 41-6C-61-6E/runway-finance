@@ -153,6 +153,16 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       await client.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_discretionary BOOLEAN NOT NULL DEFAULT TRUE`);
     }
 
+    // 3d. Check if sensitive column exists on accounts
+    const accountSensitiveColCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'accounts' AND column_name = 'sensitive'
+    `);
+    if (accountSensitiveColCheck.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Adding missing sensitive column to accounts...');
+      await client.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS sensitive BOOLEAN NOT NULL DEFAULT FALSE`);
+    }
+
     // 4. Check if account_sharing_invitations table exists
     const tableCheck1 = await client.query(`
       SELECT table_name FROM information_schema.tables
@@ -372,6 +382,12 @@ async function runSelfHealingChecks(client: any): Promise<void> {
         { tag: '0073_loving_sinister_six', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary_year'` },
         { tag: '0074_add_allow_penalty_withdrawals', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'` },
         { tag: '0075_naive_secret_warriors', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'weekly_net_worth_alert_day'` },
+        { tag: '0083_sharing_invitation_attempts', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'account_sharing_invitations' AND column_name = 'attempts'` },
+        { tag: '0084_sharing_dek_versions', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'dek_versions'` },
+        { tag: '0085_sharing_roles_audit', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'share_audit_log'` },
+        { tag: '0086_sharing_join_tokens', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'account_sharing_invitations' AND column_name = 'join_token_hash'` },
+        { tag: '0087_accounts_sensitive', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'accounts' AND column_name = 'sensitive'` },
+        { tag: '0088_rate_limits', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'rate_limits'` },
       ];
       for (const { tag, check } of migrationArtifacts) {
         if (appliedTagsMap.has(tag)) continue;

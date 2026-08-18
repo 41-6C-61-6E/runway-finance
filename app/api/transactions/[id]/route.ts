@@ -10,6 +10,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, encryptRow, decryptRows } from '@/lib/crypto';
 import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries, triggerUserSummariesRebuild } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+import { isAccountHiddenFromUser } from '@/lib/data-visibility';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -52,6 +53,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const row = result[0];
+
+  // Transactions on sensitive accounts are invisible to plain sharing members.
+  if (await isAccountHiddenFromUser(userId, dataUserId, row.transaction?.accountId ?? null)) {
+    return NextResponse.json(
+      { error: 'not_found', message: 'Transaction not found' },
+      { status: 404 }
+    );
+  }
 
   // Decrypt transaction fields
   const decryptedTx = await decryptRow('transactions', row.transaction, dek);
@@ -137,6 +146,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (!existing) {
     logger.warn('Transaction not found for PATCH', { transactionId: id });
+    return NextResponse.json(
+      { error: 'not_found', message: 'Transaction not found' },
+      { status: 404 }
+    );
+  }
+
+  if (await isAccountHiddenFromUser(userId, dataUserId, existing.accountId)) {
     return NextResponse.json(
       { error: 'not_found', message: 'Transaction not found' },
       { status: 404 }
@@ -244,6 +260,13 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   if (!existing) {
     logger.warn('Transaction not found for DELETE', { transactionId: id });
+    return NextResponse.json(
+      { error: 'not_found', message: 'Transaction not found' },
+      { status: 404 }
+    );
+  }
+
+  if (await isAccountHiddenFromUser(userId, dataUserId, existing.accountId)) {
     return NextResponse.json(
       { error: 'not_found', message: 'Transaction not found' },
       { status: 404 }

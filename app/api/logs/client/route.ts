@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { auth } from '@/lib/auth';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  if (!checkRateLimit(`client-logs:${ip}`, 30, 60_000)) {
+  const ip = getClientIp(request);
+  if (!(await checkRateLimit(`client-logs:${ip}`, 30, 60_000))) {
     return NextResponse.json({ error: 'Too many log requests' }, { status: 429 });
   }
 

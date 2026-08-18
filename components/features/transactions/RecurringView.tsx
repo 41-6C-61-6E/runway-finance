@@ -14,6 +14,8 @@ import {
   ArrowUpDown,
   RefreshCw,
   SlidersHorizontal,
+  TrendingDown,
+  TrendingUp,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,6 +29,7 @@ import { RecurringSettingsMenu } from './RecurringSettingsMenu';
 import { RecurringBulkActionsToolbar } from './RecurringBulkActionsToolbar';
 import { MergeRecurringModal } from './MergeRecurringModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { formatCurrency } from '@/lib/utils/format';
 import { toast } from 'sonner';
 
 interface RecurringViewProps {
@@ -41,6 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const SORT_LABELS: Record<string, string> = {
+  amount: 'Highest Amount',
   name: 'Name',
   nextDate: 'Next Due',
 };
@@ -246,7 +250,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
     return items.filter((i) => !i.isConfirmed && !i.isDismissed);
   }, [items]);
 
-  // Filtered and sorted items
+  // Filtered items
   const displayedItems = useMemo(() => {
     let list = items;
 
@@ -276,11 +280,12 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
       );
     }
 
-    // Sort
-    return [...list].sort((a, b) => {
-      if (sortBy === 'amount') {
-        return b.monthlyAmount - a.monthlyAmount;
-      }
+    return list;
+  }, [items, activeFilter, searchQuery]);
+
+  // Sorter helper (highest amount first by default)
+  const sortComparator = useCallback(
+    (a: RecurringItem, b: RecurringItem) => {
       if (sortBy === 'name') {
         return a.displayName.localeCompare(b.displayName);
       }
@@ -289,9 +294,28 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
         if (!b.nextExpectedDate) return -1;
         return a.nextExpectedDate.localeCompare(b.nextExpectedDate);
       }
-      return 0;
-    });
-  }, [items, activeFilter, searchQuery, sortBy]);
+      // default 'amount': highest amount first
+      return b.averageAmount - a.averageAmount;
+    },
+    [sortBy]
+  );
+
+  // Split into Expense and Income columns (sorted by highest amount first)
+  const expenseItems = useMemo(() => {
+    return displayedItems.filter((i) => i.flowType === 'expense').sort(sortComparator);
+  }, [displayedItems, sortComparator]);
+
+  const incomeItems = useMemo(() => {
+    return displayedItems.filter((i) => i.flowType === 'income').sort(sortComparator);
+  }, [displayedItems, sortComparator]);
+
+  const totalExpenseMonthly = useMemo(() => {
+    return expenseItems.reduce((sum, i) => sum + i.monthlyAmount, 0);
+  }, [expenseItems]);
+
+  const totalIncomeMonthly = useMemo(() => {
+    return incomeItems.reduce((sum, i) => sum + i.monthlyAmount, 0);
+  }, [incomeItems]);
 
   // Bulk confirm all needs review
   const handleConfirmAllReview = async () => {
@@ -497,7 +521,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
         </div>
       )}
 
-      {/* ── Cards Grid ── */}
+      {/* ── Income & Expense Columns (Highest Amount First) ── */}
       {loading ? (
         <div className="py-16 text-center text-sm text-muted-foreground">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-primary opacity-60" />
@@ -526,34 +550,91 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
-          {displayedItems.map((item) => (
-            <RecurringCard
-              key={item.id}
-              item={item}
-              selected={selectedIds.includes(item.id)}
-              onToggleSelect={handleToggleSelect}
-              onOpenDetail={(i) => {
-                setSelectedItem(i);
-                setDrawerOpen(true);
-              }}
-              onUpdate={handleUpdate}
-              onDelete={handleDelete}
-              onMergeRequest={(i) => setMergeModalItem(i)}
-            />
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* ── Column 1: Expenses & Bills (Highest Amount First) ── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-xs" />
+                <h3 className="font-bold text-xs sm:text-sm text-foreground uppercase tracking-wider">
+                  Expenses ({expenseItems.length})
+                </h3>
+              </div>
+              <span className="text-xs font-mono font-bold text-muted-foreground">
+                -{formatCurrency(totalExpenseMonthly)}/mo
+              </span>
+            </div>
+
+            {expenseItems.length === 0 ? (
+              <div className="p-6 text-center rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground">
+                No recurring expenses in this filter.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {expenseItems.map((item) => (
+                  <RecurringCard
+                    key={item.id}
+                    item={item}
+                    selected={selectedIds.includes(item.id)}
+                    onToggleSelect={handleToggleSelect}
+                    onOpenDetail={(i) => {
+                      setSelectedItem(i);
+                      setDrawerOpen(true);
+                    }}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                    onMergeRequest={(i) => setMergeModalItem(i)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Column 2: Recurring Income (Highest Amount First) ── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs" />
+                <h3 className="font-bold text-xs sm:text-sm text-foreground uppercase tracking-wider">
+                  Income ({incomeItems.length})
+                </h3>
+              </div>
+              <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                +{formatCurrency(totalIncomeMonthly)}/mo
+              </span>
+            </div>
+
+            {incomeItems.length === 0 ? (
+              <div className="p-6 text-center rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground">
+                No recurring income in this filter.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {incomeItems.map((item) => (
+                  <RecurringCard
+                    key={item.id}
+                    item={item}
+                    selected={selectedIds.includes(item.id)}
+                    onToggleSelect={handleToggleSelect}
+                    onOpenDetail={(i) => {
+                      setSelectedItem(i);
+                      setDrawerOpen(true);
+                    }}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                    onMergeRequest={(i) => setMergeModalItem(i)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 
   const summaryContent = (
-    <RecurringSidePanel
-      summary={summary}
-      onScan={handleScan}
-      onAddManual={() => setCreateModalOpen(true)}
-      scanning={scanning}
-    />
+    <RecurringSidePanel summary={summary} />
   );
 
   return (

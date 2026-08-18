@@ -20,6 +20,7 @@ export default function SignInPage() {
   const [isSharingJoin, setIsSharingJoin] = useState(false);
   const [sharingEmail, setSharingEmail] = useState('');
   const [sharingPin, setSharingPin] = useState('');
+  const [joinToken, setJoinToken] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -28,16 +29,20 @@ export default function SignInPage() {
     const join = params.get('join');
     const email = params.get('email');
     const pinVal = params.get('pin');
+    const tokenVal = params.get('token');
 
-    if (mode === 'register' || mode === 'join' || join === 'true') {
+    if (mode === 'register' || mode === 'join' || join === 'true' || tokenVal) {
       setIsLogin(false);
     }
-    if (mode === 'join' || join === 'true') {
+    if (mode === 'join' || join === 'true' || tokenVal) {
       setIsSharingJoin(true);
       if (email) setSharingEmail(email);
       if (pinVal) setSharingPin(pinVal);
+      if (tokenVal) setJoinToken(tokenVal);
     }
   }, []);
+
+  const hasJoinToken = joinToken.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,10 +68,15 @@ export default function SignInPage() {
         if (email) body.email = email;
         if (pin) body.pin = pin;
 
-        // Sharing join: pass sharingEmail + sharingPin instead of standard registration PIN
+        // Sharing join: pass the one-time join token (shareable link) or,
+        // for legacy invitations, the invitee email + 8-digit PIN.
         if (isSharingJoin) {
-          body.sharingEmail = sharingEmail.trim();
-          body.sharingPin = sharingPin.trim();
+          if (hasJoinToken) {
+            body.joinToken = joinToken.trim();
+          } else {
+            body.sharingEmail = sharingEmail.trim();
+            body.sharingPin = sharingPin.trim();
+          }
         }
 
         const response = await fetch('/api/register', {
@@ -216,45 +226,54 @@ export default function SignInPage() {
 
             {/* Sharing join fields */}
             {!isLogin && isSharingJoin && (
-              <>
+              hasJoinToken ? (
                 <div className="p-3 bg-primary/8 border border-primary/20 rounded-lg">
                   <p className="text-xs text-muted-foreground">
-                    Enter the <strong className="text-foreground">email address the invitation was sent to</strong> and the{' '}
-                    <strong className="text-foreground">8-digit PIN</strong> shared with you by the account owner.
+                    You&apos;ve been invited to join a shared account with a one-time link.
+                    Choose a username and password to create your account.
                   </p>
                 </div>
-
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="p-3 bg-primary/8 border border-primary/20 rounded-lg">
+                    <p className="text-xs text-muted-foreground">
+                      Enter the <strong className="text-foreground">email address the invitation was sent to</strong> and the{' '}
+                      <strong className="text-foreground">8-digit PIN</strong> shared with you by the account owner.
+                    </p>
                   </div>
-                  <input
-                    type="email"
-                    id="sharingEmail"
-                    value={sharingEmail}
-                    onChange={(e) => setSharingEmail(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                    placeholder="Invitation email address"
-                    required={isSharingJoin}
-                  />
-                </div>
 
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <input
+                      type="email"
+                      id="sharingEmail"
+                      value={sharingEmail}
+                      onChange={(e) => setSharingEmail(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                      placeholder="Invitation email address"
+                      required={isSharingJoin}
+                    />
                   </div>
-                  <input
-                    type="text"
-                    id="sharingPin"
-                    value={sharingPin}
-                    onChange={(e) => setSharingPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                    className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                    placeholder="8-digit PIN"
-                    maxLength={8}
-                    required={isSharingJoin}
-                  />
-                </div>
-              </>
+
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <KeyRound className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <input
+                      type="text"
+                      id="sharingPin"
+                      value={sharingPin}
+                      onChange={(e) => setSharingPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                      placeholder="8-digit PIN"
+                      maxLength={8}
+                      required={isSharingJoin}
+                    />
+                  </div>
+                </>
+              )
             )}
 
             <button
