@@ -57,7 +57,7 @@ function WhatIsSharedPanel() {
             Shared between all members
           </div>
           <ul className="space-y-1 text-muted-foreground pl-5 list-disc">
-            <li>All accounts and balances</li>
+            <li>All accounts and balances (except ones hidden from members)</li>
             <li>All transactions and categories</li>
             <li>Budgets and goals</li>
             <li>FIRE scenarios and retirement projections</li>
@@ -79,9 +79,20 @@ function WhatIsSharedPanel() {
             <li>SimpleFIN connections can only be <em>edited</em> by their owner</li>
           </ul>
         </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <div className="flex items-center gap-1.5 text-primary font-semibold">
+            <Crown className="w-3.5 h-3.5" />
+            Owner controls
+          </div>
+          <ul className="space-y-1 text-muted-foreground pl-5 list-disc">
+            <li>Hide specific accounts from members (toggle in account details)</li>
+            <li>Delete SimpleFIN connections and manual accounts (members can&apos;t)</li>
+            <li>Transfer ownership to a member</li>
+          </ul>
+        </div>
       </div>
       <p className="text-[11px] text-muted-foreground/80 border-t border-border pt-2">
-        Shared data is encrypted at rest in your database. Everyone in your household can see and manage the same financial data — there is no duplicate data.
+        Shared data is encrypted at rest in your database. Everyone in your household sees the same financial data — there is no duplicate data — except accounts the owner hides from members.
         If sharing is removed, the account owner retains all data; the removed member starts fresh with an empty account.
       </p>
     </div>
