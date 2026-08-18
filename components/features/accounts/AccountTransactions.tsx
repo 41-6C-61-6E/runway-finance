@@ -13,15 +13,17 @@ import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, formatChartDateRange } from '@/lib/utils/chart-format';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/chart-tooltip';
+import { cn } from '@/lib/utils';
 
 export interface AccountTransactionsProps {
   accountId: string;
   historyData: any[];
   isLiability: boolean;
   hierarchyTimeframe: TimeRange;
+  className?: string;
 }
 
-export function AccountTransactions({ accountId, historyData, isLiability, hierarchyTimeframe }: AccountTransactionsProps) {
+export function AccountTransactions({ accountId, historyData, isLiability, hierarchyTimeframe, className }: AccountTransactionsProps) {
   const {
     timeframe,
     windowEnd,
@@ -153,14 +155,11 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
   const txs = txData?.data || [];
 
   return (
-    <div className="py-4 px-0 transition-all duration-300 !border-none [&+div]:!border-t-0 bg-primary/10">
+    <div className={cn('py-4 px-0 transition-all duration-300 !border-none [&+div]:!border-t-0', className)}>
       <div className="grid grid-cols-1 md:grid-cols-5 gap-5 sm:gap-6 px-2 sm:px-4">
         {/* Left Side: Balance History Mini-Chart */}
         <div className="md:col-span-3 flex flex-col space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
-              Balance History
-            </span>
             {showWindowNav && (
               <DateWindowNav
                 prev={prevWindow}
@@ -224,9 +223,6 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
         {/* Right Side: Recent Transactions */}
         <div className="md:col-span-2 flex flex-col space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 select-none">
-              Recent Activity
-            </div>
             <Link
               href={`/transactions?accountId=${accountId}`}
               className="text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer"

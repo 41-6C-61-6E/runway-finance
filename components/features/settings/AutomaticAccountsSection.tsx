@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 import { usePlaidLink } from 'react-plaid-link';
 import { 
   Check, 
@@ -233,13 +234,7 @@ export default function AutomaticAccountsSection({
   };
 
   const invalidateAllFinanceQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['accounts'] });
-    queryClient.invalidateQueries({ queryKey: ['account-transactions'] });
-    queryClient.invalidateQueries({ queryKey: ['budgets'] });
-    queryClient.invalidateQueries({ queryKey: ['budgets-chart'] });
-    queryClient.invalidateQueries({ queryKey: ['cash-flow-monthly'] });
-    queryClient.invalidateQueries({ queryKey: ['real-estate-properties'] });
-    queryClient.invalidateQueries({ queryKey: ['investments'] });
+    invalidateAfterAccountChange(queryClient);
   };
 
   const handleToggleDeletePending = useCallback(async (checked: boolean) => {

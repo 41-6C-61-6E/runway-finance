@@ -89,6 +89,28 @@ const authHandler = NextAuth(authConfig).auth(async (request) => {
     }
   }
 
+  // 2. Server-side body-size cap for large upload endpoints (defense in depth —
+  // the client also enforces its own limits). Rejects oversized payloads early,
+  // before they reach the route handler and consume memory/CPU.
+  if (
+    request.method === 'POST' &&
+    (pathname.startsWith('/api/import/execute') || pathname.startsWith('/api/backup/import'))
+  ) {
+    const contentLength = request.headers.get('content-length');
+    if (contentLength) {
+      const size = parseInt(contentLength, 10);
+      // 100 MB cap (backup restore allows up to 100 MB on the client; CSV import
+      // is capped at 50 MB in its own handler).
+      const MAX_BODY_BYTES = 100 * 1024 * 1024;
+      if (!isNaN(size) && size > MAX_BODY_BYTES) {
+        return new NextResponse(
+          JSON.stringify({ error: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large.' }),
+          { status: 413, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+  }
+
   return NextResponse.next();
 });
 

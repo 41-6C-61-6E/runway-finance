@@ -167,6 +167,66 @@ export async function deriveKeyFromPassword(password: string, salt: Uint8Array):
   return new Uint8Array(bits);
 }
 
+// ── File-level backup encryption ─────────────────────────────────────────
+// Whole-file encryption for backup exports. The user supplies a passphrase;
+// we derive a key with PBKDF2 (same parameters as the household DEK) and
+// encrypt the entire backup JSON with AES-GCM. The result is a self-contained
+// container that carries its own salt + ciphertext so it can be decrypted
+// later with just the passphrase.
+
+export const BACKUP_ENCRYPTION_MAGIC = 'runway-encrypted-backup';
+export const BACKUP_ENCRYPTION_VERSION = 2;
+export const BACKUP_KDF = 'pbkdf2-sha256';
+export const BACKUP_KDF_ITERATIONS = 600_000;
+
+export interface EncryptedBackupPayload {
+  magic: string;
+  version: number;
+  kdf: string;
+  iterations: number;
+  salt: string; // hex
+  iv: string; // hex
+  ct: string; // base64 AES-GCM ciphertext (tag appended by WebCrypto)
+}
+
+export async function deriveBackupKey(passphrase: string, salt: Uint8Array): Promise<Uint8Array> {
+  return deriveKeyFromPassword(passphrase, salt);
+}
+
+export async function encryptBackupJson(jsonString: string, passphrase: string): Promise<EncryptedBackupPayload> {
+  if (!passphrase) {
+    throw new Error('A passphrase is required to encrypt the backup');
+  }
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveBackupKey(passphrase, salt);
+  const { ciphertext, iv } = await encrypt(jsonString, key);
+  return {
+    magic: BACKUP_ENCRYPTION_MAGIC,
+    version: BACKUP_ENCRYPTION_VERSION,
+    kdf: BACKUP_KDF,
+    iterations: BACKUP_KDF_ITERATIONS,
+    salt: bytesToHex(salt),
+    iv,
+    ct: ciphertext,
+  };
+}
+
+export async function decryptBackupJson(payload: EncryptedBackupPayload, passphrase: string): Promise<string> {
+  if (!passphrase) {
+    throw new Error('A passphrase is required to decrypt the backup');
+  }
+  if (!payload || payload.magic !== BACKUP_ENCRYPTION_MAGIC) {
+    throw new Error('Not an encrypted backup payload');
+  }
+  const salt = hexToBytes(payload.salt);
+  const key = await deriveBackupKey(passphrase, salt);
+  try {
+    return await decrypt({ ciphertext: payload.ct, iv: payload.iv, tag: '' }, key);
+  } catch {
+    throw new Error('Backup decryption failed: wrong passphrase or corrupted file');
+  }
+}
+
 // ── Key wrapping ───────────────────────────────────────────────────────
 
 export function generateDEK(): Uint8Array {
@@ -248,6 +308,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   holding_snapshots: ['name', 'quantity', 'price', 'value', 'costBasis'],
   import_log: ['fileContent'],
 
+  ai_providers: ['apiKeyEncrypted'],
   simplefin_connections: ['accessUrlEncrypted', 'accessUrlIv', 'accessUrlTag'],
   plaid_connections: ['accessTokenEncrypted', 'accessTokenIv', 'accessTokenTag'],
   sync_logs: ['accountsSynced', 'transactionsFetched', 'transactionsNew', 'durationMs', 'details'],

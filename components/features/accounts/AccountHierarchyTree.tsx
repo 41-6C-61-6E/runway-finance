@@ -8,7 +8,9 @@ import {
   Landmark, 
   Plus, 
   AlertCircle, 
-  AlertTriangle 
+  AlertTriangle,
+  Search,
+  X
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +26,7 @@ import { isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
 import { AccountTransactions } from '@/components/features/accounts/AccountTransactions';
+import AccountDetailPanel from '@/components/features/accounts/AccountDetailPanel';
 import {
   type Account,
   type TagItem,
@@ -73,6 +76,9 @@ export default function AccountHierarchyTree({
   const [hierarchyTypeSearch, setHierarchyTypeSearch] = useState('');
   const [hierarchyAccountSearch, setHierarchyAccountSearch] = useState('');
   const [hierarchyTagSearch, setHierarchyTagSearch] = useState('');
+
+  // Quick search (transient, not persisted) — matches name, institution, or tag
+  const [searchQuery, setSearchQuery] = useState('');
 
   const hierarchyGroupsRef = useRef<HTMLDivElement>(null);
   const hierarchyTypesRef = useRef<HTMLDivElement>(null);
@@ -238,6 +244,7 @@ export default function AccountHierarchyTree({
 
   const treeHierarchy = useMemo(() => {
     const map = new Map<string, Map<string, Account[]>>();
+    const q = searchQuery.toLowerCase().trim();
 
     for (const acc of filteredAllAccounts) {
       if (acc.isHidden) continue;
@@ -250,6 +257,12 @@ export default function AccountHierarchyTree({
         const accTags = acc.tags || [];
         const hasMatchingTag = accTags.some((t: any) => hierarchySelectedTags.has(t.id));
         if (!hasMatchingTag) continue;
+      }
+      if (q) {
+        const matchesName = acc.name.toLowerCase().includes(q);
+        const matchesInstitution = acc.institution ? acc.institution.toLowerCase().includes(q) : false;
+        const matchesTag = (acc.tags || []).some((t) => t.name.toLowerCase().includes(q));
+        if (!matchesName && !matchesInstitution && !matchesTag) continue;
       }
 
       if (!map.has(group)) map.set(group, new Map());
@@ -269,7 +282,7 @@ export default function AccountHierarchyTree({
     }
 
     return map;
-  }, [filteredAllAccounts, hierarchySelectedGroups, hierarchySelectedTypes, hierarchySelectedAccounts, hierarchySelectedTags]);
+  }, [filteredAllAccounts, hierarchySelectedGroups, hierarchySelectedTypes, hierarchySelectedAccounts, hierarchySelectedTags, searchQuery]);
 
   const sortedGroups = useMemo(() => {
     return Array.from(treeHierarchy.keys()).sort((a, b) => {
@@ -282,8 +295,39 @@ export default function AccountHierarchyTree({
     });
   }, [treeHierarchy]);
 
+  // Count of accounts actually visible after all filters + search
+  const visibleAccountCount = useMemo(() => {
+    let count = 0;
+    for (const subMap of treeHierarchy.values()) {
+      for (const accs of subMap.values()) count += accs.length;
+    }
+    return count;
+  }, [treeHierarchy]);
+
+  const hasActiveFilters =
+    hierarchySelectedGroups.size > 0 ||
+    hierarchySelectedTypes.size > 0 ||
+    hierarchySelectedAccounts.size > 0 ||
+    hierarchySelectedTags.size > 0;
+
+  const clearAllFilters = useCallback(() => {
+    setHierarchySelectedGroups(new Set());
+    setHierarchySelectedTypes(new Set());
+    setHierarchySelectedAccounts(new Set());
+    setHierarchySelectedTags(new Set());
+    setSearchQuery('');
+  }, [setHierarchySelectedGroups, setHierarchySelectedTypes, setHierarchySelectedAccounts, setHierarchySelectedTags]);
+
+  // Selected account (single-select via expandedAccounts) — drives the desktop side panel
+  const selectedAccount = useMemo(() => {
+    const selectedId = Object.keys(expandedAccounts).find((id) => expandedAccounts[id]);
+    if (!selectedId) return null;
+    return filteredAllAccounts.find((a) => a.id === selectedId) || null;
+  }, [expandedAccounts, filteredAllAccounts]);
+
   return (
-    <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
+      <Card className="@container lg:col-span-5 bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
       <CollapsibleCardHeader
         isCollapsed={hierarchyCollapsed}
         onToggle={setHierarchyCollapsed}
@@ -316,26 +360,67 @@ export default function AccountHierarchyTree({
                 </Link>
               </div>
             </CardContent>
+          ) : visibleAccountCount === 0 ? (
+            <CardContent className="p-2 sm:p-5">
+              <div className="py-12 text-center border border-dashed border-border/40 rounded-xl space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                  <Search className="w-6 h-6" />
+                </div>
+                <h3 className="font-semibold text-base text-foreground">No accounts match</h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  {searchQuery.trim()
+                    ? `No accounts match "${searchQuery.trim()}" with the current filters.`
+                    : 'No accounts match the current filters.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all mx-auto w-fit"
+                >
+                  Clear Search & Filters
+                </button>
+              </div>
+            </CardContent>
           ) : (
             <>
               <CollapsibleFilterPanel
                 isOpen={showHierarchyFilters}
                 onToggle={() => setShowHierarchyFilters(!showHierarchyFilters)}
-                feedback={
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                      Showing {filteredAllAccounts.length} Accounts
-                    </span>
-                    <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                      {hierarchyTimeframe.toUpperCase()}
-                    </span>
-                    {(hierarchySelectedGroups.size > 0 || hierarchySelectedTypes.size > 0 || hierarchySelectedAccounts.size > 0 || hierarchySelectedTags.size > 0) && (
-                      <span className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                        FILTERED
-                      </span>
+                centerContent={
+                  <div className="relative w-full max-w-xs">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search accounts, institutions, tags..."
+                      className="h-8 w-full pl-8 pr-7 bg-background border border-border rounded-lg text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        aria-label="Clear search"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     )}
                   </div>
                 }
+                feedbackItems={[
+                  <span key="count" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                    Showing {visibleAccountCount} Accounts
+                  </span>,
+                  <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                    {hierarchyTimeframe.toUpperCase()}
+                  </span>,
+                  hasActiveFilters && (
+                    <span key="filtered" className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                      FILTERED
+                    </span>
+                  ),
+                ].filter(Boolean) as React.ReactNode[]}
               >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-1.5">
@@ -678,7 +763,7 @@ export default function AccountHierarchyTree({
                         </div>
 
                         {/* Group Sparkline */}
-                        <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                        <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                           <Sparkline 
                             data={groupStats.historyPoints} 
                             isPositive={groupStats.isPositive} 
@@ -808,7 +893,7 @@ export default function AccountHierarchyTree({
                                         </div>
                                       </div>
 
-                                      <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                      <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                         {!isAccExpanded && (
                                         <Sparkline 
                                           data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
@@ -827,12 +912,14 @@ export default function AccountHierarchyTree({
                                     </div>
 
                                     {isAccExpanded && (
-                                      <AccountTransactions 
-                                        accountId={acc.id} 
-                                        historyData={historyData}
-                                        isLiability={isLiabilityAccount(acc.type)}
-                                        hierarchyTimeframe={hierarchyTimeframe}
-                                      />
+                                      <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                        <AccountTransactions
+                                          accountId={acc.id}
+                                          historyData={historyData}
+                                          isLiability={isLiabilityAccount(acc.type)}
+                                          hierarchyTimeframe={hierarchyTimeframe}
+                                        />
+                                      </div>
                                     )}
                                   </Fragment>
                                 );
@@ -864,7 +951,7 @@ export default function AccountHierarchyTree({
                                         <span className="text-[10px] sm:text-xs text-muted-foreground/50 ml-1">({accs.length})</span>
                                       </div>
 
-                                      <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                      <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                         <Sparkline 
                                           data={subStats.historyPoints} 
                                           isPositive={subStats.isPositive} 
@@ -977,7 +1064,7 @@ export default function AccountHierarchyTree({
                                               </div>
                                             </div>
 
-                                            <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                            <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                               {!isAccExpanded && (
                                               <Sparkline 
                                                 data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
@@ -996,12 +1083,14 @@ export default function AccountHierarchyTree({
                                           </div>
 
                                           {isAccExpanded && (
-                                            <AccountTransactions 
-                                              accountId={acc.id} 
-                                              historyData={historyData}
-                                              isLiability={isLiabilityAccount(acc.type)}
-                                              hierarchyTimeframe={hierarchyTimeframe}
-                                            />
+                                            <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                              <AccountTransactions
+                                                accountId={acc.id}
+                                                historyData={historyData}
+                                                isLiability={isLiabilityAccount(acc.type)}
+                                                hierarchyTimeframe={hierarchyTimeframe}
+                                              />
+                                            </div>
                                           )}
                                         </Fragment>
                                       );
@@ -1090,7 +1179,7 @@ export default function AccountHierarchyTree({
                                       </div>
                                     </div>
 
-                                    <div className="hidden sm:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                    <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                       {!isAccExpanded && (
                                       <Sparkline 
                                         data={singleAcc.isHidden || singleAcc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
@@ -1109,12 +1198,14 @@ export default function AccountHierarchyTree({
                                   </div>
 
                                   {isAccExpanded && (
-                                    <AccountTransactions 
-                                      accountId={singleAcc.id} 
-                                      historyData={historyData}
-                                      isLiability={isLiabilityAccount(singleAcc.type)}
-                                      hierarchyTimeframe={hierarchyTimeframe}
-                                    />
+                                    <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                      <AccountTransactions
+                                        accountId={singleAcc.id}
+                                        historyData={historyData}
+                                        isLiability={isLiabilityAccount(singleAcc.type)}
+                                        hierarchyTimeframe={hierarchyTimeframe}
+                                      />
+                                    </div>
                                   )}
                                 </Fragment>
                               );
@@ -1130,6 +1221,17 @@ export default function AccountHierarchyTree({
           )}
         </>
       )}
-    </Card>
+      </Card>
+
+      {/* Desktop side panel: selected account detail (2/3 width) */}
+      <div className="hidden lg:block lg:col-span-7 sticky top-[84px] max-h-[calc(100vh-100px)] overflow-y-auto">
+        <AccountDetailPanel
+          account={selectedAccount}
+          historyData={historyData}
+          hierarchyTimeframe={hierarchyTimeframe}
+          onClose={() => setExpandedAccounts({})}
+        />
+      </div>
+    </div>
   );
 }

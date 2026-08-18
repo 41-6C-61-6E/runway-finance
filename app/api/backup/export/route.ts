@@ -44,6 +44,13 @@ import {
   planSettings,
   planLiabilities,
   retirementRules,
+  recurringTransactions,
+  issues,
+  customAlertRules,
+  userNotifications,
+  sentNotifications,
+  pushSubscriptions,
+  syncLogs,
 } from '@/lib/db/schema';
 
 const USER_TABLES: { table: any; dbName: string }[] = [
@@ -79,6 +86,13 @@ const USER_TABLES: { table: any; dbName: string }[] = [
   { table: planFlows, dbName: 'plan_flows' },
   { table: planSettings, dbName: 'plan_settings' },
   { table: planLiabilities, dbName: 'plan_liabilities' },
+  { table: recurringTransactions, dbName: 'recurring_transactions' },
+  { table: issues, dbName: 'issues' },
+  { table: customAlertRules, dbName: 'custom_alert_rules' },
+  { table: userNotifications, dbName: 'user_notifications' },
+  { table: sentNotifications, dbName: 'sent_notifications' },
+  { table: pushSubscriptions, dbName: 'push_subscriptions' },
+  { table: syncLogs, dbName: 'sync_logs' },
 ];
 
 import { apiUnauthorized, apiTooManyRequests, handleApiError } from '@/lib/api/response';
@@ -171,8 +185,29 @@ export async function GET(request: Request) {
     };
 
     const json = JSON.stringify(backup, null, 2);
-    const filename = `personal-finance-backup-${new Date().toISOString().split('T')[0]}.json`;
+    const dateStr = new Date().toISOString().split('T')[0];
 
+    // Optional file-level encryption. When a passphrase is supplied, the entire
+    // backup JSON is encrypted with AES-GCM (key derived via PBKDF2) and returned
+    // as a self-contained encrypted container. The default (no passphrase) keeps
+    // the existing plaintext version-1 format for backward compatibility.
+    const url = new URL(request.url);
+    const passphrase = url.searchParams.get('passphrase');
+
+    if (passphrase) {
+      const { encryptBackupJson } = await import('@/lib/crypto');
+      const encrypted = await encryptBackupJson(json, passphrase);
+      const encJson = JSON.stringify(encrypted, null, 2);
+      const encFilename = `personal-finance-backup-${dateStr}.json.enc`;
+      return new NextResponse(encJson, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Disposition': `attachment; filename="${encFilename}"`,
+        },
+      });
+    }
+
+    const filename = `personal-finance-backup-${dateStr}.json`;
     return new NextResponse(json, {
       headers: {
         'Content-Type': 'application/json',

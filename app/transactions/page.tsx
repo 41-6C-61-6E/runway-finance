@@ -1,6 +1,8 @@
 'use client';
 
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterTransactionChange } from '@/lib/query-invalidation';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Sparkles, Receipt, LayoutList, Columns2, X, Repeat } from 'lucide-react';
@@ -54,6 +56,7 @@ import { TransactionListSkeleton } from '@/components/ui/skeleton-loaders';
 function TransactionsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParamsRef = useRef(searchParams);
   searchParamsRef.current = searchParams;
 
@@ -179,9 +182,10 @@ function TransactionsContent() {
 
   const handleProposalsUpdated = useCallback(() => {
     setRefreshKey((k) => k + 1);
+    invalidateAfterTransactionChange(queryClient);
     fetchPendingAi();
     fetchRecurringCount();
-  }, [fetchPendingAi, fetchRecurringCount]);
+  }, [queryClient, fetchPendingAi, fetchRecurringCount]);
 
   const handleApplyPreset = useCallback((preset: TransactionPreset) => {
     setFilters({
@@ -428,7 +432,8 @@ function TransactionsContent() {
     setSelectedIds(new Set());
     setSelectAllMatching(false);
     setRefreshKey((k) => k + 1);
-  }, []);
+    invalidateAfterTransactionChange(queryClient);
+  }, [queryClient]);
 
   const handleTransactionClick = useCallback((tx: any) => {
     setSelectedTransaction(tx);
@@ -449,7 +454,8 @@ function TransactionsContent() {
 
   const handleDrawerSuccess = useCallback(() => {
     setRefreshKey((k) => k + 1);
-  }, []);
+    invalidateAfterTransactionChange(queryClient);
+  }, [queryClient]);
 
   const availableTabs = [
     { id: 'all', label: 'Transactions' },

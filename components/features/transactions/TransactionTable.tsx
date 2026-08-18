@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateAfterTransactionChange } from "@/lib/query-invalidation";
 import {
   useReactTable,
   getCoreRowModel,
@@ -213,6 +215,7 @@ export default function TransactionTable({
   onAiSuggestionsDismissed,
   onOpenAiSuggestions,
 }: TransactionTableProps) {
+  const queryClient = useQueryClient();
   const settingsContext = useUserSettings();
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
 
@@ -590,6 +593,9 @@ export default function TransactionTable({
           ),
         );
 
+        // Keep the rest of the app (balances, budgets, cash-flow, net worth) in sync.
+        invalidateAfterTransactionChange(queryClient);
+
         if (
           wasUncategorized &&
           categoryId &&
@@ -823,6 +829,9 @@ export default function TransactionTable({
       if (!applyRes.ok) {
         throw new Error("Failed to apply rule");
       }
+
+      // The rule re-categorizes many transactions — refresh dependent caches.
+      invalidateAfterTransactionChange(queryClient);
 
       // Refresh the transactions table
       if (page !== 0) {

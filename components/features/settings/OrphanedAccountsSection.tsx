@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { AlertCircle, ArrowUpDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
@@ -89,13 +90,7 @@ export default function OrphanedAccountsSection({
   const activeAutomaticAccounts = accounts.filter((a) => a.connectionId !== null || a.plaidConnectionId !== null);
 
   const invalidateAllFinanceQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['accounts'] });
-    queryClient.invalidateQueries({ queryKey: ['account-transactions'] });
-    queryClient.invalidateQueries({ queryKey: ['budgets'] });
-    queryClient.invalidateQueries({ queryKey: ['budgets-chart'] });
-    queryClient.invalidateQueries({ queryKey: ['cash-flow-monthly'] });
-    queryClient.invalidateQueries({ queryKey: ['real-estate-properties'] });
-    queryClient.invalidateQueries({ queryKey: ['investments'] });
+    invalidateAfterAccountChange(queryClient);
   };
 
   const handleRemap = useCallback(async () => {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -220,13 +221,7 @@ const formatTimeUntil = (date: Date): string => {
 };
 
 const invalidateAllFinanceQueries = (queryClient: any) => {
-  queryClient.invalidateQueries({ queryKey: ['accounts'] });
-  queryClient.invalidateQueries({ queryKey: ['account-transactions'] });
-  queryClient.invalidateQueries({ queryKey: ['budgets'] });
-  queryClient.invalidateQueries({ queryKey: ['budgets-chart'] });
-  queryClient.invalidateQueries({ queryKey: ['cash-flow-monthly'] });
-  queryClient.invalidateQueries({ queryKey: ['real-estate-properties'] });
-  queryClient.invalidateQueries({ queryKey: ['investments'] });
+  invalidateAfterAccountChange(queryClient);
 };
 
 export default function ManualAccountsSection() {

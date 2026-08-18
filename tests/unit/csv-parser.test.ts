@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseCsv, parseDateField, determineTransactionSign } from '../../lib/utils/csv-parser';
+import { parseCsv, parseDateField, determineTransactionSign, parseAmount } from '../../lib/utils/csv-parser';
 
 describe('CSV Parser', () => {
   it('should parse simple CSV content', () => {
@@ -99,5 +99,61 @@ describe('CSV Parser', () => {
     // Unknown indicators (should remain unchanged)
     expect(determineTransactionSign(45, 'unknown')).toBe(45);
     expect(determineTransactionSign(-45, '')).toBe(-45);
+  });
+
+  it('should strip a UTF-8 BOM from the first header', () => {
+    const csv = '\uFEFFDate,Amount,Description\n2025-01-01,10.50,Test';
+    const result = parseCsv(csv);
+    expect(result.headers).toEqual(['Date', 'Amount', 'Description']);
+    expect(result.rows[0].Date).toBe('2025-01-01');
+  });
+
+  it('should treat mid-field quotes as literal characters', () => {
+    // A quote that does not start a field should not corrupt the parse state.
+    const csv = 'Date,Description\n2025-01-01,He said "hi" loudly\n2025-01-02,Normal';
+    const result = parseCsv(csv);
+    expect(result.totalRows).toBe(2);
+    expect(result.rows[0].Description).toBe('He said "hi" loudly');
+    expect(result.rows[1].Description).toBe('Normal');
+  });
+
+  it('should strip the time component from ISO dates', () => {
+    expect(parseDateField('2025-01-15 10:30:00')).toBe('2025-01-15');
+    expect(parseDateField('2025-01-15T10:30:00Z')).toBe('2025-01-15');
+    expect(parseDateField('2025-1-5')).toBe('2025-01-05');
+  });
+
+  it('should disambiguate DD/MM vs MM/DD slash dates', () => {
+    // First component > 12 => day-first (DD/MM)
+    expect(parseDateField('25/12/2025')).toBe('2025-12-25');
+    // Second component > 12 => month-first (MM/DD)
+    expect(parseDateField('12/25/2025')).toBe('2025-12-25');
+    // Ambiguous (both <= 12) => default US MM/DD
+    expect(parseDateField('03/04/2025')).toBe('2025-03-04');
+  });
+
+  it('should return empty string for invalid calendar dates', () => {
+    expect(parseDateField('2025-02-31')).toBe('');
+    expect(parseDateField('2025-13-01')).toBe('');
+    expect(parseDateField('02/30/2025')).toBe('');
+  });
+
+  it('should return empty string for unparseable garbage', () => {
+    expect(parseDateField('not a date')).toBe('');
+    expect(parseDateField('')).toBe('');
+  });
+
+  it('should parse amounts in common bank formats', () => {
+    expect(parseAmount('1234.56')).toBe(1234.56);
+    expect(parseAmount('-1234.56')).toBe(-1234.56);
+    expect(parseAmount('(1,234.56)')).toBe(-1234.56);
+    expect(parseAmount('1234.56-')).toBe(-1234.56);
+    expect(parseAmount('1,234.56')).toBe(1234.56);
+    expect(parseAmount('1234,56')).toBe(1234.56);
+    expect(parseAmount('1.234,56')).toBe(1234.56);
+    expect(parseAmount('$1,234.56')).toBe(1234.56);
+    expect(parseAmount('1,234,567.89')).toBe(1234567.89);
+    expect(parseAmount('')).toBe(0);
+    expect(parseAmount('abc')).toBe(0);
   });
 });

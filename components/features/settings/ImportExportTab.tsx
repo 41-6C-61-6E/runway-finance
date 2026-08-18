@@ -77,6 +77,11 @@ export default function ImportExportTab() {
   const [backupBusy, setBackupBusy] = useState<'export' | 'csv' | 'import' | null>(null);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [confirmRestoreOpen, setConfirmRestoreOpen] = useState(false);
+  // Encrypted backup state
+  const [encExportOpen, setEncExportOpen] = useState(false);
+  const [encExportPassphrase, setEncExportPassphrase] = useState('');
+  const [restoreIsEncrypted, setRestoreIsEncrypted] = useState(false);
+  const [restorePassphrase, setRestorePassphrase] = useState('');
 
   const queryClient = useQueryClient();
   const { refreshSettings } = useUserSettings() || {};
@@ -323,6 +328,31 @@ export default function ImportExportTab() {
     }
   }, []);
 
+  const handleEncryptedExport = useCallback(async () => {
+    if (!encExportPassphrase) {
+      setExportError('Please enter a passphrase to encrypt the backup.');
+      return;
+    }
+    setEncExportOpen(false);
+    setBackupBusy('export');
+    setExportError(null);
+    setExportSuccess(null);
+    try {
+      const params = new URLSearchParams({ passphrase: encExportPassphrase });
+      const res = await fetch(`/api/backup/export?${params.toString()}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Encrypted export failed');
+      const blob = await res.blob();
+      triggerDownload(blob, `personal-finance-backup-${new Date().toISOString().split('T')[0]}.json.enc`);
+      setExportSuccess('Encrypted backup downloaded successfully. Keep your passphrase safe — it cannot be recovered.');
+      setTimeout(() => setExportSuccess(null), 8000);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Encrypted export failed');
+    } finally {
+      setBackupBusy(null);
+      setEncExportPassphrase('');
+    }
+  }, [encExportPassphrase]);
+
   const handleBackupFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -331,23 +361,47 @@ export default function ImportExportTab() {
       return;
     }
     setRestoreFile(file);
+    setRestorePassphrase('');
+    // Detect an encrypted backup container so we can prompt for a passphrase.
+    file
+      .text()
+      .then((text) => {
+        try {
+          const parsed = JSON.parse(text);
+          setRestoreIsEncrypted(!!parsed && parsed.magic === 'runway-encrypted-backup');
+        } catch {
+          setRestoreIsEncrypted(false);
+        }
+      })
+      .catch(() => setRestoreIsEncrypted(false));
     setConfirmRestoreOpen(true);
     if (backupFileInputRef.current) backupFileInputRef.current.value = '';
   }, []);
 
   const handleConfirmRestore = useCallback(async () => {
     if (!restoreFile) return;
+    if (restoreIsEncrypted && !restorePassphrase) {
+      setExportError('Please enter the backup passphrase to decrypt this file.');
+      return;
+    }
     setConfirmRestoreOpen(false);
     setBackupBusy('import');
     setExportError(null);
     setExportSuccess(null);
     try {
       const text = await restoreFile.text();
+      let body = text;
+      if (restoreIsEncrypted) {
+        // Inject the passphrase into the encrypted container before sending.
+        const parsed = JSON.parse(text);
+        parsed.passphrase = restorePassphrase;
+        body = JSON.stringify(parsed);
+      }
       const res = await fetch('/api/backup/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: text,
+        body,
       });
       let data: any = null;
       try {
@@ -369,8 +423,10 @@ export default function ImportExportTab() {
     } finally {
       setBackupBusy(null);
       setRestoreFile(null);
+      setRestorePassphrase('');
+      setRestoreIsEncrypted(false);
     }
-  }, [restoreFile, queryClient, refreshSettings]);
+  }, [restoreFile, restoreIsEncrypted, restorePassphrase, queryClient, refreshSettings]);
 
   return (
     <div className="space-y-6">
@@ -459,6 +515,16 @@ export default function ImportExportTab() {
               </Button>
 
               <Button
+                onClick={() => { setEncExportPassphrase(''); setEncExportOpen(true); }}
+                disabled={backupBusy !== null}
+                variant="outline"
+                className="flex items-center gap-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+              >
+                {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                Encrypted Backup
+              </Button>
+
+              <Button
                 onClick={handleBackupExportCsv}
                 disabled={backupBusy !== null}
                 variant="outline"
@@ -481,7 +547,7 @@ export default function ImportExportTab() {
               <input
                 ref={backupFileInputRef}
                 type="file"
-                accept=".json"
+                accept=".json,.json.enc"
                 onChange={handleBackupFileSelect}
                 className="hidden"
               />
@@ -860,6 +926,18 @@ export default function ImportExportTab() {
                     {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
                   </div>
                 )}
+                {restoreIsEncrypted && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Backup passphrase</label>
+                    <Input
+                      type="password"
+                      value={restorePassphrase}
+                      onChange={(e) => setRestorePassphrase(e.target.value)}
+                      placeholder="Enter the passphrase used to encrypt this backup"
+                      className="h-9"
+                    />
+                  </div>
+                )}
                 <p className="text-destructive">
                   This action cannot be undone. All existing transactions, accounts, categories, budgets, and other data will be deleted before restoration.
                 </p>
@@ -871,10 +949,52 @@ export default function ImportExportTab() {
             <button
               type="button"
               onClick={handleConfirmRestore}
-              disabled={backupBusy === 'import'}
+              disabled={backupBusy === 'import' || (restoreIsEncrypted && !restorePassphrase)}
               className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
             >
               {backupBusy === 'import' ? 'Restoring...' : 'Yes, Replace All Data'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Encrypted Backup Export Dialog */}
+      <AlertDialog open={encExportOpen} onOpenChange={(open) => { if (!open) { setEncExportOpen(false); setEncExportPassphrase(''); } }}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Download Encrypted Backup</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Your backup will be encrypted with <strong className="text-foreground">AES-256-GCM</strong> using a key derived from your passphrase. The resulting file can only be restored with that same passphrase.
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Passphrase</label>
+                  <Input
+                    type="password"
+                    value={encExportPassphrase}
+                    onChange={(e) => setEncExportPassphrase(e.target.value)}
+                    placeholder="Choose a strong passphrase"
+                    className="h-9"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-xs text-destructive">
+                  If you lose this passphrase, the backup cannot be recovered. Store it securely.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <button
+              type="button"
+              onClick={handleEncryptedExport}
+              disabled={backupBusy === 'export' || !encExportPassphrase}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+              <span className="ml-2">Encrypt & Download</span>
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>

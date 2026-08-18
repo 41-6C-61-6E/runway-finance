@@ -5,4 +5,10 @@ description: To be followed when executing large-scope reviews, coding tasks, or
 
 <!-- Tip: Use /create-instructions in chat to generate content with agent assistance -->
 
-When executing large-scope reviews, coding tasks, or research, spawn focused subagents or parallel audit passes for specific sub-domains (e.g., API routes vs. client hooks vs. database schemas) to ensure exhaustive coverage without cognitive degradation.
+When executing large-scope reviews, coding tasks, or research, and when it makes sense to do so, spawn focused subagents or parallel audit passes for specific sub-domains to ensure exhaustive coverage without cognitive degradation. Keep subagent scope tight and focused on a single concern or task, provide clear instructions for each subagent, and review their outputs for consistency and completeness.
+
+If a Subagent fails, consider re-spawning it with adjusted instructions or a narrower scope. 
+
+If working a large task, periodically output an estimated percentage complete withe the task, and summary of the current state of the task, including what has been completed, what remains to be done, and any issues or blockers encountered. 
+
+Be aware, at most 1 image(s) may be provided in one prompt; a limit of the current model.
