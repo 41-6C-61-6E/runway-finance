@@ -83,6 +83,28 @@ export function usePersistentState<T>(
     }
   }, [key, context?.loading]);
 
+  // Cross-tab sync: the `storage` event fires only in OTHER tabs when
+  // localStorage changes, so we pick up writes made by another tab here.
+  // Setting state does not write back to localStorage, so this cannot loop.
+  useEffect(() => {
+    if (!key || typeof window === 'undefined') return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== key || e.newValue === null) return;
+      try {
+        const deserialize = optionsRef.current?.deserialize ?? JSON.parse;
+        const parsed = deserialize(e.newValue) as T;
+        if (JSON.stringify(parsed) !== JSON.stringify(stateRef.current)) {
+          stateRef.current = parsed;
+          setState(parsed);
+        }
+      } catch {
+        // ignore malformed cross-tab values
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [key]);
+
   const setPersistentState = useCallback((value: T | ((prev: T) => T)) => {
     const prev = stateRef.current;
     const newValue = value instanceof Function ? value(prev) : value;

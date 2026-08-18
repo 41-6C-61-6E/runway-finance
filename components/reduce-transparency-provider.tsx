@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 
 type ReduceTransparencyContextType = {
   reduceTransparency: boolean;
@@ -46,8 +46,13 @@ export function ReduceTransparencyProvider({ children }: { children: ReactNode }
     }
   }, []);
 
+  const value = useMemo(
+    () => ({ reduceTransparency, updateReduceTransparency, loading }),
+    [reduceTransparency, updateReduceTransparency, loading],
+  );
+
   return (
-    <ReduceTransparencyContext.Provider value={{ reduceTransparency, updateReduceTransparency, loading }}>
+    <ReduceTransparencyContext.Provider value={value}>
       {children}
     </ReduceTransparencyContext.Provider>
   );

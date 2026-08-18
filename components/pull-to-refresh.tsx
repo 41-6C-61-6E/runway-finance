@@ -112,7 +112,9 @@ export function PullToRefresh({ children }: PullToRefreshProps) {
             // Keep indicator showing for at least 800ms to guarantee visual feedback
             const minDelay = new Promise((resolve) => setTimeout(resolve, 800));
             await Promise.all([
-              queryClient.refetchQueries(),
+              // Only refetch active (mounted) queries — avoids needlessly
+              // re-hitting background/inactive queries on every pull.
+              queryClient.refetchQueries({ type: 'active' }),
               minDelay,
             ]);
             router.refresh();

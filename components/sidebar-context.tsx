@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, createContext, useContext, type ReactNode } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, createContext, useContext, type ReactNode } from 'react';
 import { useUserSettings } from '@/components/user-settings-provider';
 
 const MIN_WIDTH = 200;
@@ -184,23 +184,39 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     });
   }, [userSettings]);
 
+  const value = useMemo(
+    () => ({
+      collapsed: !isExpanded,
+      sidebarWidth,
+      isHovering,
+      accountsWidth,
+      setAccountsWidth,
+      accountsCollapsed,
+      toggleAccountsCollapsed,
+      hideAccountsSidebarByDefault,
+      updateHideAccountsSidebarByDefault,
+      handleNavResizeDown: handleMouseDown,
+      handleMouseEnter,
+      handleMouseLeave,
+    }),
+    [
+      isExpanded,
+      sidebarWidth,
+      isHovering,
+      accountsWidth,
+      setAccountsWidth,
+      accountsCollapsed,
+      toggleAccountsCollapsed,
+      hideAccountsSidebarByDefault,
+      updateHideAccountsSidebarByDefault,
+      handleMouseDown,
+      handleMouseEnter,
+      handleMouseLeave,
+    ],
+  );
+
   return (
-    <SidebarContext.Provider
-      value={{
-        collapsed: !isExpanded,
-        sidebarWidth,
-        isHovering,
-        accountsWidth,
-        setAccountsWidth,
-        accountsCollapsed,
-        toggleAccountsCollapsed,
-        hideAccountsSidebarByDefault,
-        updateHideAccountsSidebarByDefault,
-        handleNavResizeDown: handleMouseDown,
-        handleMouseEnter,
-        handleMouseLeave,
-      }}
-    >
+    <SidebarContext.Provider value={value}>
       {children}
     </SidebarContext.Provider>
   );

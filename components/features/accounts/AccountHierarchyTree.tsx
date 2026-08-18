@@ -798,8 +798,7 @@ export default function AccountHierarchyTree({
                               return flatAccs.map(({ acc, subgroup }) => {
                                 const accStats = getTrendStats([acc]);
                                 const isAccExpanded = expandedAccounts[acc.id] ?? false;
-                                return (
-                                  <Fragment key={acc.id}>
+                                const row = (
                                     <div 
                                       id={`account-row-${acc.id}`}
                                       onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
@@ -910,9 +909,13 @@ export default function AccountHierarchyTree({
                                         </p>
                                       </div>
                                     </div>
+                                );
 
-                                    {isAccExpanded && (
+                                return (
+                                  <Fragment key={acc.id}>
+                                    {isAccExpanded ? (
                                       <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                        {row}
                                         <AccountTransactions
                                           accountId={acc.id}
                                           historyData={historyData}
@@ -920,6 +923,8 @@ export default function AccountHierarchyTree({
                                           hierarchyTimeframe={hierarchyTimeframe}
                                         />
                                       </div>
+                                    ) : (
+                                      row
                                     )}
                                   </Fragment>
                                 );
@@ -971,8 +976,7 @@ export default function AccountHierarchyTree({
                                       const accStats = getTrendStats([acc]);
                                       const isAccExpanded = expandedAccounts[acc.id] ?? false;
 
-                                      return (
-                                        <Fragment key={acc.id}>
+                                      const row = (
                                           <div 
                                             id={`account-row-${acc.id}`}
                                             onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
@@ -1081,9 +1085,13 @@ export default function AccountHierarchyTree({
                                               </p>
                                             </div>
                                           </div>
+                                      );
 
-                                          {isAccExpanded && (
+                                      return (
+                                        <Fragment key={acc.id}>
+                                          {isAccExpanded ? (
                                             <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                              {row}
                                               <AccountTransactions
                                                 accountId={acc.id}
                                                 historyData={historyData}
@@ -1091,6 +1099,8 @@ export default function AccountHierarchyTree({
                                                 hierarchyTimeframe={hierarchyTimeframe}
                                               />
                                             </div>
+                                          ) : (
+                                            row
                                           )}
                                         </Fragment>
                                       );
@@ -1104,8 +1114,7 @@ export default function AccountHierarchyTree({
                               const accStats = getTrendStats([singleAcc]);
                               const isAccExpanded = expandedAccounts[singleAcc.id] ?? false;
 
-                              return (
-                                <Fragment key={singleAcc.id}>
+                              const row = (
                                   <div 
                                     id={`account-row-${singleAcc.id}`}
                                     onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [singleAcc.id]: true })}
@@ -1196,9 +1205,13 @@ export default function AccountHierarchyTree({
                                       </p>
                                     </div>
                                   </div>
+                              );
 
-                                  {isAccExpanded && (
+                              return (
+                                <Fragment key={singleAcc.id}>
+                                  {isAccExpanded ? (
                                     <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                      {row}
                                       <AccountTransactions
                                         accountId={singleAcc.id}
                                         historyData={historyData}
@@ -1206,6 +1219,8 @@ export default function AccountHierarchyTree({
                                         hierarchyTimeframe={hierarchyTimeframe}
                                       />
                                     </div>
+                                  ) : (
+                                    row
                                   )}
                                 </Fragment>
                               );

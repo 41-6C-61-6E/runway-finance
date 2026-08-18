@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { applyAccent } from '@/lib/utils/apply-accent';
 import { useUserSettings } from '@/components/user-settings-provider';
 
@@ -280,8 +280,13 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePrivacyMode]);
 
+  const value = useMemo(
+    () => ({ privacyMode, togglePrivacyMode, loading, shortcutLabel }),
+    [privacyMode, togglePrivacyMode, loading, shortcutLabel],
+  );
+
   return (
-    <PrivacyModeContext.Provider value={{ privacyMode, togglePrivacyMode, loading, shortcutLabel }}>
+    <PrivacyModeContext.Provider value={value}>
       {children}
     </PrivacyModeContext.Provider>
   );
