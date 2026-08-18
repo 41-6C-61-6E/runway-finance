@@ -16,6 +16,10 @@ ARG BUILD_NUMBER
 ARG BUILD_TIME
 ENV BUILD_NUMBER=$BUILD_NUMBER
 ENV BUILD_TIME=$BUILD_TIME
+# Build-time placeholder so Next.js page-data collection doesn't fail on the
+# production secret check in lib/auth.config.ts. The real secret is provided
+# at runtime via the container environment.
+ENV NEXTAUTH_SECRET=build-time-placeholder
 WORKDIR /app
 COPY . .
 
