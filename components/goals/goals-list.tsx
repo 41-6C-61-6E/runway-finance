@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterGoalChange } from '@/lib/query-invalidation';
 import { GoalCard } from './goal-card';
 import { GoalFormDialog } from './goal-form-drawer';
 import { formatCurrency } from '@/lib/utils/goals';
@@ -49,6 +51,7 @@ interface ProjectionsData {
 }
 
 export function GoalsList() {
+  const queryClient = useQueryClient();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +113,7 @@ export function GoalsList() {
       });
       if (res.ok) {
         await fetchGoals();
+        invalidateAfterGoalChange(queryClient);
       }
     } catch {
       // ignore delete errors
@@ -130,6 +134,7 @@ export function GoalsList() {
     setShowForm(false);
     setEditingGoal(undefined);
     fetchGoals();
+    invalidateAfterGoalChange(queryClient);
   };
 
   // Filter goals

@@ -156,9 +156,9 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
 
   return (
     <div className={cn('py-4 px-0 transition-all duration-300 !border-none [&+div]:!border-t-0', className)}>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-5 sm:gap-6 px-2 sm:px-4">
-        {/* Left Side: Balance History Mini-Chart */}
-        <div className="md:col-span-3 flex flex-col space-y-3">
+      <div className="grid grid-cols-1 gap-5 sm:gap-6 px-2 sm:px-4">
+        {/* Balance History Mini-Chart */}
+        <div className="flex flex-col space-y-3">
           <div className="flex items-center justify-between">
             {showWindowNav && (
               <DateWindowNav
@@ -220,8 +220,8 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
           </div>
         </div>
 
-        {/* Right Side: Recent Transactions */}
-        <div className="md:col-span-2 flex flex-col space-y-3">
+        {/* Recent Transactions */}
+        <div className="flex flex-col space-y-3">
           <div className="flex items-center justify-between">
             <Link
               href={`/transactions?accountId=${accountId}`}

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
 import { useUserSettings } from '@/components/user-settings-provider';
 
 type AccountSubheadingsContextType = {
@@ -22,8 +22,13 @@ export function AccountSubheadingsProvider({ children }: { children: ReactNode }
     }
   }, [userSettingsCtx]);
 
+  const value = useMemo(
+    () => ({ hideSubheadings, updateHideSubheadings, loading }),
+    [hideSubheadings, updateHideSubheadings, loading],
+  );
+
   return (
-    <AccountSubheadingsContext.Provider value={{ hideSubheadings, updateHideSubheadings, loading }}>
+    <AccountSubheadingsContext.Provider value={value}>
       {children}
     </AccountSubheadingsContext.Provider>
   );

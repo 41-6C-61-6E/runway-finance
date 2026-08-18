@@ -24,8 +24,9 @@ export function OfflineBanner() {
       setIsOffline(false);
       setShowReconnected(true);
 
-      // Automatically refetch active queries upon reconnection
-      queryClient.refetchQueries().catch((err) => {
+      // Automatically refetch active (mounted) queries upon reconnection,
+      // skipping background/inactive queries to avoid a burst of redundant requests.
+      queryClient.refetchQueries({ type: 'active' }).catch((err) => {
         console.warn('Failed to refetch queries after reconnecting:', err);
       });
 
