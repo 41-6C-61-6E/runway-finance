@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { encryptField } from '@/lib/crypto';
-import { parseCsv, parseDateField, determineTransactionSign } from '@/lib/utils/csv-parser';
+import { encryptField, decryptField } from '@/lib/crypto';
+import { parseCsv, parseDateField, determineTransactionSign, parseAmount } from '@/lib/utils/csv-parser';
 import { transactions, accountSnapshots, accounts, categories, importLog } from '@/lib/db/schema';
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, desc, inArray, gte, lte } from 'drizzle-orm';
 import { randomUUID, createHash } from 'crypto';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots, formatToCents, roundToCents } from '@/lib/services/account-history';
 import { triggerUserSummariesRebuild } from '@/lib/services/sync';
@@ -46,6 +46,16 @@ export async function POST(request: Request) {
 
     if (importType !== 'transactions' && importType !== 'account_snapshots') {
       return NextResponse.json({ error: 'Invalid import type' }, { status: 400 });
+    }
+
+    // Server-side size cap (defense in depth — the client also enforces 50MB).
+    // Reject oversized payloads before we spend CPU parsing/encrypting them.
+    const MAX_CSV_BYTES = 50 * 1024 * 1024; // 50 MB
+    if (typeof csvText === 'string' && csvText.length > MAX_CSV_BYTES) {
+      return NextResponse.json(
+        { error: 'CSV file is too large. The maximum size is 50 MB.' },
+        { status: 413 }
+      );
     }
 
     // Validate required columns
@@ -170,6 +180,7 @@ export async function POST(request: Request) {
 
     const transactionsToInsert: any[] = [];
     const snapshotsToInsert: any[] = [];
+    const transactionMeta: { accountId: string; date: string; amount: string }[] = [];
     let recordsSkipped = 0;
     let recordsErrored = 0;
 
@@ -213,9 +224,9 @@ export async function POST(request: Request) {
             const resolvedCategoryId = mapped.category ? categoryIdByName.get(mapped.category) : null;
 
             if (importType === 'transactions') {
-              const rawAmount = mapped.amount?.replace(/[^0-9.\-]/g, '') || '0';
-              let parsedAmount = parseFloat(rawAmount);
-              if (isNaN(parsedAmount)) parsedAmount = 0;
+              // Parse the raw amount, handling bank conventions like
+              // "(1,234.56)", "1234.56-", "1.234,56" (EU), and "1,234.56".
+              let parsedAmount = parseAmount(mapped.amount || '');
 
               if (mapped.type) {
                 parsedAmount = determineTransactionSign(parsedAmount, mapped.type);
@@ -223,8 +234,19 @@ export async function POST(request: Request) {
 
               const formattedAmount = formatToCents(roundToCents(parsedAmount));
               const dateVal = parseDateField(mapped.date);
+              // Reject rows whose date could not be parsed into a valid
+              // YYYY-MM-DD calendar date instead of inserting a bad date.
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+                return { errored: true };
+              }
+
+              // Normalize text fields before hashing so that trivial
+              // differences (whitespace, case) don't defeat deduplication.
+              const normPayee = (mapped.payee || '').trim().toLowerCase();
+              const normDescription = (mapped.description || '').trim().toLowerCase();
+              const normMemo = (mapped.memo || '').trim().toLowerCase();
               const contentHash = createHash('sha256')
-                .update(`${resolvedAccountId}|${dateVal}|${formattedAmount}|${mapped.payee || ''}|${mapped.description || ''}|${mapped.memo || ''}`)
+                .update(`${resolvedAccountId}|${dateVal}|${formattedAmount}|${normPayee}|${normDescription}|${normMemo}`)
                 .digest('hex')
                 .substring(0, 32);
               const externalId = `imported-${contentHash}`;
@@ -248,22 +270,35 @@ export async function POST(request: Request) {
                   memo: encryptedMemo ?? undefined,
                   notes: encryptedNotes ?? undefined,
                   categoryId: resolvedCategoryId ?? undefined,
+                  source: 'import',
                   isImported: true,
                   importId,
                   reviewed: true,
                 },
+                // Plain (unencrypted) values used only for post-import
+                // duplicate detection — never inserted into the DB.
+                meta: {
+                  accountId: resolvedAccountId,
+                  date: dateVal,
+                  amount: formattedAmount,
+                },
               };
             } else {
-              const rawBalance = parseFloat(mapped.balance?.replace(/[^0-9.\-]/g, '') || '0');
-              const roundedBalance = isNaN(rawBalance) ? 0 : roundToCents(rawBalance);
+              const rawBalance = parseAmount(mapped.balance || '');
+              const roundedBalance = roundToCents(rawBalance);
               const encryptedBalance = await encryptField(formatToCents(roundedBalance), dek);
+
+              const snapshotDate = parseDateField(mapped.date, snapshotDayOfMonth ?? 'end');
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(snapshotDate)) {
+                return { errored: true };
+              }
 
               return {
                 type: 'snapshot',
                 data: {
                   userId: dataUserId,
                   accountId: resolvedAccountId,
-                  snapshotDate: parseDateField(mapped.date, snapshotDayOfMonth ?? 'end'),
+                  snapshotDate,
                   balance: encryptedBalance,
                   isImported: true,
                   importId,
@@ -286,12 +321,40 @@ export async function POST(request: Request) {
         recordsErrored++;
       } else if (res.type === 'transaction') {
         transactionsToInsert.push(res.data);
+        if (res.meta) transactionMeta.push(res.meta);
       } else if (res.type === 'snapshot') {
         snapshotsToInsert.push(res.data);
       }
     }
 
-    const recordsImported = transactionsToInsert.length + snapshotsToInsert.length;
+    // Compute an accurate "records imported" count by pre-querying which
+    // externalIds already exist. Rows that collide with the unique
+    // (accountId, externalId) constraint are skipped by onConflictDoNothing,
+    // so they should not be counted as imported.
+    let existingTxCount = 0;
+    if (transactionsToInsert.length > 0) {
+      const txExternalIds = Array.from(
+        new Set(transactionsToInsert.map((t) => t.externalId))
+      );
+      // Query in batches to avoid an overly large IN clause.
+      const BATCH = 1000;
+      for (let i = 0; i < txExternalIds.length; i += BATCH) {
+        const batch = txExternalIds.slice(i, i + BATCH);
+        const existing = await db
+          .select({ externalId: transactions.externalId })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.userId, dataUserId),
+              inArray(transactions.externalId, batch)
+            )
+          );
+        existingTxCount += existing.length;
+      }
+    }
+
+    const recordsImported =
+      (transactionsToInsert.length - existingTxCount) + snapshotsToInsert.length;
 
     let dataStartDate: string | null = null;
     let dataEndDate: string | null = null;
@@ -412,6 +475,66 @@ export async function POST(request: Request) {
       }
     });
 
+    // Step 4b: Post-import duplicate detection. Flag imported transactions that
+    // match an existing NON-imported transaction on (accountId, date, amount) —
+    // a strong signal the user re-imported data they already have from bank sync.
+    // We scope the lookup to the affected accounts (a bounded set) and match on
+    // the plain (accountId, date) columns first, only decrypting amounts for the
+    // rows that already match on those two fields.
+    let possibleDuplicates = 0;
+    if (transactionMeta.length > 0) {
+      try {
+        const dupKeys = new Set(
+          transactionMeta.map((m) => `${m.accountId}|${m.date}|${m.amount}`)
+        );
+        const affectedTxAccountIds = Array.from(
+          new Set(transactionMeta.map((m) => m.accountId))
+        );
+        const BATCH = 500;
+        const matchedKeys = new Set<string>();
+        // Bound the lookup to the import's date range so we don't scan (and
+        // decrypt) an account's entire bank-synced history.
+        const dupDateFilter =
+          dataStartDate && dataEndDate
+            ? and(gte(transactions.date, dataStartDate), lte(transactions.date, dataEndDate))
+            : undefined;
+        for (let i = 0; i < affectedTxAccountIds.length; i += BATCH) {
+          const batch = affectedTxAccountIds.slice(i, i + BATCH);
+          const existing = await db
+            .select({
+              accountId: transactions.accountId,
+              date: transactions.date,
+              amount: transactions.amount,
+            })
+            .from(transactions)
+            .where(
+              and(
+                eq(transactions.userId, dataUserId),
+                eq(transactions.isImported, false),
+                inArray(transactions.accountId, batch),
+                dupDateFilter
+              )
+            );
+          for (const row of existing) {
+            const plainAmount = await decryptField(row.amount, dek);
+            const key = `${row.accountId}|${row.date}|${plainAmount}`;
+            if (dupKeys.has(key)) {
+              matchedKeys.add(key);
+            }
+          }
+        }
+        possibleDuplicates = matchedKeys.size;
+        if (possibleDuplicates > 0) {
+          warnings.push(
+            `${possibleDuplicates} imported transaction(s) match existing transactions (same account, date, and amount). Review them to avoid double-counting.`
+          );
+        }
+      } catch (dupError) {
+        const msg = dupError instanceof Error ? dupError.message : String(dupError);
+        logger.warn(`[import/execute] Duplicate detection failed (non-fatal)`, { error: msg });
+      }
+    }
+
     // Step 5: Post-import processing (Snapshots and Summary updates)
     try {
       const affectedAccountIds = new Set<string>();
@@ -497,6 +620,7 @@ export async function POST(request: Request) {
       recordsImported,
       recordsSkipped,
       recordsErrored,
+      possibleDuplicates,
       status: recordsErrored > 0 && recordsImported > 0 ? 'partial' : recordsErrored > 0 ? 'failed' : 'completed',
       warnings: warnings.length > 0 ? warnings : undefined,
     });

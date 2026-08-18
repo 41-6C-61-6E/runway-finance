@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
@@ -99,13 +100,7 @@ function findMajorType(type: string): string {
 }
 
 const invalidateAllFinanceQueries = (queryClient: any) => {
-  queryClient.invalidateQueries({ queryKey: ['accounts'] });
-  queryClient.invalidateQueries({ queryKey: ['account-transactions'] });
-  queryClient.invalidateQueries({ queryKey: ['budgets'] });
-  queryClient.invalidateQueries({ queryKey: ['budgets-chart'] });
-  queryClient.invalidateQueries({ queryKey: ['cash-flow-monthly'] });
-  queryClient.invalidateQueries({ queryKey: ['real-estate-properties'] });
-  queryClient.invalidateQueries({ queryKey: ['investments'] });
+  invalidateAfterAccountChange(queryClient);
 };
 
 interface AccountDetailDrawerProps {

@@ -145,4 +145,26 @@ describe('Crypto', () => {
 
     process.env.ENCRYPTION_KEY = originalEnv;
   });
+
+  it('backup file-level encrypt/decrypt roundtrips with a passphrase', async () => {
+    const { encryptBackupJson, decryptBackupJson, BACKUP_ENCRYPTION_MAGIC } = await import('@/lib/crypto');
+    const json = JSON.stringify({ version: 1, exportedAt: '2025-01-01T00:00:00.000Z', data: { accounts: [{ id: 'a1', name: 'Checking' }] } });
+    const passphrase = 'correct horse battery staple';
+
+    const payload = await encryptBackupJson(json, passphrase);
+    expect(payload.magic).toBe(BACKUP_ENCRYPTION_MAGIC);
+    expect(payload.version).toBe(2);
+    expect(payload.salt).toBeTruthy();
+    expect(payload.iv).toBeTruthy();
+    expect(payload.ct).toBeTruthy();
+
+    const decrypted = await decryptBackupJson(payload, passphrase);
+    expect(decrypted).toBe(json);
+  });
+
+  it('backup decryption fails with the wrong passphrase', async () => {
+    const { encryptBackupJson, decryptBackupJson } = await import('@/lib/crypto');
+    const payload = await encryptBackupJson('{"version":1}', 'right-passphrase');
+    await expect(decryptBackupJson(payload, 'wrong-passphrase')).rejects.toThrow('Backup decryption failed');
+  });
 });

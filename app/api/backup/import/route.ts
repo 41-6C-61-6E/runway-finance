@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptRow } from '@/lib/crypto';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
+import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { apiUnauthorized, apiForbidden, apiBadRequest, apiTooManyRequests, handleApiError } from '@/lib/api/response';
 import {
   accounts,
@@ -46,6 +48,12 @@ import {
   planSettings,
   planLiabilities,
   retirementRules,
+  recurringTransactions,
+  issues,
+  customAlertRules,
+  userNotifications,
+  sentNotifications,
+  pushSubscriptions,
 } from '@/lib/db/schema';
 
 interface BackupPayload {
@@ -79,6 +87,12 @@ const DELETE_ORDER: { table: any; dbName: string }[] = [
   { table: planSettings, dbName: 'plan_settings' },
   { table: plans, dbName: 'plans' },
   { table: retirementRules, dbName: 'retirement_rules' },
+  { table: recurringTransactions, dbName: 'recurring_transactions' },
+  { table: issues, dbName: 'issues' },
+  { table: customAlertRules, dbName: 'custom_alert_rules' },
+  { table: userNotifications, dbName: 'user_notifications' },
+  { table: sentNotifications, dbName: 'sent_notifications' },
+  { table: pushSubscriptions, dbName: 'push_subscriptions' },
   { table: accounts, dbName: 'accounts' },
   { table: simplifinConnections, dbName: 'simplefin_connections' },
   { table: plaidConnections, dbName: 'plaid_connections' },
@@ -124,6 +138,16 @@ const INSERT_ORDER: { table: any; dbName: string }[] = [
   { table: planFlows, dbName: 'plan_flows' },
   { table: planSettings, dbName: 'plan_settings' },
   { table: planLiabilities, dbName: 'plan_liabilities' },
+  // Recurring transactions reference accounts + categories, so insert after them.
+  { table: recurringTransactions, dbName: 'recurring_transactions' },
+  // Sync logs reference the connection tables, so insert after them.
+  { table: syncLogs, dbName: 'sync_logs' },
+  // Notification / alert tables have no FK dependencies.
+  { table: issues, dbName: 'issues' },
+  { table: customAlertRules, dbName: 'custom_alert_rules' },
+  { table: userNotifications, dbName: 'user_notifications' },
+  { table: sentNotifications, dbName: 'sent_notifications' },
+  { table: pushSubscriptions, dbName: 'push_subscriptions' },
 ];
 
 export async function POST(request: Request) {
@@ -148,27 +172,48 @@ export async function POST(request: Request) {
   const db = getDb();
   const dek = await getSessionDEK();
 
-  let backup: any;
+  let rawBody: any;
   try {
-    backup = await request.json();
+    rawBody = await request.json();
   } catch {
     return apiBadRequest('Invalid JSON payload');
+  }
+
+  // Encrypted backup container: { magic, version: 2, kdf, iterations, salt, iv, ct }.
+  // Decrypt it (with the supplied passphrase) into the plaintext version-1 shape
+  // before proceeding. The crypto helpers are loaded dynamically so that unit
+  // tests which mock only decryptRow/encryptRow are unaffected.
+  let backup: any;
+  if (rawBody && rawBody.magic === 'runway-encrypted-backup') {
+    const passphrase = rawBody.passphrase;
+    if (!passphrase) {
+      return apiBadRequest('A passphrase is required to decrypt this backup');
+    }
+    try {
+      const { decryptBackupJson } = await import('@/lib/crypto');
+      const jsonStr = await decryptBackupJson(rawBody, passphrase);
+      backup = JSON.parse(jsonStr);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('wrong passphrase') || msg.includes('decryption failed')) {
+        return apiBadRequest('Backup decryption failed. Please check your passphrase and try again.');
+      }
+      return handleApiError(err, 'Failed to decrypt backup');
+    }
+  } else {
+    backup = rawBody;
   }
 
   if (!backup.version || !backup.data || typeof backup.data !== 'object') {
     return apiBadRequest('Invalid backup format');
   }
 
-  if (backup.version !== 1) {
+  if (backup.version !== 1 && backup.version !== 2) {
     return apiBadRequest(`Unsupported backup version: ${backup.version}`);
   }
 
   try {
     await db.transaction(async (tx) => {
-      // Defer FK constraints so we can insert categories in batches without
-      // parent-before-child ordering being enforced per-statement.
-      await tx.execute(sql`SET CONSTRAINTS ALL DEFERRED`);
-
       // Delete existing data
       for (const { table, dbName } of DELETE_ORDER) {
         const isPersonalTable = dbName === 'ai_providers' || dbName === 'simplefin_connections' || dbName === 'plaid_connections';
@@ -186,10 +231,16 @@ export async function POST(request: Request) {
         delete rawSettings.updatedAt;
 
         const encryptedSettings = await encryptRow('user_settings', rawSettings, dek);
+        const now = new Date();
+        // Upsert so a restore works even when no user_settings row exists yet
+        // (e.g. a fresh account) instead of silently doing nothing.
         await tx
-          .update(userSettings)
-          .set({ ...encryptedSettings, updatedAt: new Date() })
-          .where(eq(userSettings.userId, userId));
+          .insert(userSettings)
+          .values({ ...encryptedSettings, userId, updatedAt: now })
+          .onConflictDoUpdate({
+            target: userSettings.userId,
+            set: { ...encryptedSettings, updatedAt: now },
+          });
       }
 
       // Insert data in dependency order
@@ -225,13 +276,35 @@ export async function POST(request: Request) {
       for (const { table, dbName } of joinTables) {
         const rows = backup.data[dbName] as Record<string, unknown>[] | undefined;
         if (!rows || !Array.isArray(rows) || rows.length === 0) continue;
-        
+
         for (let i = 0; i < rows.length; i += 50) {
           const batch = rows.slice(i, i + 50);
           await tx.insert(table).values(batch as any).onConflictDoNothing();
         }
       }
+
+      // Audit log: record the restore in import_log so there is a durable
+      // trail of when household data was replaced by a backup. We do not store
+      // the (potentially huge) backup payload in fileContent — that column is
+      // intended for CSV imports.
+      const totalRestored = Object.values(backup.data).reduce<number>(
+        (sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0),
+        0
+      );
+      await tx.insert(importLog).values({
+        id: randomUUID(),
+        userId: dataUserId,
+        fileName: 'backup-restore',
+        importType: 'restore',
+        status: 'completed',
+        recordsImported: totalRestored,
+        recordsSkipped: 0,
+        recordsErrored: 0,
+      });
     });
+
+    // Invalidate the search cache so restored data is immediately searchable.
+    invalidateUserSearchCache(dataUserId);
 
     return NextResponse.json({
       success: true,
