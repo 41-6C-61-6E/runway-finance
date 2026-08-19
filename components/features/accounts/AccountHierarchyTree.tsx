@@ -914,14 +914,16 @@ export default function AccountHierarchyTree({
                                 return (
                                   <Fragment key={acc.id}>
                                     {isAccExpanded ? (
-                                      <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                      <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit">
                                         {row}
-                                        <AccountTransactions
-                                          accountId={acc.id}
-                                          historyData={historyData}
-                                          isLiability={isLiabilityAccount(acc.type)}
-                                          hierarchyTimeframe={hierarchyTimeframe}
-                                        />
+                                        <div className="lg:hidden">
+                                          <AccountTransactions
+                                            accountId={acc.id}
+                                            historyData={historyData}
+                                            isLiability={isLiabilityAccount(acc.type)}
+                                            hierarchyTimeframe={hierarchyTimeframe}
+                                          />
+                                        </div>
                                       </div>
                                     ) : (
                                       row
@@ -1090,14 +1092,16 @@ export default function AccountHierarchyTree({
                                       return (
                                         <Fragment key={acc.id}>
                                           {isAccExpanded ? (
-                                            <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                            <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit">
                                               {row}
-                                              <AccountTransactions
-                                                accountId={acc.id}
-                                                historyData={historyData}
-                                                isLiability={isLiabilityAccount(acc.type)}
-                                                hierarchyTimeframe={hierarchyTimeframe}
-                                              />
+                                              <div className="lg:hidden">
+                                                <AccountTransactions
+                                                  accountId={acc.id}
+                                                  historyData={historyData}
+                                                  isLiability={isLiabilityAccount(acc.type)}
+                                                  hierarchyTimeframe={hierarchyTimeframe}
+                                                />
+                                              </div>
                                             </div>
                                           ) : (
                                             row
@@ -1210,14 +1214,16 @@ export default function AccountHierarchyTree({
                               return (
                                 <Fragment key={singleAcc.id}>
                                   {isAccExpanded ? (
-                                    <div className="lg:hidden bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+                                    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit">
                                       {row}
-                                      <AccountTransactions
-                                        accountId={singleAcc.id}
-                                        historyData={historyData}
-                                        isLiability={isLiabilityAccount(singleAcc.type)}
-                                        hierarchyTimeframe={hierarchyTimeframe}
-                                      />
+                                      <div className="lg:hidden">
+                                        <AccountTransactions
+                                          accountId={singleAcc.id}
+                                          historyData={historyData}
+                                          isLiability={isLiabilityAccount(singleAcc.type)}
+                                          hierarchyTimeframe={hierarchyTimeframe}
+                                        />
+                                      </div>
                                     </div>
                                   ) : (
                                     row
