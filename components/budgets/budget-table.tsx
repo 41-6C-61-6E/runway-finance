@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Fragment, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { BudgetFormDialog } from './budget-form-dialog';
 import { AutoBudgetDialog } from './auto-budget-dialog';
 import { BudgetExclusionsDialog } from './budget-exclusions-dialog';
+import { FeatureSettingsMenu } from '@/components/ui/feature-settings-menu';
 import { BudgetItemTransactionsIcon, getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
-import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, Settings, History, Layers, Filter, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, History, Layers, Filter, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
@@ -53,7 +54,7 @@ interface Account {
   tags?: { id: string; name: string; color: string }[];
 }
 
-export function BudgetTable() {
+export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | null } = {}) {
   const queryClient = useQueryClient();
   const settingsContext = useUserSettings();
   const showBudgetTags = settingsContext?.settings?.accountTagVisibility?.budgets !== false;
@@ -108,6 +109,28 @@ export function BudgetTable() {
     return () => observer.disconnect();
   }, []);
 
+  // Notification deep-linking: when a budget-alert notification lands us here
+  // with ?categoryId=<id>, scroll the matching row into view and flash it.
+  const [flashCategoryId, setFlashCategoryId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!targetCategoryId) return;
+    // Wait for the budgets query to render rows.
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      const el = document.querySelector<HTMLElement>(`[data-budget-category-id="${targetCategoryId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setFlashCategoryId(targetCategoryId);
+        window.setTimeout(() => setFlashCategoryId(null), 2600);
+        clearInterval(timer);
+      } else if (tries > 20) {
+        clearInterval(timer);
+      }
+    }, 150);
+    return () => clearInterval(timer);
+  }, [targetCategoryId]);
+
   const { data: budgetData, isLoading: budgetsLoading, error: queryError } = useQuery({
     queryKey: ['budgets', periodType, periodKey],
     queryFn: async () => {
@@ -144,7 +167,6 @@ export function BudgetTable() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Gear actions & popup menu state
-  const [showGearMenu, setShowGearMenu] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmPurgeHistoryOpen, setConfirmPurgeHistoryOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -152,17 +174,6 @@ export function BudgetTable() {
   // Breakout dropdown state for "Everything Else" catch-all item
   const [expandedCatchAll, setExpandedCatchAll] = useState(false);
   const [convertingCatId, setConvertingCatId] = useState<string | null>(null);
-
-  const gearMenuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (gearMenuRef.current && !gearMenuRef.current.contains(e.target as Node)) {
-        setShowGearMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const fetchBudgets = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['budgets'] });
@@ -462,50 +473,36 @@ export function BudgetTable() {
                 </TooltipContent>
               </Tooltip>
 
-              <div className="relative inline-block text-left" ref={gearMenuRef}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setShowGearMenu(!showGearMenu)}
-                      aria-label="Budget settings & history settings"
-                      className="inline-flex items-center justify-center h-8 w-8 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border/80 rounded-lg transition-all shrink-0 cursor-pointer focus:outline-none"
-                    >
-                      <Settings className="w-4 h-4 shrink-0" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">
-                    Budget settings & history actions
-                  </TooltipContent>
-                </Tooltip>
-                {showGearMenu && (
-                  <div className="absolute right-0 mt-1.5 w-60 rounded-xl bg-popover border border-border shadow-lg z-50 py-1.5 text-left animate-in fade-in-50 zoom-in-95">
-                    <button
-                      onClick={() => { setShowGearMenu(false); setShowExclusionsDialog(true); }}
-                      title="Configure custom categories and tags to ignore from budget tracking"
-                      className="w-full px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-primary shrink-0" />
-                      <span>Budget Exclusions</span>
-                    </button>
-                    <button
-                      onClick={() => { setShowGearMenu(false); setConfirmPurgeHistoryOpen(true); }}
-                      title="Erase historical budgets prior to current period while keeping active recurring amounts"
-                      className="w-full px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <History className="w-3.5 h-3.5 text-primary shrink-0" />
-                      <span>Remove Budget History</span>
-                    </button>
-                    <button
-                      onClick={() => { setShowGearMenu(false); setConfirmResetOpen(true); }}
-                      title="Permanently erase all budget items"
-                      className="w-full px-3 py-2 text-xs text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-destructive shrink-0" />
-                      <span>Reset All Budgets</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+              <FeatureSettingsMenu
+                ariaLabel="Budget settings & history actions"
+                title="Budget settings & history actions"
+                items={[
+                  {
+                    id: 'exclusions',
+                    icon: SlidersHorizontal,
+                    label: 'Budget Exclusions',
+                    tip: 'Configure categories and tags to ignore from budget tracking.',
+                    variant: 'primary',
+                    onSelect: () => setShowExclusionsDialog(true),
+                  },
+                  {
+                    id: 'purge-history',
+                    icon: History,
+                    label: 'Remove Budget History',
+                    tip: 'Erase budgets prior to the current period, keeping active recurring amounts.',
+                    variant: 'primary',
+                    onSelect: () => setConfirmPurgeHistoryOpen(true),
+                  },
+                  {
+                    id: 'reset-all',
+                    icon: Trash2,
+                    label: 'Reset All Budgets',
+                    tip: 'Permanently erase all budget items.',
+                    variant: 'danger',
+                    onSelect: () => setConfirmResetOpen(true),
+                  },
+                ]}
+              />
             </TooltipProvider>
           </div>
         </div>
@@ -525,7 +522,7 @@ export function BudgetTable() {
             {incomeBudgets.map((b) => {
               const isTargetMet = b.remaining >= 0;
               return (
-                <div key={b.id} className="px-4 py-3 space-y-2 group/row">
+                <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
@@ -579,7 +576,7 @@ export function BudgetTable() {
               const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
               const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
               return (
-                <div key={b.id} className="px-4 py-3 space-y-2 group/row">
+                <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
@@ -752,8 +749,8 @@ export function BudgetTable() {
                     {incomeBudgets.map((b) => {
                       const isTargetMet = b.remaining >= 0;
                       return (
-                        <tr key={b.id} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
-                          <td className="px-2.5 sm:px-3.5 py-2.5 min-w-0">
+                        <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors">
+                          <td className={`px-2.5 sm:px-3.5 py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
                             <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
                               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
                               <Link
@@ -833,8 +830,8 @@ export function BudgetTable() {
                       const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
                       return (
                         <Fragment key={b.id}>
-                          <tr className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
-                            <td className="px-2.5 sm:px-3.5 py-2.5 min-w-0">
+                          <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
+                            <td className={`px-2.5 sm:px-3.5 py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
                               <div className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-wrap">
                                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                                 <Link

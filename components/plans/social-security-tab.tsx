@@ -403,7 +403,7 @@ export function SocialSecurityTab({
       </div>
 
       {/* SECTION 2: CUMULATIVE LIFETIME PAYOUT TRAJECTORY CHART */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl shadow-sm">
         <CollapsibleCardHeader
           title="Lifetime Payout & Break-Even Trajectory"
           description="Compare cumulative lifetime cash flows between claiming early at 62, at FRA 67, or delayed at 70"

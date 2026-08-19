@@ -27,6 +27,7 @@ import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
 import { AccountTransactions } from '@/components/features/accounts/AccountTransactions';
 import AccountDetailPanel from '@/components/features/accounts/AccountDetailPanel';
+import GroupDetailPanel from '@/components/features/accounts/GroupDetailPanel';
 import {
   type Account,
   type TagItem,
@@ -62,6 +63,7 @@ export default function AccountHierarchyTree({
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expandedSubgroups, setExpandedSubgroups] = useState<Record<string, boolean>>({});
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
   const [hierarchySelectedGroups, setHierarchySelectedGroups] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedGroups', new Set(), setOptions);
   const [hierarchySelectedTypes, setHierarchySelectedTypes] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedTypes', new Set(), setOptions);
@@ -110,6 +112,7 @@ export default function AccountHierarchyTree({
   useEffect(() => {
     if (!targetAccountId) return;
     setExpandedAccounts({ [targetAccountId]: true });
+    setSelectedGroup(null);
 
     if (filteredAllAccounts && filteredAllAccounts.length > 0) {
       const acc = filteredAllAccounts.find((a) => a.id === targetAccountId);
@@ -324,6 +327,16 @@ export default function AccountHierarchyTree({
     if (!selectedId) return null;
     return filteredAllAccounts.find((a) => a.id === selectedId) || null;
   }, [expandedAccounts, filteredAllAccounts]);
+
+    // Selected group — drives the desktop side panel (mutually exclusive with account selection)
+    const selectedGroupAccounts = useMemo(() => {
+      if (!selectedGroup) return null;
+      const subMap = treeHierarchy.get(selectedGroup);
+      if (!subMap) return null;
+      const accs: Account[] = [];
+      subMap.forEach((accsInGroup) => accs.push(...accsInGroup));
+      return accs;
+    }, [selectedGroup, treeHierarchy]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
@@ -743,23 +756,40 @@ export default function AccountHierarchyTree({
                   subMap.forEach((accs) => groupAccounts.push(...accs));
                   const groupStats = getTrendStats(groupAccounts);
                   const isGroupExpanded = expandedGroups[group] ?? true;
+                  const isGroupSelected = selectedGroup === group;
 
                   return (
                     <div key={group} className="divide-y divide-border/10">
                       {/* Group Header Row */}
                       <div 
-                        onClick={() => setExpandedGroups((prev) => ({ ...prev, [group]: !isGroupExpanded }))}
-                        className="w-full flex items-center justify-between px-0 py-3.5 bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer select-none"
+                        onClick={() => {
+                          const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+                          if (isDesktop) {
+                            setSelectedGroup(group);
+                            setExpandedAccounts({});
+                          } else {
+                            setExpandedGroups((prev) => ({ ...prev, [group]: !isGroupExpanded }));
+                          }
+                        }}
+                        className={`w-full flex items-center justify-between px-0 py-3.5 ${isGroupSelected ? 'bg-primary/10 hover:bg-primary/15' : 'bg-muted/40 hover:bg-muted/60'} transition-colors cursor-pointer select-none`}
                       >
                         <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-6">
-                          <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedGroups((prev) => ({ ...prev, [group]: !isGroupExpanded }));
+                            }}
+                            className="w-6 h-6 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
+                            aria-label={isGroupExpanded ? `Collapse ${group}` : `Expand ${group}`}
+                          >
                             {isGroupExpanded ? (
                               <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
                             ) : (
                               <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
                             )}
-                          </div>
-                          <span className="text-sm sm:text-base font-bold text-foreground truncate">{group}</span>
+                          </button>
+                          <span className={`text-sm sm:text-base font-bold truncate ${isGroupSelected ? 'text-primary' : 'text-foreground'}`}>{group}</span>
                         </div>
 
                         {/* Group Sparkline */}
@@ -801,7 +831,7 @@ export default function AccountHierarchyTree({
                                 const row = (
                                     <div 
                                       id={`account-row-${acc.id}`}
-                                      onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
+                                      onClick={() => { setSelectedGroup(null); setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true }); }}
                                       className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
                                         isAccExpanded 
                                           ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
@@ -981,7 +1011,7 @@ export default function AccountHierarchyTree({
                                       const row = (
                                           <div 
                                             id={`account-row-${acc.id}`}
-                                            onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true })}
+                                            onClick={() => { setSelectedGroup(null); setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true }); }}
                                             className={`w-full flex items-center justify-between px-0 py-2 transition-all cursor-pointer select-none ${
                                               isAccExpanded 
                                                 ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
@@ -1121,7 +1151,7 @@ export default function AccountHierarchyTree({
                               const row = (
                                   <div 
                                     id={`account-row-${singleAcc.id}`}
-                                    onClick={() => setExpandedAccounts(isAccExpanded ? {} : { [singleAcc.id]: true })}
+                                    onClick={() => { setSelectedGroup(null); setExpandedAccounts(isAccExpanded ? {} : { [singleAcc.id]: true }); }}
                                     className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
                                       isAccExpanded 
                                         ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
@@ -1244,14 +1274,24 @@ export default function AccountHierarchyTree({
       )}
       </Card>
 
-      {/* Desktop side panel: selected account detail (2/3 width) */}
+      {/* Desktop side panel: selected group or account detail (2/3 width) */}
       <div className="hidden lg:block lg:col-span-7 sticky top-[84px] max-h-[calc(100vh-100px)] overflow-y-auto">
-        <AccountDetailPanel
-          account={selectedAccount}
-          historyData={historyData}
-          hierarchyTimeframe={hierarchyTimeframe}
-          onClose={() => setExpandedAccounts({})}
-        />
+        {selectedGroup && selectedGroupAccounts ? (
+          <GroupDetailPanel
+            group={selectedGroup}
+            accounts={selectedGroupAccounts}
+            historyData={historyData}
+            hierarchyTimeframe={hierarchyTimeframe}
+            onClose={() => setSelectedGroup(null)}
+          />
+        ) : (
+          <AccountDetailPanel
+            account={selectedAccount}
+            historyData={historyData}
+            hierarchyTimeframe={hierarchyTimeframe}
+            onClose={() => setExpandedAccounts({})}
+          />
+        )}
       </div>
     </div>
   );

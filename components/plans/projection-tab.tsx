@@ -619,7 +619,7 @@ export function ProjectionTab({
       )}
 
       {/* Main Chart Card: Deterministic vs Monte Carlo Fan Chart */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+      <div className="bg-card border border-border rounded-xl shadow-sm space-y-0">
         <CollapsibleCardHeader
           isCollapsed={isMainChartCollapsed}
           onToggle={setIsMainChartCollapsed}
@@ -937,7 +937,7 @@ export function ProjectionTab({
       </div>
 
       {/* Income vs. Drawdowns Composed Stacked Bar & Line Chart */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden space-y-0">
+      <div className="bg-card border border-border rounded-xl shadow-sm space-y-0">
         <CollapsibleCardHeader
           isCollapsed={isCashFlowCollapsed}
           onToggle={setIsCashFlowCollapsed}

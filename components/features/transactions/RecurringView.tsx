@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Repeat,
   Sparkles,
@@ -52,6 +53,9 @@ const SORT_LABELS: Record<string, string> = {
 export default function RecurringView({ onSelectTransaction }: RecurringViewProps) {
   const [items, setItems] = useState<RecurringItem[]>([]);
   const [summary, setSummary] = useState<any>(null);
+
+  // Notification deep-linking: honor ?search=<name> from notification urlPath
+  const searchParams = useSearchParams();
   const [categories, setCategories] = useState<{ id: string; name: string; color: string }[]>([]);
   const [accountsList, setAccountsList] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +63,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
 
   // Filters & Search
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'needs_review' | 'paused' | 'dismissed'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState<'amount' | 'name' | 'nextDate'>('amount');
   const [showOptions, setShowOptions] = useState(false);
 
@@ -104,8 +108,10 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
   }, []);
 
   // Fetch recurring list & summary
-  const fetchRecurring = useCallback(async () => {
-    setLoading(true);
+  // Silent refreshes (after saves/confirmations) skip the spinner so the
+  // page doesn't flicker while the data updates in place.
+  const fetchRecurring = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const res = await fetch('/api/recurring?includeDismissed=true&status=all');
       if (res.ok) {
@@ -116,13 +122,20 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
     } catch (err) {
       console.error('Failed to load recurring data:', err);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchRecurring();
   }, [fetchRecurring]);
+
+  // Sync search when the URL deep-link changes (e.g. clicking a notification
+  // while already on the recurring view).
+  useEffect(() => {
+    const q = searchParams.get('search');
+    if (q !== null) setSearchQuery(q);
+  }, [searchParams]);
 
   // Trigger scan
   const handleScan = async () => {
@@ -143,6 +156,9 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
     }
   };
 
+  // Silent refresh helper for post-mutation updates (no page-level spinner)
+  const refreshRecurring = useCallback(() => fetchRecurring({ silent: true }), [fetchRecurring]);
+
   // Update single item
   const handleUpdate = async (id: string, updates: Partial<RecurringItem>) => {
     try {
@@ -159,7 +175,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
         } else {
           toast.success('Updated successfully');
         }
-        await fetchRecurring();
+        await refreshRecurring();
       }
     } catch (err) {
       toast.error('Update failed');
@@ -172,7 +188,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
       const res = await fetch(`/api/recurring/${id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Deleted rule');
-        await fetchRecurring();
+        await refreshRecurring();
       }
     } catch (err) {
       toast.error('Delete failed');
@@ -209,7 +225,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
         setCreateModalOpen(false);
         setNewMerchant('');
         setNewAmount('');
-        await fetchRecurring();
+        await refreshRecurring();
       } else {
         const d = await res.json().catch(() => ({}));
         toast.error(d.error || 'Failed to create recurring item');
@@ -331,7 +347,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
       });
       if (res.ok) {
         toast.success(`Confirmed all ${needsReviewItems.length} subscriptions`);
-        await fetchRecurring();
+        await refreshRecurring();
       }
     } catch {
       toast.error('Bulk confirm failed');
@@ -351,7 +367,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
       });
       if (res.ok) {
         toast.success('Dismissed all pending suggestions');
-        await fetchRecurring();
+        await refreshRecurring();
       }
     } catch {
       toast.error('Bulk dismiss failed');
@@ -429,7 +445,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
           rightActions={
             <RecurringSettingsMenu
               onScan={handleScan}
-              onRefresh={fetchRecurring}
+              onRefresh={refreshRecurring}
               scanning={scanning}
             />
           }
@@ -479,7 +495,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
         selectedIds={selectedIds}
         items={items}
         onClearSelection={handleClearSelection}
-        onSuccess={fetchRecurring}
+        onSuccess={refreshRecurring}
       />
 
       {/* ── Needs Review Quick Action Banner ── */}
@@ -653,7 +669,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
         item={selectedItem}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        onSuccess={fetchRecurring}
+        onSuccess={refreshRecurring}
         categories={categories}
       />
 
@@ -664,7 +680,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
           onClose={() => setMergeModalItem(null)}
           sourceItem={mergeModalItem}
           allItems={items}
-          onSuccess={fetchRecurring}
+          onSuccess={refreshRecurring}
         />
       )}
 

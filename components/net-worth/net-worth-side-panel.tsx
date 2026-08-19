@@ -11,6 +11,8 @@ import type { AccountData, ChartPoint } from '@/lib/types/financial';
 import { computeMovingAverage, computeMedianFilter } from '@/lib/utils/chart-aggregation';
 import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
+import { NetWorthBenchmarks } from '@/components/net-worth/net-worth-benchmarks';
+import { useUserSettings } from '@/components/user-settings-provider';
 import {
   DollarSign,
   ShieldCheck,
@@ -109,6 +111,8 @@ function getDebtRatioRating(rawRatio: number) {
 
 export function NetWorthSidePanel() {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthSidePanel');
+  const { settings } = useUserSettings();
+  const birthYear: number | null | undefined = settings?.birthYear;
 
   const { data: accounts = [], isLoading: accountsLoading, error: accountsError } = useQuery<AccountData[]>({
     queryKey: ['accounts-all'],
@@ -479,6 +483,9 @@ export function NetWorthSidePanel() {
               </ChartHoverTooltip>
             </div>
           )}
+
+          {/* Emergency fund coverage + age-band reference benchmarks */}
+          <NetWorthBenchmarks birthYear={birthYear} />
 
           {/* Section 5: Net Worth Milestone Tracker */}
           <div className="py-4 first:pt-0 last:pb-0">

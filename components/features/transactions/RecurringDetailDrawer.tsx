@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Sheet,
   SheetContent,
@@ -38,6 +39,7 @@ import {
   AlertCircle,
   Save,
   Loader2,
+  Landmark,
 } from 'lucide-react';
 import type { RecurringItem } from './RecurringCard';
 import type { FrequencyType } from '@/lib/services/recurring-detection';
@@ -195,9 +197,15 @@ export default function RecurringDetailDrawer({
                 <SheetTitle className="text-base sm:text-lg font-bold text-foreground truncate">
                   {item.displayName}
                 </SheetTitle>
-                <p className="text-xs text-muted-foreground truncate">
-                  Pattern: {item.matchPattern || item.merchantName}
-                </p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
+                  <span className="truncate">
+                    Pattern: {item.matchPattern || item.merchantName}
+                  </span>
+                  <span className="inline-flex items-center gap-1 shrink-0 text-foreground/70">
+                    <Landmark className="w-3 h-3 opacity-70" />
+                    {item.accountName || 'Any account'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -389,6 +397,26 @@ export default function RecurringDetailDrawer({
                 ))}
               </select>
             </div>
+
+            {item.accountId && (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-card border">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Landmark className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] uppercase font-bold text-muted-foreground">Account</div>
+                  <div className="text-xs font-semibold text-foreground truncate">
+                    {item.accountName || 'Any account'}
+                  </div>
+                </div>
+                <Link
+                  href={`/accounts?accountId=${item.accountId}`}
+                  className="text-[11px] font-semibold text-primary hover:underline shrink-0"
+                >
+                  View
+                </Link>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-foreground mb-1">

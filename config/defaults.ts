@@ -31,6 +31,7 @@ export const GENERAL_DEFAULTS = {
   recurringExclusions: {
     categoryIds: [],
     accountIds: [],
+    accountTypes: [],
     merchantPatterns: [],
   },
   deletePendingOlderThan30Days: true,

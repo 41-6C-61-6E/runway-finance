@@ -680,6 +680,7 @@ export default function NotificationsTab() {
                     id="max-notifications"
                     type="number"
                     min="1"
+                    max="50"
                     value={maxNotificationsPerPeriod}
                     onChange={(e) => handleUpdateSetting('maxNotificationsPerPeriod', parseInt(e.target.value) || 1)}
                     className="max-w-xs h-9 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -694,7 +695,8 @@ export default function NotificationsTab() {
                   <Input
                     id="limiter-period"
                     type="number"
-                    min="1"
+                    min="5"
+                    max="1440"
                     value={notificationLimiterPeriodMinutes}
                     onChange={(e) => handleUpdateSetting('notificationLimiterPeriodMinutes', parseInt(e.target.value) || 1)}
                     className="max-w-xs h-9 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"

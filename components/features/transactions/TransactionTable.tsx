@@ -1643,7 +1643,7 @@ export default function TransactionTable({
               </div>
 
               <div className="flex items-center gap-2">
-                {transactions.length > 0 && !compactView && (
+                {transactions.length > 0 && !effectiveCompactView && (
                   <div className="relative" ref={columnMenuRef}>
                     <button
                       onClick={() => setShowColumnMenu(!showColumnMenu)}

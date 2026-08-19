@@ -15,6 +15,7 @@ export default function GeneralTab() {
   const [accentColor, setAccentColor] = useState('violet');
   const [devMode, setDevMode] = useState<boolean | null>(null);
   const [devModeLoading, setDevModeLoading] = useState(false);
+  const [birthYear, setBirthYear] = useState<string>('');
 
   const { privacyMode, togglePrivacyMode, loading: privacyModeLoading } = usePrivacyMode();
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
@@ -29,7 +30,10 @@ export default function GeneralTab() {
 
     fetch('/api/user-settings', { credentials: 'include' })
       .then((res) => res.json())
-      .then((data) => setAccentColor(data.accentColor ?? 'violet'))
+      .then((data) => {
+        setAccentColor(data.accentColor ?? 'violet');
+        setBirthYear(data.birthYear != null ? String(data.birthYear) : '');
+      })
       .catch(() => setAccentColor('violet'));
   }, []);
 
@@ -53,6 +57,29 @@ export default function GeneralTab() {
       });
     } catch {}
   }, []);
+
+    const handleBirthYearChange = useCallback((value: string) => {
+      setBirthYear(value);
+      const trimmed = value.trim();
+      if (trimmed === '') {
+        fetch('/api/user-settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ birthYear: null }),
+        }).catch(() => {});
+        return;
+      }
+      const year = Number(trimmed);
+      const currentYear = new Date().getFullYear();
+      if (!Number.isInteger(year) || year < 1900 || year > currentYear) return;
+      fetch('/api/user-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ birthYear: year }),
+      }).catch(() => {});
+    }, []);
 
   const handleToggleDevMode = async () => {
     setDevModeLoading(true);
@@ -137,6 +164,25 @@ export default function GeneralTab() {
             </div>
           </div>
 
+          {/* Birth Year */}
+          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Birth Year</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Used for age-based benchmark comparisons (savings rate &amp; net worth) on the Net Worth page. Optional.
+              </p>
+            </div>
+            <input
+              type="number"
+              min={1900}
+              max={new Date().getFullYear()}
+              value={birthYear}
+              onChange={(e) => handleBirthYearChange(e.target.value)}
+              placeholder="1990"
+              className="w-28 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
           {/* Privacy Mode */}
           <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
@@ -204,6 +250,7 @@ export default function GeneralTab() {
                 pageKey === 'transactions' ? 'Transactions' :
                 pageKey === 'flows' ? 'Flows' :
                 pageKey === 'budgets' ? 'Budgets' :
+                pageKey === 'subscriptions' ? 'Subscriptions' :
                 pageKey === 'realEstate' ? 'Real Estate' :
                 pageKey === 'investments' ? 'Investments' :
                 pageKey === 'dataExplorer' ? 'Data Explorer' :

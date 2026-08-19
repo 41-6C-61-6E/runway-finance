@@ -321,7 +321,7 @@ export async function updateGoalAllocations(userId: string): Promise<void> {
                 userId,
                 `Savings Goal Reached!`,
                 `Your savings goal "${goal.goalName}" is now fully funded!`,
-                '/goals',
+                  `/goals?goalId=${encodeURIComponent(goal.goalId)}`,
                 'goal_milestone',
                 milestoneKey
               ).catch((err) => {

@@ -9,6 +9,8 @@ import {
   validateInvitation,
   acceptInvitation,
   removeMember,
+  getShareMemberRole,
+  updateMemberRole,
   MAX_SHARE_GROUP_SIZE,
   MAX_INVITATION_ATTEMPTS,
 } from '@/lib/sharing';
@@ -368,7 +370,90 @@ describe('Account Sharing Service (lib/sharing.ts)', () => {
       });
 
       const result = await removeMember('member_user', 'unauthorized_stranger');
-      expect(result.error).toBe('Not authorised to remove this member.');
+      expect(result.error).toBe('Only the owner or an admin can remove this member.');
+    });
+
+    it('blocks an admin from removing another admin', async () => {
+      mockState.user_encryption_keys.push(
+        { userId: 'admin_a', primaryUserId: 'owner_user' },
+        { userId: 'admin_b', primaryUserId: 'owner_user' }
+      );
+      mockState.account_share_members.push(
+        { primaryUserId: 'owner_user', memberUserId: 'admin_a', status: 'active', role: 'admin' },
+        { primaryUserId: 'owner_user', memberUserId: 'admin_b', status: 'active', role: 'admin' }
+      );
+
+      const result = await removeMember('admin_b', 'admin_a');
+      expect(result.error).toBe('Only the owner or an admin can remove this member.');
     });
   });
-});
+
+  describe('getShareMemberRole', () => {
+    it('returns admin for an active admin row', async () => {
+      mockState.account_share_members.push({
+        primaryUserId: 'owner_user',
+        memberUserId: 'admin_user',
+        status: 'active',
+        role: 'admin',
+      });
+      await expect(getShareMemberRole('owner_user', 'admin_user')).resolves.toBe('admin');
+    });
+
+    it('returns member when no active row exists', async () => {
+      await expect(getShareMemberRole('owner_user', 'ghost_user')).resolves.toBe('member');
+    });
+  });
+
+  describe('updateMemberRole', () => {
+    it('lets the primary promote a member to admin', async () => {
+      mockState.user_encryption_keys.push({ userId: 'owner_user', primaryUserId: null });
+      mockState.account_share_members.push({
+        primaryUserId: 'owner_user',
+        memberUserId: 'member_a',
+        status: 'active',
+        role: 'member',
+      });
+
+      const result = await updateMemberRole('member_a', 'admin', 'owner_user');
+      expect(result.error).toBeUndefined();
+      expect(mockState.account_share_members[0].role).toBe('admin');
+    });
+
+    it('rejects role changes by a plain member', async () => {
+      mockState.user_encryption_keys.push({ userId: 'member_b', primaryUserId: 'owner_user' });
+      mockState.account_share_members.push(
+        { primaryUserId: 'owner_user', memberUserId: 'member_b', status: 'active', role: 'member' },
+        { primaryUserId: 'owner_user', memberUserId: 'member_a', status: 'active', role: 'member' }
+      );
+
+      const result = await updateMemberRole('member_a', 'admin', 'member_b');
+      expect(result.error).toBe('Only the owner or an admin can change member roles.');
+    });
+
+    it('rejects self role changes', async () => {
+      mockState.user_encryption_keys.push({ userId: 'member_a', primaryUserId: 'owner_user' });
+      mockState.account_share_members.push({
+        primaryUserId: 'owner_user',
+        memberUserId: 'member_a',
+        status: 'active',
+        role: 'admin',
+      });
+
+      const result = await updateMemberRole('member_a', 'admin', 'member_a');
+      expect(result.error).toBe('You cannot change your own role.');
+    });
+
+    it('rejects no-op role changes', async () => {
+      mockState.user_encryption_keys.push({ userId: 'owner_user', primaryUserId: null });
+      mockState.account_share_members.push({
+        primaryUserId: 'owner_user',
+        memberUserId: 'member_a',
+        status: 'active',
+        role: 'member',
+      });
+
+      const result = await updateMemberRole('member_a', 'member', 'owner_user');
+      expect(result.error).toBe('Member already has that role.');
+    });
+  });
+  });

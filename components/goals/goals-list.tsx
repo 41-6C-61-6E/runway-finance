@@ -50,12 +50,13 @@ interface ProjectionsData {
   }>;
 }
 
-export function GoalsList() {
+export function GoalsList({ targetGoalId }: { targetGoalId?: string | null } = {}) {
   const queryClient = useQueryClient();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>('all');
+  const [flashGoalId, setFlashGoalId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);
   const [projections, setProjections] = useState<Map<string, GoalProjection>>(new Map());
@@ -104,6 +105,27 @@ export function GoalsList() {
   useEffect(() => {
     fetchGoals();
   }, [fetchGoals]);
+
+  // Notification deep-linking: when a goal notification lands us here with
+  // ?goalId=<id>, make sure it's visible (force "all" filter) and flash it.
+  useEffect(() => {
+    if (!targetGoalId) return;
+    setFilter('all');
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      const el = document.querySelector<HTMLElement>(`[data-goal-id="${targetGoalId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setFlashGoalId(targetGoalId);
+        window.setTimeout(() => setFlashGoalId(null), 2600);
+        clearInterval(timer);
+      } else if (tries > 20) {
+        clearInterval(timer);
+      }
+    }, 150);
+    return () => clearInterval(timer);
+  }, [targetGoalId, goals]);
 
   const handleDelete = async (goalId: string) => {
     try {
@@ -358,8 +380,10 @@ export function GoalsList() {
                   onDragEnd={handleDragEnd}
                   className={cn(
                     "transition-all duration-200 rounded-xl",
+                    flashGoalId === goal.id ? 'ring-2 ring-primary/70' : '',
                     dragIndex === index ? 'opacity-40 border border-dashed border-primary/50 bg-primary/5' : 'opacity-100'
                   )}
+                  data-goal-id={goal.id}
                 >
                   <GoalCard
                     goal={goal}
@@ -411,15 +435,20 @@ export function GoalsList() {
 
           <div className="flex flex-col gap-4">
             {completedGoals.map((goal) => (
-              <GoalCard
+              <div
                 key={goal.id}
-                goal={goal}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                percentage={parseFloat(goal.percentage)}
-                reserve={parseFloat(goal.reserve)}
-                projection={projections.get(goal.id) || null}
-              />
+                data-goal-id={goal.id}
+                className={cn('rounded-xl', flashGoalId === goal.id ? 'ring-2 ring-primary/70' : '')}
+              >
+                <GoalCard
+                  goal={goal}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  percentage={parseFloat(goal.percentage)}
+                  reserve={parseFloat(goal.reserve)}
+                  projection={projections.get(goal.id) || null}
+                />
+              </div>
             ))}
           </div>
         </div>

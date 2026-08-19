@@ -25,6 +25,108 @@ function validateConditionsForTrigger(conditions: any[], triggerType: TriggerTyp
   return null;
 }
 
+// ── R13: recursive conditionTree validation (mirrors the create route) ────────
+const CONDITION_VALUE_FIELDS = new Set([
+  'account', 'amount_min', 'amount_max', 'keyword',
+  'balance_above_value', 'balance_below_value',
+  'balance_above_account', 'balance_below_account',
+  'goal_reached_percentage', 'goal_reached_amount',
+  'cf_net_savings_below', 'cf_net_savings_above',
+  'cf_savings_rate_below', 'cf_savings_rate_above',
+]);
+const MAX_TREE_DEPTH = 3;
+
+function validateSingleCondition(cond: any, path: string): string | null {
+  if (!cond || typeof cond !== 'object' || Array.isArray(cond)) {
+    return `${path} must be a condition object.`;
+  }
+  if (typeof cond.field !== 'string' || !CONDITION_VALUE_FIELDS.has(cond.field)) {
+    return `${path} has an invalid or unknown field "${cond.field}".`;
+  }
+  if (cond.value === undefined || cond.value === null) {
+    return `${path} is missing a value.`;
+  }
+  if (typeof cond.value !== 'string' && typeof cond.value !== 'number') {
+    return `${path} value must be a string or number.`;
+  }
+  if (typeof cond.value === 'number' && !Number.isFinite(cond.value)) {
+    return `${path} value must be a finite number.`;
+  }
+  if (cond.compareAccountId !== undefined && typeof cond.compareAccountId !== 'string') {
+    return `${path} compareAccountId must be a string.`;
+  }
+  if (cond.goalId !== undefined && typeof cond.goalId !== 'string') {
+    return `${path} goalId must be a string.`;
+  }
+  if (
+    cond.consecutiveMonths !== undefined &&
+    (typeof cond.consecutiveMonths !== 'number' || !Number.isInteger(cond.consecutiveMonths) || cond.consecutiveMonths < 1)
+  ) {
+    return `${path} consecutiveMonths must be a positive integer.`;
+  }
+  return null;
+}
+
+function validateConditionTree(node: any, depth: number, path: string): string | null {
+  if (depth > MAX_TREE_DEPTH) {
+    return `Condition tree is too deep (max ${MAX_TREE_DEPTH} levels).`;
+  }
+  if (!node || typeof node !== 'object' || Array.isArray(node)) {
+    return `${path} must be a condition group object.`;
+  }
+  if (node.operator !== 'AND' && node.operator !== 'OR') {
+    return `${path} operator must be "AND" or "OR".`;
+  }
+  if (node.conditions !== undefined) {
+    if (!Array.isArray(node.conditions)) {
+      return `${path}.conditions must be an array.`;
+    }
+    for (let i = 0; i < node.conditions.length; i++) {
+      const err = validateSingleCondition(node.conditions[i], `${path}.conditions[${i}]`);
+      if (err) return err;
+    }
+  }
+  if (node.subGroups !== undefined) {
+    if (!Array.isArray(node.subGroups)) {
+      return `${path}.subGroups must be an array.`;
+    }
+    for (let i = 0; i < node.subGroups.length; i++) {
+      const err = validateConditionTree(node.subGroups[i], depth + 1, `${path}.subGroups[${i}]`);
+      if (err) return err;
+    }
+  }
+  const hasConds = Array.isArray(node.conditions) && node.conditions.length > 0;
+  const hasSubs = Array.isArray(node.subGroups) && node.subGroups.length > 0;
+  if (!hasConds && !hasSubs) {
+    return `${path} is empty; add at least one condition.`;
+  }
+  return null;
+}
+
+function validateConditionTreeInput(conditionTree: any, triggerType: TriggerType): string | null {
+  const baseErr = validateConditionTree(conditionTree, 1, 'conditionTree');
+  if (baseErr) return baseErr;
+  const validFields = TRIGGER_FIELDS[triggerType];
+  const walk = (node: any): string | null => {
+    if (!node || typeof node !== 'object') return null;
+    if (Array.isArray(node.conditions)) {
+      for (const cond of node.conditions) {
+        if (!validFields.includes(cond?.field)) {
+          return `Field "${cond?.field}" is not valid for trigger type "${triggerType}". Valid fields: ${validFields.join(', ')}.`;
+        }
+      }
+    }
+    if (Array.isArray(node.subGroups)) {
+      for (const sub of node.subGroups) {
+        const err = walk(sub);
+        if (err) return err;
+      }
+    }
+    return null;
+  };
+  return walk(conditionTree);
+}
+
 interface RouteParams {
   params: Promise<{
     id: string;
@@ -73,6 +175,33 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       }
     } catch (lookupErr) {
       console.error('[custom-alerts] Failed to fetch rule for validation:', lookupErr);
+    }
+  }
+
+  // R13: validate conditionTree / conditionOperator (if provided) against the
+  // rule's current trigger type, same as the flat `conditions` path above.
+  const treeBeingUpdated = conditionTree !== undefined && conditionTree !== null;
+  if (treeBeingUpdated || conditionOperator !== undefined) {
+    if (conditionOperator !== undefined && conditionOperator !== 'AND' && conditionOperator !== 'OR') {
+      return Response.json({ error: 'conditionOperator must be "AND" or "OR".' }, { status: 400 });
+    }
+    try {
+      const { id } = await params;
+      const db = getDb();
+      const [existing] = await db
+        .select({ triggerType: customAlertRules.triggerType })
+        .from(customAlertRules)
+        .where(and(eq(customAlertRules.id, id), eq(customAlertRules.userId, session.user.id)))
+        .limit(1);
+
+      if (existing && ALLOWED_TRIGGER_TYPES.includes(existing.triggerType as TriggerType)) {
+        if (treeBeingUpdated) {
+          const treeError = validateConditionTreeInput(conditionTree, existing.triggerType as TriggerType);
+          if (treeError) return Response.json({ error: treeError }, { status: 400 });
+        }
+      }
+    } catch (lookupErr) {
+      console.error('[custom-alerts] Failed to fetch rule for tree validation:', lookupErr);
     }
   }
 
