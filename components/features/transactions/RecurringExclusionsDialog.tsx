@@ -9,24 +9,24 @@ import { Button } from '@/components/ui/button';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getTypesByGroup } from '@/lib/constants/account-types';
 import {
   SlidersHorizontal,
   Search,
-  FolderTree,
-  ShieldAlert,
   Landmark,
   Layers,
   CheckSquare,
   Square,
+  MinusSquare,
   Loader2,
   Plus,
-  Trash2,
   X,
 } from 'lucide-react';
 
 interface CategoryItem {
   id: string;
   name: string;
+  parentId?: string | null;
   color: string;
   isIncome: boolean;
   categoryType: string;
@@ -53,7 +53,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
   const settings = settingsContext?.settings || {};
   const updateSetting = settingsContext?.updateSetting;
 
-  const [activeTab, setActiveTab] = useState<'categories' | 'accounts' | 'merchants'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'accounts' | 'types' | 'merchants'>('categories');
   const [categorySearch, setCategorySearch] = useState('');
   const [accountSearch, setAccountSearch] = useState('');
   const [newMerchantPattern, setNewMerchantPattern] = useState('');
@@ -62,20 +62,24 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
   // Local state for exclusions
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [selectedAccountTypes, setSelectedAccountTypes] = useState<string[]>([]);
   const [merchantPatterns, setMerchantPatterns] = useState<string[]>([]);
 
-  // Initialize from user settings
+  // Initialize from user settings (only when the dialog opens, so that
+  // settings refreshes mid-edit don't clobber local selections)
   useEffect(() => {
     if (open) {
       const exclusions = (settings.recurringExclusions as any) || {};
       setSelectedCategoryIds(Array.isArray(exclusions.categoryIds) ? exclusions.categoryIds : []);
       setSelectedAccountIds(Array.isArray(exclusions.accountIds) ? exclusions.accountIds : []);
+      setSelectedAccountTypes(Array.isArray(exclusions.accountTypes) ? exclusions.accountTypes : []);
       setMerchantPatterns(Array.isArray(exclusions.merchantPatterns) ? exclusions.merchantPatterns : []);
       setCategorySearch('');
       setAccountSearch('');
       setNewMerchantPattern('');
     }
-  }, [open, settings.recurringExclusions]);
+  }, [open]);
+
 
   // Fetch all user categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<CategoryItem[]>({
@@ -99,13 +103,6 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
     enabled: open,
   });
 
-  // Filtered categories
-  const filteredCategories = useMemo(() => {
-    if (!categorySearch.trim()) return categories;
-    const query = categorySearch.toLowerCase().trim();
-    return categories.filter((c) => c.name.toLowerCase().includes(query));
-  }, [categories, categorySearch]);
-
   // Filtered accounts
   const filteredAccounts = useMemo(() => {
     if (!accountSearch.trim()) return accounts;
@@ -116,6 +113,110 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
         (a.institutionName && a.institutionName.toLowerCase().includes(query))
     );
   }, [accounts, accountSearch]);
+
+  // Category tree: parents with nested children (1 level deep is enough for
+  // the typical category hierarchy; deeper descendants are appended as children)
+  const { categoryParents, categoryChildrenById } = useMemo(() => {
+    const ids = new Set(categories.map((c) => c.id));
+    const childrenById = new Map<string, CategoryItem[]>();
+    const parents: CategoryItem[] = [];
+    for (const cat of categories) {
+      if (cat.parentId && ids.has(cat.parentId)) {
+        const list = childrenById.get(cat.parentId) || [];
+        list.push(cat);
+        childrenById.set(cat.parentId, list);
+      } else {
+        parents.push(cat);
+      }
+    }
+    return { categoryParents: parents, categoryChildrenById: childrenById };
+  }, [categories]);
+
+  // Categories visible in the list, respecting search (a parent row shows when
+  // it matches, or when any of its children match; only matching children are
+  // rendered under it while searching)
+  const visibleCategoryRows = useMemo(() => {
+    const query = categorySearch.toLowerCase().trim();
+    const matches = (c: CategoryItem) => (query ? c.name.toLowerCase().includes(query) : true);
+    return categoryParents
+      .map((parent) => {
+        const allChildren = categoryChildrenById.get(parent.id) || [];
+        const children = query ? allChildren.filter((c) => matches(c)) : allChildren;
+        const show = matches(parent) || children.length > 0;
+        if (!show) return null;
+        return { parent, children, allChildren };
+      })
+      .filter(Boolean) as { parent: CategoryItem; children: CategoryItem[]; allChildren: CategoryItem[] }[];
+  }, [categoryParents, categoryChildrenById, categorySearch]);
+
+  // Effective selection for a parent: selected if its ID or all listed
+  // children are selected; "partial" if some (but not all) are selected
+  const parentSelectionState = (parent: CategoryItem, children: CategoryItem[]) => {
+    const childIds = children.map((c) => c.id);
+    const selectedChildren = childIds.filter((id) => selectedCategoryIds.includes(id)).length;
+    const parentSelected = selectedCategoryIds.includes(parent.id);
+    const totalSelected = selectedChildren + (parentSelected ? 1 : 0);
+    if (totalSelected === childIds.length + 1) return 'all' as const;
+    if (totalSelected === 0) return 'none' as const;
+    return 'partial' as const;
+  };
+
+  const handleToggleCategoryGroup = (parent: CategoryItem, children: CategoryItem[]) => {
+    const parentSel = selectedCategoryIds.includes(parent.id);
+    const allChildIds = children.map((c) => c.id);
+    const allSelected = parentSel && allChildIds.every((id) => selectedCategoryIds.includes(id));
+    setSelectedCategoryIds((prev) => {
+      if (allSelected && allChildIds.length > 0) {
+        // Deselect parent and all children
+        return prev.filter((id) => id !== parent.id && !allChildIds.includes(id));
+      }
+      // Select parent and all children
+      const next = new Set(prev);
+      next.add(parent.id);
+      for (const id of allChildIds) next.add(id);
+      return [...next];
+    });
+  };
+
+  // Account types with counts derived from the user's accounts
+  const accountTypesWithCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const acc of accounts) {
+      if (!acc.type) continue;
+      counts.set(acc.type, (counts.get(acc.type) || 0) + 1);
+    }
+    return getTypesByGroup()
+      .map((g) => ({
+        group: g.group,
+        types: g.types.filter((t) => counts.has(t.value)),
+        count: g.types.reduce((n, t) => n + (counts.get(t.value) || 0), 0),
+      }))
+      .filter((g) => g.types.length > 0);
+  }, [accounts]);
+
+  const typeGroupState = (types: { value: string }[]) => {
+    const all = types.length > 0 && types.every((t) => selectedAccountTypes.includes(t.value));
+    const some = types.some((t) => selectedAccountTypes.includes(t.value));
+    if (all) return 'all' as const;
+    if (some) return 'partial' as const;
+    return 'none' as const;
+  };
+
+  const handleToggleTypeGroup = (types: { value: string }[]) => {
+    const all = types.every((t) => selectedAccountTypes.includes(t.value));
+    setSelectedAccountTypes((prev) => {
+      if (all) return prev.filter((id) => !types.some((t) => t.value === id));
+      const next = new Set(prev);
+      for (const t of types) next.add(t.value);
+      return [...next];
+    });
+  };
+
+  const handleToggleAccountType = (type: string) => {
+    setSelectedAccountTypes((prev) =>
+      prev.includes(type) ? prev.filter((id) => id !== type) : [...prev, type]
+    );
+  };
 
   const handleToggleCategory = (catId: string) => {
     setSelectedCategoryIds((prev) =>
@@ -148,6 +249,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
       const newExclusions = {
         categoryIds: selectedCategoryIds,
         accountIds: selectedAccountIds,
+        accountTypes: selectedAccountTypes,
         merchantPatterns: merchantPatterns.filter(Boolean),
       };
 
@@ -190,7 +292,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
                 Recurring Exclusions
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Configure accounts, categories, and keywords to ignore from automatic subscription detection.
+                Configure categories, accounts, account types, and payee keywords to ignore from automatic subscription detection.
               </DialogDescription>
             </div>
           </div>
@@ -202,10 +304,11 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
             tabs={[
               { id: 'categories', label: `Categories (${selectedCategoryIds.length})` },
               { id: 'accounts', label: `Accounts (${selectedAccountIds.length})` },
+              { id: 'types', label: `Types (${selectedAccountTypes.length})` },
               { id: 'merchants', label: `Keywords (${merchantPatterns.length})` },
             ]}
             activeTab={activeTab}
-            onChange={(t) => setActiveTab(t as any)}
+            onChange={(t) => setActiveTab(t as 'categories' | 'accounts' | 'types' | 'merchants')}
             variant="pills"
             size="sm"
           />
@@ -225,6 +328,9 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
                   className="pl-8 text-xs h-9"
                 />
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Selecting a parent category also excludes all of its sub-categories.
+              </p>
 
               {categoriesLoading ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">
@@ -233,38 +339,80 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
                 </div>
               ) : (
                 <div className="border border-border/60 rounded-xl divide-y divide-border/40 max-h-[300px] overflow-y-auto">
-                  {filteredCategories.map((cat) => {
-                    const isSelected = selectedCategoryIds.includes(cat.id);
+                  {visibleCategoryRows.length === 0 && (
+                    <p className="text-xs text-muted-foreground py-6 text-center">
+                      No categories match your search.
+                    </p>
+                  )}
+                  {visibleCategoryRows.map(({ parent, children, allChildren }) => {
+                    const parentState = parentSelectionState(parent, allChildren);
                     return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => handleToggleCategory(cat.id)}
-                        className={cn(
-                          'w-full p-2.5 flex items-center justify-between text-left text-xs hover:bg-muted/30 transition-colors cursor-pointer',
-                          isSelected && 'bg-primary/5'
-                        )}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: cat.color || '#6366f1' }}
-                          />
-                          <span className="font-medium text-foreground truncate">{cat.name}</span>
-                          {cat.excludeFromReports && (
-                            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.2 rounded">
-                              transfer/excluded
-                            </span>
+                      <div key={parent.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCategoryGroup(parent, allChildren)}
+                          className={cn(
+                            'w-full p-2.5 flex items-center justify-between text-left text-xs hover:bg-muted/30 transition-colors cursor-pointer',
+                            (parentState === 'all' || (parentState === 'partial' && selectedCategoryIds.includes(parent.id))) && 'bg-primary/5'
                           )}
-                        </div>
-                        <div className="shrink-0">
-                          {isSelected ? (
-                            <CheckSquare className="w-4 h-4 text-primary" />
-                          ) : (
-                            <Square className="w-4 h-4 text-muted-foreground/60" />
-                          )}
-                        </div>
-                      </button>
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-semibold text-foreground truncate">{parent.name}</span>
+                            {allChildren.length > 0 && (
+                              <span className="text-[10px] text-muted-foreground shrink-0">
+                                {allChildren.length} sub-categor{allChildren.length === 1 ? 'y' : 'ies'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="shrink-0">
+                            {parentState === 'all' ? (
+                              <CheckSquare className="w-4 h-4 text-primary" />
+                            ) : parentState === 'partial' ? (
+                              <MinusSquare className="w-4 h-4 text-primary/70" />
+                            ) : (
+                              <Square className="w-4 h-4 text-muted-foreground/60" />
+                            )}
+                          </div>
+                        </button>
+                        {children.length > 0 ? (
+                          <div className="border-t border-border/30">
+                            {children.map((cat) => {
+                              const isSelected = selectedCategoryIds.includes(cat.id);
+                              return (
+                                <button
+                                  key={cat.id}
+                                  type="button"
+                                  onClick={() => handleToggleCategory(cat.id)}
+                                  className={cn(
+                                    'w-full pl-8 pr-2.5 py-2 flex items-center justify-between text-left text-xs hover:bg-muted/30 transition-colors cursor-pointer',
+                                    isSelected && 'bg-primary/5'
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div
+                                      className="w-2 h-2 rounded-full shrink-0"
+                                      style={{ backgroundColor: cat.color || '#6366f1' }}
+                                    />
+                                    <span className="text-foreground/90 truncate">{cat.name}</span>
+                                    {cat.excludeFromReports && (
+                                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.2 rounded">
+                                        transfer/excluded
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="shrink-0">
+                                    {isSelected ? (
+                                      <CheckSquare className="w-4 h-4 text-primary" />
+                                    ) : (
+                                      <Square className="w-4 h-4 text-muted-foreground/60" />
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>
@@ -333,6 +481,87 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
           )}
 
           {/* ── Merchant Keywords Tab ── */}
+          {/* ── Account Types Tab ── */}
+          {activeTab === 'types' && (
+            <div className="space-y-3">
+              <p className="text-[11px] text-muted-foreground">
+                Exclude entire account types or subtypes (e.g. Retirement, Mortgage). This
+                applies to all of your accounts of the selected type — not just linked ones.
+              </p>
+
+              {accountsLoading ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                  Loading accounts...
+                </div>
+              ) : accountTypesWithCounts.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-6 text-center">
+                  No linked accounts with known types to exclude by type.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {accountTypesWithCounts.map(({ group, types, count }) => {
+                    const groupState = typeGroupState(types);
+                    return (
+                      <div key={group} className="border border-border/60 rounded-xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTypeGroup(types)}
+                          className={cn(
+                            'w-full p-2.5 flex items-center justify-between text-left text-xs hover:bg-muted/30 transition-colors cursor-pointer',
+                            groupState === 'all' && 'bg-primary/5'
+                          )}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Layers className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            <span className="font-semibold text-foreground truncate">{group}</span>
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {count} account{count === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                          <div className="shrink-0">
+                            {groupState === 'all' ? (
+                              <CheckSquare className="w-4 h-4 text-primary" />
+                            ) : groupState === 'partial' ? (
+                              <MinusSquare className="w-4 h-4 text-primary/70" />
+                            ) : (
+                              <Square className="w-4 h-4 text-muted-foreground/60" />
+                            )}
+                          </div>
+                        </button>
+                        <div className="border-t border-border/30 divide-y divide-border/30">
+                          {types.map((t) => {
+                            const isSelected = selectedAccountTypes.includes(t.value);
+                            return (
+                              <button
+                                key={t.value}
+                                type="button"
+                                onClick={() => handleToggleAccountType(t.value)}
+                                className={cn(
+                                  'w-full pl-8 pr-2.5 py-2 flex items-center justify-between text-left text-xs hover:bg-muted/30 transition-colors cursor-pointer',
+                                  isSelected && 'bg-primary/5'
+                                )}
+                              >
+                                <span className="text-foreground/90 truncate">{t.label}</span>
+                                <div className="shrink-0">
+                                  {isSelected ? (
+                                    <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                  ) : (
+                                    <Square className="w-3.5 h-3.5 text-muted-foreground/60" />
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'merchants' && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">

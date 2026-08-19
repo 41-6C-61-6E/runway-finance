@@ -1,9 +1,14 @@
 {
-  "buildNumber": "26.08.1787070359150",
-  "buildTime": "2026-08-18T16:25:59.150Z",
-  "hash": "c8c6123",
-  "fullHash": "c8c61230294e7b9efb36239534fb4e6f89271c02",
+  "buildNumber": "26.08.1787128423785",
+  "buildTime": "2026-08-19T08:33:43.785Z",
+  "hash": "e364a5b",
+  "fullHash": "e364a5ba3b7db65c51f7ebebaf2751bffa240f4e",
   "commits": [
+    "fix: update AccountHierarchyTree component for responsive design and improve transaction visibility",
+    "feat: enhance context providers with useMemo for performance optimization and add cross-tab sync for user settings",
+    "feat: centralize query invalidation logic for accounts and transactions",
+    "fix: update Dockerfile to use 'file' instead of 'dockerfile' and add NEXTAUTH_SECRET environment variable",
+    "feat: update Dockerfile environment variables, enhance sharing tab descriptions, and modify versioning information",
     "feat: implement sharing security enhancements including data visibility, rate limiting, and audit logs with database schema migrations",
     "feat: implement recurring transaction management system with detection, recurring bills view, and merge capabilities",
     "refactor: implement global error handling, optimize scheduler logic, and improve session management",
@@ -198,22 +203,57 @@
     "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility",
     "feat: enhance sankey hub visualization with net change delta bars and improved labels",
     "feat: implement ExpandableDriverRow component to display granular net worth breakdown and account-level transaction details",
-    "feat: add 1D time range, migrate /net-worth to /flows, update sankey hub tooltips, and refine sync/projection logic.",
-    "style: refine card border transparency, update chart filter button typography, and adjust filter panel layout",
-    "refactor: calculate average of price and range bounds for valuation methods and update corresponding unit tests",
-    "refactor: introduce centralized chart formatting utilities and apply them to standardise axis labels and tick generation across all financial charts",
-    "dev server change",
-    "bug fix"
+    "feat: add 1D time range, migrate /net-worth to /flows, update sankey hub tooltips, and refine sync/projection logic."
   ],
   "history": [
+    {
+      "hash": "e364a5b",
+      "fullHash": "e364a5ba3b7db65c51f7ebebaf2751bffa240f4e",
+      "author": "Alan Racek",
+      "date": "2026-08-18T18:10:25-07:00",
+      "message": "fix: update AccountHierarchyTree component for responsive design and improve transaction visibility",
+      "type": "fix",
+      "buildNumber": "26.08.1787128423785"
+    },
+    {
+      "hash": "a8de407",
+      "fullHash": "a8de4073e9edb7e7819218d05351795e68a68554",
+      "author": "Alan Racek",
+      "date": "2026-08-18T16:41:43-07:00",
+      "message": "feat: enhance context providers with useMemo for performance optimization and add cross-tab sync for user settings",
+      "type": "feat"
+    },
+    {
+      "hash": "c58f326",
+      "fullHash": "c58f3269f438ff196fa7878da6a55d3a24d0b7fd",
+      "author": "Alan Racek",
+      "date": "2026-08-18T14:50:03-07:00",
+      "message": "feat: centralize query invalidation logic for accounts and transactions",
+      "type": "feat"
+    },
+    {
+      "hash": "4ae9e8d",
+      "fullHash": "4ae9e8df099103b01bd7fb1a40213c1aae01333d",
+      "author": "Alan Racek",
+      "date": "2026-08-18T10:33:07-07:00",
+      "message": "fix: update Dockerfile to use 'file' instead of 'dockerfile' and add NEXTAUTH_SECRET environment variable",
+      "type": "fix"
+    },
+    {
+      "hash": "5b3a673",
+      "fullHash": "5b3a67392e369dc6f5987315f206c5b879c1142b",
+      "author": "Alan Racek",
+      "date": "2026-08-18T10:06:42-07:00",
+      "message": "feat: update Dockerfile environment variables, enhance sharing tab descriptions, and modify versioning information",
+      "type": "feat"
+    },
     {
       "hash": "c8c6123",
       "fullHash": "c8c61230294e7b9efb36239534fb4e6f89271c02",
       "author": "Alan Racek",
       "date": "2026-08-18T07:07:14-07:00",
       "message": "feat: implement sharing security enhancements including data visibility, rate limiting, and audit logs with database schema migrations",
-      "type": "feat",
-      "buildNumber": "26.08.1787070359150"
+      "type": "feat"
     },
     {
       "hash": "f4163db",
@@ -1766,46 +1806,6 @@
       "date": "2026-07-04T15:34:16-07:00",
       "message": "feat: add 1D time range, migrate /net-worth to /flows, update sankey hub tooltips, and refine sync/projection logic.",
       "type": "feat"
-    },
-    {
-      "hash": "deefc2f",
-      "fullHash": "deefc2fc722f92bc56eccf640f58ee6db4878960",
-      "author": "Alan Racek",
-      "date": "2026-07-03T08:39:42-07:00",
-      "message": "style: refine card border transparency, update chart filter button typography, and adjust filter panel layout",
-      "type": "style"
-    },
-    {
-      "hash": "9c0efae",
-      "fullHash": "9c0efae3705bd052cc239ca8ebedb67533ed7460",
-      "author": "Alan Racek",
-      "date": "2026-07-03T08:32:06-07:00",
-      "message": "refactor: calculate average of price and range bounds for valuation methods and update corresponding unit tests",
-      "type": "refactor"
-    },
-    {
-      "hash": "095ed2e",
-      "fullHash": "095ed2e17771090ea5d67c4fa79fa00bbbf30318",
-      "author": "Alan Racek",
-      "date": "2026-07-02T15:13:40-07:00",
-      "message": "refactor: introduce centralized chart formatting utilities and apply them to standardise axis labels and tick generation across all financial charts",
-      "type": "refactor"
-    },
-    {
-      "hash": "13fd86e",
-      "fullHash": "13fd86e5b817dbc3a307c7869f7f0f8dad2cb7fd",
-      "author": "Alan Racek",
-      "date": "2026-07-02T11:13:55-07:00",
-      "message": "dev server change",
-      "type": "other"
-    },
-    {
-      "hash": "1add774",
-      "fullHash": "1add774c6b9b0de338300a9945702e4d501a2f61",
-      "author": "Alan Racek",
-      "date": "2026-07-02T08:09:53-07:00",
-      "message": "bug fix",
-      "type": "other"
     }
   ]
 }

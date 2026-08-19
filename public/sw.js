@@ -1,4 +1,4 @@
-const CACHE_NAME = "personal-finance-26.08.1787070359150";
+const CACHE_NAME = "personal-finance-26.08.1787128423785";
 const STATIC_ASSETS = [
   "/",
   "/offline",
@@ -142,6 +142,17 @@ self.addEventListener("push", (event) => {
         url: data.url || "/"
       }
     };
+
+      // Notify all open clients so the in-app dropdown badge refreshes
+      // immediately instead of waiting for the 30s poll (R11).
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: "NOTIFICATION_ARRIVED" });
+          });
+        })
+        .catch(() => {});
 
     event.waitUntil(
       self.registration.showNotification(data.title || "Personal Finance", options)

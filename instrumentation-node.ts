@@ -3,6 +3,7 @@ import { syncScheduler } from '@/lib/services/sync-scheduler';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 import { paystubAutoGenerateScheduler } from '@/lib/services/paystub-auto-generate-scheduler';
 import { weeklyNetWorthScheduler } from '@/lib/services/weekly-networth-scheduler';
+import { stalenessScheduler } from '@/lib/services/staleness-scheduler';
 
 const LOG_TAG = '[finance-sync]';
 let watchdogTimer: ReturnType<typeof setInterval> | null = null;
@@ -29,6 +30,7 @@ export async function registerNodeInstrumentation(): Promise<void> {
         manualAccountScheduler.shutdown();
         paystubAutoGenerateScheduler.shutdown();
         weeklyNetWorthScheduler.shutdown();
+        stalenessScheduler.shutdown();
       } finally {
         process.exit(1);
       }
@@ -89,6 +91,15 @@ export async function registerNodeInstrumentation(): Promise<void> {
     });
   }
 
+  try {
+    await stalenessScheduler.init();
+    logger.info(`${LOG_TAG} Staleness alert scheduler initialized.`);
+  } catch (err) {
+    logger.error(`${LOG_TAG} Staleness alert scheduler initialization failed`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   // 5. Watchdog: Periodically re-check scheduler status and auto-recover on transient DB recovery
   if (!watchdogTimer && typeof setInterval !== 'undefined') {
     watchdogTimer = setInterval(async () => {
@@ -106,6 +117,9 @@ export async function registerNodeInstrumentation(): Promise<void> {
         }
         if (!weeklyNetWorthScheduler.isRunning) {
           await weeklyNetWorthScheduler.init();
+        }
+        if (!stalenessScheduler.isRunning) {
+          await stalenessScheduler.init();
         }
       } catch (err) {
         logger.error('[watchdog] Scheduler recovery check failed', { error: String(err) });
@@ -149,6 +163,7 @@ export async function registerNodeInstrumentation(): Promise<void> {
       manualAccountScheduler.shutdown();
       paystubAutoGenerateScheduler.shutdown();
       weeklyNetWorthScheduler.shutdown();
+      stalenessScheduler.shutdown();
       logger.info(`${LOG_TAG} Schedulers stopped.`);
       process.exit(0);
     };

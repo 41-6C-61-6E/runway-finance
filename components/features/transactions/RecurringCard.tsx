@@ -13,6 +13,8 @@ import {
   Merge,
   Square,
   CheckSquare,
+  Sparkles,
+  Landmark,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -112,23 +114,25 @@ function getStatusBadge(item: RecurringItem) {
   }
 
   if (item.isConfirmed) {
-    return (
-      <span
-        className="goal-pill px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0"
-        style={{ '--goal-color': 'var(--status-positive)' } as React.CSSProperties}
-      >
-        Confirmed
-      </span>
-    );
+    // Confirmed is the default state — no badge needed. Needs-review is the
+    // only status worth flagging (small icon + tooltip).
+    return null;
   }
 
   return (
-    <span
-      className="goal-pill px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0"
-      style={{ '--goal-color': 'var(--chart-2)' } as React.CSSProperties}
-    >
-      Review
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex p-1 rounded-md text-amber-500 dark:text-amber-400 hover:bg-amber-500/10 cursor-help"
+          aria-label="Needs review"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-xs">
+        Needs review — confirm or dismiss to decide its status.
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -290,9 +294,10 @@ export default function RecurringCard({
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      Dismiss suggestion
-                    </TooltipContent>
+                        <TooltipContent side="top" className="text-xs max-w-56">
+                          Dismiss — hides it; won't reappear in future scans.
+                          It stays in the Dismissed tab.
+                        </TooltipContent>
                   </Tooltip>
 
                   <Tooltip>
@@ -307,9 +312,9 @@ export default function RecurringCard({
                         <Check className="w-3.5 h-3.5" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      Confirm subscription
-                    </TooltipContent>
+                        <TooltipContent side="top" className="text-xs max-w-56">
+                          Confirm — keeps it active in forecasts and bill alerts.
+                        </TooltipContent>
                   </Tooltip>
                 </>
               )}
@@ -337,7 +342,7 @@ export default function RecurringCard({
                   </TooltipContent>
                 </Tooltip>
 
-                <PopoverContent align="end" className="w-48 p-1.5 z-50">
+                <PopoverContent align="end" className="w-56 p-1.5 z-50">
                   <button
                     type="button"
                     onClick={() => {
@@ -410,10 +415,15 @@ export default function RecurringCard({
                       setMenuOpen(false);
                       handleDismiss();
                     }}
-                    className="w-full px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent rounded-md flex items-center gap-2 transition-colors cursor-pointer text-left"
+                    className="w-full px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent rounded-md flex items-start gap-2 transition-colors cursor-pointer text-left"
                   >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Dismiss</span>
+                    <X className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block">Dismiss</span>
+                      <span className="block text-[10px] font-normal text-muted-foreground leading-tight mt-0.5">
+                        Hides it — it won't reappear in future scans (stays in Dismissed).
+                      </span>
+                    </span>
                   </button>
 
                   <div className="h-px bg-border/40 my-1" />
@@ -424,10 +434,15 @@ export default function RecurringCard({
                       setMenuOpen(false);
                       handleDelete();
                     }}
-                    className="w-full px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10 rounded-md flex items-center gap-2 transition-colors cursor-pointer text-left"
+                    className="w-full px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10 rounded-md flex items-start gap-2 transition-colors cursor-pointer text-left"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
+                    <Trash2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block">Delete</span>
+                      <span className="block text-[10px] font-normal text-foreground/60 leading-tight mt-0.5">
+                        Removes the rule permanently — may reappear if the pattern is detected again.
+                      </span>
+                    </span>
                   </button>
                 </PopoverContent>
               </Popover>
@@ -437,19 +452,29 @@ export default function RecurringCard({
 
         {/* ── Bottom Row: Amount & Frequency ── */}
         <div className="flex items-baseline justify-between pt-1">
-          <div
-            className={cn(
-              'text-lg sm:text-xl font-bold font-mono tracking-tight',
-              isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground',
-              privacyMode && 'blur-xs select-none'
-            )}
-          >
-            {isIncome ? '+' : '-'}
-            {formatCurrency(item.averageAmount)}
-            <span className="text-xs font-normal text-muted-foreground ml-1">
-              {formatFrequencyUnit(item.frequency)}
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  'text-lg sm:text-xl font-bold font-mono tracking-tight',
+                  isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground',
+                  privacyMode && 'blur-xs select-none'
+                )}
+              >
+                {isIncome ? '+' : '-'}
+                {formatCurrency(item.averageAmount)}
+                <span className="text-xs font-normal text-muted-foreground ml-1">
+                  {formatFrequencyUnit(item.frequency)}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              <span className="flex items-center gap-1.5">
+                <Landmark className="w-3 h-3 shrink-0 opacity-70" />
+                {item.accountName ? `Occurs on ${item.accountName}` : 'Any account'}
+              </span>
+            </TooltipContent>
+          </Tooltip>
 
           <div className="text-xs text-muted-foreground font-medium">
             {formatFrequencyLabel(item.frequency)}

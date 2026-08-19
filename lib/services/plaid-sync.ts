@@ -277,6 +277,8 @@ export async function syncPlaidConnection(
     let transactionsUpdated = 0;
 
     const externalIdToAccountId = new Map<string, string>();
+    // accountId -> hidden/excluded flags, for large-transaction alert scoping (R12b)
+    const accountFlags = new Map<string, { isHidden: boolean; isExcludedFromNetWorth: boolean }>();
     const existingExternalIds = new Set<string>();
 
     const existingAccts = await getDb()
@@ -386,6 +388,10 @@ export async function syncPlaidConnection(
       }
 
       externalIdToAccountId.set(plaidAcc.account_id, upserted.id);
+      accountFlags.set(upserted.id, {
+        isHidden: upserted.isHidden ?? false,
+        isExcludedFromNetWorth: upserted.isExcludedFromNetWorth ?? false,
+      });
 
       const wasNewAccount = !orphanedAccount && !existingExternalIds.has(plaidAcc.account_id);
       if (wasNewAccount) {
@@ -525,6 +531,19 @@ export async function syncPlaidConnection(
 
     // 2. Process added and modified transactions
     const allIncomingTxns = [...addedTxns, ...modifiedTxns];
+    // R12b: fetch large-transaction alert settings once per sync (mirrors the
+    // SimpleFIN path in sync.ts) so new Plaid transactions also fire the alert.
+    const [plaidLargeTxSettingsRow] = await getDb()
+      .select({
+        notifyLargeTransactions: userSettings.notifyLargeTransactions,
+        largeTransactionThreshold: userSettings.largeTransactionThreshold,
+      })
+      .from(userSettings)
+      .where(eq(userSettings.userId, dataUserId))
+      .limit(1);
+    const plaidLargeTxEnabled = plaidLargeTxSettingsRow?.notifyLargeTransactions ?? false;
+    const plaidLargeTxThreshold = plaidLargeTxSettingsRow?.largeTransactionThreshold ?? 100;
+
     for (const pt of allIncomingTxns) {
       const accountId = externalIdToAccountId.get(pt.account_id);
       if (!accountId) continue;
@@ -607,6 +626,34 @@ export async function syncPlaidConnection(
         }).catch((e) => {
           logger.error('[plaid-sync] Failed to run custom transaction alert checks:', e);
         });
+
+        // R12b: large-transaction alert — mirrors the SimpleFIN path in
+        // sync.ts so Plaid-sourced transactions are covered too. Skips
+        // hidden / net-worth-excluded accounts.
+        const acctFlags = accountFlags.get(accountId);
+        if (
+          plaidLargeTxEnabled &&
+          !acctFlags?.isHidden &&
+          !acctFlags?.isExcludedFromNetWorth
+        ) {
+          const absAmount = Math.abs(parseFloat(appAmount)) || 0;
+          if (absAmount >= plaidLargeTxThreshold) {
+            const decDesc = pt.original_description || pt.name || 'Plaid Transaction';
+            const encodedDesc = encodeURIComponent(decDesc);
+            const linkUrl = `/transactions?search=${encodedDesc}&startDate=${pt.date}&endDate=${pt.date}`;
+            const { sendPushNotification } = await import('@/lib/services/notifications');
+            sendPushNotification(
+              dataUserId,
+              `Transaction Alert`,
+              `New transaction of $${absAmount.toFixed(2)} at ${decDesc}.`,
+              linkUrl,
+              'large_transaction',
+              `large_tx:${pt.transaction_id}`
+            ).catch((e) => {
+              logger.error('[plaid-sync] Failed to send large-transaction notification:', e);
+            });
+          }
+        }
       }
 
       // Update counters in accountDetails
@@ -789,10 +836,21 @@ export async function syncPlaidConnection(
     const summariesReady = triggerUserSummariesRebuild(dataUserId, dek);
 
     // Trigger custom cash flow alerts check
-    const { checkCashFlowAlerts, checkRecurringPriceChangesAndNotify, checkUpcomingBillsAndNotify } = await import('@/lib/services/notifications');
+    const { checkCashFlowAlerts, checkRecurringPriceChangesAndNotify, checkUpcomingBillsAndNotify, checkMonthlySummaryAndNotify, healSyncAlerts } = await import('@/lib/services/notifications');
     await summariesReady;
     checkCashFlowAlerts(dataUserId, dek).catch((e) => {
       logger.error('[plaid-sync] Failed to check cash flow alerts:', e);
+    });
+
+    // R1: re-arm sync-failure alerts now that this connection synced OK, and
+    // mark the resolved sync_error inbox rows read.
+    healSyncAlerts(dataUserId, connectionId).catch((e) => {
+      logger.debug('[plaid-sync] Failed to heal sync alerts (non-fatal):', e);
+    });
+
+    // R12a: month-boundary cash flow summary (fires at most once per month).
+    checkMonthlySummaryAndNotify(dataUserId, dek).catch((e) => {
+      logger.error('[plaid-sync] Failed to check monthly summary:', e);
     });
 
     // Run recurring transaction detection, price alerts & bill reminders (non-fatal)

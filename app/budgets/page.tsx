@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { BudgetPeriodProvider, BudgetPeriodSelector } from '@/components/budgets/budget-period-selector';
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 import { BudgetTable } from '@/components/budgets/budget-table';
@@ -16,6 +17,24 @@ function BudgetsContent() {
   const showSummary = isVisible('budgetSummary');
   const showTable = isVisible('budgetTable');
 
+  // Notification deep-linking: read ?categoryId=<id> (from budget alerts) and
+  // clear it after applying so a manual table re-render keeps the highlight.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [targetCategoryId, setTargetCategoryId] = useState<string | null>(null);
+  useEffect(() => {
+    const cid = searchParams.get('categoryId');
+    if (cid) {
+      setTargetCategoryId(cid);
+      // Strip the param so refreshing/leaving doesn't re-trigger the scroll.
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('categoryId');
+      const qs = params.toString();
+      router.replace(`/budgets${qs ? `?${qs}` : ''}`);
+    }
+    return () => setTargetCategoryId(null);
+  }, [searchParams, router]);
+
   const mainContent = (
     <div className="space-y-6">
       {/* On mobile, selector appears inside the main view content below swipe indicator */}
@@ -24,7 +43,7 @@ function BudgetsContent() {
       </div>
       {showTable && (
         <Suspense fallback={<LoadingSpinner category="summary" />}>
-          <BudgetTable />
+          <BudgetTable targetCategoryId={targetCategoryId} />
         </Suspense>
       )}
     </div>

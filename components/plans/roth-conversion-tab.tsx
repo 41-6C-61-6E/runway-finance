@@ -353,7 +353,7 @@ export function RothConversionTab({
       </div>
 
       {/* SECTION 2: COMPARATIVE TRAJECTORY CHART */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl shadow-sm">
         <CollapsibleCardHeader
           title="Comparative Trajectory: Baseline vs Optimized Roth Ladder"
           description="Visualize long-term net worth impact and account balance composition over your retirement lifetime"

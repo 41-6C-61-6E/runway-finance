@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ChartSpline, Receipt, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark, ChevronDown, ChevronRight, LayoutDashboard, CandlestickChart, ArrowLeftRight, Flame } from 'lucide-react'
+import { ChartSpline, Receipt, Home, Wallet, Database, Target, DollarSign, Sparkles, Calculator, Landmark, ChevronDown, ChevronRight, LayoutDashboard, CandlestickChart, ArrowLeftRight, Flame, Repeat } from 'lucide-react'
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
@@ -19,6 +19,7 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: '/flows', label: 'Flows', icon: ArrowLeftRight, pageKey: 'flows' },
   { href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending' },
   { href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets' },
+  { href: '/subscriptions', label: 'Subscriptions', icon: Repeat, pageKey: 'subscriptions' },
   { href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate' },
   { href: '/investments', label: 'Investments', icon: CandlestickChart, pageKey: 'investments' },
   { href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals' },

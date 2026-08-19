@@ -11,4 +11,4 @@ If a Subagent fails, consider re-spawning it with adjusted instructions or a nar
 
 If working a large task, periodically output an estimated percentage complete withe the task, and summary of the current state of the task, including what has been completed, what remains to be done, and any issues or blockers encountered. 
 
-Be aware, at most 1 image(s) may be provided in one prompt; a limit of the current model.
+The dev server is running at http://10.1.1.10:3001 You can use this to test your changes locally before committing them.

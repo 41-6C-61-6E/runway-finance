@@ -624,6 +624,13 @@
       "when": 1787000006000,
       "tag": "0088_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1787000007000,
+      "tag": "0089_user_settings_birth_year",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterTransactionChange } from '@/lib/query-invalidation';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Receipt, LayoutList, Columns2, X, Repeat } from 'lucide-react';
+import { Sparkles, Receipt, LayoutList, X, Repeat } from 'lucide-react';
 import TransactionTable from '@/components/features/transactions/TransactionTable';
 import FilterBar from '@/components/features/transactions/FilterBar';
 import BulkActionsToolbar from '@/components/features/transactions/BulkActionsToolbar';

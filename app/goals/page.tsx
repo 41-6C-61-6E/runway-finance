@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { GoalsSidePanel } from '@/components/goals/goals-side-panel';
 import { GoalsList } from '@/components/goals/goals-list';
 import { MilestonesProjections } from '@/components/goals/milestones-projections';
@@ -19,11 +20,28 @@ function GoalsContent() {
   const showList = isVisible('goalsList');
   const showProjections = isVisible('milestonesProjections');
 
+  // Notification deep-linking: honor ?goalId=<id> (goal alerts / fully-funded
+  // milestone) by scrolling + flashing the matching goal card once.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [targetGoalId, setTargetGoalId] = useState<string | null>(null);
+  useEffect(() => {
+    const gid = searchParams.get('goalId');
+    if (gid) {
+      setTargetGoalId(gid);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('goalId');
+      const qs = params.toString();
+      router.replace(`/goals${qs ? `?${qs}` : ''}`);
+    }
+    return () => setTargetGoalId(null);
+  }, [searchParams, router]);
+
   const mainContent = (
     <div className="space-y-6">
       {showList && (
         <Suspense fallback={<LoadingSpinner category="summary" />}>
-          <GoalsList />
+          <GoalsList targetGoalId={targetGoalId} />
         </Suspense>
       )}
 

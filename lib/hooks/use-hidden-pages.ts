@@ -6,6 +6,7 @@ export const HIDDEN_PAGE_KEYS = [
   'netWorth',
   'transactions',
   'budgets',
+  'subscriptions',
   'realEstate',
   'dataExplorer',
   'goals',

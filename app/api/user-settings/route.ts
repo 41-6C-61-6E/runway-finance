@@ -65,6 +65,7 @@ export async function GET() {
       notifyBudgetAlerts: created?.notifyBudgetAlerts ?? DEFAULTS.notifyBudgetAlerts,
       notifyLargeTransactions: created?.notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
       largeTransactionThreshold: created?.largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
+      birthYear: created?.birthYear ?? null,
       notifyMonthlySummary: created?.notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
       budgetAlertThreshold: created?.budgetAlertThreshold ?? DEFAULTS.budgetAlertThreshold,
       notifyGoalMilestones: created?.notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
@@ -123,6 +124,7 @@ export async function GET() {
     notifyBudgetAlerts: settings[0].notifyBudgetAlerts ?? DEFAULTS.notifyBudgetAlerts,
     notifyLargeTransactions: settings[0].notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
     largeTransactionThreshold: settings[0].largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
+    birthYear: settings[0].birthYear ?? null,
     notifyMonthlySummary: settings[0].notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
     budgetAlertThreshold: settings[0].budgetAlertThreshold ?? DEFAULTS.budgetAlertThreshold,
     notifyGoalMilestones: settings[0].notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
@@ -182,6 +184,7 @@ export async function PATCH(request: Request) {
 	const notifyBudgetAlerts = body.notifyBudgetAlerts;
 	const notifyLargeTransactions = body.notifyLargeTransactions;
 	const largeTransactionThreshold = body.largeTransactionThreshold;
+  const birthYear = body.birthYear;
 	const notifyMonthlySummary = body.notifyMonthlySummary;
 	const budgetAlertThreshold = body.budgetAlertThreshold;
 	const notifyGoalMilestones = body.notifyGoalMilestones;
@@ -366,6 +369,9 @@ export async function PATCH(request: Request) {
 	if (largeTransactionThreshold !== undefined && (typeof largeTransactionThreshold !== 'number' || largeTransactionThreshold < 0)) {
 		return Response.json({ error: 'Invalid largeTransactionThreshold value' }, { status: 400 });
 	}
+  if (birthYear !== undefined && birthYear !== null && (typeof birthYear !== 'number' || !Number.isInteger(birthYear) || birthYear < 1900 || birthYear > new Date().getFullYear())) {
+    return Response.json({ error: 'Invalid birthYear value (must be an integer between 1900 and the current year)' }, { status: 400 });
+  }
 	if (notifyMonthlySummary !== undefined && typeof notifyMonthlySummary !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyMonthlySummary value' }, { status: 400 });
 	}
@@ -391,12 +397,21 @@ export async function PATCH(request: Request) {
 	if (notifyAiProposals !== undefined && typeof notifyAiProposals !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyAiProposals value' }, { status: 400 });
 	}
-	if (maxNotificationsPerPeriod !== undefined && (typeof maxNotificationsPerPeriod !== 'number' || maxNotificationsPerPeriod <= 0)) {
-		return Response.json({ error: 'Invalid maxNotificationsPerPeriod value' }, { status: 400 });
-	}
-	if (notificationLimiterPeriodMinutes !== undefined && (typeof notificationLimiterPeriodMinutes !== 'number' || notificationLimiterPeriodMinutes <= 0)) {
-		return Response.json({ error: 'Invalid notificationLimiterPeriodMinutes value' }, { status: 400 });
-	}
+  // R6: cap limiter settings server-side so users cannot configure a limiter
+  // so strict that it silently drops legitimate alerts, or so loose that it
+  // becomes a no-op. (maxNotificationsPerPeriod: 1–50, period: 5–1440 min.)
+  if (
+    maxNotificationsPerPeriod !== undefined &&
+    (typeof maxNotificationsPerPeriod !== 'number' || !Number.isFinite(maxNotificationsPerPeriod) || maxNotificationsPerPeriod < 1 || maxNotificationsPerPeriod > 50)
+  ) {
+    return Response.json({ error: 'Invalid maxNotificationsPerPeriod value (must be 1-50)' }, { status: 400 });
+  }
+  if (
+    notificationLimiterPeriodMinutes !== undefined &&
+    (typeof notificationLimiterPeriodMinutes !== 'number' || !Number.isFinite(notificationLimiterPeriodMinutes) || notificationLimiterPeriodMinutes < 5 || notificationLimiterPeriodMinutes > 1440)
+  ) {
+    return Response.json({ error: 'Invalid notificationLimiterPeriodMinutes value (must be 5-1440)' }, { status: 400 });
+  }
 	if (notifyRecurringPriceChanges !== undefined && typeof notifyRecurringPriceChanges !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyRecurringPriceChanges value' }, { status: 400 });
 	}
@@ -416,6 +431,9 @@ export async function PATCH(request: Request) {
 		if (recurringExclusions.accountIds !== undefined && (!Array.isArray(recurringExclusions.accountIds) || !recurringExclusions.accountIds.every((id: unknown) => typeof id === 'string'))) {
 			return Response.json({ error: 'Invalid recurringExclusions.accountIds value' }, { status: 400 });
 		}
+    if (recurringExclusions.accountTypes !== undefined && (!Array.isArray(recurringExclusions.accountTypes) || !recurringExclusions.accountTypes.every((t: unknown) => typeof t === 'string'))) {
+      return Response.json({ error: 'Invalid recurringExclusions.accountTypes value' }, { status: 400 });
+    }
 		if (recurringExclusions.merchantPatterns !== undefined && (!Array.isArray(recurringExclusions.merchantPatterns) || !recurringExclusions.merchantPatterns.every((pattern: unknown) => typeof pattern === 'string'))) {
 			return Response.json({ error: 'Invalid recurringExclusions.merchantPatterns value' }, { status: 400 });
 		}
@@ -467,6 +485,7 @@ export async function PATCH(request: Request) {
       notifyBudgetAlerts: created?.notifyBudgetAlerts ?? DEFAULTS.notifyBudgetAlerts,
       notifyLargeTransactions: created?.notifyLargeTransactions ?? DEFAULTS.notifyLargeTransactions,
       largeTransactionThreshold: created?.largeTransactionThreshold ?? DEFAULTS.largeTransactionThreshold,
+      birthYear: created?.birthYear ?? null,
       notifyMonthlySummary: created?.notifyMonthlySummary ?? DEFAULTS.notifyMonthlySummary,
       budgetAlertThreshold: created?.budgetAlertThreshold ?? DEFAULTS.budgetAlertThreshold,
       notifyGoalMilestones: created?.notifyGoalMilestones ?? DEFAULTS.notifyGoalMilestones,
@@ -534,6 +553,7 @@ export async function PATCH(request: Request) {
     updates.recurringExclusions = {
       categoryIds: recurringExclusions.categoryIds ?? [],
       accountIds: recurringExclusions.accountIds ?? [],
+      accountTypes: recurringExclusions.accountTypes ?? [],
       merchantPatterns: recurringExclusions.merchantPatterns ?? [],
     };
   }
@@ -541,6 +561,7 @@ export async function PATCH(request: Request) {
 	if (notifyBudgetAlerts !== undefined) updates.notifyBudgetAlerts = notifyBudgetAlerts;
 	if (notifyLargeTransactions !== undefined) updates.notifyLargeTransactions = notifyLargeTransactions;
 	if (largeTransactionThreshold !== undefined) updates.largeTransactionThreshold = largeTransactionThreshold;
+  if (birthYear !== undefined) updates.birthYear = birthYear;
 	if (notifyMonthlySummary !== undefined) updates.notifyMonthlySummary = notifyMonthlySummary;
 	if (budgetAlertThreshold !== undefined) updates.budgetAlertThreshold = budgetAlertThreshold;
 	if (notifyGoalMilestones !== undefined) updates.notifyGoalMilestones = notifyGoalMilestones;
@@ -754,6 +775,7 @@ export async function PATCH(request: Request) {
     notifyBudgetAlerts: updated.notifyBudgetAlerts,
     notifyLargeTransactions: updated.notifyLargeTransactions,
     largeTransactionThreshold: updated.largeTransactionThreshold,
+    birthYear: updated.birthYear ?? null,
     notifyMonthlySummary: updated.notifyMonthlySummary,
     budgetAlertThreshold: updated.budgetAlertThreshold,
     notifyGoalMilestones: updated.notifyGoalMilestones,

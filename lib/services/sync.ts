@@ -6,7 +6,7 @@ import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
 import { invalidateUserSearchCache, getUserTransactionsFromCache } from '@/lib/services/search-cache';
 import { userSettings } from '@/lib/db/schema';
-import { eq, and, or, inArray, isNull, sql, gte, lte, lt } from 'drizzle-orm';
+import { eq, and, or, inArray, isNull, sql, gte, lte, lt, desc } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
@@ -33,7 +33,7 @@ export async function createNetWorthSnapshot(
   const db = getDb();
   
   const [settings] = await db
-    .select({ currency: userSettings.currency })
+    .select({ currency: userSettings.currency, notifyNetWorthMilestones: userSettings.notifyNetWorthMilestones })
     .from(userSettings)
     .where(eq(userSettings.userId, userId))
     .limit(1);
@@ -99,6 +99,26 @@ export async function createNetWorthSnapshot(
   };
   const encryptedNw = await encryptRow('net_worth_snapshots', nwValues, dek);
 
+  // R7: fetch the most recent *previous* snapshot before the upsert so we can
+  // detect the liabilities >0 → 0 transition (debt-free milestone).
+  let prevTotalLiabilities: number | null = null;
+  try {
+    const [prevSnapshot] = await db
+      .select({
+        snapshotDate: netWorthSnapshots.snapshotDate,
+        totalLiabilities: netWorthSnapshots.totalLiabilities,
+      })
+      .from(netWorthSnapshots)
+      .where(and(eq(netWorthSnapshots.userId, userId), lt(netWorthSnapshots.snapshotDate, snapshotDate)))
+      .orderBy(desc(netWorthSnapshots.snapshotDate))
+      .limit(1);
+    if (prevSnapshot) {
+      prevTotalLiabilities = parseFloat(await decryptField(prevSnapshot.totalLiabilities, dek));
+    }
+  } catch (prevErr) {
+    logger.debug(`${LOG_TAG} Could not fetch previous snapshot for debt-free check (non-fatal):`, prevErr);
+  }
+
   await getDb()
     .insert(netWorthSnapshots)
     .values(encryptedNw)
@@ -114,10 +134,35 @@ export async function createNetWorthSnapshot(
 
   if (!options?.skipNotifications) {
     // Call milestone checker dynamically to avoid circular imports
-    const { checkNetWorthMilestonesAndNotify } = await import('@/lib/services/notifications');
+    const { checkNetWorthMilestonesAndNotify, sendPushNotification } = await import('@/lib/services/notifications');
     checkNetWorthMilestonesAndNotify(userId, dek).catch((err) => {
       logger.error(`${LOG_TAG} Failed to run net worth milestones check:`, err);
     });
+
+    // R7: debt-free celebration milestone — fires exactly once, when tracked
+    // liabilities transition from a positive amount to zero.
+    if (
+      settings?.notifyNetWorthMilestones &&
+      prevTotalLiabilities !== null && !isNaN(prevTotalLiabilities)
+    ) {
+      if (prevTotalLiabilities > 0 && totalLiabilities === 0) {
+        const formatted = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: baseCurrency,
+          maximumFractionDigits: 0,
+        }).format(prevTotalLiabilities);
+        sendPushNotification(
+          userId,
+          `You're Debt Free! 🎉`,
+          `Congratulations — your tracked liabilities are at $0 (down from ${formatted}). Enjoy the freedom!`,
+          '/',
+          'debt_free',
+          `debt_free:${userId}`
+        ).catch((err) => {
+          logger.error(`${LOG_TAG} Failed to send debt-free milestone notification:`, err);
+        });
+      }
+    }
   }
 }
 
@@ -1287,10 +1332,21 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     const summariesReady = triggerUserSummariesRebuild(dataUserId, dek);
 
     // Trigger custom cash flow alerts check
-    const { checkCashFlowAlerts, checkRecurringPriceChangesAndNotify, checkUpcomingBillsAndNotify } = await import('@/lib/services/notifications');
+    const { checkCashFlowAlerts, checkRecurringPriceChangesAndNotify, checkUpcomingBillsAndNotify, checkMonthlySummaryAndNotify, healSyncAlerts } = await import('@/lib/services/notifications');
     await summariesReady;
     checkCashFlowAlerts(dataUserId, dek).catch((e) => {
       logger.error('[sync] Failed to check cash flow alerts:', e);
+    });
+
+    // R1: re-arm sync-failure alerts now that this connection synced OK, and
+    // mark the resolved sync_error inbox rows read.
+    healSyncAlerts(dataUserId, connectionId).catch((e) => {
+      logger.debug('[sync] Failed to heal sync alerts (non-fatal):', e);
+    });
+
+    // R12a: month-boundary cash flow summary (fires at most once per month).
+    checkMonthlySummaryAndNotify(dataUserId, dek).catch((e) => {
+      logger.error('[sync] Failed to check monthly summary:', e);
     });
 
     // Run recurring transaction detection, price alerts & bill reminders (non-fatal)

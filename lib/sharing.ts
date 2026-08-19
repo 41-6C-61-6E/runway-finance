@@ -53,6 +53,7 @@ export interface ShareGroupInfo {
     id: string;
     memberUserId: string;
     joinedAt: Date;
+    role: string;
   }>;
   /** Pending invitations created by this primary. */
   pendingInvitations: Array<{
@@ -135,6 +136,7 @@ export async function getShareGroup(userId: string): Promise<ShareGroupInfo | nu
       id: accountShareMembers.id,
       memberUserId: accountShareMembers.memberUserId,
       joinedAt: accountShareMembers.joinedAt,
+      role: accountShareMembers.role,
     })
     .from(accountShareMembers)
     .where(
@@ -439,6 +441,19 @@ export async function acceptInvitation(
     return { error: `Share groups are limited to ${MAX_SHARE_GROUP_SIZE} users.` };
   }
 
+    // Preserve the admin role if a previously REMOVED admin is re-invited.
+    const [existingMember] = await db
+      .select({ role: accountShareMembers.role, status: accountShareMembers.status })
+      .from(accountShareMembers)
+      .where(
+        and(
+          eq(accountShareMembers.primaryUserId, inviterUserId),
+          eq(accountShareMembers.memberUserId, newMemberUserId)
+        )
+      )
+      .limit(1);
+    const existingAdmin = existingMember?.status !== 'active' && existingMember?.role === 'admin';
+
   await db
     .update(accountSharingInvitations)
     .set({ status: 'accepted', updatedAt: new Date() })
@@ -453,14 +468,14 @@ export async function acceptInvitation(
       primaryUserId: inviterUserId,
       memberUserId: newMemberUserId,
       invitationId,
-      role: 'member',
+        role: existingAdmin ? 'admin' : 'member',
     })
     .onConflictDoUpdate({
       target: [accountShareMembers.primaryUserId, accountShareMembers.memberUserId],
       set: {
         status: 'active',
         invitationId,
-        role: 'member',
+        role: existingAdmin ? 'admin' : 'member',
         removedAt: null,
         removedBy: null,
         joinedAt: new Date(),
@@ -497,9 +512,17 @@ export async function removeMember(
 
   const primaryUserId = keyRow.primaryUserId;
 
-  // Only the primary or the member themselves may remove
-  if (requestingUserId !== primaryUserId && requestingUserId !== memberUserId) {
-    return { error: 'Not authorised to remove this member.' };
+  // The primary and the member themselves may always remove. Anyone else
+  // (typically an admin) may remove a member only if they hold the admin role
+  // AND the target is a plain member (admins cannot remove other admins).
+  const isPrimary = requestingUserId === primaryUserId;
+  const isSelf = requestingUserId === memberUserId;
+  if (!isPrimary && !isSelf) {
+    const requesterRole = await getShareMemberRole(primaryUserId, requestingUserId);
+    const targetRole = await getShareMemberRole(primaryUserId, memberUserId);
+    if (requesterRole !== 'admin' || targetRole === 'admin') {
+      return { error: 'Only the owner or an admin can remove this member.' };
+    }
   }
 
   // Run the whole mutation sequence in ONE transaction so a crash cannot leave
@@ -705,3 +728,100 @@ export async function removeMember(
 
   return {};
 }
+
+  /**
+   * Shared-group role for a user, resolved against the group they actually
+   * belong to (via user_encryption_keys.primaryUserId). Returns 'member' when
+   * the user is not an active admin — safe default for permission checks.
+   */
+  export async function getShareMemberRole(
+    primaryUserId: string,
+    userId: string
+  ): Promise<'admin' | 'member'> {
+    const db = getDb();
+    const [row] = await db
+      .select({ role: accountShareMembers.role })
+      .from(accountShareMembers)
+      .where(
+        and(
+          eq(accountShareMembers.primaryUserId, primaryUserId),
+          eq(accountShareMembers.memberUserId, userId),
+          eq(accountShareMembers.status, 'active')
+        )
+      )
+      .limit(1);
+    return row?.role === 'admin' ? 'admin' : 'member';
+  }
+
+  /**
+   * Change a member's role between 'admin' and 'member'.
+   * Only the primary or an existing admin may change roles, and a user can
+   * never change their own role (prevents self-escalation).
+   *
+   * Returns `{ error }` on failure (auth, not found, self-change, no-op).
+   */
+  export async function updateMemberRole(
+    memberUserId: string,
+    newRole: 'admin' | 'member',
+    requestingUserId: string
+  ): Promise<{ error?: string }> {
+    const db = getDb();
+
+    // Resolve the requesting user's group (they must be primary or a member).
+    const [keyRow] = await db
+      .select({ primaryUserId: userEncryptionKeys.primaryUserId })
+      .from(userEncryptionKeys)
+      .where(eq(userEncryptionKeys.userId, requestingUserId))
+      .limit(1);
+
+    const groupPrimaryId = keyRow?.primaryUserId ?? requestingUserId;
+    const isPrimary = groupPrimaryId === requestingUserId;
+    const requesterRole = isPrimary ? 'admin' : await getShareMemberRole(groupPrimaryId, requestingUserId);
+    if (!isPrimary && requesterRole !== 'admin') {
+      return { error: 'Only the owner or an admin can change member roles.' };
+    }
+
+    if (requestingUserId === memberUserId) {
+      return { error: 'You cannot change your own role.' };
+    }
+
+    const [target] = await db
+      .select({ role: accountShareMembers.role, status: accountShareMembers.status })
+      .from(accountShareMembers)
+      .where(
+        and(
+          eq(accountShareMembers.primaryUserId, groupPrimaryId),
+          eq(accountShareMembers.memberUserId, memberUserId),
+          eq(accountShareMembers.status, 'active')
+        )
+      )
+      .limit(1);
+
+    if (!target) {
+      return { error: 'Member not found.' };
+    }
+
+    if (target.role === newRole) {
+      return { error: 'Member already has that role.' };
+    }
+
+    await db
+      .update(accountShareMembers)
+      .set({ role: newRole })
+      .where(
+        and(
+          eq(accountShareMembers.primaryUserId, groupPrimaryId),
+          eq(accountShareMembers.memberUserId, memberUserId),
+          eq(accountShareMembers.status, 'active')
+        )
+      );
+
+    logger.info('[sharing] Member role changed', {
+      primaryUserId: groupPrimaryId,
+      memberUserId,
+      newRole,
+      changedBy: requestingUserId,
+    });
+
+    return {};
+  }

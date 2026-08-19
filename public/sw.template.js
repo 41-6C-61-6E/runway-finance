@@ -143,6 +143,17 @@ self.addEventListener("push", (event) => {
       }
     };
 
+      // Notify all open clients so the in-app dropdown badge refreshes
+      // immediately instead of waiting for the 30s poll (R11).
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: "NOTIFICATION_ARRIVED" });
+          });
+        })
+        .catch(() => {});
+
     event.waitUntil(
       self.registration.showNotification(data.title || "Personal Finance", options)
     );

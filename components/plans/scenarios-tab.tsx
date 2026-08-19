@@ -314,7 +314,7 @@ export function ScenariosTab({
       {/* SUB-TAB 1: WITHDRAW STRATEGY */}
       {activeSubTab === 'withdraw' && (
         <div className="space-y-6">
-          <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-card border border-border rounded-2xl shadow-sm">
             <CollapsibleCardHeader
               title="Withdrawal Sequencing Strategy Laboratory"
               description="Simulate and compare 5 distinct withdrawal ordering methods directly on your plan. Click any strategy row to expand its full sequencing breakdown."

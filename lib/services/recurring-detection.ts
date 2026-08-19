@@ -312,6 +312,24 @@ export async function detectRecurringTransactions(
     if (accId) excludedAccountIds.add(accId.toString());
   }
 
+  // Account-type exclusions (e.g. '401k', 'mortgage', 'investment'): every
+  // account whose type matches is excluded. Comparison is normalized
+  // (lowercase, alphanumerics only) to tolerate casing/separator variants.
+  const normTypeKey = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const excludedAccountTypeKeys = new Set<string>(
+    ((customExcl.accountTypes || []) as string[])
+      .map((t) => normTypeKey(String(t)))
+      .filter(Boolean)
+  );
+  if (excludedAccountTypeKeys.size > 0) {
+    for (const acc of userAccounts) {
+      const key = normTypeKey(String(acc.type || ''));
+      if (key && excludedAccountTypeKeys.has(key)) {
+        excludedAccountIds.add(acc.id.toString());
+      }
+    }
+  }
+
   const excludedCategoryIds = new Set<string>();
   for (const cat of userCategories) {
     if (cat.excludeFromReports || cat.name.toLowerCase().includes('transfer')) {
@@ -321,6 +339,24 @@ export async function detectRecurringTransactions(
   for (const catId of (customExcl.categoryIds || [])) {
     if (catId) excludedCategoryIds.add(catId.toString());
   }
+
+  // Category hierarchy: excluding a parent category also excludes any
+  // transaction categorized to a descendant of it. Walk up the ancestor
+  // chain for each transaction's category (bounded to avoid cycles).
+  const categoryParentById = new Map<string, string | null>();
+  for (const cat of userCategories) {
+    categoryParentById.set(cat.id.toString(), cat.parentId ? cat.parentId.toString() : null);
+  }
+  const isCategoryExcluded = (catId: string): boolean => {
+    let cur: string | null = catId;
+    let guard = 0;
+    while (cur && guard < 32) {
+      if (excludedCategoryIds.has(cur)) return true;
+      cur = categoryParentById.get(cur) ?? null;
+      guard += 1;
+    }
+    return false;
+  };
 
   const excludedMerchantPatterns: string[] = (customExcl.merchantPatterns || [])
     .map((p: string) => p.toLowerCase().trim())
@@ -362,7 +398,7 @@ export async function detectRecurringTransactions(
     // Filter virtual/paystub accounts, transfers, and user exclusions
     if (tx.accountId && excludedAccountIds.has(tx.accountId.toString())) continue;
     if (tx.paystubId || (tx as any).source === 'paystub' || (tx as any).isTransfer) continue;
-    if (tx.categoryId && excludedCategoryIds.has(tx.categoryId.toString())) continue;
+    if (tx.categoryId && isCategoryExcluded(tx.categoryId.toString())) continue;
 
     const rawDesc = tx.payee || tx.description || '';
     if (!rawDesc || rawDesc.trim().length === 0) continue;

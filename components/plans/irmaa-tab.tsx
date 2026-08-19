@@ -268,7 +268,7 @@ export function IrmaaTab({
         )}
       </div>
 
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl shadow-sm">
         <CollapsibleCardHeader
           title="Retirement MAGI vs IRMAA Cliffs Timeline"
           description="Track projected MAGI against statutory IRMAA cliffs, with 2-year lookback window (ages 63-64)"

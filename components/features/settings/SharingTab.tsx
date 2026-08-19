@@ -15,6 +15,7 @@ import {
   User,
   ShieldCheck,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ interface ShareMember {
   id: string;
   memberUserId: string;
   joinedAt: string;
+  role?: 'admin' | 'member';
 }
 
 interface PendingInvitation {
@@ -90,6 +92,18 @@ function WhatIsSharedPanel() {
             <li>Transfer ownership to a member</li>
           </ul>
         </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <div className="flex items-center gap-1.5 text-primary font-semibold">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Admin (assigned by the owner)
+          </div>
+          <ul className="space-y-1 text-muted-foreground pl-5 list-disc">
+            <li>View and manage hidden (sensitive) accounts</li>
+            <li>Delete SimpleFIN connections and manual accounts</li>
+            <li>Remove members who don&apos;t have the admin role</li>
+            <li>Assign or revoke the admin role on other members</li>
+          </ul>
+        </div>
       </div>
       <p className="text-[11px] text-muted-foreground/80 border-t border-border pt-2">
         Shared data is encrypted at rest in your database. Everyone in your household sees the same financial data — there is no duplicate data — except accounts the owner hides from members.
@@ -138,6 +152,7 @@ export default function SharingTab() {
   const [confirmTransfer, setConfirmTransfer] = useState<ShareMember | null>(null);
   const [transferError, setTransferError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [roleUpdatingId, setRoleUpdatingId] = useState<string | null>(null);
 
   const fetchGroup = useCallback(async () => {
     try {
@@ -170,6 +185,18 @@ export default function SharingTab() {
   }, [fetchGroup, fetchCurrentUser]);
 
   const isPrimary = currentUser && group ? group.primaryUserId === currentUser : true;
+
+  // The signed-in user's role within the group (primary if owner, else the
+  // stored role; members default to 'member').
+  const currentRole: 'primary' | 'admin' | 'member' =
+    isPrimary && group
+      ? 'primary'
+      : group && currentUser
+        ? (group.members.find((m) => m.memberUserId === currentUser)?.role ?? 'member')
+        : 'member';
+
+  // Owners and admins may assign/revoke the admin role and remove plain members.
+  const canManageRoles = currentRole === 'primary' || currentRole === 'admin';
 
   // ── Invite ──────────────────────────────────────────────────────────────────
 
@@ -235,6 +262,30 @@ export default function SharingTab() {
     } finally {
       setActionLoading(false);
       setConfirmRemove(null);
+    }
+  };
+
+  // ── Change member role ──────────────────────────────────────────────────────
+
+  const handleRoleChange = async (member: ShareMember, newRole: 'admin' | 'member') => {
+    setRoleUpdatingId(member.id);
+    try {
+      const res = await fetch(`/api/sharing/members/${member.memberUserId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ role: newRole }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.message || 'Failed to change role');
+        return;
+      }
+      await fetchGroup();
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setRoleUpdatingId(null);
     }
   };
 
@@ -485,14 +536,36 @@ export default function SharingTab() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-foreground truncate">{m.memberUserId}</span>
+                  {m.role === 'admin' && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-primary/15 text-primary rounded font-medium">Admin</span>
+                  )}
                   {currentUser === m.memberUserId && (
                     <span className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded">You</span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">Joined {formatDate(m.joinedAt)}</p>
               </div>
-              {/* Remove (primary can remove; member can leave) */}
-              {(isPrimary || currentUser === m.memberUserId) && (
+              {/* Role control (owner or admin can promote/demote others) */}
+              {canManageRoles && currentUser !== m.memberUserId && (
+                <div className="flex items-center gap-1" title={`Role for ${m.memberUserId}`}>
+                  {(['member', 'admin'] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => m.role !== r && handleRoleChange(m, r)}
+                      disabled={roleUpdatingId === m.id}
+                      className={`px-2 py-1 text-[10px] font-medium rounded border transition-colors disabled:opacity-50 ${
+                        (m.role ?? 'member') === r
+                          ? 'bg-primary/15 text-primary border-primary/30'
+                          : 'bg-transparent text-muted-foreground border-border hover:text-foreground'
+                      }`}
+                    >
+                      {r === 'admin' ? 'Admin' : 'Member'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Remove (primary or admin of a non-admin can remove; member can leave) */}
+              {(isPrimary || (canManageRoles && !isPrimary && m.role !== 'admin') || currentUser === m.memberUserId) && (
                 <button
                   onClick={() => {
                     if (currentUser === m.memberUserId) {
