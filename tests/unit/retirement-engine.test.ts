@@ -2121,7 +2121,7 @@ describe('Retirement Projection Engine', () => {
           dividendYield: 0.0,
           reinvestDividends: false,
           qualifiedDividendRatio: 1.0,
-          contributionMode: 'fixed',
+          contributionMode: 'none',
           contributionValue: 0,
         },
       ],
