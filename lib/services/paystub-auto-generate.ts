@@ -19,10 +19,12 @@ import {
   capOasdiAmount,
   computeOasdiYtdBefore,
   isOasdiLine,
-    nextCadenceDate,
+  isSection125Line,
+  nextCadenceDate,
   type OasdiYtdState,
 } from '@/lib/utils/paystub';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
+import { HISTORICAL_TAX_RULES } from '@/lib/constants/historical-tax-rules';
 import { logger } from '@/lib/logger';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
@@ -158,13 +160,19 @@ async function generatePaystub(
 
   // ── P-1: OASDI (Social Security) annual wage-base cap ─────────────────
   // OASDI is 6.2% on the first $ssWageBaseCap of wages per calendar year
-  // (IRC 3121(a) / SSA cap, $184,500 for 2026). A template stub's OASDI line
+  // (IRC 3121(a) / SSA cap). A template stub's OASDI line
   // is only correct while cumulative YTD wages remain inside the base; once
   // the base is exhausted the line must roll off. We cap the OASDI line
   // accordingly and stamp a realistic ytdAmount.
-  const oasdiWageBaseCap = DEFAULT_2026_RULES.ficaRules.ssWageBaseCap;
-  const oasdiRate = DEFAULT_2026_RULES.ficaRules.ssTaxRate;
+  const checkYear = new Date(newCheckDate + 'T00:00:00Z').getUTCFullYear();
+  const yearRules = HISTORICAL_TAX_RULES[checkYear] ?? DEFAULT_2026_RULES;
+  const oasdiWageBaseCap = yearRules.ficaRules.ssWageBaseCap;
+  const oasdiRate = yearRules.ficaRules.ssTaxRate;
   const grossCurrent = Number(template.grossCurrent) || 0;
+
+  const currentSection125Deductions = templateLineItems
+    .filter((item: any) => isSection125Line(item.section, item.description))
+    .reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0);
 
   // Resolve final line-item amounts BEFORE inserting so header totals below
   // reflect the capped OASDI (not the stale template values).
@@ -181,6 +189,7 @@ async function generatePaystub(
       const capped = capOasdiAmount({
         expectedOasdi,
         gross: grossCurrent,
+        section125Deductions: currentSection125Deductions,
         ytd: oasdiYtdBefore,
         wageBaseCap: oasdiWageBaseCap,
         oasdiRate,

@@ -328,6 +328,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
   for (const tx of decryptedTxns) {
     if (tx.ignored) continue;
     if (!isPaystubEnabled && tx.source === 'paystub') continue;
+    if (!tx.accountId) continue;
 
     const category = tx.categoryId ? catById.get(tx.categoryId.toString()) : undefined;
 
@@ -342,7 +343,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
     const rawAmount = parseFloat(tx.amount);
-    const amount = toCashFlowAmount(rawAmount, accountTypeById.get(tx.accountId.toString()));
+    if (isNaN(rawAmount)) continue;
 
     if (!monthlyData[yearMonth]) {
       monthlyData[yearMonth] = { income: 0, expenses: 0, count: 0 };
@@ -352,17 +353,17 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     transactionsProcessed++;
     if (category?.categoryType === 'transfer') continue;
     if (category?.categoryType === 'compound') {
-      const absAmt = Math.abs(amount);
+      const absAmt = Math.abs(rawAmount);
       monthlyData[yearMonth].income += absAmt;
       monthlyData[yearMonth].expenses += absAmt;
-    } else if (amount > 0) {
+    } else if (rawAmount > 0) {
       if (category && !category.isIncome) {
-        monthlyData[yearMonth].expenses -= amount;
+        monthlyData[yearMonth].expenses -= rawAmount;
       } else {
-        monthlyData[yearMonth].income += amount;
+        monthlyData[yearMonth].income += rawAmount;
       }
-    } else if (amount < 0) {
-      const absAmt = Math.abs(amount);
+    } else if (rawAmount < 0) {
+      const absAmt = Math.abs(rawAmount);
       if (category && category.isIncome) {
         monthlyData[yearMonth].income -= absAmt;
       } else {
@@ -503,12 +504,10 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
       };
     }
       const rawAmount = parseFloat(tx.amount);
-      // Liability payments (positive raw amounts) are money out of the
-      // account → spending; normalize before accumulating.
-      const amount = toCashFlowAmount(rawAmount, accountTypeById.get(accountId));
+      if (isNaN(rawAmount)) continue;
       const absVal = category.categoryType === 'compound'
         ? Math.abs(rawAmount)
-        : -amount;
+        : -rawAmount;
     categoryByMonthAndAccount[yearMonth][catId][accountId].amount += absVal;
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
@@ -610,7 +609,14 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     if (tx.ignored) continue;
     if (!isPaystubEnabled && tx.source === 'paystub') continue;
 
+    // categoryId / accountId columns are non-null uuids with FKs — skip
+    // transactions whose category is missing or no longer exists.
+    if (!tx.categoryId) continue;
+
     const category = tx.categoryId ? catById.get(tx.categoryId.toString()) : undefined;
+    if (!category) continue;
+
+    if (!tx.accountId) continue;
 
     let excluded = category?.excludeFromReports ?? false;
     if (category && category.isIncome === false) {
@@ -619,14 +625,12 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     if (excluded) continue;
 
   const yearMonth = tx.date.substring(0, 7);
-  const catId = tx.categoryId ? tx.categoryId.toString() : 'uncategorized';
-  const accountId = tx.accountId ? tx.accountId.toString() : 'unknown';
+  const catId = tx.categoryId.toString();
+  const accountId = tx.accountId.toString();
 
     const rawAmount = parseFloat(tx.amount);
-    // Liability payments (positive raw amounts) are NOT income; normalize so
-    // they are skipped here like any other non-positive cash-flow amount.
-    const amount = toCashFlowAmount(rawAmount, accountTypeById.get(accountId));
-    if (category?.categoryType !== 'compound' && amount <= 0) continue;
+    if (isNaN(rawAmount)) continue;
+    if (category?.categoryType !== 'compound' && rawAmount <= 0) continue;
 
     uniqueCategories.add(catId);
 
@@ -648,7 +652,7 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
 
     const incVal = category?.categoryType === 'compound'
       ? Math.abs(rawAmount)
-      : amount;
+      : rawAmount;
     categoryByMonthAndAccount[yearMonth][catId][accountId].amount += incVal;
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
@@ -1313,6 +1317,13 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
     await createAccountSnapshots(dataUserId, dek, today);
     logger.debug(`${LOG_TAG} Account snapshots created`, { userId, date: today, durationMs: ms(startedAt) });
+
+    // Refresh goal allocations and milestone alerts in the background (non-fatal)
+    import('@/lib/services/goal-allocation').then(({ updateGoalAllocations }) => {
+      return updateGoalAllocations(dataUserId);
+    }).catch((err) => {
+      logger.error(`${LOG_TAG} Failed to update goal allocations (non-fatal):`, err);
+    });
 
     for (const sfAccount of data.accounts) {
       const accountId = externalIdToAccountId.get(sfAccount.id);

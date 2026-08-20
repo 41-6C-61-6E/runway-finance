@@ -75,7 +75,9 @@ export function DebtToAssetRatio() {
       }
     }
 
-    const rawRatio = assets > 0 ? liabilities / assets : 0;
+    const rawRatio = assets > 0 
+      ? liabilities / assets 
+      : (liabilities > 0 ? Infinity : 0);
     const ratingInfo = getRating(rawRatio);
 
     return {
@@ -86,7 +88,7 @@ export function DebtToAssetRatio() {
     };
   }, [accounts]);
 
-  const pct = ratio * 100;
+  const pct = isFinite(ratio) ? ratio * 100 : 100;
 
   if (loading) {
     return (
@@ -176,7 +178,7 @@ export function DebtToAssetRatio() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2.5 shrink-0">
               <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
-                {pct.toFixed(0)}%
+                {isFinite(ratio) ? `${pct.toFixed(0)}%` : '100%+'}
               </span>
               <span
                 className="inline-flex items-center px-2.5 py-0.5 text-[11px] font-bold rounded-full border font-mono"

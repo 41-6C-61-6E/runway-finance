@@ -563,24 +563,30 @@ export function runRetirementSimulation(
       const ownerAge = owner === 'spouse' && spouseAge !== undefined ? spouseAge : primaryAge;
       const ownerCatchUp50 = ownerAge >= 50;
       const ownerCatchUp55 = ownerAge >= 55;
+      const ownerCatchUp60_63 = ownerAge >= 60 && ownerAge <= 63;
       const t = (accType || '').toLowerCase();
 
       if (t.includes('401k') || t.includes('403b') || t.includes('sep') || t.includes('simple')) {
-        const base = rules.contributionLimits?.k401 ?? 23500;
-        const catchup = ownerCatchUp50 ? (rules.contributionLimits?.k401CatchUp ?? 7500) : 0;
-        return base + catchup;
+        const base = (rules.contributionLimits?.k401 ?? 23500) * ruleScale;
+        let catchup = 0;
+        if (ownerCatchUp60_63 && rules.contributionLimits?.k401SpecialCatchUp) {
+          catchup = rules.contributionLimits.k401SpecialCatchUp * ruleScale;
+        } else if (ownerCatchUp50) {
+          catchup = (rules.contributionLimits?.k401CatchUp ?? 7500) * ruleScale;
+        }
+        return Math.round(base + catchup);
       }
       if (t === 'hsa') {
-        const hsaBase = (isMfj || owner === 'joint')
+        const hsaBase = ((isMfj || owner === 'joint')
           ? (rules.contributionLimits?.hsaFamily ?? 8550)
-          : (rules.contributionLimits?.hsaSingle ?? 4300);
-        const catchup = ownerCatchUp55 ? (rules.contributionLimits?.hsaCatchUp ?? 1000) : 0;
-        return hsaBase + catchup;
+          : (rules.contributionLimits?.hsaSingle ?? 4300)) * ruleScale;
+        const catchup = (ownerCatchUp55 ? (rules.contributionLimits?.hsaCatchUp ?? 1000) : 0) * ruleScale;
+        return Math.round(hsaBase + catchup);
       }
       if (t.includes('ira')) {
-        const base = rules.contributionLimits?.ira ?? 7000;
-        const catchup = ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0;
-        return base + catchup;
+        const base = (rules.contributionLimits?.ira ?? 7000) * ruleScale;
+        const catchup = (ownerCatchUp50 ? (rules.contributionLimits?.iraCatchUp ?? 1000) : 0) * ruleScale;
+        return Math.round(base + catchup);
       }
       return Infinity;
     };
@@ -773,7 +779,7 @@ export function runRetirementSimulation(
     const age65Boost = rules.additionalStdDeduction65Plus;
     if (age65Boost) {
       if (primaryAge >= 65) {
-        stdDeduction += (isMfj ? age65Boost.marriedPerPerson : age65Boost.singleOrHoH) * ruleScale;
+        stdDeduction += ((isMfj || isMfs) ? age65Boost.marriedPerPerson : age65Boost.singleOrHoH) * ruleScale;
       }
       if (isMfj && spouseAge !== undefined && spouseAge >= 65) {
         stdDeduction += age65Boost.marriedPerPerson * ruleScale;
@@ -1263,10 +1269,10 @@ export function runRetirementSimulation(
           discretionaryDeficitWithdrawn = deficit - remDeficit;
           deficitWithdrawn += discretionaryDeficitWithdrawn;
         } else if (method === 'tax_optimized') {
-          const target12Bracket = rules.ordinaryTaxBrackets?.find((b: any) => Math.abs(b.rate - 0.12) < 0.01)
-            || rules.ordinaryTaxBrackets?.[1]
-            || { threshold: 48475 };
-          const target12Limit = target12Bracket.threshold * (isMfj ? 2 : 1) * ruleScale;
+          const ordBrackets = rules.ordinaryTaxBrackets || [];
+          const target12Idx = ordBrackets.findIndex((b: any) => Math.abs(b.rate - 0.12) < 0.01);
+          const nextBracketObj = target12Idx >= 0 ? ordBrackets[target12Idx + 1] : undefined;
+          const target12Limit = (nextBracketObj ? nextBracketObj.threshold : 48475) * (isMfj ? 2 : 1) * ruleScale;
           const currentTaxable = taxableOrdinaryIncome + drawdownsByType.traditional;
           const bracketRoom = Math.max(0, target12Limit - currentTaxable);
 

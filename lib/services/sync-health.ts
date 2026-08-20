@@ -52,6 +52,7 @@ export async function getAccountsSyncStatus(
         lastSyncAt: simplifinConnections.lastSyncAt,
         lastSyncStatus: simplifinConnections.lastSyncStatus,
         lastSyncError: simplifinConnections.lastSyncError,
+        createdAt: simplifinConnections.createdAt,
       })
       .from(simplifinConnections)
       .where(inArray(simplifinConnections.userId, userIds));
@@ -64,6 +65,7 @@ export async function getAccountsSyncStatus(
         lastSyncAt: plaidConnections.lastSyncAt,
         lastSyncStatus: plaidConnections.lastSyncStatus,
         lastSyncError: plaidConnections.lastSyncError,
+        createdAt: plaidConnections.createdAt,
       })
       .from(plaidConnections)
       .where(inArray(plaidConnections.userId, userIds));
@@ -149,13 +151,29 @@ export async function getAccountsSyncStatus(
       if (hasConnection) {
         const conn = connectionsMap.get(connectionId);
         if (conn && conn.lastSyncStatus === 'error') {
+          const lastSuccess = conn.lastSyncAt ? new Date(conn.lastSyncAt).getTime() : (conn.createdAt ? new Date(conn.createdAt).getTime() : null);
+          const elapsedHours = lastSuccess ? (now - lastSuccess) / (1000 * 60 * 60) : null;
+          const isPersistent = elapsedHours === null || elapsedHours >= 72;
           statuses[accountId] = {
-            status: 'error',
-            reason: conn.lastSyncError || 'The connection failed to sync.',
+            status: isPersistent ? 'error' : 'warning',
+            reason: conn.lastSyncError || (isPersistent ? 'The connection has failed to sync for over 3 days.' : 'Recent sync attempt failed; will retry automatically.'),
             lastSyncAt: conn.lastSyncAt ? new Date(conn.lastSyncAt).toISOString() : undefined,
           };
           continue;
         }
+      }
+
+      // ── Rule 1b: Manual API Account Sync Error ──
+      if (isApiDrivenManual && meta.syncError) {
+        const lastSuccess = acc.balanceDate ? new Date(acc.balanceDate).getTime() : (acc.createdAt ? new Date(acc.createdAt).getTime() : null);
+        const elapsedHours = lastSuccess ? (now - lastSuccess) / (1000 * 60 * 60) : null;
+        const isPersistent = elapsedHours === null || elapsedHours >= 72;
+        statuses[accountId] = {
+          status: isPersistent ? 'error' : 'warning',
+          reason: String(meta.syncError) || (isPersistent ? 'Account sync has failed for over 3 days.' : 'Recent sync attempt failed; will retry automatically.'),
+          lastSyncAt: acc.balanceDate ? new Date(acc.balanceDate).toISOString() : undefined,
+        };
+        continue;
       }
 
       // ── Rule 2: Stale Connection (Applies to connected accounts) ──
@@ -163,20 +181,26 @@ export async function getAccountsSyncStatus(
         const conn = connectionsMap.get(connectionId);
         if (conn) {
           if (!conn.lastSyncAt) {
-            statuses[accountId] = {
-              status: 'warning',
-              reason: 'Connection has never successfully synced.',
-            };
+            const createdTime = conn.createdAt ? new Date(conn.createdAt).getTime() : now;
+            const elapsedHours = (now - createdTime) / (1000 * 60 * 60);
+            if (elapsedHours >= 72) {
+              statuses[accountId] = {
+                status: 'warning',
+                reason: 'Connection has not synced since being created over 3 days ago.',
+              };
+              continue;
+            }
+            statuses[accountId] = { status: 'ok' };
             continue;
           }
 
           const lastSyncTime = new Date(conn.lastSyncAt).getTime();
           const elapsedHours = (now - lastSyncTime) / (1000 * 60 * 60);
 
-          if (conn.syncFrequency === 'daily' && elapsedHours > 48) {
+          if (conn.syncFrequency === 'daily' && elapsedHours > 72) {
             statuses[accountId] = {
               status: 'warning',
-              reason: `Connection has not successfully synced in over 48 hours (last sync was ${Math.round(elapsedHours / 24)} days ago).`,
+              reason: `Connection has not successfully synced in over 3 days (last sync was ${Math.round(elapsedHours / 24)} days ago).`,
               lastSyncAt: new Date(conn.lastSyncAt).toISOString(),
             };
             continue;

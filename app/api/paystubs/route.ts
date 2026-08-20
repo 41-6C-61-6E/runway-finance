@@ -10,6 +10,7 @@ import {
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+import { isAssetAccount } from '@/lib/utils/account-scope';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -376,6 +377,13 @@ export async function createTransactionsFromLineItems(
     }
   }
 
+  // Pre-fetch user account types to detect asset destination accounts
+  const userAccounts = await db
+    .select({ id: accounts.id, type: accounts.type })
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+  const accountTypeById = new Map(userAccounts.map((a) => [a.id, a.type]));
+
   // TAXES and DEDUCTIONS: Create individual transactions
   const expenseItems = mappedItems.filter(
     (item) =>
@@ -386,17 +394,25 @@ export async function createTransactionsFromLineItems(
 
   for (const item of expenseItems) {
     const amount = parseFloat(item.amount || '0');
-    const negativeAmount = -Math.abs(amount);
-    const externalId = `paystub-${paystub.id}-${item.id}`;
-
     const { accountId, tagId } = await resolveAccountAndTagForLine(item.section, item.description);
+    const targetType = accountTypeById.get(accountId) || (virtualAccountId === accountId ? 'paystub' : '');
+
+    // F04-1: If a deduction (401k, HSA, Roth, ESPP, etc.) is routed to an asset account,
+    // it represents a positive contribution inflow (+Math.abs(amount)).
+    // If routed to the virtual paystub account, an expense/liability account, or if it is a tax,
+    // it represents a negative expense/outflow (-Math.abs(amount)).
+    const isDeduction = item.section === 'before_tax_deductions' || item.section === 'after_tax_deductions';
+    const isAssetDest = targetType !== 'paystub' && isAssetAccount(targetType);
+    const signedAmount = (isDeduction && isAssetDest) ? Math.abs(amount) : -Math.abs(amount);
+
+    const externalId = `paystub-${paystub.id}-${item.id}`;
 
     const txnValues = {
       userId,
       accountId: accountId,
       externalId,
       date: checkDate,
-      amount: String(negativeAmount),
+      amount: String(signedAmount),
       description: item.description,
       source: 'paystub',
       paystubId: paystub.id,

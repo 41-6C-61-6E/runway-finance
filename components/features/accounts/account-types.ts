@@ -97,7 +97,7 @@ export const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; i
   sepira:         { group: 'Investments',   subGroup: 'SEP IRA',          icon: '📈' },
   simpleira:      { group: 'Investments',   subGroup: 'Simple IRA',       icon: '📈' },
   '529':          { group: 'Investments',   subGroup: '529 Account',      icon: '📈' },
-  otherAsset: { group: 'Investments',   subGroup: 'Other Assets',     icon: '📈' },
+  otherAsset: { group: 'Assets',        subGroup: 'Other Assets',     icon: '💼' },
   vehicle:    { group: 'Assets',        subGroup: 'Vehicles',         icon: '🚗' },
   crypto:     { group: 'Assets',        subGroup: 'Crypto Currency',  icon: '₿' },
   metals:     { group: 'Assets',        subGroup: 'Metals',           icon: '🏅' },

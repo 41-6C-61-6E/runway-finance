@@ -323,9 +323,11 @@ describe('Savings Rate API Route', () => {
       const response = await GET(request);
       const data = await response.json();
       expect(response.status).toBe(200);
-      // Income used for denominator should be: stats.income (4400) + paystubRetirement (400) = 4800
-      // Savings rate = 400 / 4800 = 0.0833 (8.33%)
-      expect(data[0].savingsRate).toBe(0.0833);
+      // F04-3: Because paystub gross earnings are already present (tx-pay-gross: 4000 + compound 401k: 400 = 4400),
+      // adjustIncomeDenominator guards against double-counting pre-tax deductions in the denominator.
+      // Denominator remains 4400 (not 4800!).
+      // Savings rate = 400 / 4400 = 0.0909 (9.09%)
+      expect(data[0].savingsRate).toBe(0.0909);
     }
   });
 
@@ -352,20 +354,18 @@ describe('Savings Rate API Route', () => {
       ignored: false,
     });
 
-    // Mortgage payment: liability accounts store debt reduction as POSITIVE.
-    // Must count as an EXPENSE of 7350 (bug: was income +7350 / expense -7350).
+    // Mortgage payment: stored as negative outflow (-7350).
     mockTransactions.push({
       id: 'tx-mortgage',
       accountId: 'acc-mortgage',
-      amount: '7350.00',
+      amount: '-7350.00',
       date: '2026-06-05',
       categoryId: 'cat-mortgage-pmt',
       categoryName: 'Mortgage Payment',
       ignored: false,
     });
 
-    // Credit card charge: stored as NEGATIVE on a liability account
-    // (debt accrual / money in from the cardholder's cash-flow perspective).
+    // Credit card charge: stored as negative outflow (-400) for grocery spending.
     mockTransactions.push({
       id: 'tx-credit',
       accountId: 'acc-credit',
@@ -381,15 +381,13 @@ describe('Savings Rate API Route', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    // Income: 5000 salary (credit charge is NOT income — it offsets expenses,
-    // mirroring refund semantics for asset accounts).
+    // Income: 5000 salary
     expect(data[0].income).toBe(5000);
-    // Expenses: 7350 mortgage payment (normalized from +7350) minus 400
-    // (credit charge normalized to +400, which offsets expenses).
-    expect(data[0].expenses).toBe(6950);
-    // Net cash flow: 5000 - 6950 = -1950
-    expect(data[0].netCashFlow).toBe(-1950);
-    // Savings rate = -1950 / 5000 = -0.39
-    expect(data[0].savingsRate).toBe(-0.39);
+    // Expenses: 7350 mortgage payment + 400 grocery charge = 7750
+    expect(data[0].expenses).toBe(7750);
+    // Net cash flow: 5000 - 7750 = -2750
+    expect(data[0].netCashFlow).toBe(-2750);
+    // Savings rate = -2750 / 5000 = -0.55
+    expect(data[0].savingsRate).toBe(-0.55);
   });
 });

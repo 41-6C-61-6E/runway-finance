@@ -8,18 +8,36 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptRow } from '@/lib/crypto';
 
+const OPERATOR_ENUM = z.enum([
+  'contains',
+  'equals',
+  'starts_with',
+  'ends_with',
+  'regex',
+  'gt',
+  'lt',
+  'gte',
+  'lte',
+  'eq_numeric',
+  'greater_than',
+  'less_than',
+  'greater_than_or_equal',
+  'less_than_or_equal',
+  'equals_numeric',
+]);
+
 const UpdateRuleSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   priority: z.number().int().optional(),
   isActive: z.boolean().optional(),
   conditionField: z.enum(['description', 'payee', 'amount', 'memo']).optional(),
-  conditionOperator: z.enum(['contains', 'equals', 'starts_with', 'ends_with', 'regex']).optional(),
+  conditionOperator: OPERATOR_ENUM.optional(),
   conditionValue: z.string().min(1).max(500).optional(),
   conditionCaseSensitive: z.boolean().optional(),
   // Multi-condition support
   conditions: z.array(z.object({
     field: z.enum(['description', 'payee', 'amount', 'memo']),
-    operator: z.enum(['contains', 'equals', 'starts_with', 'ends_with', 'regex']),
+    operator: OPERATOR_ENUM,
     value: z.string().min(1).max(500),
     caseSensitive: z.boolean().default(false),
   })).optional(),

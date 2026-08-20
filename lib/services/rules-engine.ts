@@ -32,7 +32,7 @@ export async function applyRulesToTransactions(
     .select()
     .from(categoryRules)
     .where(and(eq(categoryRules.userId, userId), eq(categoryRules.isActive, true)))
-    .orderBy(asc(categoryRules.priority));
+    .orderBy(asc(categoryRules.priority), asc(categoryRules.createdAt), asc(categoryRules.id));
 
   if (rules.length === 0) {
     logger.debug(`${LOG_TAG} No active rules found`, { userId });
@@ -126,7 +126,7 @@ function evaluateSingleCondition(
   const fieldValue = getFieldValue(condition.field, tx);
   if (fieldValue === null || fieldValue === undefined) return false;
 
-  const searchValue = condition.value;
+  const searchValue = String(condition.value ?? '');
   const fieldStr = String(fieldValue);
   const searchStr = condition.caseSensitive ? searchValue : searchValue.toLowerCase();
   const targetStr = condition.caseSensitive ? fieldStr : fieldStr.toLowerCase();
@@ -147,6 +147,41 @@ function evaluateSingleCondition(
       } catch {
         return false;
       }
+    case 'gt':
+    case 'greater_than': {
+      const numField = parseFloat(fieldStr.replace(/[^\d.-]/g, ''));
+      const numSearch = parseFloat(searchValue.replace(/[^\d.-]/g, ''));
+      if (isNaN(numField) || isNaN(numSearch)) return false;
+      return (condition.field === 'amount' ? Math.abs(numField) : numField) > (condition.field === 'amount' ? Math.abs(numSearch) : numSearch);
+    }
+    case 'lt':
+    case 'less_than': {
+      const numField = parseFloat(fieldStr.replace(/[^\d.-]/g, ''));
+      const numSearch = parseFloat(searchValue.replace(/[^\d.-]/g, ''));
+      if (isNaN(numField) || isNaN(numSearch)) return false;
+      return (condition.field === 'amount' ? Math.abs(numField) : numField) < (condition.field === 'amount' ? Math.abs(numSearch) : numSearch);
+    }
+    case 'gte':
+    case 'greater_than_or_equal': {
+      const numField = parseFloat(fieldStr.replace(/[^\d.-]/g, ''));
+      const numSearch = parseFloat(searchValue.replace(/[^\d.-]/g, ''));
+      if (isNaN(numField) || isNaN(numSearch)) return false;
+      return (condition.field === 'amount' ? Math.abs(numField) : numField) >= (condition.field === 'amount' ? Math.abs(numSearch) : numSearch);
+    }
+    case 'lte':
+    case 'less_than_or_equal': {
+      const numField = parseFloat(fieldStr.replace(/[^\d.-]/g, ''));
+      const numSearch = parseFloat(searchValue.replace(/[^\d.-]/g, ''));
+      if (isNaN(numField) || isNaN(numSearch)) return false;
+      return (condition.field === 'amount' ? Math.abs(numField) : numField) <= (condition.field === 'amount' ? Math.abs(numSearch) : numSearch);
+    }
+    case 'eq_numeric':
+    case 'equals_numeric': {
+      const numField = parseFloat(fieldStr.replace(/[^\d.-]/g, ''));
+      const numSearch = parseFloat(searchValue.replace(/[^\d.-]/g, ''));
+      if (isNaN(numField) || isNaN(numSearch)) return false;
+      return Math.abs((condition.field === 'amount' ? Math.abs(numField) : numField) - (condition.field === 'amount' ? Math.abs(numSearch) : numSearch)) < 0.001;
+    }
     default:
       return false;
   }

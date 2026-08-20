@@ -113,17 +113,36 @@ export async function POST(request: Request) {
     return NextResponse.json(matchingExisting, { status: 200 });
   }
 
+  let effectiveCategoryType = categoryType;
+  let effectiveIsIncome = isIncome;
+  let effectiveExcludeFromReports = excludeFromReports;
+
+  if (parentId) {
+    const parentCategory = existingCategories.find((cat) => cat.id === parentId);
+    if (parentCategory) {
+      if (categoryType === 'standard' && parentCategory.categoryType && parentCategory.categoryType !== 'standard') {
+        effectiveCategoryType = parentCategory.categoryType;
+      }
+      if (parentCategory.categoryType === 'transfer' || parentCategory.excludeFromReports) {
+        effectiveExcludeFromReports = parentCategory.excludeFromReports ?? effectiveExcludeFromReports;
+      }
+      if (parentCategory.isIncome !== undefined && ((body as any)?.isIncome === undefined)) {
+        effectiveIsIncome = parentCategory.isIncome;
+      }
+    }
+  }
+
   const encryptedValues = await encryptRow('categories', {
     userId: dataUserId,
     name,
     parentId: parentId ?? null,
     color,
-    isIncome,
+    isIncome: effectiveIsIncome,
     isSystem: false,
-    excludeFromReports,
+    excludeFromReports: effectiveExcludeFromReports,
     hideFromTransactions,
     displayOrder,
-    categoryType,
+    categoryType: effectiveCategoryType,
     expenseParentId: expenseParentId ?? null,
     isDiscretionary: isDiscretionary ?? true,
   }, dek);

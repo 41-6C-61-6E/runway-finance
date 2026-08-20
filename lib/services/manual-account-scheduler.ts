@@ -67,6 +67,7 @@ class ManualAccountScheduler extends BaseScheduler<string> {
       .from(accounts)
       .where(and(
         isNull(accounts.connectionId),
+        isNull(accounts.plaidConnectionId),
       ));
 
     let scheduled = 0;

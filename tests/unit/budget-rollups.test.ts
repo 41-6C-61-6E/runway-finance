@@ -436,4 +436,89 @@ describe('Budget Timeframe Rollups', () => {
     expect(item.coveredCategoryIds).toContain('cat-groceries');
     expect(item.coveredCategoryIds).toContain('cat-restaurants');
   });
+
+  it('calculates accumulated rollover carryover from prior months when rollover=true', async () => {
+    mockDbState.categories = [
+      {
+        id: 'cat-clothing',
+        name: 'Clothing',
+        color: '#ec4899',
+        parentId: null,
+        isIncome: false,
+        categoryType: 'expense',
+        excludeFromReports: false,
+        isDiscretionary: true,
+      },
+    ];
+
+    mockDbState.budgets = [
+      {
+        id: 'b-clothing',
+        userId: 'test-user-id',
+        categoryId: 'cat-clothing',
+        amount: '200.00',
+        periodType: 'monthly',
+        isRecurring: true,
+        effectiveFrom: '2026-06',
+        effectiveTo: null,
+        rollover: true,
+        categoryName: 'Clothing',
+        categoryColor: '#ec4899',
+        isIncome: false,
+        categoryType: 'expense',
+        isDiscretionary: true,
+      },
+    ];
+
+    // Historical transactions:
+    // June 2026: spent $50 (surplus = $150)
+    // July 2026: spent $100 (surplus = $100)
+    // August 2026 (current): spent $75
+    mockDbState.transactions = [
+      {
+        id: 'tx-1',
+        userId: 'test-user-id',
+        date: '2026-06-15',
+        amount: '-50.00',
+        categoryId: 'cat-clothing',
+        deleted: false,
+        ignored: false,
+        isImported: false,
+      },
+      {
+        id: 'tx-2',
+        userId: 'test-user-id',
+        date: '2026-07-20',
+        amount: '-100.00',
+        categoryId: 'cat-clothing',
+        deleted: false,
+        ignored: false,
+        isImported: false,
+      },
+      {
+        id: 'tx-3',
+        userId: 'test-user-id',
+        date: '2026-08-05',
+        amount: '-75.00',
+        categoryId: 'cat-clothing',
+        deleted: false,
+        ignored: false,
+        isImported: false,
+      },
+    ];
+
+    const req = new Request('http://localhost:3000/api/budgets?periodType=monthly&periodKey=2026-08');
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.budgets).toHaveLength(1);
+    const item = data.budgets[0];
+    expect(item.budgeted).toBe(200);
+    expect(item.rollover).toBe(true);
+    expect(item.rolloverCarryover).toBe(250); // $150 from June + $100 from July
+    expect(item.availableBudget).toBe(450); // $200 + $250
+    expect(item.actual).toBe(75);
+    expect(item.remaining).toBe(375); // $450 available - $75 actual
+  });
 });

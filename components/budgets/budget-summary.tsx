@@ -8,7 +8,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle, PiggyBank } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
@@ -208,8 +208,14 @@ export function BudgetSummary() {
   const variableBudgeted = variableExpenseBudgets.reduce((s, b) => s + b.budgeted, 0);
   const variableActual = variableExpenseBudgets.reduce((s, b) => s + b.actual, 0);
 
-  // Variable daily rate & period projection
-  const variableDailyRate = daysElapsed > 0 ? variableActual / daysElapsed : 0;
+  // Variable daily rate & period projection with warmup dampener for first 3 days
+  let variableDailyRate = daysElapsed > 0 ? variableActual / daysElapsed : 0;
+  if (periodType === 'monthly' && daysElapsed > 0 && daysElapsed < 4 && variableBudgeted > 0) {
+    const expectedDailyBudget = variableBudgeted / totalDays;
+    const weight = daysElapsed / 4;
+    variableDailyRate = weight * variableDailyRate + (1 - weight) * expectedDailyBudget;
+  }
+
   const projectedVariableTotal = daysElapsed === totalDays
     ? variableActual
     : isFuture
@@ -222,6 +228,14 @@ export function BudgetSummary() {
 
   const totalExpenseCushion = Math.max(0, totalExpenseBudgeted - totalExpenseActual);
   const projectedSurplusOrDeficit = totalExpenseBudgeted - projectedExpenseTotal;
+
+  // Budgeted vs Actual Savings Rate
+  const budgetedSavingsRate = totalIncomeBudgeted > 0
+    ? Math.max(0, ((totalIncomeBudgeted - totalExpenseBudgeted) / totalIncomeBudgeted) * 100)
+    : 0;
+  const actualSavingsRate = totalIncomeActual > 0
+    ? Math.max(0, ((totalIncomeActual - totalExpenseActual) / totalIncomeActual) * 100)
+    : 0;
 
   // Period-scaled thresholds
   const overBudgetThreshold = 500 * periodConfig.multiplier;
@@ -705,6 +719,50 @@ export function BudgetSummary() {
                     <span className="text-emerald-500 font-semibold">{underBudgetCount} On Track</span>
                     {nearLimitCount > 0 && <span className="text-amber-500 font-semibold">{nearLimitCount} Near</span>}
                     {overBudgetCount > 0 && <span className="text-destructive font-semibold">{overBudgetCount} Over</span>}
+                  </div>
+                </div>
+              </ChartHoverTooltip>
+            </div>
+          )}
+
+          {/* Section 5: Target vs. Actual Savings Rate */}
+          {hasIncome && totalIncomeBudgeted > 0 && (
+            <div className="py-4 first:pt-0 last:pb-0">
+              <ChartHoverTooltip
+                content={
+                  <>
+                    <TooltipHeader>Budgeted vs. Actual Savings Rate</TooltipHeader>
+                    <TooltipRow label="Planned Savings Rate" value={`${budgetedSavingsRate.toFixed(1)}% (${formatCurrency(Math.max(0, totalIncomeBudgeted - totalExpenseBudgeted))})`} color="var(--color-chart-1)" />
+                    <TooltipRow label="Actual Savings Rate" value={`${actualSavingsRate.toFixed(1)}% (${formatCurrency(Math.max(0, totalIncomeActual - totalExpenseActual))})`} color={actualSavingsRate >= budgetedSavingsRate ? 'var(--color-status-success)' : 'var(--color-status-warning)'} />
+                    <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1 text-[10px] text-muted-foreground">
+                      <div>Planned: (Budgeted Income - Budgeted Expenses) / Budgeted Income</div>
+                      <div>Actual: (Actual Income - Actual Expenses) / Actual Income</div>
+                    </div>
+                  </>
+                }
+              >
+                <div className="space-y-2 cursor-help">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-foreground flex items-center gap-1">
+                      <PiggyBank className="w-3.5 h-3.5 text-chart-1 shrink-0" />
+                      Target Savings Rate
+                      <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
+                    </span>
+                    <span className="font-mono text-[11px] font-bold">
+                      <span className={cn(actualSavingsRate >= budgetedSavingsRate ? 'text-constructive' : 'text-amber-500')}>
+                        {actualSavingsRate.toFixed(0)}%
+                      </span>
+                      <span className="text-muted-foreground font-normal"> / {budgetedSavingsRate.toFixed(0)}% target</span>
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
+                    <div
+                      className={cn(
+                        'h-full transition-all duration-500 rounded-full',
+                        actualSavingsRate >= budgetedSavingsRate ? 'bg-emerald-500' : 'bg-amber-500'
+                      )}
+                      style={{ width: `${Math.min(Math.max(actualSavingsRate, 0), 100)}%` }}
+                    />
                   </div>
                 </div>
               </ChartHoverTooltip>

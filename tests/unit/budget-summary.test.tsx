@@ -125,4 +125,14 @@ describe('BudgetSummary Component', () => {
     const collapsePill = screen.getByRole('button', { name: /collapse budget pacing details/i });
     expect(collapsePill).toBeDefined();
   });
+
+  it('renders target vs actual savings rate when income budget is present', () => {
+    render(<BudgetSummary />);
+
+    expect(screen.getByText('Target Savings Rate')).toBeDefined();
+    // Planned savings rate: (3000 - 2000) / 3000 = 33% target
+    // Actual savings rate: (3000 - 1700) / 3000 = 43%
+    expect(screen.getByText('43%')).toBeDefined();
+    expect(screen.getByText('/ 33% target')).toBeDefined();
+  });
 });

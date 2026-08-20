@@ -50,19 +50,21 @@ export interface ProjectionsResult {
 }
 
 /**
- * Calculate average monthly net inflow for an account over the last ~60 days.
+ * Calculate average monthly net inflow for an account over the lookback window (~30 days per lookback month, default 2 months / ~60 days).
  * Uses account snapshots first, falls back to goal allocation history, then current balance.
  */
 export async function calculateMonthlyInflow(
   accountId: string,
-  userId: string
+  userId: string,
+  lookbackMonths: number = 2
 ): Promise<number> {
   const dek = await getSessionDEK();
   const now = new Date();
-  const cutoff60d = new Date(now);
-  cutoff60d.setDate(cutoff60d.getDate() - 60);
+  const months = Math.max(1, lookbackMonths);
+  const cutoffDate = new Date(now);
+  cutoffDate.setDate(cutoffDate.getDate() - (months * 30));
 
-  const cutoffStr = cutoff60d.toISOString().split('T')[0];
+  const cutoffStr = cutoffDate.toISOString().split('T')[0];
 
   // Try accountSnapshots first (most accurate)
   const snapshots = await getDb()
@@ -148,11 +150,13 @@ export async function computeGoalProjections(
   overrides?: {
     monthlyInflow?: number;
     accountInflows?: Record<string, number>;
+    lookbackMonths?: number;
     projectionMonths?: number;
   }
 ): Promise<ProjectionsResult> {
   const dek = await getSessionDEK();
   const projectionMonths = overrides?.projectionMonths ?? 120;
+  const lookbackMonths = overrides?.lookbackMonths ?? 2;
 
   const goals = await getDb()
     .select()
@@ -204,11 +208,11 @@ export async function computeGoalProjections(
       ? overrides.accountInflows[accountId]
       : overrides?.monthlyInflow !== undefined
         ? overrides.monthlyInflow
-        : await calculateMonthlyInflow(accountId, userId);
+        : await calculateMonthlyInflow(accountId, userId, lookbackMonths);
 
     totalMonthlyInflow += monthlyInflow;
 
-    const totalReserve = accountGoals.reduce((sum, g) => sum + (parseFloat(g.reserve) || 0), 0);
+    const totalReserve = accountGoals.reduce((max, g) => Math.max(max, parseFloat(g.reserve) || 0), 0);
 
     const goalDefs = accountGoals.map(g => ({
       goalId: g.id,
@@ -234,8 +238,13 @@ export async function computeGoalProjections(
       }
     }
 
+    // Deduct prefunded goal targets so downstream active goals don't double-dip cash already claimed by funded goals
+    const prefundedTotal = goalDefs
+      .filter(g => g.initialAllocation >= g.targetAmount && g.targetAmount > 0)
+      .reduce((sum, g) => sum + g.targetAmount, 0);
+
     const points: ProjectionPoint[] = [];
-    let runningBalance = currentBalance;
+    let runningBalance = Math.max(0, currentBalance - prefundedTotal);
     const now = new Date();
 
     const initialAllocations = Object.fromEntries(goalSavings);
@@ -260,7 +269,7 @@ export async function computeGoalProjections(
       runningBalance = Math.round((runningBalance + monthlyInflow) * 100) / 100;
 
       const activeGoals = goalDefs.filter(g => !fundedGoals.has(g.goalId) && g.targetAmount > 0);
-      const reserveUsed = activeGoals.reduce((sum, g) => sum + g.reserve, 0);
+      const reserveUsed = activeGoals.reduce((max, g) => Math.max(max, g.reserve), 0);
 
       const availableBalance = Math.max(0, runningBalance - reserveUsed);
       let remaining = availableBalance;
@@ -381,7 +390,7 @@ export async function computeGoalProjections(
   return {
     accounts: accountProjections,
     totalMonthlyInflow,
-    lookbackMonths: 2,
+    lookbackMonths,
     projectionMonths,
   };
 }

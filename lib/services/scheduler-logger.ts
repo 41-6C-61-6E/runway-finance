@@ -195,67 +195,6 @@ export async function logJobEnd(
         details: details || {},
       })
       .where(eq(schedulerJobLogs.id, logId));
-
-    if (status === 'failed') {
-      const [logRow] = await db
-        .select({
-          userId: schedulerJobLogs.userId,
-          jobName: schedulerJobLogs.jobName,
-          details: schedulerJobLogs.details,
-        })
-        .from(schedulerJobLogs)
-        .where(eq(schedulerJobLogs.id, logId))
-        .limit(1);
-
-      if (logRow) {
-        const { sendPushNotification } = await import('@/lib/services/notifications');
-        const { userSettings } = await import('@/lib/db/schema');
-        const [settings] = await db
-          .select({ notifySyncErrors: userSettings.notifySyncErrors })
-          .from(userSettings)
-          .where(eq(userSettings.userId, logRow.userId))
-          .limit(1);
-
-        if (settings?.notifySyncErrors) {
-          // R1: stable, re-arming dedup key so a broken connection alerts once
-          // per error class instead of spamming every 30-minute retry. The key
-          // is deleted on the next successful sync (healSyncAlerts), which
-          // re-arms the alert for future failures.
-          const connectionId: string | undefined =
-            (logRow.details as any)?.connectionId || details?.connectionId;
-          // Manual (non-connected) accounts retry on the same 30m cadence; use
-          // the stable account id as the dedup dimension so they also alert once.
-          const accountId: string | undefined =
-            logRow.jobName === 'manual-account-sync'
-              ? (logRow.details as any)?.accountId || details?.accountId
-              : undefined;
-          const errorClass = classifySyncError(errorMessage);
-          const stableId = connectionId || accountId;
-          const key = stableId ? `sync_error:${stableId}:${errorClass}` : undefined;
-
-          // R9: actionable, human-readable message with a deep link to the
-          // specific connection instead of a raw SDK error string.
-          const connectionDisplayName = connectionId
-            ? await getConnectionDisplayName(connectionId)
-            : null;
-          const { title, body } = buildSyncAlertMessage(logRow.jobName, errorMessage, connectionId, connectionDisplayName);
-          const urlPath = connectionId
-            ? `/settings?tab=advanced&connection=${connectionId}`
-            : accountId
-              ? '/accounts'
-              : '/settings?tab=advanced';
-
-          await sendPushNotification(
-            logRow.userId,
-            title,
-            body,
-            urlPath,
-            'sync_error',
-            key
-          );
-        }
-      }
-    }
   } catch (err) {
     logger.error('[scheduler-logger] Failed to write job end log', { logId, status, error: String(err) });
   }

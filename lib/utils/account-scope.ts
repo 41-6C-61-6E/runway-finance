@@ -108,24 +108,18 @@ export function isLiabilityAccount(type: string): boolean {
 
 /**
  * Normalize a stored transaction amount to the standard "cash-flow" sign
- * convention used by income/expense splits across the app:
+ * convention used across the application:
  *
- *   positive ⇒ money in  (deposit, income, disbursement)
- *   negative ⇒ money out (payment, expense)
+ *   positive ⇒ money in  (deposit, income, refund/credit)
+ *   negative ⇒ money out (charge, purchase, expense)
  *
- * Asset accounts already store transactions this way. Liability accounts
- * (credit cards, loans, mortgages) store the OPPOSITE orientation: a payment
- * (debt reduction) is a POSITIVE amount and a charge/disbursement is NEGATIVE
- * (see Plaid ingestion in lib/services/plaid-sync.ts and the liability-aware
- * balance engine in lib/services/account-history.ts).
- *
- * Call sites that classify transactions purely by sign must run the raw amount
- * through this helper first, otherwise a +2000 mortgage payment gets booked
- * as income (or subtracted from expenses) instead of an expense.
+ * In Runway Finance, all transaction ingestion services (Plaid, SimpleFIN, CSV)
+ * store transactions with this consistent orientation across both asset and
+ * liability accounts.
  */
-export function toCashFlowAmount(amount: number, accountType?: string | null): number {
+export function toCashFlowAmount(amount: number, _accountType?: string | null): number {
   if (amount === 0) return 0;
-  return isLiabilityAccount(accountType ?? '') ? -amount : amount;
+  return amount;
 }
 
 export function isReportableAccount(account: {

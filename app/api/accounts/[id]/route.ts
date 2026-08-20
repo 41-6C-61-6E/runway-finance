@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountTags, tags, simplifinConnections, plaidConnections } from '@/lib/db/schema';
+import { accounts, accountTags, tags, simplifinConnections, plaidConnections, accountSnapshots, holdingSnapshots } from '@/lib/db/schema';
 import { eq, and, or } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -389,6 +389,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         error: err instanceof Error ? err.message : String(err),
       });
     });
+
+    import('@/lib/services/goal-allocation').then(({ updateGoalAllocations }) => {
+      return updateGoalAllocations(dataUserId);
+    }).catch(() => {});
   }
 
   return NextResponse.json(decryptedWithTags);
@@ -427,8 +431,53 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
-  // Delete the account from the database
-  await getDb().delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)));
+  // Delete the account and cascade cleanup of snapshots, tags, and cross-linked metadata
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    // Clean up cross-linked mortgage / property metadata
+    if (account.type === 'mortgage') {
+      const userAccts = await tx
+        .select()
+        .from(accounts)
+        .where(eq(accounts.userId, dataUserId));
+      for (const a of userAccts) {
+        let metaObj: any = null;
+        if (typeof a.metadata === 'string') {
+          try { metaObj = JSON.parse(a.metadata); } catch {}
+        } else if (a.metadata && typeof a.metadata === 'object') {
+          metaObj = a.metadata;
+        }
+        if (metaObj && Array.isArray(metaObj.mortgageAccountIds) && metaObj.mortgageAccountIds.includes(id)) {
+          metaObj.mortgageAccountIds = metaObj.mortgageAccountIds.filter((mid: string) => mid !== id);
+          const updatedMeta = JSON.stringify(metaObj);
+          await tx.update(accounts).set({ metadata: updatedMeta }).where(eq(accounts.id, a.id));
+        }
+      }
+    } else {
+      const userMortgages = await tx
+        .select()
+        .from(accounts)
+        .where(and(eq(accounts.userId, dataUserId), eq(accounts.type, 'mortgage')));
+      for (const m of userMortgages) {
+        let mMetaObj: any = null;
+        if (typeof m.metadata === 'string') {
+          try { mMetaObj = JSON.parse(m.metadata); } catch {}
+        } else if (m.metadata && typeof m.metadata === 'object') {
+          mMetaObj = m.metadata;
+        }
+        if (mMetaObj && mMetaObj.linkedPropertyId === id) {
+          delete mMetaObj.linkedPropertyId;
+          const updatedMeta = JSON.stringify(mMetaObj);
+          await tx.update(accounts).set({ metadata: updatedMeta }).where(eq(accounts.id, m.id));
+        }
+      }
+    }
+
+    await tx.delete(accountSnapshots).where(eq(accountSnapshots.accountId, id));
+    await tx.delete(accountTags).where(eq(accountTags.accountId, id));
+    await tx.delete(holdingSnapshots).where(eq(holdingSnapshots.accountId, id));
+    await tx.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)));
+  });
 
   // Invalidate search cache
   const { invalidateUserSearchCache } = await import('@/lib/services/search-cache');
@@ -453,6 +502,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       error: err instanceof Error ? err.message : String(err),
     });
   }
+
+  import('@/lib/services/goal-allocation').then(({ updateGoalAllocations }) => {
+    return updateGoalAllocations(dataUserId);
+  }).catch(() => {});
 
   logger.info('DELETE /api/accounts/[id]', { userId, id });
   return NextResponse.json({ success: true });

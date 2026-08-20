@@ -59,6 +59,10 @@ class MockDbQueryBuilder {
       resolvedVal = mockCategories;
     } else if (name === 'transactions') {
       resolvedVal = mockTransactions;
+    } else if (name === 'accounts') {
+      resolvedVal = [];
+    } else if (name === 'transaction_tags') {
+      resolvedVal = [];
     } else if (name === 'push_subscriptions') {
       resolvedVal = [];
     } else if (name === 'user_notifications') {
@@ -174,5 +178,76 @@ describe('checkBudgetsAndNotify', () => {
     // Should complete without throwing
     await expect(checkBudgetsAndNotify('user-1', new Uint8Array())).resolves.not.toThrow();
     expect(insertedNotifications.length).toBe(1);
+  });
+
+  it('does not double count child category spending against parent when child has direct budget', async () => {
+    // Parent: Food ($300), Child: Groceries ($500)
+    mockBudgets = [
+      {
+        id: 'budget-parent',
+        categoryId: 'cat-food',
+        amount: '300',
+        isRecurring: true,
+        yearMonth: null,
+        notes: null,
+        categoryName: 'Food',
+        isIncome: false,
+        categoryType: 'expense',
+      },
+      {
+        id: 'budget-child',
+        categoryId: 'cat-groceries',
+        amount: '500',
+        isRecurring: true,
+        yearMonth: null,
+        notes: null,
+        categoryName: 'Groceries',
+        isIncome: false,
+        categoryType: 'expense',
+      },
+    ];
+
+    mockCategories = [
+      { id: 'cat-food', name: 'Food', parentId: null, isIncome: false },
+      { id: 'cat-groceries', name: 'Groceries', parentId: 'cat-food', isIncome: false },
+    ];
+
+    // Spent $400 on groceries (under 500 grocery budget) and $0 direct on food
+    mockTransactions = [
+      { amount: '-400', categoryId: 'cat-groceries' },
+    ];
+
+    await checkBudgetsAndNotify('user-1', new Uint8Array());
+
+    // Groceries is at $400 / $500 = 80%, so it gets a warning alert.
+    // BUT Food should NOT get an alert because Groceries has its own budget!
+    expect(insertedNotifications.length).toBe(1);
+    expect(insertedNotifications[0].title).toBe('Budget Warning: Groceries');
+  });
+
+  it('ignores retired recurring budgets whose effectiveTo is in the past', async () => {
+    mockBudgets = [
+      {
+        id: 'budget-retired',
+        categoryId: 'cat-food',
+        amount: '100',
+        isRecurring: true,
+        effectiveFrom: '2020-01',
+        effectiveTo: '2020-12', // Expired
+        yearMonth: null,
+        notes: null,
+        categoryName: 'Food',
+        isIncome: false,
+        categoryType: 'expense',
+      },
+    ];
+
+    mockTransactions = [
+      { amount: '-150' },
+    ];
+
+    await checkBudgetsAndNotify('user-1', new Uint8Array());
+
+    expect(insertedNotifications.length).toBe(0);
   });
 });

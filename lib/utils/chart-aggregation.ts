@@ -14,10 +14,11 @@ export function getAggregationLevel(pointCount: number): AggregationLevel {
 }
 
 function getWeekKey(dateStr: string): string {
-  const d = new Date(dateStr);
-  const start = new Date(d);
-  start.setDate(d.getDate() - d.getDay());
-  return start.toISOString().split('T')[0];
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const day = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() - day);
+  return date.toISOString().split('T')[0];
 }
 
 function getMonthKey(dateStr: string): string {

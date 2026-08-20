@@ -22,56 +22,51 @@ export interface HistoricalYearReturn {
 }
 
 /**
- * Returns the SECURE 2.0 RMD starting age for a primary-birth year.
- * 1951–1959 → 73 · 1960 → 75 · 1961 → 76 · 1962 → 77 · 1963 → 78 ·
- * 1964 → 79 · 1965+ → 80
+ * Returns the SECURE 2.0 RMD starting age for a primary-birth year:
+ * - 1951–1959 → Age 73
+ * - 1960+ → Age 75 (SECURE 2.0 §107 / IRC §401(a)(9)(C)(v))
  */
 export function getRmdStartAge(birthYear: number | null | undefined, fallback = 73): number {
   if (!birthYear) return fallback;
   if (birthYear <= 1959) return 73;
-  if (birthYear === 1960) return 75;
-  if (birthYear === 1961) return 76;
-  if (birthYear === 1962) return 77;
-  if (birthYear === 1963) return 78;
-  if (birthYear === 1964) return 79;
-  return 80; // 1965+
+  return 75; // 1960+ born individuals
 }
 
 export const DEFAULT_2026_RULES = {
   taxYear: 2026,
   country: 'US',
   filingStatus: 'single',
-  standardDeduction: '15000',
-  standardDeductionSingle: '15000',
-  standardDeductionMfj: '30000',
-  standardDeductionHoH: '22500',
-  standardDeductionMfs: '15000',
+  standardDeduction: '15750',
+  standardDeductionSingle: '15750',
+  standardDeductionMfj: '31500',
+  standardDeductionHoH: '23625',
+  standardDeductionMfs: '15750',
   additionalStdDeduction65Plus: {
-    singleOrHoH: 1950,
-    marriedPerPerson: 1550,
+    singleOrHoH: 2050,
+    marriedPerPerson: 1650,
   },
   ordinaryTaxBrackets: [
     { rate: 0.10, threshold: 0 },
-    { rate: 0.12, threshold: 11925 },
-    { rate: 0.22, threshold: 48475 },
-    { rate: 0.24, threshold: 103350 },
-    { rate: 0.32, threshold: 197300 },
-    { rate: 0.35, threshold: 250525 },
-    { rate: 0.37, threshold: 626350 },
+    { rate: 0.12, threshold: 12400 },
+    { rate: 0.22, threshold: 50400 },
+    { rate: 0.24, threshold: 105700 },
+    { rate: 0.32, threshold: 202100 },
+    { rate: 0.35, threshold: 253950 },
+    { rate: 0.37, threshold: 664650 },
   ],
   headOfHouseholdBrackets: [
     { rate: 0.10, threshold: 0 },
-    { rate: 0.12, threshold: 17000 },
-    { rate: 0.22, threshold: 64850 },
-    { rate: 0.24, threshold: 103350 },
-    { rate: 0.32, threshold: 197300 },
-    { rate: 0.35, threshold: 250500 },
-    { rate: 0.37, threshold: 626350 },
+    { rate: 0.12, threshold: 17700 },
+    { rate: 0.22, threshold: 67450 },
+    { rate: 0.24, threshold: 105700 },
+    { rate: 0.32, threshold: 202100 },
+    { rate: 0.35, threshold: 253900 },
+    { rate: 0.37, threshold: 664650 },
   ],
   capitalGainsBrackets: [
     { rate: 0.00, threshold: 0 },
-    { rate: 0.15, threshold: 48350 },
-    { rate: 0.20, threshold: 533400 },
+    { rate: 0.15, threshold: 50600 },
+    { rate: 0.20, threshold: 558400 },
   ],
   ficaRules: {
     ssTaxRate: 0.062,
@@ -85,8 +80,8 @@ export const DEFAULT_2026_RULES = {
     ssWageBaseCap: 184500,
   },
   socialSecurityRules: {
-    bendPoint1: 1226,
-    bendPoint2: 7391,
+    bendPoint1: 1286,
+    bendPoint2: 7749,
     claimingMultipliers: {
       62: 0.70,
       63: 0.75,
@@ -115,7 +110,7 @@ export const DEFAULT_2026_RULES = {
   acaRules: {
     benchmarkCostSingle: 8400,
     benchmarkCostMfj: 16800,
-    fplBaseSingle: 15060,
+    fplBaseSingle: 16725,
     fplMfjMultiplier: 1.35,
   },
   niitThreshold: '200000',
@@ -125,6 +120,7 @@ export const DEFAULT_2026_RULES = {
     { magiSingle: 129000, magiJoint: 258000, partBMonthly: 174.70, partDMonthly: 33.30 },
     { magiSingle: 161000, magiJoint: 322000, partBMonthly: 279.50, partDMonthly: 53.80 },
     { magiSingle: 193000, magiJoint: 386000, partBMonthly: 384.30, partDMonthly: 74.20 },
+    { magiSingle: 500000, magiJoint: 750000, partBMonthly: 419.30, partDMonthly: 81.00 },
   ],
   ssTaxationThresholds: {
     single: { tier1: 25000, tier2: 34000 },
@@ -135,13 +131,14 @@ export const DEFAULT_2026_RULES = {
     iraCatchUp: 1000, // age >= 50
     k401: 23500,
     k401CatchUp: 7500, // age >= 50
-    hsaSingle: 4300,
-    hsaFamily: 8550,
+    k401SpecialCatchUp: 11250, // SECURE 2.0 ages 60-63 (IRC §414(v)(2)(E))
+    hsaSingle: 4400,
+    hsaFamily: 8750,
     hsaCatchUp: 1000, // age >= 55
   },
   giftEstateExemptions: {
-    annualGiftLimit: 18000,
-    lifetimeEstateLimit: 13610000,
+    annualGiftLimit: 19000,
+    lifetimeEstateLimit: 14400000,
   },
   acaSubsidyTable: [
     { fplPercent: 100, premiumCapPercent: 0.00 },
@@ -151,10 +148,8 @@ export const DEFAULT_2026_RULES = {
     { fplPercent: 300, premiumCapPercent: 0.06 },
     { fplPercent: 400, premiumCapPercent: 0.085 },
   ],
-  fplAmount: '15060',
+  fplAmount: '16725',
   secureActRules: {
-    // Fallback band only. Exact SECURE 2.0 start age is per birth year —
-    // see getRmdStartAge() (1951–1959→73, 1960→75, 1961→76, ... 1965+→80).
     rmdAge: 73,
     inheritedIraYears: 10,
   },

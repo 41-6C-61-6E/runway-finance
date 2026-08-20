@@ -821,6 +821,13 @@ export async function syncManualAccount(
     invalidateUserSearchCache(userId);
   }
 
+  try {
+    const { healSyncAlerts } = await import('@/lib/services/notifications');
+    await healSyncAlerts(userId, accountId);
+  } catch (healErr) {
+    logger.debug(`${LOG_TAG} Non-critical error healing sync alerts for manual account`, { accountId, error: String(healErr) });
+  }
+
   return {
     status: 'success',
     newBalance: newValue,

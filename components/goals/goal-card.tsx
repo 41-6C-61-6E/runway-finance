@@ -116,10 +116,10 @@ export function GoalCard({
 }: GoalCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const target = parseFloat(goal.targetAmount);
+  const target = Math.max(0, parseFloat(goal.targetAmount) || 0);
   // Use allocatedAmount for linked accounts (considers priority allocation), fall back to currentAmount
-  const current = parseFloat(goal.allocatedAmount?.toString() ?? goal.currentAmount);
-  const progress = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+  const current = Math.max(0, parseFloat(goal.allocatedAmount?.toString() ?? goal.currentAmount) || 0);
+  const progress = target > 0 ? Math.max(0, Math.min(100, (current / target) * 100)) : 0;
   const barColor = progress >= 75 ? 'bg-chart-1' :
                    progress >= 50 ? 'bg-chart-3' :
                    progress >= 25 ? 'bg-status-warning' : 'bg-destructive';
@@ -225,6 +225,14 @@ export function GoalCard({
                 )}
                 <h4 className="text-base font-semibold text-foreground truncate leading-snug">{goal.name}</h4>
                 {getStatusBadge(goal.status)}
+                {goal.isUnderfunded && goal.status === 'active' && (
+                  <span 
+                    className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider shrink-0"
+                    title="Underfunded: allocated less than desired due to priority ordering or account balance limits"
+                  >
+                    Underfunded
+                  </span>
+                )}
               </div>
 
               {goal.description && (
@@ -387,7 +395,7 @@ export function GoalCard({
               <div className="flex items-center gap-2 shrink-0 text-[10px]">
                 <span>{percentage}% allocated</span>
                 <span>•</span>
-                <span className="blur-number">{formatCurrency(parseFloat(goal.reserve))} reserve</span>
+                <span className="blur-number">{formatCurrency(parseFloat(goal.reserve || '0') || 0)} reserve</span>
               </div>
             </div>
           )}

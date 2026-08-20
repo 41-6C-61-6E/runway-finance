@@ -8,7 +8,7 @@ import { getShareGroupUserIds } from '@/lib/sharing';
 
 const LOG_TAG = '[recurring-detection]';
 
-export type FrequencyType = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
+export type FrequencyType = 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
 
 interface RecurringExclusions {
   categoryIds?: string[];
@@ -185,15 +185,30 @@ export function classifyFrequency(intervals: number[]): {
 }
 
 /**
- * Adds frequency period to a date.
+ * Adds frequency period to a date, preserving original anchor day-of-month.
  */
-export function addFrequencyPeriod(dateStr: string, frequency: FrequencyType): string {
+export function addFrequencyPeriod(dateStr: string, frequency: FrequencyType, anchorDay?: number): string {
   const d = new Date(dateStr + 'T00:00:00Z');
   if (isNaN(d.getTime())) return dateStr;
 
   const year = d.getUTCFullYear();
   const month = d.getUTCMonth();
   const day = d.getUTCDate();
+  const effectiveDay = anchorDay ?? day;
+
+  if (frequency === 'semi_monthly') {
+    const target = new Date(Date.UTC(year, month, 1));
+    if (day < 15) {
+      target.setUTCDate(15);
+    } else {
+      const nextMonth = new Date(Date.UTC(year, month + 1, 1));
+      const daysInNext = new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth() + 1, 0)).getUTCDate();
+      target.setUTCFullYear(nextMonth.getUTCFullYear());
+      target.setUTCMonth(nextMonth.getUTCMonth());
+      target.setUTCDate(Math.min(effectiveDay <= 15 ? 1 : effectiveDay, daysInNext));
+    }
+    return target.toISOString().split('T')[0];
+  }
 
   const monthDelta =
     frequency === 'monthly' ? 1
@@ -205,7 +220,7 @@ export function addFrequencyPeriod(dateStr: string, frequency: FrequencyType): s
 
   const target = new Date(Date.UTC(year, month + monthDelta, 1));
   const daysInTargetMonth = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
-  target.setUTCDate(Math.min(day, daysInTargetMonth) + dayDelta);
+  target.setUTCDate(Math.min(effectiveDay, daysInTargetMonth) + dayDelta);
 
   return target.toISOString().split('T')[0];
 }
@@ -213,9 +228,11 @@ export function addFrequencyPeriod(dateStr: string, frequency: FrequencyType): s
 /**
  * Calculates next expected date from the last date, stepping forward to present/future.
  */
-export function calculateNextExpectedDate(lastDateStr: string, frequency: FrequencyType, referenceDateStr?: string): string {
+export function calculateNextExpectedDate(lastDateStr: string, frequency: FrequencyType, referenceDateStr?: string, anchorDay?: number): string {
+  const origDate = new Date(lastDateStr + 'T00:00:00Z');
+  const effectiveAnchor = anchorDay ?? (isNaN(origDate.getTime()) ? undefined : origDate.getUTCDate());
   const todayStr = referenceDateStr || new Date().toISOString().split('T')[0];
-  let next = addFrequencyPeriod(lastDateStr, frequency);
+  let next = addFrequencyPeriod(lastDateStr, frequency, effectiveAnchor);
 
   // If lastDate was recent and next is already >= today, return next
   if (next >= todayStr) return next;
@@ -224,7 +241,7 @@ export function calculateNextExpectedDate(lastDateStr: string, frequency: Freque
   let current = next;
   let iterations = 0;
   while (current < todayStr && iterations < 50) {
-    current = addFrequencyPeriod(current, frequency);
+    current = addFrequencyPeriod(current, frequency, effectiveAnchor);
     iterations++;
   }
 
@@ -240,6 +257,8 @@ export function getMonthlyMultiplier(frequency: string): number {
       return 52 / 12;
     case 'biweekly':
       return 26 / 12;
+    case 'semi_monthly':
+      return 2;
     case 'monthly':
       return 1;
     case 'quarterly':
@@ -262,6 +281,8 @@ export function getAnnualMultiplier(frequency: string): number {
       return 52;
     case 'biweekly':
       return 26;
+    case 'semi_monthly':
+      return 24;
     case 'monthly':
       return 12;
     case 'quarterly':
@@ -280,6 +301,7 @@ export function getMaxRecencyDays(frequency: FrequencyType): number {
     case 'weekly':
       return 28;
     case 'biweekly':
+    case 'semi_monthly':
       return 45;
     case 'monthly':
       return 65;
@@ -1136,6 +1158,9 @@ export async function getUpcomingBills(
                   : 30;
     const maxIterations = Math.min(104, Math.ceil(daysAhead / periodDays) + 1);
 
+    const origAnchorDate = new Date((item.lastDate || item.nextExpectedDate) + 'T00:00:00Z');
+    const initialAnchorDay = isNaN(origAnchorDate.getTime()) ? undefined : origAnchorDate.getUTCDate();
+
     let projDate = item.nextExpectedDate;
     let safety = 0;
 
@@ -1163,7 +1188,7 @@ export async function getUpcomingBills(
       });
 
       // Advance to next upcoming
-      projDate = calculateNextExpectedDate(projDate, item.frequency, todayStr);
+      projDate = calculateNextExpectedDate(projDate, item.frequency, todayStr, initialAnchorDay);
     }
 
     // Advance and collect occurrences up to horizon
@@ -1189,7 +1214,7 @@ export async function getUpcomingBills(
         isOverdue: false,
       });
 
-      projDate = addFrequencyPeriod(projDate, item.frequency);
+      projDate = addFrequencyPeriod(projDate, item.frequency, initialAnchorDay);
       safety++;
     }
   }

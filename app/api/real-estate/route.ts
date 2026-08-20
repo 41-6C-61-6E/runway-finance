@@ -106,7 +106,8 @@ export async function GET(request: Request) {
         );
         const equity = propertyValue - Math.abs(totalMortgageBalance);
         const ltv = propertyValue > 0 ? (Math.abs(totalMortgageBalance) / propertyValue) * 100 : 0;
-        const saleProceeds = propertyValue * 0.92 - Math.abs(totalMortgageBalance);
+        const sellerClosingCostPercent = 8.0;
+        const saleProceeds = propertyValue * (1 - sellerClosingCostPercent / 100) - Math.abs(totalMortgageBalance);
 
         const snapshotsConditions = [
           eq(accountSnapshots.userId, dataUserId),
@@ -207,6 +208,7 @@ export async function GET(request: Request) {
         totalEquity,
         overallLtv,
         propertyCount: properties.length,
+        sellerClosingCostPercent: 8.0,
       },
     });
   } catch (error) {

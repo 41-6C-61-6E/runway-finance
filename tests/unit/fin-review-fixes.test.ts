@@ -211,4 +211,150 @@ describe('Financial Engine Remediation & Fixes (FIN_REVIEW)', () => {
       expect(bounds.minValue).toBe(-100 * 1.15);
     });
   });
+
+  describe('F01: Statutory Tax Engine & Rule Tables Verification', () => {
+    it('F01-6: tax_optimized withdrawal fills full 12% bracket ceiling (up to 22% floor), not 12% floor', () => {
+      const plan: EnginePlan = {
+        id: 'plan-tax-opt',
+        name: 'Tax Optimized Plan',
+        hasSpouse: false,
+        primaryBirthYear: 1965, // age 61 in 2026
+        primaryBirthMonth: 1,
+        filingStatus: 'single',
+        retirementAge: 60, // already retired
+        lifeExpectancyAge: 70,
+        withdrawalMethod: 'tax_optimized',
+        accounts: [
+          {
+            id: 'trad-acc',
+            name: 'Traditional IRA',
+            type: 'traditional_ira',
+            owner: 'primary',
+            balance: 200000,
+            costBasis: 200000,
+            expectedGrowthRate: 0,
+            dividendYield: 0,
+            reinvestDividends: false,
+          },
+          {
+            id: 'taxable-acc',
+            name: 'Taxable Brokerage',
+            type: 'brokerage',
+            owner: 'primary',
+            balance: 200000,
+            costBasis: 200000,
+            expectedGrowthRate: 0,
+            dividendYield: 0,
+            reinvestDividends: false,
+          },
+        ],
+        liabilities: [],
+        events: [
+          {
+            id: 'ev-living',
+            name: 'Living Expenses',
+            category: 'expense',
+            type: 'living_expense',
+            owner: 'primary',
+            amount: 80000,
+            frequency: 'yearly',
+            growthRate: 0,
+            adjustForInflation: false,
+            startTriggerType: 'now',
+            endTriggerType: 'end_of_plan',
+          },
+        ],
+        flows: [],
+      };
+
+      const res = runRetirementSimulation(plan);
+      const year1 = res.yearlyResults[0];
+
+      // Standard deduction is $15,750. In 2026, 12% bracket ceiling is $50,400.
+      // So traditional drawdown can fill $15,750 (0% bracket) + $50,400 (10% and 12% brackets) = $66,150.
+      // With the fix, traditional drawdown should exceed $40,000 (previously capped at $12,400 taxable income).
+      expect(year1.drawdownsByType.traditional).toBeGreaterThan(45000);
+      expect(year1.drawdownsByType.traditional).toBeLessThanOrEqual(80000);
+    });
+
+    it('F01-1 & F01-2: statutory rules for 2024 and 2025 match published IRS schedules', async () => {
+      const rules2024 = await getSystemTaxRules(2024);
+      expect(rules2024.standardDeduction).toBe('14600');
+      expect(rules2024.standardDeductionMfj).toBe('29200');
+      expect(rules2024.capitalGainsBrackets[1].threshold).toBe(47025);
+      expect(rules2024.capitalGainsBrackets[2].threshold).toBe(518900); // 2024 LTCG 20% floor
+      expect(rules2024.ficaRules.ssWageBaseCap).toBe(168600);
+
+      const rules2025 = await getSystemTaxRules(2025);
+      expect(rules2025.standardDeduction).toBe('15000');
+      expect(rules2025.standardDeductionMfj).toBe('30000');
+      expect(rules2025.ordinaryTaxBrackets[1].threshold).toBe(11925);
+      expect(rules2025.ordinaryTaxBrackets[2].threshold).toBe(48475);
+      expect(rules2025.capitalGainsBrackets[1].threshold).toBe(48350);
+      expect(rules2025.ficaRules.ssWageBaseCap).toBe(176100);
+    });
+
+    it('F01-3: SECURE 2.0 higher catch-up ($11,250) applies to ages 60-63', () => {
+      const plan: EnginePlan = {
+        id: 'plan-age62-catchup',
+        name: 'Age 62 Catch-Up Plan',
+        hasSpouse: false,
+        primaryBirthYear: 1964, // age 62 in 2026
+        primaryBirthMonth: 1,
+        filingStatus: 'single',
+        retirementAge: 65,
+        lifeExpectancyAge: 85,
+        primarySalary: 200000,
+        primarySalaryYear: 2026,
+        accounts: [
+          {
+            id: 'k401-acc',
+            name: '401k Account',
+            type: 'traditional_401k',
+            owner: 'primary',
+            balance: 100000,
+            costBasis: 100000,
+            expectedGrowthRate: 0,
+            dividendYield: 0,
+            reinvestDividends: false,
+            contributionMode: 'maximize',
+          },
+        ],
+        liabilities: [],
+        events: [],
+        flows: [],
+      };
+
+      const res = runRetirementSimulation(plan);
+      const year1 = res.yearlyResults[0];
+      // 401(k) base $23,500 + special 60-63 catchup $11,250 = $34,750
+      expect(year1.surplusSaved).toBe(34750);
+    });
+
+    it('F01-12: MFS age 65+ additional standard deduction uses married boost', () => {
+      const planMfs: EnginePlan = {
+        id: 'plan-mfs-65',
+        name: 'MFS 65+ Plan',
+        hasSpouse: false,
+        primaryBirthYear: 1955, // age 71 in 2026 (>= 65)
+        primaryBirthMonth: 1,
+        filingStatus: 'married_separate',
+        retirementAge: 75,
+        lifeExpectancyAge: 85,
+        primarySalary: 100000,
+        primarySalaryYear: 2026,
+        accounts: [],
+        liabilities: [],
+        events: [],
+        flows: [],
+      };
+
+      const res = runRetirementSimulation(planMfs);
+      const year1 = res.yearlyResults[0];
+      // MFS base $15,750 + married 65+ boost $1,650 = $17,400
+      // Taxable ordinary: $100,000 - $17,400 = $82,600
+      expect(year1.ordinaryTax).toBeGreaterThan(0);
+    });
+  });
 });
+

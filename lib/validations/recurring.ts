@@ -20,7 +20,7 @@ export const RecurringPatchSchema = z.object({
   customName: z.string().max(200).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   categoryId: z.string().uuid().nullable().optional(),
-  frequency: z.enum(['weekly', 'biweekly', 'monthly', 'quarterly', 'semi_annual', 'annual']).optional(),
+  frequency: z.enum(['weekly', 'biweekly', 'semi_monthly', 'monthly', 'quarterly', 'semi_annual', 'annual']).optional(),
   averageAmount: z.coerce.number().positive().finite().optional(),
 });
 
@@ -33,7 +33,7 @@ export const RecurringCreateSchema = z.object({
   matchPattern: z.string().max(200).optional(),
   accountId: z.string().uuid().nullable().optional(),
   categoryId: z.string().uuid().nullable().optional(),
-  frequency: z.enum(['weekly', 'biweekly', 'monthly', 'quarterly', 'semi_annual', 'annual']).default('monthly'),
+  frequency: z.enum(['weekly', 'biweekly', 'semi_monthly', 'monthly', 'quarterly', 'semi_annual', 'annual']).default('monthly'),
   amount: z.coerce.number().positive().finite(),
   lastDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   nextExpectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

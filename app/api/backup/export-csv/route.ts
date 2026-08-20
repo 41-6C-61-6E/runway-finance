@@ -22,6 +22,8 @@ import {
   tags,
   importLog,
   paystubs,
+  recurringTransactions,
+  transactionTags,
 } from '@/lib/db/schema';
 import { toCsv } from '@/lib/utils/export-formatter';
 import { ZipArchive } from 'archiver';
@@ -33,6 +35,9 @@ const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: categories, dbName: 'categories', label: 'categories' },
   { table: transactions, dbName: 'transactions', label: 'transactions' },
   { table: categoryRules, dbName: 'category_rules', label: 'category_rules' },
+  { table: recurringTransactions, dbName: 'recurring_transactions', label: 'recurring_transactions' },
+  { table: tags, dbName: 'tags', label: 'tags' },
+  { table: transactionTags, dbName: 'transaction_tags', label: 'transaction_tags' },
   { table: budgets, dbName: 'budgets', label: 'budgets' },
   { table: financialGoals, dbName: 'financial_goals', label: 'financial_goals' },
   { table: netWorthSnapshots, dbName: 'net_worth_snapshots', label: 'net_worth_snapshots' },

@@ -59,6 +59,11 @@ const DEBT_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
   credit: { label: 'Credit Cards' },
   loan: { label: 'Loans' },
   mortgage: { label: 'Mortgages' },
+  studentloan: { label: 'Student Loans' },
+  autoloan: { label: 'Auto Loans' },
+  otherloan: { label: 'Other Loans' },
+  otherLiability: { label: 'Other Debt' },
+  otherliability: { label: 'Other Debt' },
 };
 
 function formatCompact(value: number): string {

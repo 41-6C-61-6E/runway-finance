@@ -29,7 +29,7 @@ import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { Switch } from '@/components/ui/switch';
-import { ArrowRightLeft, TrendingUp, Info, ChevronDown, ChevronUp, Settings2, CheckSquare, Square, RefreshCw } from 'lucide-react';
+import { ArrowRightLeft, TrendingUp, Info, ChevronDown, ChevronUp, Settings2, PiggyBank, Layers } from 'lucide-react';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
@@ -73,6 +73,7 @@ const typeOptions = [
 
 export function IncomeExpenseChart() {
   const { privacyMode } = usePrivacyMode();
+  const [activeView, setActiveView] = usePersistentState<'income' | 'savingsRate'>('cf-chart:active-view', 'income');
   const [selectedSavingsPoint, setSelectedSavingsPoint] = useState<any | null>(null);
   const [selectedCashFlowPoint, setSelectedCashFlowPoint] = useState<any | null>(null);
   const [expandedBucket, setExpandedBucket] = useState<'retirement' | 'hsa' | 'brokerage' | 'savingsAccount' | 'cash' | 'income' | 'expenses' | null>(null);
@@ -86,7 +87,7 @@ export function IncomeExpenseChart() {
   const [adjustIncomeDenominator, setAdjustIncomeDenominator] = usePersistentState<boolean>('cf-chart:adjust-income-denominator', false);
 
   const [showCustomizer, setShowCustomizer] = useState(false);
-  const [activeTab, setActiveTab] = useState<'accounts' | 'categories'>('accounts');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'categories' | 'savings'>('accounts');
   const [categorySearch, setCategorySearch] = useState('');
 
   // Fetch all user accounts
@@ -254,8 +255,8 @@ export function IncomeExpenseChart() {
     const totalIncome = chartData.reduce((sum, d) => sum + d.income, 0);
     const totalExpenses = chartData.reduce((sum, d) => sum + Math.abs(d.expenses), 0);
     const formattedLastPointMonth = formatChartXAxisDate(lastPoint.yearMonth + '-01', timeframe, { isMonthly: true });
-    return `Income versus expenses chart. Over the selected period, total income was ${formatCurrency(totalIncome)} and total expenses were ${formatCurrency(totalExpenses)}. In the most recent month (${formattedLastPointMonth}), income was ${formatCurrency(lastPoint.income)} and expenses were ${formatCurrency(Math.abs(lastPoint.expenses))}.`;
-  }, [chartData, timeframe]);
+    return `Income versus expenses chart. Over the selected period, total income was ${formatCurrency(totalIncome)} and total expenses were ${formatCurrency(totalExpenses)}. In the most recent month (${formattedLastPointMonth}), income was ${formatCurrency(lastPoint.income)} and expenses were ${formatCurrency(Math.abs(lastPoint.expenses))}. Average savings rate was ${avgSavingsRate.toFixed(1)}%.`;
+  }, [chartData, timeframe, avgSavingsRate]);
 
   // Left Y-Axis domains (Income vs Expenses)
   const allValues = chartData.flatMap((d) => [d.income, d.expenses, d.net]);
@@ -380,23 +381,23 @@ export function IncomeExpenseChart() {
     if (!point) return null;
     const headerDate = formatChartXAxisDate(point.yearMonth + '-01', timeframe, { isMonthly: true });
 
-    const totalSavings = point.retirement + point.hsa + point.brokerage + point.savingsAccount + point.cash;
+    const totalSavings = (point.retirement || 0) + (point.hsa || 0) + (point.brokerage || 0) + (point.savingsAccount || 0) + (point.cash || 0);
 
     return (
       <ChartTooltip>
         <TooltipHeader>{headerDate}</TooltipHeader>
-        <TooltipRow label="Retirement" value={formatCurrency(point.retirement)} color="var(--color-chart-1)" />
-        <TooltipRow label="HSA" value={formatCurrency(point.hsa)} color="var(--color-chart-2)" />
-        <TooltipRow label="Brokerage" value={formatCurrency(point.brokerage)} color="var(--color-chart-3)" />
-        <TooltipRow label="Savings Account" value={formatCurrency(point.savingsAccount)} color="var(--color-chart-4)" />
-        <TooltipRow label="Leftover Cash" value={formatCurrency(point.cash)} color="var(--color-chart-5)" />
+        <TooltipRow label="Retirement" value={formatCurrency(point.retirement || 0)} color="var(--color-chart-1)" />
+        <TooltipRow label="HSA" value={formatCurrency(point.hsa || 0)} color="var(--color-chart-2)" />
+        <TooltipRow label="Brokerage" value={formatCurrency(point.brokerage || 0)} color="var(--color-chart-3)" />
+        <TooltipRow label="Savings Account" value={formatCurrency(point.savingsAccount || 0)} color="var(--color-chart-4)" />
+        <TooltipRow label="Leftover Cash" value={formatCurrency(point.cash || 0)} color="var(--color-chart-5)" />
         <div className="border-t border-border my-1 pt-1 font-semibold text-foreground flex justify-between gap-8 text-xs">
           <span>Total Savings:</span>
           <span>{formatCurrency(totalSavings)}</span>
         </div>
         <div className="font-semibold text-primary flex justify-between gap-8 text-xs">
           <span>Savings Rate:</span>
-          <span>{point.savingsRate.toFixed(1)}%</span>
+          <span>{Number(point.savingsRate || 0).toFixed(1)}%</span>
         </div>
       </ChartTooltip>
     );
@@ -411,7 +412,7 @@ export function IncomeExpenseChart() {
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Income</span>
+              <span>Net Income & Savings Rate</span>
             </div>
           }
         />
@@ -429,7 +430,7 @@ export function IncomeExpenseChart() {
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Income</span>
+              <span>Net Income & Savings Rate</span>
             </div>
           }
         />
@@ -451,7 +452,7 @@ export function IncomeExpenseChart() {
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Income</span>
+              <span>Net Income & Savings Rate</span>
             </div>
           }
         />
@@ -477,7 +478,7 @@ export function IncomeExpenseChart() {
         title={
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-            <span>Net Income</span>
+            <span>Net Income & Savings Rate</span>
           </div>
         }
       />
@@ -506,6 +507,9 @@ export function IncomeExpenseChart() {
               </button>
             }
             feedbackItems={[
+              <span key="view" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                {activeView === 'income' ? 'Net Income' : 'Savings Rate'}
+              </span>,
               <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                 {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
               </span>,
@@ -529,7 +533,35 @@ export function IncomeExpenseChart() {
             }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-              <div className="flex items-center">
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* View Switcher: Net Income vs Savings Rate */}
+                <div className="inline-flex rounded-lg border border-border bg-background p-0.5 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('income')}
+                    className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                      activeView === 'income'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <ArrowRightLeft className="w-3 h-3" />
+                    <span>Net Income</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('savingsRate')}
+                    className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                      activeView === 'savingsRate'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <PiggyBank className="w-3 h-3" />
+                    <span>Savings Rate</span>
+                  </button>
+                </div>
+
                 <TimeRangeFilter value={timeframe} presets={incomeExpensePresets} onChange={setTimeframe} />
               </div>
               <div className="flex items-center gap-1.5">
@@ -543,7 +575,7 @@ export function IncomeExpenseChart() {
             <div className="border-b border-border bg-muted/5 px-5 py-4 space-y-4 animate-in slide-in-from-top-2 duration-250">
               {/* Tabs */}
               <div className="flex gap-2 border-b border-border/30 pb-2 overflow-x-auto scrollbar-none">
-                {(['accounts', 'categories'] as const).map((tab) => (
+                {(['accounts', 'categories', 'savings'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -555,6 +587,7 @@ export function IncomeExpenseChart() {
                   >
                     {tab === 'accounts' && 'Included Accounts'}
                     {tab === 'categories' && 'Excluded Categories'}
+                    {tab === 'savings' && 'Savings Components'}
                   </button>
                 ))}
               </div>
@@ -667,7 +700,7 @@ export function IncomeExpenseChart() {
                                     }
                                   }}
                                   className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
-                                  />
+                                />
                                 <span className="text-xs font-bold text-foreground">{parent.name}</span>
                               </label>
                             </div>
@@ -704,155 +737,352 @@ export function IncomeExpenseChart() {
                 </div>
               )}
 
+              {/* Tab Content: Savings Components */}
+              {activeTab === 'savings' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-foreground">Included Savings Categories</span>
+                    <p className="text-xs text-muted-foreground">Select which destinations count as personal savings in the savings rate breakdown.</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                      {[
+                        { id: 'retirement', label: 'Retirement (401k/IRA)' },
+                        { id: 'hsa', label: 'HSA / Health Savings' },
+                        { id: 'brokerage', label: 'Taxable Brokerage' },
+                        { id: 'savingsAccount', label: 'Savings Accounts' },
+                        { id: 'cash', label: 'Leftover Cash Surplus' },
+                      ].map((item) => {
+                        const isIncluded = savingsComponents.includes(item.id);
+                        return (
+                          <label
+                            key={item.id}
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer hover:bg-muted/20 transition-all ${
+                              isIncluded ? 'border-primary/20 bg-primary/5' : 'border-border/65 bg-background opacity-60'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isIncluded}
+                              onChange={() => {
+                                if (isIncluded) {
+                                  setSavingsComponents((prev) => prev.filter((c) => c !== item.id));
+                                } else {
+                                  setSavingsComponents((prev) => [...prev, item.id]);
+                                }
+                              }}
+                              className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                            />
+                            <span className="text-xs font-medium text-foreground">{item.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/40 pt-3 space-y-2.5">
+                    <span className="text-xs font-semibold text-foreground">Payroll & Denominator Adjustments</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includePaystubRetirement}
+                          onChange={(e) => setIncludePaystubRetirement(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                        />
+                        <span>Include Paystub 401(k)</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includePaystubHsa}
+                          onChange={(e) => setIncludePaystubHsa(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                        />
+                        <span>Include Paystub HSA</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={adjustIncomeDenominator}
+                          onChange={(e) => setAdjustIncomeDenominator(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
+                        />
+                        <span>Gross Up Denominator</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           <div className="p-2.5 sm:p-5">
-            <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-              <ArrowRightLeft className="w-3.5 h-3.5 text-primary shrink-0" />
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Income vs Expenses</span>
+            <div className="flex items-center justify-between gap-1.5 mb-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                {activeView === 'income' ? (
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-primary shrink-0" />
+                ) : (
+                  <PiggyBank className="w-3.5 h-3.5 text-primary shrink-0" />
+                )}
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {activeView === 'income' ? 'Income vs Expenses' : 'Savings Rate & Components'}
+                </span>
+              </div>
+              <span className="text-[11px] text-muted-foreground italic hidden sm:inline">
+                Click any bar or point for point-in-time breakdown
+              </span>
             </div>
+
             <div className="h-[260px] sm:h-[300px] w-full relative touch-pan-y">
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                {chartType === 'bar' ? (
-                  <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} stackOffset="sign" margin={{ top: 15, right: 10, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
-                    <XAxis
-                      dataKey="yearMonth"
-                      tickLine={false}
-                      axisLine={{ stroke: 'var(--color-border)' }}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      ticks={xAxisTicks}
-                      tickFormatter={formatXTick}
-                      minTickGap={30}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={{ stroke: 'var(--color-border)' }}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      domain={[minVal * 1.15, maxVal * 1.15]}
-                      ticks={leftYAxisTicks}
-                      tickFormatter={formatYTick}
-                    />
-                    <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
-                    <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
-                    <Bar
-                      dataKey="income"
-                      name="Income"
-                      fill="var(--color-chart-1)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={24}
-                      stackId="a"
-                      onClick={(data: any) => setSelectedCashFlowPoint(data?.payload)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <Bar
-                      dataKey="expenses"
-                      name="Expenses"
-                      fill="var(--color-destructive)"
-                      radius={[0, 0, 4, 4]}
-                      maxBarSize={24}
-                      stackId="a"
-                      onClick={(data: any) => setSelectedCashFlowPoint(data?.payload)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="net"
-                      name="Net Income"
-                      stroke="var(--color-primary)"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      iconType="circle"
-                      iconSize={10}
-                      wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                      formatter={(value: string) => (
-                        <span style={{ color: 'var(--color-foreground)' }}>{value}</span>
-                      )}
-                    />
-                  </ComposedChart>
+                {activeView === 'income' ? (
+                  chartType === 'bar' ? (
+                    <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} stackOffset="sign" margin={{ top: 15, right: 10, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
+                      <XAxis
+                        dataKey="yearMonth"
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        ticks={xAxisTicks}
+                        tickFormatter={formatXTick}
+                        minTickGap={30}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        domain={[minVal * 1.15, maxVal * 1.15]}
+                        ticks={leftYAxisTicks}
+                        tickFormatter={formatYTick}
+                      />
+                      <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+                      <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+                      <Bar
+                        dataKey="income"
+                        name="Income"
+                        fill="var(--color-chart-1)"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={24}
+                        stackId="a"
+                        onClick={(data: any) => setSelectedCashFlowPoint(data?.payload)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <Bar
+                        dataKey="expenses"
+                        name="Expenses"
+                        fill="var(--color-destructive)"
+                        radius={[0, 0, 4, 4]}
+                        maxBarSize={24}
+                        stackId="a"
+                        onClick={(data: any) => setSelectedCashFlowPoint(data?.payload)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="net"
+                        name="Net Income"
+                        stroke="var(--color-primary)"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        iconType="circle"
+                        iconSize={10}
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                        formatter={(value: string) => (
+                          <span style={{ color: 'var(--color-foreground)' }}>{value}</span>
+                        )}
+                      />
+                    </ComposedChart>
+                  ) : (
+                    <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} margin={{ top: 15, right: 10, left: -10, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.45} />
+                          <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.08} />
+                        </linearGradient>
+                        <linearGradient id="expensesGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--color-destructive)" stopOpacity={0.45} />
+                          <stop offset="95%" stopColor="var(--color-destructive)" stopOpacity={0.08} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
+                      <XAxis
+                        dataKey="yearMonth"
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        ticks={xAxisTicks}
+                        tickFormatter={formatXTick}
+                        minTickGap={30}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        domain={[minVal * 1.15, maxVal * 1.15]}
+                        ticks={leftYAxisTicks}
+                        tickFormatter={formatYTick}
+                      />
+                      <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
+                      <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+                      <Area
+                        type="monotone"
+                        dataKey="income"
+                        name="Income"
+                        fill="url(#incomeGrad)"
+                        stroke="var(--color-chart-1)"
+                        strokeWidth={2}
+                        activeDot={{ r: 4 }}
+                        onClick={(data: any) => setSelectedCashFlowPoint(data?.payload)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="expenses"
+                        name="Expenses"
+                        fill="url(#expensesGrad)"
+                        stroke="var(--color-destructive)"
+                        strokeWidth={2}
+                        activeDot={{ r: 4 }}
+                        onClick={(data: any) => setSelectedCashFlowPoint(data?.payload)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="net"
+                        name="Net Income"
+                        stroke="var(--color-primary)"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        iconType="circle"
+                        iconSize={10}
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                        formatter={(value: string) => (
+                          <span style={{ color: 'var(--color-foreground)' }}>{value}</span>
+                        )}
+                      />
+                    </ComposedChart>
+                  )
                 ) : (
-                  <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} margin={{ top: 15, right: 10, left: -10, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-chart-1)" stopOpacity={0.45} />
-                        <stop offset="95%" stopColor="var(--color-chart-1)" stopOpacity={0.08} />
-                      </linearGradient>
-                      <linearGradient id="expensesGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--color-destructive)" stopOpacity={0.45} />
-                        <stop offset="95%" stopColor="var(--color-destructive)" stopOpacity={0.08} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
-                    <XAxis
-                      dataKey="yearMonth"
-                      tickLine={false}
-                      axisLine={{ stroke: 'var(--color-border)' }}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      ticks={xAxisTicks}
-                      tickFormatter={formatXTick}
-                      minTickGap={30}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={{ stroke: 'var(--color-border)' }}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                      domain={[minVal * 1.15, maxVal * 1.15]}
-                      ticks={leftYAxisTicks}
-                      tickFormatter={formatYTick}
-                    />
-                    <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
-                    <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
-                    <Area
-                      type="monotone"
-                      dataKey="income"
-                      name="Income"
-                      fill="url(#incomeGrad)"
-                      stroke="var(--color-chart-1)"
-                      strokeWidth={2}
-                      activeDot={{ r: 4 }}
-                      onClick={(data: any) => setSelectedCashFlowPoint(data?.payload)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="expenses"
-                      name="Expenses"
-                      fill="url(#expensesGrad)"
-                      stroke="var(--color-destructive)"
-                      strokeWidth={2}
-                      activeDot={{ r: 4 }}
-                      onClick={(data: any) => setSelectedCashFlowPoint(data?.payload)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="net"
-                      name="Net Income"
-                      stroke="var(--color-primary)"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      iconType="circle"
-                      iconSize={10}
-                      wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                      formatter={(value: string) => (
-                        <span style={{ color: 'var(--color-foreground)' }}>{value}</span>
-                      )}
-                    />
-                  </ComposedChart>
+                  chartType === 'bar' ? (
+                    <ComposedChart role="img" aria-label="Savings Rate Composed Chart" data={savingsChartData} margin={{ top: 15, right: 10, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
+                      <XAxis
+                        dataKey="yearMonth"
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        ticks={xAxisTicks}
+                        tickFormatter={formatXTick}
+                        minTickGap={30}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        domain={[leftSavingsMin, leftSavingsMax]}
+                        ticks={savingsYAxisTicks}
+                        tickFormatter={formatSavingsYTick}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        domain={[rightSavingsMin, rightSavingsMax]}
+                        ticks={rightSavingsTicks}
+                        tickFormatter={(v: number) => `${v}%`}
+                      />
+                      <ReferenceLine yAxisId="left" y={0} stroke="var(--color-border)" strokeWidth={1} />
+                      <RechartsTooltip content={<SavingsTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+                      <Bar yAxisId="left" dataKey="retirement" name="Retirement" fill="var(--color-chart-1)" stackId="savings" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Bar yAxisId="left" dataKey="hsa" name="HSA" fill="var(--color-chart-2)" stackId="savings" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Bar yAxisId="left" dataKey="brokerage" name="Brokerage" fill="var(--color-chart-3)" stackId="savings" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Bar yAxisId="left" dataKey="savingsAccount" name="Savings Account" fill="var(--color-chart-4)" stackId="savings" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Bar yAxisId="left" dataKey="cash" name="Leftover Cash" fill="var(--color-chart-5)" stackId="savings" maxBarSize={24} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Line yAxisId="right" type="monotone" dataKey="savingsRate" name="Savings Rate (%)" stroke="var(--color-primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                      <Legend
+                        verticalAlign="bottom"
+                        iconType="circle"
+                        iconSize={10}
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                        formatter={(value: string) => (
+                          <span style={{ color: 'var(--color-foreground)' }}>{value}</span>
+                        )}
+                      />
+                    </ComposedChart>
+                  ) : (
+                    <ComposedChart role="img" aria-label="Savings Rate Composed Chart" data={savingsChartData} margin={{ top: 15, right: 10, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
+                      <XAxis
+                        dataKey="yearMonth"
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        ticks={xAxisTicks}
+                        tickFormatter={formatXTick}
+                        minTickGap={30}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        domain={[leftSavingsMin, leftSavingsMax]}
+                        ticks={savingsYAxisTicks}
+                        tickFormatter={formatSavingsYTick}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        tickLine={false}
+                        axisLine={{ stroke: 'var(--color-border)' }}
+                        tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
+                        domain={[rightSavingsMin, rightSavingsMax]}
+                        ticks={rightSavingsTicks}
+                        tickFormatter={(v: number) => `${v}%`}
+                      />
+                      <ReferenceLine yAxisId="left" y={0} stroke="var(--color-border)" strokeWidth={1} />
+                      <RechartsTooltip content={<SavingsTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} />
+                      <Area yAxisId="left" type="monotone" dataKey="retirement" name="Retirement" fill="var(--color-chart-1)" stroke="var(--color-chart-1)" fillOpacity={0.4} stackId="savings" activeDot={{ r: 4 }} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Area yAxisId="left" type="monotone" dataKey="hsa" name="HSA" fill="var(--color-chart-2)" stroke="var(--color-chart-2)" fillOpacity={0.4} stackId="savings" activeDot={{ r: 4 }} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Area yAxisId="left" type="monotone" dataKey="brokerage" name="Brokerage" fill="var(--color-chart-3)" stroke="var(--color-chart-3)" fillOpacity={0.4} stackId="savings" activeDot={{ r: 4 }} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Area yAxisId="left" type="monotone" dataKey="savingsAccount" name="Savings Account" fill="var(--color-chart-4)" stroke="var(--color-chart-4)" fillOpacity={0.4} stackId="savings" activeDot={{ r: 4 }} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Area yAxisId="left" type="monotone" dataKey="cash" name="Leftover Cash" fill="var(--color-chart-5)" stroke="var(--color-chart-5)" fillOpacity={0.4} stackId="savings" activeDot={{ r: 4 }} onClick={(data: any) => setSelectedSavingsPoint(data?.payload)} style={{ cursor: 'pointer' }} />
+                      <Line yAxisId="right" type="monotone" dataKey="savingsRate" name="Savings Rate (%)" stroke="var(--color-primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                      <Legend
+                        verticalAlign="bottom"
+                        iconType="circle"
+                        iconSize={10}
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                        formatter={(value: string) => (
+                          <span style={{ color: 'var(--color-foreground)' }}>{value}</span>
+                        )}
+                      />
+                    </ComposedChart>
+                  )
                 )}
               </ResponsiveContainer>
-              {/* On-chart average net income label overlay styled as a permanent tooltip */}
+              {/* On-chart average net income or savings rate label overlay */}
               <div className="absolute top-1 left-1/2 -translate-x-1/2 bg-muted/95 border border-border rounded-lg px-2.5 py-1 text-[10px] sm:text-xs font-semibold text-muted-foreground shadow-sm pointer-events-none z-10 whitespace-nowrap">
-                Avg. Net Income ({windowLabel}): <span className="text-foreground font-bold">{formatCurrency(avgNetIncome)} / mo</span>
+                {activeView === 'income' ? (
+                  <>
+                    Avg. Net Income ({windowLabel}): <span className="text-foreground font-bold">{formatCurrency(avgNetIncome)} / mo</span>
+                  </>
+                ) : (
+                  <>
+                    Avg. Savings Rate ({windowLabel}): <span className="text-primary font-bold">{avgSavingsRate.toFixed(1)}%</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -993,6 +1223,227 @@ export function IncomeExpenseChart() {
                 <span>
                   <strong>Calculation Formula:</strong> Net Cash Flow is computed as Total Income minus Total Expenses. Standard category exclusion rules (e.g. transfers) are automatically applied to reflect true household cash inflows and outflows.
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Savings Rate Breakdown Popup Modal ── */}
+      {selectedSavingsPoint && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={handleCloseSavingsModal}
+        >
+          <div
+            className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-2">
+                <PiggyBank className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-semibold text-foreground">
+                  Savings Rate Analysis — {formatChartXAxisDate(selectedSavingsPoint.yearMonth + '-01', timeframe, { isMonthly: true })}
+                </h3>
+              </div>
+              <button
+                onClick={handleCloseSavingsModal}
+                className="text-xs text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-1 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-5 bg-background text-sm">
+              {/* Summary Hero Box */}
+              {(() => {
+                const totSav = (selectedSavingsPoint.retirement || 0) + (selectedSavingsPoint.hsa || 0) + (selectedSavingsPoint.brokerage || 0) + (selectedSavingsPoint.savingsAccount || 0) + (selectedSavingsPoint.cash || 0);
+                return (
+                  <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-center space-y-1">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Savings</div>
+                    <div className={`text-3xl font-extrabold font-mono blur-number ${totSav >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                      {totSav >= 0 ? '+' : ''}{formatCurrency(totSav)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Savings Rate: <span className="font-bold text-primary blur-number">{Number(selectedSavingsPoint.savingsRate || 0).toFixed(1)}%</span>
+                      {' '}• Total Income: <span className="font-semibold text-foreground blur-number">{formatCurrency(selectedSavingsPoint.income || 0)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Savings Breakdown */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Components breakdown</h4>
+                  <span className="text-[10px] text-muted-foreground italic">Click any bucket to inspect tracked items</span>
+                </div>
+                <div className="border border-border rounded-xl divide-y divide-border overflow-hidden bg-background">
+                  {/* Retirement */}
+                  <div
+                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
+                    onClick={() => setExpandedBucket(expandedBucket === 'retirement' ? null : 'retirement')}
+                  >
+                    <div className="flex justify-between p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-1)' }} />
+                        <span className="text-muted-foreground font-medium">Retirement (401k / IRA)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
+                        <span className="blur-number">{formatCurrency(selectedSavingsPoint.retirement || 0)}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'retirement' ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                    {expandedBucket === 'retirement' && (
+                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
+                        {selectedSavingsPoint.details?.retirement?.length > 0 ? (
+                          selectedSavingsPoint.details.retirement.map((tx: any, idx: number) => (
+                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
+                              <div className="flex flex-col">
+                                <span className="font-medium text-foreground">{tx.description}</span>
+                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
+                              </div>
+                              <span className="font-mono font-medium text-primary">
+                                +{formatCurrency(Math.abs(tx.amount))}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-muted-foreground text-center py-3 italic">No specific retirement transactions in this period.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* HSA */}
+                  <div
+                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
+                    onClick={() => setExpandedBucket(expandedBucket === 'hsa' ? null : 'hsa')}
+                  >
+                    <div className="flex justify-between p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-2)' }} />
+                        <span className="text-muted-foreground font-medium">HSA Contributions</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
+                        <span className="blur-number">{formatCurrency(selectedSavingsPoint.hsa || 0)}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'hsa' ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                    {expandedBucket === 'hsa' && (
+                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
+                        {selectedSavingsPoint.details?.hsa?.length > 0 ? (
+                          selectedSavingsPoint.details.hsa.map((tx: any, idx: number) => (
+                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
+                              <div className="flex flex-col">
+                                <span className="font-medium text-foreground">{tx.description}</span>
+                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
+                              </div>
+                              <span className="font-mono font-medium text-primary">
+                                +{formatCurrency(Math.abs(tx.amount))}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-muted-foreground text-center py-3 italic">No specific HSA transactions in this period.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Brokerage */}
+                  <div
+                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
+                    onClick={() => setExpandedBucket(expandedBucket === 'brokerage' ? null : 'brokerage')}
+                  >
+                    <div className="flex justify-between p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-3)' }} />
+                        <span className="text-muted-foreground font-medium">Taxable Brokerage</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
+                        <span className="blur-number">{formatCurrency(selectedSavingsPoint.brokerage || 0)}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'brokerage' ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                    {expandedBucket === 'brokerage' && (
+                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
+                        {selectedSavingsPoint.details?.brokerage?.length > 0 ? (
+                          selectedSavingsPoint.details.brokerage.map((tx: any, idx: number) => (
+                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
+                              <div className="flex flex-col">
+                                <span className="font-medium text-foreground">{tx.description}</span>
+                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
+                              </div>
+                              <span className="font-mono font-medium text-primary">
+                                +{formatCurrency(Math.abs(tx.amount))}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-muted-foreground text-center py-3 italic">No specific brokerage transfers in this period.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Savings Account */}
+                  <div
+                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
+                    onClick={() => setExpandedBucket(expandedBucket === 'savingsAccount' ? null : 'savingsAccount')}
+                  >
+                    <div className="flex justify-between p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-4)' }} />
+                        <span className="text-muted-foreground font-medium">Savings Accounts</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
+                        <span className="blur-number">{formatCurrency(selectedSavingsPoint.savingsAccount || 0)}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'savingsAccount' ? 'rotate-180' : ''}`} />
+                      </div>
+                    </div>
+                    {expandedBucket === 'savingsAccount' && (
+                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
+                        {selectedSavingsPoint.details?.savingsAccount?.length > 0 ? (
+                          selectedSavingsPoint.details.savingsAccount.map((tx: any, idx: number) => (
+                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
+                              <div className="flex flex-col">
+                                <span className="font-medium text-foreground">{tx.description}</span>
+                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
+                              </div>
+                              <span className="font-mono font-medium text-primary">
+                                +{formatCurrency(Math.abs(tx.amount))}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-muted-foreground text-center py-3 italic">No specific savings account transfers in this period.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Leftover Cash */}
+                  <div className="flex justify-between p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-5)' }} />
+                      <span className="text-muted-foreground font-medium">Leftover Operating Cash Surplus</span>
+                    </div>
+                    <div className="font-semibold font-mono text-foreground blur-number">
+                      {formatCurrency(selectedSavingsPoint.cash || 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informative Note */}
+              <div className="text-xs text-muted-foreground bg-muted/30 border border-border/20 rounded-xl p-3 flex items-start gap-2 leading-relaxed space-y-1">
+                <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground/60" />
+                <div>
+                  <strong>Calculation Formula:</strong> Savings Rate is computed as (Total Tracked Savings / Total Income) × 100%. Debt principal reductions (e.g. mortgage/loans) are accounted for as cash outflows in cash flow analysis and accrue to net worth via liability reduction.
+                </div>
               </div>
             </div>
           </div>
