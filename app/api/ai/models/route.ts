@@ -3,21 +3,55 @@ import { auth } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
+import { getDb } from '@/lib/db';
+import { aiProviders } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { getSessionDEK } from '@/lib/crypto-context';
+import { decryptField } from '@/lib/crypto';
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  let body: { endpoint?: string; apiKey?: string };
+  let body: { endpoint?: string; apiKey?: string; providerId?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const rawEndpoint = body.endpoint?.replace(/\/$/, '');
-  const apiKey = body.apiKey || '';
+  let rawEndpoint = body.endpoint?.replace(/\/$/, '');
+  let apiKey = body.apiKey || '';
+
+  // Disregard masked API keys
+  if (apiKey && (/^[•*]+$/.test(apiKey) || /\.{3}/.test(apiKey))) {
+    apiKey = '';
+  }
+
+  if (body.providerId && (!apiKey || !rawEndpoint)) {
+    try {
+      const db = getDb();
+      const dek = await getSessionDEK();
+      const rows = await db
+        .select()
+        .from(aiProviders)
+        .where(and(eq(aiProviders.id, body.providerId), eq(aiProviders.userId, session.user.id)))
+        .limit(1);
+
+      if (rows.length > 0) {
+        if (!rawEndpoint) {
+          rawEndpoint = rows[0].endpoint.replace(/\/$/, '');
+        }
+        if (!apiKey && rows[0].apiKeyEncrypted) {
+          apiKey = await decryptField(rows[0].apiKeyEncrypted, dek);
+        }
+      }
+    } catch (err) {
+      logger.warn('[ai/models] Failed to load credentials for providerId', { providerId: body.providerId, error: String(err) });
+    }
+  }
 
   if (!rawEndpoint) {
     return NextResponse.json({ error: 'No endpoint provided' }, { status: 400 });

@@ -106,7 +106,9 @@ export function createMockDb<T extends Record<string, any[]>>(initialTables: T =
           const tableName =
             typeof chain._currentTable === 'string'
               ? chain._currentTable
-              : chain._currentTable?._?.name ||
+              : chain._currentTable?.[Symbol.for('drizzle:Name')] ||
+                chain._currentTable?.[Symbol.for('drizzle:OriginalName')] ||
+                chain._currentTable?._?.name ||
                 chain._currentTable?.name ||
                 'default';
 

@@ -4,7 +4,7 @@ import {
   TrendingDown,
   TrendingUp,
   ShieldCheck,
-  Sparkles,
+  CircleAlert,
   Pause,
   Wallet,
   Receipt,
@@ -221,7 +221,7 @@ export default function RecurringSidePanel({ summary }: RecurringSidePanelProps)
 
               <div className="p-2.5 rounded-xl bg-card border border-border/50">
                 <div className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <CircleAlert className="w-3 h-3 text-amber-500" />
                   Review
                 </div>
                 <div className="text-sm font-bold font-mono text-foreground mt-0.5">

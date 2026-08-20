@@ -1,23 +1,24 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SpendingBreakdown } from '@/components/cash-flow/spending-breakdown';
 import { CashVsCreditCard } from '@/components/cash-flow/cash-vs-credit-card';
-import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { DollarSign } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { SubscriptionTracker } from '@/components/features/transactions/SubscriptionTracker';
+import type { RecurringItem } from '@/components/features/transactions/RecurringCard';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { ChartErrorBoundary } from '@/components/chart-error-boundary';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
-type SpendingTab = 'spending' | 'income' | 'cash';
+type SpendingTab = 'spending' | 'cash' | 'subscriptions';
 
 const parseTab = (value: string | null): SpendingTab =>
-  value === 'income' || value === 'cash' ? value : 'spending';
+  (value === 'cash' || value === 'subscriptions') ? value : 'spending';
 
 function HiddenChartNote() {
   return (
@@ -27,6 +28,49 @@ function HiddenChartNote() {
       </p>
     </div>
   );
+}
+
+function SubscriptionsTab() {
+  const [items, setItems] = useState<RecurringItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      const res = await fetch('/api/recurring?includeDismissed=true&status=all');
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items || []);
+      } else {
+        setError('Failed to load subscriptions. Please try again.');
+      }
+    } catch {
+      setError('Failed to load subscriptions. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (error) {
+    return (
+      <div className="py-16 text-center space-y-4">
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <button
+          onClick={load}
+          className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return <SubscriptionTracker items={items} loading={loading} />;
 }
 
 function SpendingContent() {
@@ -54,9 +98,9 @@ function SpendingContent() {
   }, [searchParams]);
 
   const availableTabs = [
-    { id: 'spending', label: 'Spending Breakdown' },
-    { id: 'income', label: 'Net Income' },
+    { id: 'spending', label: 'Breakdown' },
     { id: 'cash', label: 'Cash vs Credit' },
+    { id: 'subscriptions', label: 'Subscriptions' },
   ];
 
   return (
@@ -88,17 +132,6 @@ function SpendingContent() {
               <HiddenChartNote />
             ))}
 
-          {activeTab === 'income' &&
-            (isVisible('incomeExpenseChart') ? (
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <ChartErrorBoundary name="Net Income">
-                  <IncomeExpenseChart />
-                </ChartErrorBoundary>
-              </Suspense>
-            ) : (
-              <HiddenChartNote />
-            ))}
-
           {activeTab === 'cash' &&
             (isVisible('cashVsCredit') ? (
               <Suspense fallback={<LoadingSpinner category="chart" />}>
@@ -107,6 +140,12 @@ function SpendingContent() {
             ) : (
               <HiddenChartNote />
             ))}
+
+          {activeTab === 'subscriptions' && (
+            <Suspense fallback={<LoadingSpinner category="chart" />}>
+              <SubscriptionsTab />
+            </Suspense>
+          )}
         </MobileTabSwipeContainer>
       </PageContent>
     </div>

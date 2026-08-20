@@ -33,6 +33,7 @@ export const GENERAL_DEFAULTS = {
     accountIds: [],
     accountTypes: [],
     merchantPatterns: [],
+    tagIds: [],
   },
   deletePendingOlderThan30Days: true,
   deletePendingDays: 10,

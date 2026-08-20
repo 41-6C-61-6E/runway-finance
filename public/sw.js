@@ -1,4 +1,4 @@
-const CACHE_NAME = "personal-finance-26.08.1787128423785";
+const CACHE_NAME = "personal-finance-26.08.1787180558267";
 const STATIC_ASSETS = [
   "/",
   "/offline",

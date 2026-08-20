@@ -1,13 +1,56 @@
 import { getDb } from '@/lib/db';
-import { recurringTransactions, transactions, categories, accounts, userSettings } from '@/lib/db/schema';
-import { eq, and, sql, desc, gte } from 'drizzle-orm';
+import { recurringTransactions, transactions, categories, accounts, userSettings, transactionTags } from '@/lib/db/schema';
+import { eq, and, sql, desc, gte, inArray } from 'drizzle-orm';
 import { decryptRows, encryptRow } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { getUserTransactionsFromCache } from '@/lib/services/search-cache';
+import { getShareGroupUserIds } from '@/lib/sharing';
 
 const LOG_TAG = '[recurring-detection]';
 
 export type FrequencyType = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
+
+interface RecurringExclusions {
+  categoryIds?: string[];
+  accountIds?: string[];
+  accountTypes?: string[];
+  tagIds?: string[];
+  merchantPatterns?: string[];
+}
+
+/**
+ * Merges recurring-exclusion settings from multiple user_settings rows into
+ * the union of each list (in share groups, every member may set exclusions
+ * on their own row). Deduplicates while preserving first-seen order.
+ */
+export function mergeRecurringExclusions(
+  rows: Array<{ recurringExclusions?: unknown } | null | undefined>
+): RecurringExclusions {
+  const merged: RecurringExclusions = {
+    categoryIds: [],
+    accountIds: [],
+    accountTypes: [],
+    tagIds: [],
+    merchantPatterns: [],
+  };
+  const union = (key: keyof RecurringExclusions, values: unknown[]) => {
+    for (const v of values) {
+      if (typeof v !== 'string' || !v) continue;
+      const list = merged[key] as string[];
+      if (!list.includes(v)) list.push(v);
+    }
+  };
+  for (const row of rows) {
+    const ex = row?.recurringExclusions as Partial<RecurringExclusions> | null | undefined;
+    if (!ex || typeof ex !== 'object') continue;
+    union('categoryIds', ex.categoryIds ?? []);
+    union('accountIds', ex.accountIds ?? []);
+    union('accountTypes', ex.accountTypes ?? []);
+    union('tagIds', ex.tagIds ?? []);
+    union('merchantPatterns', ex.merchantPatterns ?? []);
+  }
+  return merged;
+}
 
 /**
  * Normalizes merchant / payee name by stripping processor prefixes, terminal IDs, store numbers, and date tokens.
@@ -293,18 +336,23 @@ export async function detectRecurringTransactions(
     .from(categories)
     .where(eq(categories.userId, userId));
 
-  const [settings] = await db
+    // Personalization rule: exclusion settings are stored per session user, so a
+    // shared group can have multiple configured rows (primary + members). Merge
+    // the group's rows and treat the union as the effective exclusions — member
+    // exclusions are no longer silently ignored. getShareGroupUserIds returns
+    // [userId, ...activeMembers]; [userId] for a user with no share group.
+    const groupIds = await getShareGroupUserIds(userId);
+  const settingsRows = await db
     .select()
     .from(userSettings)
-    .where(eq(userSettings.userId, userId))
-    .limit(1);
+    .where(inArray(userSettings.userId, groupIds));
 
-  const customExcl = (settings?.recurringExclusions as any) || {};
+  const customExcl = mergeRecurringExclusions(settingsRows as Array<{ recurringExclusions?: unknown }>);
 
   // Build exclusion sets
   const excludedAccountIds = new Set<string>();
   for (const acc of userAccounts) {
-    if (acc.type === 'paystub' || (acc as any).isVirtual) {
+    if (acc.type === 'paystub' || acc.externalId?.startsWith('virtual-')) {
       excludedAccountIds.add(acc.id.toString());
     }
   }
@@ -381,6 +429,28 @@ export async function detectRecurringTransactions(
 
   const decryptedTxns = await decryptRows('transactions', rawTxns, dek);
 
+  // Tag-based exclusions: any transaction carrying an excluded tag is
+  // skipped directly (no split-group expansion — a tagged parent does not
+  // exclude its untagged children, matching the budgets tag-exclusion
+  // semantics). One join-table query scoped to the fetched transaction ids.
+  const excludedTagIds = (customExcl.tagIds || [])
+    .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+  const excludedTaggedTxIds = new Set<string>();
+  if (excludedTagIds.length > 0) {
+    const taggedRows = await db
+      .select({ transactionId: transactionTags.transactionId })
+      .from(transactionTags)
+      .where(
+        and(
+          inArray(transactionTags.tagId, excludedTagIds),
+          inArray(transactionTags.transactionId, rawTxns.map((t) => t.id))
+        )
+      );
+    for (const row of taggedRows) {
+      if (row.transactionId) excludedTaggedTxIds.add(row.transactionId.toString());
+    }
+  }
+
   // 3. Group transactions by normalized merchant pattern + flowType + account
   type TxItem = {
     id: string;
@@ -396,6 +466,7 @@ export async function detectRecurringTransactions(
 
   for (const tx of decryptedTxns) {
     // Filter virtual/paystub accounts, transfers, and user exclusions
+    if (tx.id && excludedTaggedTxIds.has(tx.id.toString())) continue;
     if (tx.accountId && excludedAccountIds.has(tx.accountId.toString())) continue;
     if (tx.paystubId || (tx as any).source === 'paystub' || (tx as any).isTransfer) continue;
     if (tx.categoryId && isCategoryExcluded(tx.categoryId.toString())) continue;

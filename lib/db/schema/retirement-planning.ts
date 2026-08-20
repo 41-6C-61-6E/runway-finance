@@ -149,6 +149,17 @@ export const planSettings = pgTable('plan_settings', {
   withholdingDeferred: text('withholding_deferred').notNull().default('20.0'),
   withholdingTaxable: text('withholding_taxable').notNull().default('10.0'),
   incomeTaxModifier: text('income_tax_modifier').notNull().default('0.0'),
+  // L-1 (TAX_PAYROLL_REVIEW.md): optional graduated state income-tax table.
+  // JSON: { stateCode?, stateTaxBrackets?: [{threshold, rate}],
+  //         stateTaxStandardDeduction?, stateGrossFloorRate? }
+  // Absent/empty → the flat incomeTaxModifier fallback (legacy behavior).
+  stateTaxTable: jsonb('state_tax_table'),
+  // T-2 (TAX_PAYROLL_REVIEW.md): 'inflationEscalated' (default, legacy
+  // behavior) escalates base-year rule figures with plan inflation; 'statutory'
+  // uses published per-year rule rows (2024/2025) where the simulation spans them.
+  projectionMode: text('projection_mode').notNull().default('inflationEscalated'),
+  // T-5 (TAX_PAYROLL_REVIEW.md): opt-in AMT in the tax engine.
+  enableAmt: boolean('enable_amt').notNull().default(false),
   capGainsTaxModifier: text('cap_gains_tax_modifier').notNull().default('0.0'),
   etrLocalTax: boolean('etr_local_tax').notNull().default(false),
   etrPropertyTax: boolean('etr_property_tax').notNull().default(false),

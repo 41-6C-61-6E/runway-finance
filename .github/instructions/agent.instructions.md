@@ -1,5 +1,5 @@
 ---
-description: To be followed when executing large-scope reviews, coding tasks, or research
+description: To be followed by all agents
 # applyTo: 'Describe when these instructions should be loaded by the agent based on task context' # when provided, instructions will automatically be added to the request context when the pattern matches an attached file
 ---
 
@@ -12,3 +12,5 @@ If a Subagent fails, consider re-spawning it with adjusted instructions or a nar
 If working a large task, periodically output an estimated percentage complete withe the task, and summary of the current state of the task, including what has been completed, what remains to be done, and any issues or blockers encountered. 
 
 The dev server is running at http://10.1.1.10:3001 You can use this to test your changes locally before committing them.
+
+All thinking, reasoning, planning, compaction, and coding shall be exclusively conducted in the english language. 

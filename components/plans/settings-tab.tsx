@@ -92,6 +92,61 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
 
   const [inflationRate, setInflationRate] = useState(plan?.settings?.fixedInflationRate || '3.0');
   const [incomeTaxModifier, setIncomeTaxModifier] = useState(plan?.settings?.incomeTaxModifier || '0.0');
+  // T-5: opt-in alternative minimum tax estimate (default off → engine
+  // output is bit-identical to the legacy regular-tax-only path).
+  const [enableAmt, setEnableAmt] = useState<boolean>(plan?.settings?.enableAmt === true);
+  // T-2: per-year statutory rule rows when published (2024/2025), then fall
+  // back to inflation-escalated base values. 'inflationEscalated' (default)
+  // is the legacy behavior, bit-identical for existing plans.
+  const [projectionMode, setProjectionMode] = useState<'statutory' | 'inflationEscalated'>(
+    plan?.settings?.projectionMode === 'statutory' ? 'statutory' : 'inflationEscalated'
+  );
+  // ── L-1: optional graduated state income-tax table (absent → the flat
+  // incomeTaxModifier keeps its legacy behavior; engine sees empty/missing
+  // brackets as "use the flat rate").
+  const [stateCode, setStateCode] = useState<string>(plan?.settings?.stateCode || '');
+  const [stateStdDed, setStateStdDed] = useState<string>(
+    plan?.settings?.stateTaxStandardDeduction != null ? String(plan.settings.stateTaxStandardDeduction) : '0'
+  );
+  const [stateFloorRate, setStateFloorRate] = useState<string>(
+    plan?.settings?.stateGrossFloorRate != null ? String(plan.settings.stateGrossFloorRate) : '0'
+  );
+  const [stateBrackets, setStateBrackets] = useState<Array<{ threshold: string; rate: string }>>(
+    Array.isArray(plan?.settings?.stateTaxBrackets)
+      ? (plan.settings.stateTaxBrackets as any[]).map((b: any) => ({
+          threshold: b?.threshold != null ? String(b.threshold) : '',
+          // Engine/JSON convention: rate is a decimal (0.01 = 1%).
+          // The UI edits in percent, so invert on the way out.
+          rate: (Number(b?.rate) || 0) !== 0 ? String(Math.round((Number(b?.rate) || 0) * 10000) / 100) : '0',
+        }))
+      : []
+  );
+  // ── L-1: persist the optional state table into plan settings. The JSON
+  // stores decimal rates (engine convention); empty brackets → the flat
+  // incomeTaxModifier keeps applying (legacy behavior).
+  const persistStateTable = (
+    code?: string,
+    stdDed?: string,
+    floorRate?: string,
+    brackets?: Array<{ threshold: string; rate: string }>
+  ) => {
+    const table: Record<string, any> = {};
+    const c = code ?? stateCode;
+    const sd = stdDed ?? stateStdDed;
+    const fr = floorRate ?? stateFloorRate;
+    const bl = brackets ?? stateBrackets;
+    if (c) table.stateCode = c;
+    if (sd !== '' && Number.isFinite(Number(sd))) table.stateTaxStandardDeduction = Number(sd);
+    if (fr !== '' && Number.isFinite(Number(fr))) table.stateGrossFloorRate = Number(fr);
+    const parsed = bl
+      .map((row) => ({
+        threshold: Number(row.threshold),
+        rate: Number(row.rate) / 100,
+      }))
+      .filter((row) => Number.isFinite(row.threshold) && Number.isFinite(row.rate));
+    if (parsed.length > 0) table.stateTaxBrackets = parsed;
+    onUpdatePlan({ settings: { stateTaxTable: Object.keys(table).length > 0 ? table : null } });
+  };
   const [heirTaxRate, setHeirTaxRate] = useState(plan?.settings?.heirFlatIncomeTaxRate || '25.0');
   const [liquidationRate, setLiquidationRate] = useState(plan?.settings?.realEstateLiquidationRate || '6.0');
   const [adminRate, setAdminRate] = useState(plan?.settings?.administrativeCostRate || '1.0');
@@ -1000,16 +1055,75 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                     />
                   </div>
 
+                  {/* ── T-2: per-year statutory tax-rule sourcing ── */}
                   <div className="space-y-1.5 bg-muted/20 border border-border rounded-xl p-3.5">
-                    <div className="flex items-center justify-between">
-                      <label className="font-bold text-foreground flex items-center gap-1.5">
-                        State / Local Income Tax Rate (%)
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="font-bold text-foreground flex items-center gap-1.5 text-xs">
+                        Tax Year Sourcing
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            Applied as a flat tax on taxable ordinary income. Set to 0% for tax-free states (TX, FL, NV, WA, etc.).
+                            "Statutory" reads the published federal tax tables year-by-year (2024 &amp; 2025 ship built-in); simulated years after the last published table inherit the most recent one. "Inflation-escalated" compounds the current base-year brackets/limits by your fixed inflation rate every year — the legacy behavior.
+                          </TooltipContent>
+                        </Tooltip>
+                      </label>
+                      <select
+                        value={projectionMode}
+                        onChange={(e) => {
+                          const v = e.target.value as 'statutory' | 'inflationEscalated';
+                          setProjectionMode(v);
+                          onUpdatePlan({ settings: { projectionMode: v } });
+                        }}
+                        className="bg-background border border-border rounded-lg px-2 py-1.5 font-mono text-foreground font-bold text-[11px] focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="inflationEscalated">Inflation-escalated</option>
+                        <option value="statutory">Statutory (per-year)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 bg-muted/20 border border-border rounded-xl p-3.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-foreground flex items-center gap-1.5">
+                        Estimate Alternative Minimum Tax (AMT)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            When enabled, the tax engine estimates the alternative minimum tax (IRC §55): tax base = MAGI + HSA income + state/local add-back, 26% on (base − statutory exemption, exemption reduced 25% above the phaseout threshold — 2025 values escalated at your inflation rate). The engine pays the higher of AMT and regular federal income tax. Off by default, so disabling it restores bit-identical legacy output.
+                          </TooltipContent>
+                        </Tooltip>
+                      </label>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={enableAmt}
+                        onClick={() => {
+                          const next = !enableAmt;
+                          setEnableAmt(next);
+                          onUpdatePlan({ settings: { enableAmt: next } });
+                        }}
+                        className="inline-flex items-center shrink-0 rounded-full transition-colors h-6 w-11"
+                        style={{ backgroundColor: enableAmt ? 'hsl(var(--primary))' : 'hsl(var(--border))' }}
+                      >
+                        <span className="inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform" style={{ transform: enableAmt ? 'translateX(22px)' : 'translateX(3px)' }} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 bg-muted/20 border border-border rounded-xl p-3.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-foreground flex items-center gap-1.5">
+                        State / Local Income Tax Rate (flat %)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Applied as a flat tax on taxable ordinary income. Set to 0% for tax-free states (TX, FL, NV, WA, etc.). Only used when no graduated bracket table is configured below.
                           </TooltipContent>
                         </Tooltip>
                       </label>
@@ -1024,6 +1138,133 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                       }}
                       className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
                     />
+                  </div>
+
+                  {/* ── L-1: optional graduated state income-tax table ── */}
+                  <div className="space-y-2 bg-muted/20 border border-border rounded-xl p-3.5">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-foreground flex items-center gap-1.5">
+                        State Bracket Table (optional)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-pointer" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Optional graduated state income-tax schedule (single filer, base-year dollars; auto-inflated and doubled for married-filing-joint). Leave empty to keep the flat-rate behavior above.
+                          </TooltipContent>
+                        </Tooltip>
+                      </label>
+                      <span className="font-mono text-[10px] text-muted-foreground">{stateBrackets.length} brackets</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">State (label)</span>
+                        <input
+                          type="text"
+                          maxLength={4}
+                          placeholder="e.g. CA"
+                          value={stateCode}
+                          onChange={(e) => {
+                            const v = e.target.value.toUpperCase();
+                            setStateCode(v);
+                            persistStateTable(v);
+                          }}
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Std Deduction ($)</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={stateStdDed}
+                          onChange={(e) => {
+                            setStateStdDed(e.target.value);
+                            persistStateTable(stateCode, e.target.value);
+                          }}
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Floor Rate on Gross (%)</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={stateFloorRate}
+                        onChange={(e) => {
+                          setStateFloorRate(e.target.value);
+                          persistStateTable(stateCode, stateStdDed, e.target.value);
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Brackets (income up to → rate %)</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...stateBrackets, { threshold: String((stateBrackets[stateBrackets.length - 1]?.threshold || '0') === '' ? '0' : String(Math.round((parseFloat(stateBrackets[stateBrackets.length - 1]?.threshold) || 0) + 10000))), rate: '0' }];
+                            setStateBrackets(next);
+                            persistStateTable(stateCode, stateStdDed, stateFloorRate, next);
+                          }}
+                          className="text-[10px] font-bold text-primary hover:underline"
+                        >
+                          + Add bracket
+                        </button>
+                      </div>
+                      {stateBrackets.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground italic">
+                          Empty → the flat rate above is used for state tax (unchanged behavior).
+                        </p>
+                      )}
+                      {stateBrackets.map((b, i) => (
+                        <div key={i} className="flex items-center gap-1.5">
+                          <span className="font-mono text-[10px] text-muted-foreground w-4">{i}</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="threshold $"
+                            value={b.threshold}
+                            onChange={(e) => {
+                              const next = stateBrackets.map((row, j) => (j === i ? { ...row, threshold: e.target.value } : row));
+                              setStateBrackets(next);
+                              persistStateTable(stateCode, stateStdDed, stateFloorRate, next);
+                            }}
+                            className="w-28 bg-background border border-border rounded-lg px-2 py-1.5 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                          />
+                          <span className="text-[10px] text-muted-foreground">→</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="rate %"
+                            value={b.rate}
+                            onChange={(e) => {
+                              const next = stateBrackets.map((row, j) => (j === i ? { ...row, rate: e.target.value } : row));
+                              setStateBrackets(next);
+                              persistStateTable(stateCode, stateStdDed, stateFloorRate, next);
+                            }}
+                            className="w-20 bg-background border border-border rounded-lg px-2 py-1.5 font-mono text-foreground focus:ring-1 focus:ring-primary font-bold text-xs"
+                          />
+                          <button
+                            type="button"
+                            aria-label="Remove bracket"
+                            onClick={() => {
+                              const next = stateBrackets.filter((_, j) => j !== i);
+                              setStateBrackets(next);
+                              persistStateTable(stateCode, stateStdDed, stateFloorRate, next);
+                            }}
+                            className="text-[10px] font-bold text-muted-foreground hover:text-destructive"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

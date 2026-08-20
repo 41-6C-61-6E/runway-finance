@@ -48,7 +48,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.model !== undefined) updates.model = body.model;
   if (body.jsonMode !== undefined) updates.jsonMode = body.jsonMode;
   if (body.apiKey !== undefined) {
-    updates.apiKeyEncrypted = body.apiKey ? await encryptField(body.apiKey, dek) : null;
+    const isMaskedKey = typeof body.apiKey === 'string' && (/^[•*]+$/.test(body.apiKey) || /\.{3}/.test(body.apiKey));
+    if (!isMaskedKey) {
+      const trimmedKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : body.apiKey;
+      updates.apiKeyEncrypted = trimmedKey ? await encryptField(trimmedKey, dek) : null;
+    }
   }
   if (body.isActive !== undefined) {
     updates.isActive = body.isActive;

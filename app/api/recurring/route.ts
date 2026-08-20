@@ -125,6 +125,14 @@ export async function POST(req: NextRequest) {
               updateRecurringTransaction(id, dataUserId, dek, { isDismissed: true })
             )
           );
+        } else if (action === 'undismiss') {
+          // Restore a dismissed suggestion back to "needs review" — clears only
+          // the dismissal flag and leaves isConfirmed untouched.
+          await Promise.all(
+            ids.map((id) =>
+              updateRecurringTransaction(id, dataUserId, dek, { isDismissed: false })
+            )
+          );
         } else if (action === 'pause') {
           await Promise.all(
             ids.map((id) =>

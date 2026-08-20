@@ -9,26 +9,76 @@ import {
   getAnnualMultiplier,
   getMaxRecencyDays,
   mergeRecurringTransactions,
+  mergeRecurringExclusions,
 } from '@/lib/services/recurring-detection';
-import { encryptRow } from '@/lib/crypto';
+import { detectRecurringTransactions } from '@/lib/services/recurring-detection';
+import { encryptRow, decryptRow } from '@/lib/crypto';
+import {
+  transactions,
+  userSettings,
+  transactionTags,
+  accounts,
+  categories,
+  recurringTransactions,
+} from '@/lib/db/schema';
 
 // Mock DB responses
 let mockRecurringRows: any[] = [];
 let mockDeletedIds: string[] = [];
 let mockUpdatedRows: any[] = [];
+// Per-test state for engine-level (detectRecurringTransactions) tests
+const mockDetectState: {
+  accounts?: any[];
+  categories?: any[];
+  userSettings?: any[];
+  transactions?: any[];
+  transactionTags?: any[];
+  created?: any[];
+  queriedTransactionTags?: boolean;
+} = {};
 
 class MockDbQueryBuilder {
-  select() { return this; }
-  from(table: any) { return this; }
-  where(...args: any[]) { return this; }
-  orderBy(...args: any[]) { return this; }
-  limit(...args: any[]) { return this; }
-  transaction = async (fn: (tx: any) => Promise<any>) => fn(this);
-  async insert(table: any) {
+  private table: any = null;
+
+  select() {
+    this.table = null;
+    return this;
+  }
+  from(table: any) {
+    this.table = table;
+    return this;
+  }
+  where(..._args: any[]) {
+    // Flag access to the transaction_tags join table (used to assert the
+    // tag exclusion query only runs when tag exclusions are configured).
+    if (this.table === transactionTags) {
+      mockDetectState.queriedTransactionTags = true;
+    }
+    return this;
+  }
+  orderBy(...args: any[]) {
+    return this;
+  }
+  limit(n: number) {
+    const rows = resultsFor(this.table);
     return {
-      values: async (data: any) => ({
-        returning: async () => [data],
-      }),
+      then: (onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) =>
+        Promise.resolve(rows).then((all: any[]) => onfulfilled?.(all.slice(0, n)), onrejected),
+    };
+  }
+  transaction = async (fn: (tx: any) => Promise<any>) => fn(this);
+  insert(table: any) {
+    const isRecurring = table === recurringTransactions;
+    return {
+      values: (data: any) => {
+        if (isRecurring) {
+          mockDetectState.created = mockDetectState.created || [];
+          mockDetectState.created.push(data);
+        }
+        return {
+          returning: async () => [data],
+        };
+      },
     };
   }
   update(table: any) {
@@ -54,10 +104,34 @@ class MockDbQueryBuilder {
     };
   }
   async then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
-    return Promise.resolve(mockRecurringRows).then(onfulfilled, onrejected);
+    return Promise.resolve(resultsFor(this.table)).then(onfulfilled, onrejected);
   }
 }
 
+// Map a schema table name to its fixture rows. Tables without explicit
+// fixtures fall back to mockRecurringRows (legacy behavior for the
+// mergeRecurringTransactions tests, which only query recurring_transactions).
+// Dispatches on table identity: in drizzle v0.45 the PgTable instance exposes
+// the table name only internally, so `table.name` is undefined.
+function resultsFor(table: any): any[] {
+  if (table === accounts) {
+      return mockDetectState.accounts ?? [];
+  }
+  if (table === categories) {
+      return mockDetectState.categories ?? [];
+  }
+  if (table === userSettings) {
+      return mockDetectState.userSettings ?? [];
+  }
+  if (table === transactionTags) {
+      return mockDetectState.transactionTags ?? [];
+  }
+  if (table === transactions) {
+      return mockDetectState.transactions ?? mockRecurringRows;
+  }
+  // recurring_transactions (legacy merge tests) and anything unrecognized
+      return mockRecurringRows;
+}
 vi.mock('@/lib/db', () => ({
   getDb: () => new MockDbQueryBuilder(),
 }));
@@ -258,6 +332,240 @@ describe('Recurring Detection Engine', () => {
       expect(res.mergedItem.matchPattern).toBe('spotify usa|spotify ab');
       expect(res.mergedItem.occurrenceCount).toBe(5);
       expect(res.mergedItem.isConfirmed).toBe(true);
+    });
+  });
+
+    describe('detectRecurringTransactions tag exclusions', () => {
+      const baseTx = (id: string, date: string) => ({
+        id,
+        userId: 'user-1',
+        accountId: 'acc-1',
+        externalId: id,
+        date,
+        amount: '-15.00',
+        description: 'NETFLIX',
+        payee: 'NETFLIX',
+        pending: false,
+        categoryId: null,
+        reviewed: false,
+        categorizedByAi: false,
+        ignored: false,
+        deleted: false,
+        isImported: false,
+        source: 'bank',
+      });
+
+      const buildEncryptedFixtures = async (
+        txs: any[],
+        excludedTagIds: string[],
+        txTags: any[]
+      ) => {
+        mockDetectState.accounts = [];
+        mockDetectState.categories = [];
+        mockDetectState.userSettings = [
+          {
+            userId: 'user-1',
+            recurringExclusions: {
+              categoryIds: [],
+              accountIds: [],
+              accountTypes: [],
+              merchantPatterns: [],
+              tagIds: excludedTagIds,
+            },
+          },
+        ];
+        mockDetectState.transactions = await Promise.all(
+          txs.map((tx) => encryptRow('transactions', tx, testDek))
+        );
+        mockDetectState.transactionTags = txTags;
+        mockDetectState.created = [];
+        mockDetectState.queriedTransactionTags = false;
+        // No pre-existing recurring items for these tests
+        mockRecurringRows = [];
+        mockUpdatedRows = [];
+      };
+
+      it('skips a transaction carrying an excluded tag while still detecting the rest', async () => {
+        // Tagged 06-15 occurrence would otherwise push the group to 4
+        // occurrences; with the tag exclusion only the 3 untagged monthly
+        // occurrences (06-20, 07-20, 08-20) remain.
+        await buildEncryptedFixtures(
+          [
+            baseTx('tx-tagged', '2026-06-15'),
+            baseTx('tx-un-1', '2026-06-20'),
+            baseTx('tx-un-2', '2026-07-20'),
+            baseTx('tx-un-3', '2026-08-20'),
+          ],
+          ['tag-excl'],
+          [{ transactionId: 'tx-tagged', tagId: 'tag-excl' }]
+        );
+
+        const res = await detectRecurringTransactions('user-1', testDek, {
+          referenceDate: '2026-08-19',
+        });
+
+        expect(res.totalDetected).toBe(1);
+        expect(mockDetectState.created).toHaveLength(1);
+        // The service encrypts rows before insert; decrypt to inspect
+        const createdRow = await decryptRow(
+          'recurring_transactions',
+          mockDetectState.created![0],
+          testDek
+        );
+        expect(createdRow.merchantName).toBe('Netflix');
+        expect(createdRow.occurrenceCount).toBe(3);
+        expect(mockDetectState.queriedTransactionTags).toBe(true);
+      });
+
+      it('omits a merchant entirely when all its occurrences carry an excluded tag', async () => {
+        await buildEncryptedFixtures(
+          [
+            baseTx('tx-all-1', '2026-06-10'),
+            baseTx('tx-all-2', '2026-07-10'),
+            baseTx('tx-all-3', '2026-08-10'),
+          ],
+          ['tag-excl'],
+          [
+            { transactionId: 'tx-all-1', tagId: 'tag-excl' },
+            { transactionId: 'tx-all-2', tagId: 'tag-excl' },
+            { transactionId: 'tx-all-3', tagId: 'tag-excl' },
+          ]
+        );
+
+        const res = await detectRecurringTransactions('user-1', testDek, {
+          referenceDate: '2026-08-19',
+        });
+
+        expect(res.totalDetected).toBe(0);
+        expect(res.created).toBe(0);
+        expect(mockDetectState.created).toHaveLength(0);
+      });
+
+      it('does not query the tag join table when no tags are excluded', async () => {
+        await buildEncryptedFixtures(
+          [
+            baseTx('tx-nt-1', '2026-06-15'),
+            baseTx('tx-nt-2', '2026-07-15'),
+            baseTx('tx-nt-3', '2026-08-15'),
+          ],
+          [],
+          []
+        );
+
+        const res = await detectRecurringTransactions('user-1', testDek, {
+          referenceDate: '2026-08-19',
+        });
+
+        expect(res.totalDetected).toBe(1);
+        expect(mockDetectState.created).toHaveLength(1);
+        expect(mockDetectState.queriedTransactionTags).toBe(false);
+      });
+
+      it('excludes only the tagged transaction, not its split siblings (direct match)', async () => {
+        // The split parent carries the excluded tag; its untagged children
+        // must still count toward detection (direct-match semantics, matching
+        // the budgets tag-exclusion behavior). Under whole-group exclusion the
+        // group would have 0 visible transactions and nothing would be
+        // detected.
+        await buildEncryptedFixtures(
+          [
+            { ...baseTx('tx-split-parent', '2026-07-15'), parentId: null },
+            { ...baseTx('tx-split-c1', '2026-06-15'), parentId: 'tx-split-parent' },
+            { ...baseTx('tx-split-c2', '2026-07-20'), parentId: 'tx-split-parent' },
+            { ...baseTx('tx-split-c3', '2026-08-15'), parentId: 'tx-split-parent' },
+          ],
+          ['tag-excl'],
+          [{ transactionId: 'tx-split-parent', tagId: 'tag-excl' }]
+        );
+
+        const res = await detectRecurringTransactions('user-1', testDek, {
+          referenceDate: '2026-08-19',
+        });
+
+        expect(res.totalDetected).toBe(1);
+        expect(mockDetectState.created).toHaveLength(1);
+        // Only the 3 untagged children form the group
+        expect(mockDetectState.created![0].occurrenceCount).toBe(3);
+      });
+    });
+
+  describe('mergeRecurringExclusions', () => {
+    it('returns empty lists for no rows', () => {
+      expect(mergeRecurringExclusions([])).toEqual({
+        categoryIds: [],
+        accountIds: [],
+        accountTypes: [],
+        tagIds: [],
+        merchantPatterns: [],
+      });
+    });
+
+    it('handles null/undefined rows and missing exclusion objects', () => {
+      expect(mergeRecurringExclusions([null, undefined, {}, { recurringExclusions: null }])).toEqual({
+        categoryIds: [],
+        accountIds: [],
+        accountTypes: [],
+        tagIds: [],
+        merchantPatterns: [],
+      });
+    });
+
+    it('returns a single row\'s exclusions with defaults for missing keys', () => {
+      const res = mergeRecurringExclusions([
+        { recurringExclusions: { categoryIds: ['c1'], merchantPatterns: ['netflix'] } },
+      ]);
+      expect(res).toEqual({
+        categoryIds: ['c1'],
+        accountIds: [],
+        accountTypes: [],
+        tagIds: [],
+        merchantPatterns: ['netflix'],
+      });
+    });
+
+    it('unions exclusions across primary and member rows', () => {
+      const res = mergeRecurringExclusions([
+        {
+          recurringExclusions: {
+            categoryIds: ['c1'],
+            accountIds: ['a1'],
+            accountTypes: ['401k'],
+            tagIds: ['t1'],
+            merchantPatterns: ['netflix'],
+          },
+        },
+        {
+          recurringExclusions: {
+            categoryIds: ['c2'],
+            accountIds: ['a2'],
+            accountTypes: ['mortgage'],
+            tagIds: ['t2'],
+            merchantPatterns: ['spotify'],
+          },
+        },
+      ]);
+      expect(res.categoryIds).toEqual(['c1', 'c2']);
+      expect(res.accountIds).toEqual(['a1', 'a2']);
+      expect(res.accountTypes).toEqual(['401k', 'mortgage']);
+      expect(res.tagIds).toEqual(['t1', 't2']);
+      expect(res.merchantPatterns).toEqual(['netflix', 'spotify']);
+    });
+
+    it('deduplicates values appearing in multiple rows', () => {
+      const res = mergeRecurringExclusions([
+        { recurringExclusions: { accountIds: ['a1', 'a2'], merchantPatterns: ['netflix'] } },
+        { recurringExclusions: { accountIds: ['a2', 'a3'], merchantPatterns: ['netflix', 'hulu'] } },
+      ]);
+      expect(res.accountIds).toEqual(['a1', 'a2', 'a3']);
+      expect(res.merchantPatterns).toEqual(['netflix', 'hulu']);
+    });
+
+    it('ignores non-string members and keeps first-seen order', () => {
+      const res = mergeRecurringExclusions([
+        { recurringExclusions: { merchantPatterns: ['b', '', null, 42, 'a'] } },
+        { recurringExclusions: { merchantPatterns: ['b', 'c'] } },
+      ]);
+      expect(res.merchantPatterns).toEqual(['b', 'a', 'c']);
     });
   });
 });

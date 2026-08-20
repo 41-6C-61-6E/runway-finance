@@ -386,7 +386,7 @@ export function EngineRulesView({
                 <h5 className="font-bold text-sm text-foreground">Scenario 5: SECURE Act 2.0 RMDs & Estate Distribution Rules</h5>
               </div>
               <p className="text-muted-foreground leading-relaxed">
-                Under SECURE Act 2.0, mandatory RMDs start at age 73 (or 75 for born 1960+). The engine calculates required minimum distributions using IRS Uniform Lifetime Table III. Additionally, Social Security taxation rules apply up to 85% of benefits.
+                Under SECURE Act 2.0, mandatory RMDs start at age 73 (born 1951–1959) and step up by one year per birth cohort for later years (e.g. 1960→75, 1963→78). The engine calculates required minimum distributions using IRS Uniform Lifetime Table III. Additionally, Social Security taxation rules apply up to 85% of benefits.
               </p>
 
               <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
@@ -1204,7 +1204,7 @@ export function EngineRulesView({
                 }
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 font-mono text-foreground font-bold"
               />
-              <p className="text-[11px] text-muted-foreground">Statutory mandatory withdrawal age (73 for birth 1951–1959, 75 for 1960+).</p>
+              <p className="text-[11px] text-muted-foreground">Statutory mandatory withdrawal age — a fallback for plans without a birth year. The engine uses per-birth-year bands (1951–1959→73, 1960→75, 1961→76, ... 1965+→80).</p>
             </div>
 
             <div className="space-y-1">

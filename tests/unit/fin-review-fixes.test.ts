@@ -85,11 +85,13 @@ describe('Financial Engine Remediation & Fixes (FIN_REVIEW)', () => {
       const acc1 = year1.accountBalances.find((a) => a.id === 'k401-job1')!;
       const acc2 = year1.accountBalances.find((a) => a.id === 'k401-job2')!;
 
-      // Total 401k contribution in year 1 across both accounts should equal exactly $23,000 (not $46,000)
+      // Total 401k contribution in year 1 across both accounts should equal the
+      // statutory elective-deferral limit ($23,500 pre-2026 — 2026 limit is TBD pending
+      // IRS Rev. Proc.), not $47,000 across two employers.
       const total401kIncrease = (acc1.balance - 50000) + (acc2.balance - 20000);
-      // factoring in growth (6% + 1.5% = 7.5%), the savings added before growth was $23,000
-      expect(total401kIncrease).toBeLessThan(30000);
-      expect(year1.surplusSaved).toBeCloseTo(23000, -2);
+      // factoring in growth (6% + 1.5% = 7.5%), the savings added before growth was $23,500
+      expect(total401kIncrease).toBeLessThan(31000);
+      expect(year1.surplusSaved).toBeCloseTo(23500, -2);
     });
   });
 

@@ -18,12 +18,12 @@ export const CHARTS = {
     charts: {
       wealthFlowSankey: 'Wealth Flow Sankey',
       cashFlowSankey: 'Cash Flow Sankey',
+      incomeExpenseChart: 'Income vs Expense Chart',
     },
   },
   spending: {
     label: 'Spending',
     charts: {
-      incomeExpenseChart: 'Income vs Expense Chart',
       spendingBreakdown: 'Spending Breakdown',
       cashVsCredit: 'Cash vs Credit',
     },

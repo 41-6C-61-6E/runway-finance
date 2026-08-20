@@ -338,6 +338,25 @@ export default function AccountHierarchyTree({
       return accs;
     }, [selectedGroup, treeHierarchy]);
 
+  // Group heading click: select the group (drives the detail panel at all viewports)
+  const handleGroupSelect = useCallback((group: string) => {
+    setSelectedGroup(group);
+    setExpandedAccounts({});
+  }, []);
+
+  // Selected-group detail (combined chart) — below lg it renders inline under the group heading,
+  // identical to how an account's transaction card opens under its row; at lg+ it fills the side column
+  const groupDetailPanel =
+    selectedGroup && selectedGroupAccounts ? (
+      <GroupDetailPanel
+        group={selectedGroup}
+        accounts={selectedGroupAccounts}
+        historyData={historyData}
+        hierarchyTimeframe={hierarchyTimeframe}
+        onClose={() => setSelectedGroup(null)}
+      />
+    ) : null;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
       <Card className="@container lg:col-span-5 bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
@@ -760,24 +779,30 @@ export default function AccountHierarchyTree({
 
                   return (
                     <div key={group} className="divide-y divide-border/10">
-                      {/* Group Header Row */}
-                      <div 
-                        onClick={() => {
-                          const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
-                          if (isDesktop) {
-                            setSelectedGroup(group);
-                            setExpandedAccounts({});
-                          } else {
-                            setExpandedGroups((prev) => ({ ...prev, [group]: !isGroupExpanded }));
-                          }
-                        }}
-                        className={`w-full flex items-center justify-between px-0 py-3.5 ${isGroupSelected ? 'bg-primary/10 hover:bg-primary/15' : 'bg-muted/40 hover:bg-muted/60'} transition-colors cursor-pointer select-none`}
-                      >
+                        {/* Group section. When selected (below lg) the heading becomes the top row of a
+                            card and the combined detail nests inside — the same treatment an expanded
+                            account row gets */}
+                        <div
+                          className={`min-w-0 divide-y divide-border/10 ${
+                            isGroupSelected
+                              ? 'bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit'
+                              : ''
+                          }`}
+                        >
+                        {/* Group Header Row */}
+                        <div 
+                          onClick={() => {
+                            handleGroupSelect(group);
+                          }}
+                          className={`w-full flex items-center justify-between px-0 ${isGroupSelected ? 'py-2.5 sm:py-3.5' : 'py-3.5'} ${isGroupSelected ? 'bg-primary/10 hover:bg-primary/15' : 'bg-muted/40 hover:bg-muted/60'} transition-colors cursor-pointer select-none`}
+                        >
                         <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-6">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                                // Collapsing closes the open combined detail, like closing an account's card
+                                if (isGroupExpanded) setSelectedGroup(null);
                               setExpandedGroups((prev) => ({ ...prev, [group]: !isGroupExpanded }));
                             }}
                             className="w-6 h-6 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
@@ -808,6 +833,14 @@ export default function AccountHierarchyTree({
                           </p>
                         </div>
                       </div>
+
+                        {/* Narrow viewports: selected group's combined chart opens inline under the heading,
+                            identical to how an account's transaction card opens under its row */}
+                        {isGroupSelected && (
+                          <div id="hierarchy-group-detail-inline" className="lg:hidden px-2 py-2.5 sm:px-3 sm:py-3">
+                            {groupDetailPanel}
+                          </div>
+                        )}
 
                       {/* Subgroups & Accounts */}
                       {isGroupExpanded && (
@@ -1264,6 +1297,7 @@ export default function AccountHierarchyTree({
                           })()}
                         </div>
                       )}
+                        </div>
                     </div>
                   );
                 })}
@@ -1276,15 +1310,7 @@ export default function AccountHierarchyTree({
 
       {/* Desktop side panel: selected group or account detail (2/3 width) */}
       <div className="hidden lg:block lg:col-span-7 sticky top-[84px] max-h-[calc(100vh-100px)] overflow-y-auto">
-        {selectedGroup && selectedGroupAccounts ? (
-          <GroupDetailPanel
-            group={selectedGroup}
-            accounts={selectedGroupAccounts}
-            historyData={historyData}
-            hierarchyTimeframe={hierarchyTimeframe}
-            onClose={() => setSelectedGroup(null)}
-          />
-        ) : (
+        {groupDetailPanel ?? (
           <AccountDetailPanel
             account={selectedAccount}
             historyData={historyData}

@@ -24,7 +24,9 @@ async function hydratePlan(planRow: any, dek: Uint8Array, preloadedTaxRules?: an
     getDb().select().from(planFlows).where(eq(planFlows.planId, planRow.id)),
     getDb().select().from(planSettings).where(eq(planSettings.planId, planRow.id)).limit(1),
     getDb().select().from(planLiabilities).where(eq(planLiabilities.planId, planRow.id)),
-    preloadedTaxRules ? Promise.resolve(preloadedTaxRules) : getSystemTaxRules(2026),
+    // Simulations run from the current calendar year; year-specific rules
+    // (e.g. statutory brackets/FICA caps) must match — see finding T-2.
+    preloadedTaxRules ? Promise.resolve(preloadedTaxRules) : getSystemTaxRules(currentYear),
   ]);
 
   const decAccounts = await Promise.all(rawAccounts.map((a) => decryptRow('plan_accounts', a, dek)));
@@ -181,6 +183,24 @@ async function hydratePlan(planRow: any, dek: Uint8Array, preloadedTaxRules?: an
       withholdingDeferred: parseFloat(decSettings?.withholdingDeferred || '20.0'),
       withholdingTaxable: parseFloat(decSettings?.withholdingTaxable || '10.0'),
       incomeTaxModifier: parseFloat(decSettings?.incomeTaxModifier || '0.0'),
+      // ── L-1: graduated state table from the state_tax_table jsonb column
+      // (absent → the flat incomeTaxModifier keeps its legacy behavior).
+      stateTaxBrackets: Array.isArray((decSettings as any)?.stateTaxTable?.stateTaxBrackets)
+        ? (decSettings as any).stateTaxTable.stateTaxBrackets
+        : undefined,
+      stateTaxStandardDeduction:
+        (decSettings as any)?.stateTaxTable?.stateTaxStandardDeduction != null
+          ? Number((decSettings as any).stateTaxTable.stateTaxStandardDeduction)
+          : undefined,
+      stateGrossFloorRate:
+        (decSettings as any)?.stateTaxTable?.stateGrossFloorRate != null
+          ? Number((decSettings as any).stateTaxTable.stateGrossFloorRate)
+          : undefined,
+      stateCode: (decSettings as any)?.stateTaxTable?.stateCode || undefined,
+      // T-2: per-year statutory rule selection (default: inflationEscalated).
+      projectionMode: (decSettings as any)?.projectionMode === 'statutory' ? 'statutory' : 'inflationEscalated',
+      // T-5: opt-in AMT (default off → bit-identical legacy output).
+      enableAmt: Boolean((decSettings as any)?.enableAmt),
       capGainsTaxModifier: parseFloat(decSettings?.capGainsTaxModifier || '0.0'),
       heirFlatIncomeTaxRate: parseFloat(decSettings?.heirFlatIncomeTaxRate || '25.0'),
       stepUpBasis: decSettings?.stepUpBasis ?? true,
@@ -223,10 +243,14 @@ export async function GET(req: NextRequest) {
     const dek = await getSessionDEK();
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
+    // Engine simulations start at the current calendar year
+    // (retirement-engine: currentYear), so rules must be for the same year.
+    const currentYear = new Date().getFullYear();
+
     // Fetch user plans and tax rules in parallel
     const [dbPlans, taxRules] = await Promise.all([
       getDb().select().from(plans).where(eq(plans.userId, dataUserId)),
-      getSystemTaxRules(2026),
+      getSystemTaxRules(currentYear),
     ]);
 
     if (dbPlans.length === 0) {

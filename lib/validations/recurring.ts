@@ -59,6 +59,6 @@ export const RecurringMergeSchema = z.object({
 });
 
 export const RecurringBulkActionSchema = z.object({
-  action: z.enum(['confirm', 'dismiss', 'pause', 'resume', 'delete', 'dismiss_all_pending', 'reset_unconfirmed']),
+  action: z.enum(['confirm', 'dismiss', 'undismiss', 'pause', 'resume', 'delete', 'dismiss_all_pending', 'reset_unconfirmed']),
   ids: z.array(z.string().uuid()).optional(),
 });

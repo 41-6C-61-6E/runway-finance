@@ -284,10 +284,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
   const openIssues = issuesList.filter((issue) => issue.status !== 'closed');
   const closedIssuesCount = issuesList.length - openIssues.length;
   const displayedIssues = showClosed ? issuesList : openIssues;
-
-  const hasActiveIssues = issuesList.some(
-    (issue) => issue.status === 'reported' || issue.status === 'requested'
-  );
+  const hasOpenBugs = openIssues.some((issue) => issue.type === 'bug');
 
   return (
     <div className="relative" ref={ref}>
@@ -300,8 +297,16 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
             aria-label="Submit Feedback / Track issues"
           >
             <MessageSquare className="w-5 h-5" />
-            {hasActiveIssues && (
-              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-destructive" />
+            {openIssues.length > 0 && (
+              <span
+                className={`absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold leading-none ${
+                  hasOpenBugs
+                    ? 'bg-destructive text-destructive-foreground'
+                    : 'bg-primary text-primary-foreground'
+                }`}
+              >
+                {openIssues.length > 99 ? '99+' : openIssues.length}
+              </span>
             )}
           </button>
         </TooltipTrigger>

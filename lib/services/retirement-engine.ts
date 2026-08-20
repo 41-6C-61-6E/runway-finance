@@ -1,5 +1,7 @@
-import { DEFAULT_2026_RULES, IRS_UNIFORM_LIFETIME_TABLE } from '@/lib/constants/retirement-defaults';
+import { computeStateTax, type StateTaxConfig } from '@/lib/tax/bracket-tax';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
+import { DEFAULT_2026_RULES, IRS_UNIFORM_LIFETIME_TABLE, getRmdStartAge } from '@/lib/constants/retirement-defaults';
+import { HISTORICAL_TAX_RULES } from '@/lib/constants/historical-tax-rules';
 
 export interface EngineAccount {
   id: string;
@@ -105,6 +107,12 @@ export interface EnginePlan {
     withholdingDeferred?: number;
     withholdingTaxable?: number;
     incomeTaxModifier?: number;
+    // ── L-1: optional graduated state table. Absent → the flat
+    // incomeTaxModifier behavior (legacy, bit-identical).
+    stateTaxBrackets?: Array<{ threshold: number; rate: number }>;
+    stateTaxStandardDeduction?: number;
+    stateGrossFloorRate?: number;
+    stateCode?: string;
     capGainsTaxModifier?: number;
     heirFlatIncomeTaxRate?: number;
     stepUpBasis?: boolean;
@@ -116,6 +124,19 @@ export interface EnginePlan {
     rothConversionTargetCeiling?: 'top_of_10' | 'top_of_12' | 'top_of_22' | 'top_of_24' | 'top_of_32' | 'irmaa_tier1';
     avoidIrmaaCliffs?: boolean;
     allowPenaltyWithdrawals?: boolean;
+    // ── T-2: 'statutory' reads per-year published rule rows (2024/2025) when
+    // available; 'inflationEscalated' (default) inflates the base-year rules —
+    // the legacy behavior, bit-identical for existing plans.
+    projectionMode?: 'statutory' | 'inflationEscalated';
+    // ── T-5: opt-in AMT, default off (bit-identical output when off).
+    // Base-year (2025) statutory amounts, escalated at the plan's inflation
+    // rate: exemption $85,800 S / $139,000 MFJ (MFS = ½ MFJ), 26% single
+    // rate, exemption reduced by 25% for tax base above $699,500 S /
+    // $1,399,000 MFJ. Tax base = MAGI (+ HSA ordinary income) + state/local
+    // add-back (state tax is non-deductible for AMT, L-2). Only the amount
+    // exceeding regular federal income tax (ordinary + gains + NIIT) is
+    // charged.
+    enableAmt?: boolean;
   };
   rules?: typeof DEFAULT_2026_RULES;
 }
@@ -191,6 +212,8 @@ export interface YearlySimulationResult {
   stateTax: number;
   ficaTax: number;
   niitTax?: number;
+  // T-5: incremental AMT over regular federal income tax (0 unless plan.settings.enableAmt)
+  amtTax?: number;
   earlyPenaltyTax?: number;
   acaSubsidy: number;
   effectiveTaxRate: number;
@@ -280,7 +303,10 @@ export function runRetirementSimulation(
   const isMfj = filingStatus === 'married_joint';
   const isMfs = filingStatus === 'married_separate';
   const isHoH = filingStatus === 'head_of_household';
-  const rules = plan.rules || DEFAULT_2026_RULES;
+  const baseRules = plan.rules || DEFAULT_2026_RULES;
+  // Pre-loop convenience alias (the simulation loop block-declares its own
+  // per-year `rules` below for T-2); keep any pre/post-loop consumers intact.
+  const rules = baseRules;
 
   // Mutable deep clones of state for simulation loop (with Roth percentage splitting)
   const accountsState: Record<string, EngineAccount> = {};
@@ -355,11 +381,27 @@ export function runRetirementSimulation(
     if (primaryAge === 65) milestonesReached.push('Medicare Eligibility & ACA Transition (Age 65)');
     if (primaryAge === 67) milestonesReached.push('Full Social Security Retirement Age (Age 67)');
     if (primaryAge === 70) milestonesReached.push('Maximum Social Security Benefit Age (Age 70)');
-    const rmdStartAge = (primaryBirthYear >= 1960) ? 75 : (rules.secureActRules?.rmdAge || 73);
+    // SECURE 2.0 birth-year bands (T-7): 1951–1959→73 · 1960→75 · 1961→76 ·
+    // 1962→77 · 1963→78 · 1964→79 · 1965+→80.
+    const rmdStartAge = getRmdStartAge(primaryBirthYear);
     if (primaryAge === rmdStartAge) milestonesReached.push(`Mandatory RMD Start Age (${rmdStartAge})`);
 
     const inflationRate = (plan.settings?.fixedInflationRate ?? 3.0) / 100;
     const compoundInflation = Math.pow(1 + inflationRate, yearOffset);
+
+    // ── T-2: per-year statutory rule selection (see TAX_PAYROLL_REVIEW §1.3). ──
+    // 'inflationEscalated' (default): every statutory dollar figure is
+    // inflated from the base year — the legacy behavior, bit-identical.
+    // 'statutory': simulated years with a published rule row (2024/2025, or a
+    // user-maintained system_tax_rules row) use exact statutory values
+    // (scale 1); later years fall back to inflation-escalated base values.
+    // The block-scoped `rules` shadow routes every in-loop rules.* read to
+    // the selected year set without touching any call site.
+    const statutoryRow = plan.settings?.projectionMode === 'statutory'
+      ? (HISTORICAL_TAX_RULES[simYear] as typeof baseRules | undefined)
+      : undefined;
+    const rules: typeof baseRules = statutoryRow ?? baseRules;
+    const ruleScale = statutoryRow ? 1 : compoundInflation;
 
     // 0. Check IRMAA surcharges triggered from 2 years prior (age 65+)
     const irmaaSurchargeAnnual = primaryAge >= 65 ? irmaaSurchargeQueue[simYear] || 0 : 0;
@@ -727,19 +769,20 @@ export function runRetirementSimulation(
           : (isMfs
               ? parseFloat(rules.standardDeductionMfs || '15000')
               : parseFloat(rules.standardDeductionSingle || rules.standardDeduction || '15000')));
-    let stdDeduction = stdDeductionBase * compoundInflation;
+    let stdDeduction = stdDeductionBase * ruleScale;  // T-2: statutory rows carry their own SD
     const age65Boost = rules.additionalStdDeduction65Plus;
     if (age65Boost) {
       if (primaryAge >= 65) {
-        stdDeduction += (isMfj ? age65Boost.marriedPerPerson : age65Boost.singleOrHoH) * compoundInflation;
+        stdDeduction += (isMfj ? age65Boost.marriedPerPerson : age65Boost.singleOrHoH) * ruleScale;
       }
       if (isMfj && spouseAge !== undefined && spouseAge >= 65) {
-        stdDeduction += age65Boost.marriedPerPerson * compoundInflation;
+        stdDeduction += age65Boost.marriedPerPerson * ruleScale;
       }
     }
 
     const ficaRules = rules.ficaRules || DEFAULT_2026_RULES.ficaRules;
-    const ssWageBase = (ficaRules.ssWageBaseCap ?? 176100) * compoundInflation;
+    // 2026 OASDI taxable maximum per SSA: $184,500 (was the 2025 cap by mistake).
+    const ssWageBase = (ficaRules.ssWageBaseCap ?? 184500) * ruleScale;  // T-2: cap tracks the selected year
     const ssTaxableSalary = Math.min(ficaTaxableSalary, ssWageBase);
     const ssFica = ssTaxableSalary * (ficaRules.ssTaxRate ?? 0.062);
     const medicareFica = ficaTaxableSalary * (ficaRules.medicareTaxRate ?? 0.0145);
@@ -773,10 +816,10 @@ export function runRetirementSimulation(
 
     for (let i = 0; i < activeOrdinaryBrackets.length; i++) {
       const b = activeOrdinaryBrackets[i];
-      const thresh = b.threshold * bracketMult * compoundInflation;
+      const thresh = b.threshold * bracketMult * ruleScale;
       if (taxableOrdinaryIncome > thresh) {
         const nextB = activeOrdinaryBrackets[i + 1];
-        const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
+        const nextThresh = nextB ? nextB.threshold * bracketMult * ruleScale : Infinity;
         const taxableChunk = Math.min(taxableOrdinaryIncome - thresh, nextThresh - thresh);
         ordinaryTax += taxableChunk * b.rate;
       }
@@ -786,7 +829,24 @@ export function runRetirementSimulation(
     let niitTax = 0;
     let earlyPenaltyTax = 0;
     const stateTaxRate = (plan.settings?.incomeTaxModifier || 0) / 100;
-    let stateTax = taxableOrdinaryIncome * stateTaxRate;
+    // ── L-1: graduated state table when the plan configures one; the flat
+    // `incomeTaxModifier` fallback is bit-identical to the legacy behavior.
+    const stateTaxCfg: StateTaxConfig = {
+      stateTaxBrackets: plan.settings?.stateTaxBrackets,
+      stateTaxStandardDeduction: plan.settings?.stateTaxStandardDeduction,
+      stateGrossFloorRate: plan.settings?.stateGrossFloorRate,
+      stateCode: plan.settings?.stateCode,
+      // MFJ: double the table thresholds (state joint ≈ 2× single), same
+      // convention as the federal bracketMult.
+      bracketMultOverride: bracketMult,
+    };
+    let stateTax = computeStateTax(
+      taxableOrdinaryIncome,
+      grossIncome,
+      plan.settings?.incomeTaxModifier || 0,
+      stateTaxCfg,
+      ruleScale // T-2: state table thresholds track the selected statutory year
+    );
     let taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax;
     const initialTaxesPaid = taxesPaid;
     let effectiveTaxRate = grossIncome > 0 ? (taxesPaid / grossIncome) * 100 : 0;
@@ -1083,7 +1143,7 @@ export function runRetirementSimulation(
       ];
       if (isMfj && spouseAge !== undefined) {
         const spouseBirthYear = plan.spouseBirthYear || (simYear - spouseAge);
-        const spouseRmdStartAge = (spouseBirthYear >= 1960) ? 75 : (rules.secureActRules?.rmdAge || 73);
+        const spouseRmdStartAge = getRmdStartAge(spouseBirthYear);
         rmdOwners.push({ owner: 'spouse', age: spouseAge, rmdAge: spouseRmdStartAge });
       }
 
@@ -1206,7 +1266,7 @@ export function runRetirementSimulation(
           const target12Bracket = rules.ordinaryTaxBrackets?.find((b: any) => Math.abs(b.rate - 0.12) < 0.01)
             || rules.ordinaryTaxBrackets?.[1]
             || { threshold: 48475 };
-          const target12Limit = target12Bracket.threshold * (isMfj ? 2 : 1) * compoundInflation;
+          const target12Limit = target12Bracket.threshold * (isMfj ? 2 : 1) * ruleScale;
           const currentTaxable = taxableOrdinaryIncome + drawdownsByType.traditional;
           const bracketRoom = Math.max(0, target12Limit - currentTaxable);
 
@@ -1341,7 +1401,7 @@ export function runRetirementSimulation(
         if (irmaaList.length > 1) {
           const tier1 = irmaaList[1];
           const baseIrmaaLimit = isMfj ? tier1.magiJoint : tier1.magiSingle;
-          const irmaaLimit = baseIrmaaLimit * compoundInflation;
+          const irmaaLimit = baseIrmaaLimit * ruleScale;  // T-2
           const preConvMagi = salaryIncome + pensionIncome + (totalSsIncome * 0.5) + otherIncome + drawdownsByType.traditional + totalTaxableGains;
           convHeadroom = Math.max(0, irmaaLimit - preConvMagi - 1000);
         }
@@ -1355,7 +1415,7 @@ export function runRetirementSimulation(
 
         const targetBracketIdx = rules.ordinaryTaxBrackets.findIndex((b: any) => Math.abs(b.rate - targetCeilingRate) < 0.01);
         const nextBracketObj = rules.ordinaryTaxBrackets[targetBracketIdx + 1];
-        const targetCeilingDollars = (nextBracketObj ? nextBracketObj.threshold : 47150) * bracketMult * compoundInflation;
+        const targetCeilingDollars = (nextBracketObj ? nextBracketObj.threshold : 47150) * bracketMult * ruleScale;
 
         const currentTaxable = taxableOrdinaryIncome + drawdownsByType.traditional;
         convHeadroom = Math.max(0, targetCeilingDollars - currentTaxable);
@@ -1367,7 +1427,7 @@ export function runRetirementSimulation(
         for (let idx = 1; idx < irmaaGuardList.length; idx++) {
           const tierObj = irmaaGuardList[idx];
           const baseIrmaaLimit = isMfj ? tierObj.magiJoint : tierObj.magiSingle;
-          const irmaaLimit = baseIrmaaLimit * compoundInflation;
+          const irmaaLimit = baseIrmaaLimit * ruleScale;  // T-2
           if (irmaaLimit > 0 && preConvMagi < irmaaLimit) {
             convHeadroom = Math.min(convHeadroom, Math.max(0, irmaaLimit - preConvMagi - 1000));
             break;
@@ -1451,10 +1511,10 @@ export function runRetirementSimulation(
       ordinaryTax = 0;
       for (let i = 0; i < activeOrdinaryBrackets.length; i++) {
         const b = activeOrdinaryBrackets[i];
-        const thresh = b.threshold * bracketMult * compoundInflation;
+        const thresh = b.threshold * bracketMult * ruleScale;
         if (fullTaxableOrdinary > thresh) {
           const nextB = activeOrdinaryBrackets[i + 1];
-          const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
+          const nextThresh = nextB ? nextB.threshold * bracketMult * ruleScale : Infinity;
           const taxableChunk = Math.min(fullTaxableOrdinary - thresh, nextThresh - thresh);
           ordinaryTax += taxableChunk * b.rate;
         }
@@ -1465,9 +1525,9 @@ export function runRetirementSimulation(
         const ordinaryBase = fullTaxableOrdinary;
         for (let i = 0; i < capBrackets.length; i++) {
           const b = capBrackets[i];
-          const thresh = b.threshold * bracketMult * compoundInflation;
+          const thresh = b.threshold * bracketMult * ruleScale;
           const nextB = capBrackets[i + 1];
-          const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
+          const nextThresh = nextB ? nextB.threshold * bracketMult * ruleScale : Infinity;
           const bracketStart = Math.max(thresh, ordinaryBase);
           const bracketEnd = Math.min(nextThresh, ordinaryBase + totalTaxableGains);
           if (bracketEnd > bracketStart) {
@@ -1477,7 +1537,15 @@ export function runRetirementSimulation(
       }
 
       const totalTaxableIncome = grossIncome + additionalOrdinaryIncome + totalTaxableGains;
-      stateTax = (fullTaxableOrdinary + totalTaxableGains) * stateTaxRate;
+      // ── L-1: keep the graduated/flat parity with the initial state-tax
+      // computation (both use the same helper + table).
+      stateTax = computeStateTax(
+        fullTaxableOrdinary + totalTaxableGains,
+        totalTaxableIncome,
+        plan.settings?.incomeTaxModifier || 0,
+        stateTaxCfg,
+        ruleScale
+      );
     }
 
     // Compute Net Investment Income Tax (NIIT)
@@ -1485,13 +1553,35 @@ export function runRetirementSimulation(
     const niitRules = rules.niitRules || DEFAULT_2026_RULES.niitRules;
     const niitRate = niitRules.rate ?? 0.038;
     const niitThreshBase = isMfj ? (niitRules.thresholdMfj ?? 250000) : (isMfs ? (niitRules.thresholdMfs ?? 125000) : (niitRules.thresholdSingle ?? 200000));
-    const niitThresh = niitThreshBase * compoundInflation;
+    const niitThresh = niitThreshBase * ruleScale;  // T-2
     if (magi > niitThresh && totalTaxableGains > 0) {
       const excessMagi = magi - niitThresh;
       niitTax = niitRate * Math.min(totalTaxableGains, excessMagi);
     }
 
-    taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax;
+    // ── T-5: Alternative Minimum Tax (opt-in via plan.settings.enableAmt) ──
+    // Simplified IRC §55: AMT tax base = MAGI (+ HSA ordinary income) with
+    // the state/local tax add-back (state income tax is nondeductible for AMT
+    // purposes). Exemption base (2025 statutory) is inflation-escalated the
+    // same way as the other statutory amounts, then phased out at 25% above
+    // the phaseout-start threshold. AMT is 26% of (base − exemption); only
+    // the excess over the regular federal income tax is charged. Off by
+    // default → amtTax === 0 and the taxesPaid expression below is unchanged.
+    let amtTax = 0;
+    if (plan.settings?.enableAmt) {
+      const amtExemptBase = ((isMfj ? 139000 : isMfs ? 69500 : 85800) * ruleScale);
+      const amtPhaseoutStart = ((isMfs ? 699500 : isMfj ? 1399000 : 699500) * ruleScale);
+      const amtTaxBase = magi + hsaOrdinaryIncome + stateTax;
+      const amtExempt = Math.max(0, amtExemptBase - 0.25 * Math.max(0, amtTaxBase - amtPhaseoutStart));
+      const federalRegTax = ordinaryTax + capGainsTax + niitTax;
+      // Minimum tax = 26% × (tax base − exemption), floored at 0, then only
+      // the amount above the regular federal income tax is charged (the
+      // taxpayer owes the higher of the two methods).
+      const minimumTax = Math.max(0, (amtTaxBase - amtExempt) * 0.26);
+      amtTax = Math.max(0, minimumTax - federalRegTax);
+    }
+
+    taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax + amtTax;
 
     // Deduct incremental taxes resulting from drawdowns and Roth conversions from cash/taxable accounts
     const taxDelta = Math.max(0, taxesPaid - initialTaxesPaid);
@@ -1538,7 +1628,7 @@ export function runRetirementSimulation(
     if (isRetired && primaryAge < hsaExemptAge) {
       const acaRules = rules.acaRules || DEFAULT_2026_RULES.acaRules;
       const fplBase = parseFloat(rules.fplAmount || String(acaRules.fplBaseSingle ?? 15060));
-      const fplHousehold = fplBase * (isMfj ? (acaRules.fplMfjMultiplier ?? 1.35) : 1.0) * compoundInflation;
+      const fplHousehold = fplBase * (isMfj ? (acaRules.fplMfjMultiplier ?? 1.35) : 1.0) * ruleScale;  // T-2
       const fplPercent = (magi / fplHousehold) * 100;
 
       let premiumCapPct = 0.085;
@@ -1549,7 +1639,7 @@ export function runRetirementSimulation(
         }
       }
 
-      const benchmarkCost = (isMfj ? (acaRules.benchmarkCostMfj ?? 16800) : (acaRules.benchmarkCostSingle ?? 8400)) * compoundInflation;
+      const benchmarkCost = (isMfj ? (acaRules.benchmarkCostMfj ?? 16800) : (acaRules.benchmarkCostSingle ?? 8400)) * ruleScale;  // T-2
       const maxContrib = magi * premiumCapPct;
       acaSubsidy = Math.max(0, benchmarkCost - maxContrib);
     }
@@ -1592,9 +1682,9 @@ export function runRetirementSimulation(
             const ordinaryBase = finalTaxableOrdinary;
             for (let i = 0; i < capBrackets.length; i++) {
               const b = capBrackets[i];
-              const thresh = b.threshold * bracketMult * compoundInflation;
+              const thresh = b.threshold * bracketMult * ruleScale;
               const nextB = capBrackets[i + 1];
-              const nextThresh = nextB ? nextB.threshold * bracketMult * compoundInflation : Infinity;
+              const nextThresh = nextB ? nextB.threshold * bracketMult * ruleScale : Infinity;
               const bracketStart = Math.max(thresh, ordinaryBase);
               const bracketEnd = Math.min(nextThresh, ordinaryBase + qualDivs);
               if (bracketEnd > bracketStart) {
@@ -1611,7 +1701,7 @@ export function runRetirementSimulation(
               const ordBase = finalTaxableOrdinary;
               for (let i = rules.ordinaryTaxBrackets.length - 1; i >= 0; i--) {
                 const b = rules.ordinaryTaxBrackets[i];
-                if (ordBase >= b.threshold * bracketMult * compoundInflation) return b.rate;
+                if (ordBase >= b.threshold * bracketMult * ruleScale) return b.rate;
               }
               return 0.10;
             })();
@@ -1672,11 +1762,11 @@ export function runRetirementSimulation(
     const ltcg15Bracket = rules.capitalGainsBrackets?.find((b: any) => b.rate === 0.15)
       || rules.capitalGainsBrackets?.[1]
       || { threshold: 50600 };
-    const ltcg0PctCeiling = ltcg15Bracket.threshold * bracketMult * compoundInflation;
+    const ltcg0PctCeiling = ltcg15Bracket.threshold * bracketMult * ruleScale;  // T-2
     const capitalGains0PctRoom = Math.max(0, ltcg0PctCeiling - finalTaxableOrdinary);
     const niitHeadroom = Math.max(0, niitThresh - magi);
 
-    taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax + totalDivTax;
+      taxesPaid = ficaTax + ordinaryTax + capGainsTax + stateTax + niitTax + totalDivTax + amtTax;
     effectiveTaxRate = totalTaxBase > 0 ? ((taxesPaid + earlyPenaltyTax) / totalTaxBase) * 100 : 0;
 
     yearlyResults.push({
@@ -1706,6 +1796,7 @@ export function runRetirementSimulation(
       stateTax,
       ficaTax,
       niitTax,
+      amtTax,
       earlyPenaltyTax,
       acaSubsidy,
       effectiveTaxRate,

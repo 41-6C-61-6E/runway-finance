@@ -455,7 +455,9 @@ export async function GET(request: Request) {
     }
   }
 
-  // Handle exclude tag filter — resolve to matching transaction IDs via join and exclude them
+  // Handle exclude tag filter — resolve to matching transaction IDs via join and exclude them.
+  // Direct-match only: a tagged transaction's split parent/children are NOT
+  // excluded — only the exact rows carrying the tag.
   if (filters.excludeTagIds || filters.excludeTagId) {
     const rawExclude = filters.excludeTagIds || filters.excludeTagId || '';
     const excludeTagIdList = rawExclude.split(',').map((id) => id.trim()).filter(Boolean);
@@ -464,20 +466,9 @@ export async function GET(request: Request) {
         .select({ transactionId: transactionTags.transactionId })
         .from(transactionTags)
         .where(inArray(transactionTags.tagId, excludeTagIdList));
-      const txIds = taggedTxIds.map((r) => r.transactionId);
+      const txIds = taggedTxIds.map((r) => r.transactionId).filter(Boolean);
       if (txIds.length > 0) {
-        const childTxnsWithTags = await getDb()
-          .select({ parentId: transactions.parentId })
-          .from(transactions)
-          .where(and(inArray(transactions.id, txIds), isNotNull(transactions.parentId)));
-        const childTxnsOfParents = await getDb()
-          .select({ id: transactions.id })
-          .from(transactions)
-          .where(inArray(transactions.parentId, txIds));
-        const parentIds = childTxnsWithTags.map((c) => c.parentId).filter(Boolean) as string[];
-        const childIds = childTxnsOfParents.map((c) => c.id).filter(Boolean) as string[];
-        const allExcludedIds = Array.from(new Set([...txIds, ...parentIds, ...childIds]));
-        whereConditions.push(notInArray(transactions.id, allExcludedIds));
+        whereConditions.push(notInArray(transactions.id, txIds));
       }
     }
   }

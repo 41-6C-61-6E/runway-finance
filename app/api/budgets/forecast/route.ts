@@ -6,6 +6,7 @@ import { eq, and, sql, inArray, desc } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, decryptRows } from '@/lib/crypto';
+import { toCashFlowAmount } from '@/lib/utils/account-scope';
 
 function normalizeToMonthly(amount: number, periodType: string): number {
   if (periodType === 'quarterly') return amount / 3;
@@ -137,13 +138,20 @@ export async function GET(request: Request) {
       .from(transactions)
       .where(and(...txConditions));
 
+    // Map account id → type so liability accounts (payments stored as
+    // POSITIVE amounts) are normalized to the standard cash-flow sign
+    // before the income/expense split below.
+    const accountTypeById = new Map<string, string>(
+      (decryptedAccounts as any[]).map((a) => [String(a.id), String(a.type ?? '')])
+    );
+
     // Decrypt all transaction amounts and categorize
     const incomeByAccount = new Map<string, number[]>();
     const expenseByAccount = new Map<string, number[]>();
     const expenseByAccountAndCategory = new Map<string, Map<string, number[]>>();
 
     for (const txn of allTxns) {
-      const amount = parseFloat(await decryptField(txn.amount, dek));
+      const rawAmount = parseFloat(await decryptField(txn.amount, dek));
       const accId = txn.accountId;
       const category = txn.categoryId ? catById.get(txn.categoryId.toString()) : undefined;
       let excluded = category?.excludeFromReports ?? false;
@@ -153,9 +161,11 @@ export async function GET(request: Request) {
       }
       if (excluded) continue;
 
+      const amount = toCashFlowAmount(rawAmount, accountTypeById.get(String(accId)));
+
       if (category?.categoryType === 'transfer') continue;
       if (category?.categoryType === 'compound') {
-        const absAmt = Math.abs(amount);
+        const absAmt = Math.abs(rawAmount);
         if (!incomeByAccount.has(accId)) incomeByAccount.set(accId, []);
         incomeByAccount.get(accId)!.push(absAmt);
         if (!expenseByAccount.has(accId)) expenseByAccount.set(accId, []);
@@ -172,7 +182,7 @@ export async function GET(request: Request) {
         if (!incomeByAccount.has(accId)) incomeByAccount.set(accId, []);
         incomeByAccount.get(accId)!.push(amount);
       } else {
-        const absAmt = Math.abs(amount);
+        const absAmt = Math.abs(rawAmount);
         if (!expenseByAccount.has(accId)) expenseByAccount.set(accId, []);
         expenseByAccount.get(accId)!.push(absAmt);
 

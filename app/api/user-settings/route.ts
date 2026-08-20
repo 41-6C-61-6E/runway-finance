@@ -76,6 +76,10 @@ export async function GET() {
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
+      recurringExclusions: created?.recurringExclusions ?? DEFAULTS.recurringExclusions,
+      notifyRecurringPriceChanges: created?.notifyRecurringPriceChanges ?? DEFAULTS.notifyRecurringPriceChanges,
+      notifyUpcomingBills: created?.notifyUpcomingBills ?? DEFAULTS.notifyUpcomingBills,
+      upcomingBillsLeadDays: created?.upcomingBillsLeadDays ?? DEFAULTS.upcomingBillsLeadDays,
       deletePendingOlderThan30Days: created?.deletePendingOlderThan30Days ?? DEFAULTS.deletePendingOlderThan30Days,
       deletePendingDays: created?.deletePendingDays ?? DEFAULTS.deletePendingDays,
     });
@@ -437,6 +441,9 @@ export async function PATCH(request: Request) {
 		if (recurringExclusions.merchantPatterns !== undefined && (!Array.isArray(recurringExclusions.merchantPatterns) || !recurringExclusions.merchantPatterns.every((pattern: unknown) => typeof pattern === 'string'))) {
 			return Response.json({ error: 'Invalid recurringExclusions.merchantPatterns value' }, { status: 400 });
 		}
+    if (recurringExclusions.tagIds !== undefined && (!Array.isArray(recurringExclusions.tagIds) || !recurringExclusions.tagIds.every((id: unknown) => typeof id === 'string'))) {
+      return Response.json({ error: 'Invalid recurringExclusions.tagIds value' }, { status: 400 });
+    }
 	}
 
 	const db = getDb();
@@ -458,6 +465,7 @@ export async function PATCH(request: Request) {
         chartColorScheme: chartColorScheme ?? DEFAULTS.chartColorScheme,
         accountTagVisibility: accountTagVisibility ?? DEFAULTS.accountTagVisibility,
         budgetExclusions: budgetExclusions ?? DEFAULTS.budgetExclusions,
+        recurringExclusions: recurringExclusions ?? DEFAULTS.recurringExclusions,
       })
       .returning();
 
@@ -555,6 +563,7 @@ export async function PATCH(request: Request) {
       accountIds: recurringExclusions.accountIds ?? [],
       accountTypes: recurringExclusions.accountTypes ?? [],
       merchantPatterns: recurringExclusions.merchantPatterns ?? [],
+        tagIds: recurringExclusions.tagIds ?? [],
     };
   }
 	if (notifySyncErrors !== undefined) updates.notifySyncErrors = notifySyncErrors;

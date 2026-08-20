@@ -124,7 +124,6 @@ export async function POST(request: Request) {
     await createUserEncryptionKeys(username, password);
     await seedUserCategories(username);
     await seedUserDefaultRules(username);
-    await seedUserAiProviders(username);
 
     const db = getDb();
     await db.insert(userSettings).values({
@@ -150,6 +149,8 @@ export async function POST(request: Request) {
       hideAccountsSidebarByDefault: DEFAULTS.hideAccountsSidebarByDefault,
       chartSelections: DEFAULTS.chartSelections,
     });
+
+    await seedUserAiProviders(username);
 
     logger.info('Register API: user created', { username });
     return NextResponse.json({ message: 'User created successfully' }, { status: 201 });
@@ -196,9 +197,6 @@ async function completeSharingJoin(params: {
 
   await logShareAudit(inviterUserId, username, SHARE_AUDIT_ACTIONS.MEMBER_JOINED, 'account_share_members');
 
-  // Seed only AI providers and personal settings (NOT categories/rules — they share the primary's)
-  await seedUserAiProviders(username);
-
   const db = getDb();
   await db.insert(userSettings).values({
     userId: username,
@@ -223,6 +221,9 @@ async function completeSharingJoin(params: {
     hideAccountsSidebarByDefault: DEFAULTS.hideAccountsSidebarByDefault,
     chartSelections: DEFAULTS.chartSelections,
   });
+
+  // Seed AI providers after personal settings exist
+  await seedUserAiProviders(username);
 
   logger.info('Register API: shared account member created', { username, inviterUserId });
 }

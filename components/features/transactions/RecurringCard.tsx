@@ -13,7 +13,7 @@ import {
   Merge,
   Square,
   CheckSquare,
-  Sparkles,
+  CircleAlert,
   Landmark,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -126,7 +126,7 @@ function getStatusBadge(item: RecurringItem) {
           className="inline-flex p-1 rounded-md text-amber-500 dark:text-amber-400 hover:bg-amber-500/10 cursor-help"
           aria-label="Needs review"
         >
-          <Sparkles className="w-3.5 h-3.5" />
+          <CircleAlert className="w-3.5 h-3.5" />
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className="text-xs">
@@ -466,6 +466,11 @@ export default function RecurringCard({
                 <span className="text-xs font-normal text-muted-foreground ml-1">
                   {formatFrequencyUnit(item.frequency)}
                 </span>
+                {item.accountName && (
+                  <span className="inline-block align-baseline text-[10px] font-normal text-muted-foreground/80 ml-1 max-w-[8rem] truncate">
+                    · {item.accountName}
+                  </span>
+                )}
               </div>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">

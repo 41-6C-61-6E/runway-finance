@@ -28,6 +28,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname),
       'auth': path.resolve(__dirname, 'tests/unit/mocks/auth.ts'),
+      'next-auth/providers/credentials': path.resolve(__dirname, 'tests/unit/mocks/auth.ts'),
+      'next-auth': path.resolve(__dirname, 'tests/unit/mocks/auth.ts'),
     },
   },
 });

@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Search,
   Landmark,
+  Tag as TagIcon,
   Layers,
   CheckSquare,
   Square,
@@ -21,6 +22,7 @@ import {
   Loader2,
   Plus,
   X,
+  Undo2,
 } from 'lucide-react';
 
 interface CategoryItem {
@@ -41,10 +43,28 @@ interface AccountItem {
   isVirtual?: boolean;
 }
 
+interface TagItem {
+  id: string;
+  name: string;
+  color: string;
+  description?: string | null;
+  transactionCount?: number;
+}
+
 interface RecurringExclusionsDialogProps {
   open: boolean;
   onClose: () => void;
   onSavedAndRescan?: () => void;
+}
+
+// A dismissed detection suggestion (reduced shape from /api/recurring items)
+interface DismissedItem {
+  id: string;
+  displayName: string;
+  accountName: string | null;
+  flowType: string;
+  averageAmount: number;
+  isDismissed?: boolean;
 }
 
 export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: RecurringExclusionsDialogProps) {
@@ -53,16 +73,22 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
   const settings = settingsContext?.settings || {};
   const updateSetting = settingsContext?.updateSetting;
 
-  const [activeTab, setActiveTab] = useState<'categories' | 'accounts' | 'types' | 'merchants'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'tags' | 'accounts' | 'types' | 'merchants' | 'dismissed'>('categories');
   const [categorySearch, setCategorySearch] = useState('');
   const [accountSearch, setAccountSearch] = useState('');
+  const [tagSearch, setTagSearch] = useState('');
   const [newMerchantPattern, setNewMerchantPattern] = useState('');
   const [saving, setSaving] = useState(false);
+  // Local copy of dismissed suggestions — rows are removed locally right after
+  // a successful undo instead of re-fetching.
+  const [dismissedItems, setDismissedItems] = useState<DismissedItem[]>([]);
+  const [restoringItemId, setRestoringItemId] = useState<string | null>(null);
 
   // Local state for exclusions
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [selectedAccountTypes, setSelectedAccountTypes] = useState<string[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [merchantPatterns, setMerchantPatterns] = useState<string[]>([]);
 
   // Initialize from user settings (only when the dialog opens, so that
@@ -73,9 +99,11 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
       setSelectedCategoryIds(Array.isArray(exclusions.categoryIds) ? exclusions.categoryIds : []);
       setSelectedAccountIds(Array.isArray(exclusions.accountIds) ? exclusions.accountIds : []);
       setSelectedAccountTypes(Array.isArray(exclusions.accountTypes) ? exclusions.accountTypes : []);
+      setSelectedTagIds(Array.isArray(exclusions.tagIds) ? exclusions.tagIds : []);
       setMerchantPatterns(Array.isArray(exclusions.merchantPatterns) ? exclusions.merchantPatterns : []);
       setCategorySearch('');
       setAccountSearch('');
+      setTagSearch('');
       setNewMerchantPattern('');
     }
   }, [open]);
@@ -102,6 +130,86 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
     },
     enabled: open,
   });
+
+    // Fetch all user tags
+    const { data: tags = [], isLoading: tagsLoading } = useQuery<TagItem[]>({
+      queryKey: ['tags'],
+      queryFn: async () => {
+        const res = await fetch('/api/tags', { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load tags');
+        return res.json();
+      },
+      enabled: open,
+    });
+
+  // Fetch dismissed detection suggestions (only while the Dismissed tab is
+  // open so the extra query stays cheap on other tabs)
+  const { data: dismissedData, isLoading: dismissedLoading } = useQuery<{ items: DismissedItem[] }>({
+    queryKey: ['recurring', 'dismissed'],
+    queryFn: async () => {
+      const res = await fetch('/api/recurring?status=dismissed&includeDismissed=true', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load dismissed items');
+      const data = (await res.json()) as { items: DismissedItem[] };
+      if (data.items.length === 0) {
+        // Fallback: fetch the full set and filter client-side (mirrors how
+        // the main Recurring view loads its data).
+        const fullRes = await fetch('/api/recurring?includeDismissed=true', { credentials: 'include' });
+        if (fullRes.ok) {
+          const full = (await fullRes.json()) as { items: DismissedItem[] };
+          const local = full.items.filter((i) => i.isDismissed);
+          if (local.length > 0) return { items: local };
+        }
+      }
+      return data;
+    },
+    enabled: open && activeTab === 'dismissed',
+  });
+
+  // Mirror fetched items into local state; keeps locally-removed rows removed
+  // while a re-fetch is in flight.
+  useEffect(() => {
+    if (dismissedData?.items) {
+      setDismissedItems(dismissedData.items as DismissedItem[]);
+    }
+  }, [dismissedData]);
+
+  const handleRestoreDismissed = async (id: string) => {
+    setRestoringItemId(id);
+    try {
+      const res = await fetch('/api/recurring', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, isDismissed: false }),
+      });
+      if (!res.ok) throw new Error('Failed to restore');
+
+      const item = dismissedItems.find((i) => i.id === id);
+      toast.success(item ? `Restored "${item.displayName}" to Review` : 'Restored to Review');
+      setDismissedItems((prev) => prev.filter((i) => i.id !== id));
+      queryClient.invalidateQueries({ queryKey: ['recurring'] });
+    } catch {
+      toast.error('Failed to restore the dismissed item');
+    } finally {
+      setRestoringItemId(null);
+    }
+  };
+
+    // Filtered tags (name or description)
+    const filteredTags = useMemo(() => {
+      const query = tagSearch.toLowerCase().trim();
+      if (!query) return tags;
+      return tags.filter(
+        (t) =>
+          t.name.toLowerCase().includes(query) ||
+          (t.description || '').toLowerCase().includes(query)
+      );
+    }, [tags, tagSearch]);
+
+    const handleToggleTag = (tagId: string) => {
+      setSelectedTagIds((prev) =>
+        prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+      );
+    };
 
   // Filtered accounts
   const filteredAccounts = useMemo(() => {
@@ -250,6 +358,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
         categoryIds: selectedCategoryIds,
         accountIds: selectedAccountIds,
         accountTypes: selectedAccountTypes,
+        tagIds: selectedTagIds,
         merchantPatterns: merchantPatterns.filter(Boolean),
       };
 
@@ -303,12 +412,14 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
           <AppTabs
             tabs={[
               { id: 'categories', label: `Categories (${selectedCategoryIds.length})` },
+              { id: 'tags', label: `Tags (${selectedTagIds.length})` },
               { id: 'accounts', label: `Accounts (${selectedAccountIds.length})` },
               { id: 'types', label: `Types (${selectedAccountTypes.length})` },
               { id: 'merchants', label: `Keywords (${merchantPatterns.length})` },
+              { id: 'dismissed', label: `Dismissed (${dismissedItems.length})` },
             ]}
             activeTab={activeTab}
-            onChange={(t) => setActiveTab(t as 'categories' | 'accounts' | 'types' | 'merchants')}
+            onChange={(t) => setActiveTab(t as 'categories' | 'tags' | 'accounts' | 'types' | 'merchants' | 'dismissed')}
             variant="pills"
             size="sm"
           />
@@ -413,6 +524,81 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
                           </div>
                         ) : null}
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Tags Tab ── */}
+          {activeTab === 'tags' && (
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={tagSearch}
+                  onChange={(e) => setTagSearch(e.target.value)}
+                  placeholder="Search transaction tags..."
+                  className="pl-8 text-xs h-9"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Transactions carrying an excluded tag are omitted from recurring detection —
+                only the tagged transaction is excluded, not its split siblings.
+              </p>
+
+              {tagsLoading ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                  Loading tags...
+                </div>
+              ) : (
+                <div className="border border-border/60 rounded-xl divide-y divide-border/40 max-h-[300px] overflow-y-auto">
+                  {filteredTags.length === 0 && (
+                    <p className="text-xs text-muted-foreground py-6 text-center">
+                      {tags.length === 0 ? 'No tags yet — create one in Settings → Tags.' : 'No tags match your search.'}
+                    </p>
+                  )}
+                  {filteredTags.map((tag) => {
+                    const isSelected = selectedTagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => handleToggleTag(tag.id)}
+                        className={cn(
+                          'w-full p-2.5 flex items-center justify-between text-left text-xs hover:bg-muted/30 transition-colors cursor-pointer',
+                          isSelected && 'bg-primary/5'
+                        )}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="px-2 py-0.5 text-xs font-semibold rounded-md flex items-center gap-1 shrink-0"
+                            style={{
+                              backgroundColor: `${tag.color || '#6366f1'}20`,
+                              color: tag.color || '#6366f1',
+                              border: `1px solid ${tag.color || '#6366f1'}40`,
+                            }}
+                          >
+                            <TagIcon className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{tag.name}</span>
+                          </span>
+                          {tag.description && (
+                            <span className="text-[10px] text-muted-foreground truncate">&mdash; {tag.description}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            {tag.transactionCount ?? 0} tx
+                          </span>
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-primary" />
+                          ) : (
+                            <Square className="w-4 h-4 text-muted-foreground/60" />
+                          )}
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -617,11 +803,68 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
               </div>
             </div>
           )}
+
+          {/* ── Dismissed Suggestions Tab ── */}
+          {activeTab === 'dismissed' && (
+            <div className="space-y-3">
+              <p className="text-[11px] text-muted-foreground">
+                Detection suggestions you previously dismissed. Undoing a dismissal moves the
+                item back to the Needs Review list — it will not be auto-confirmed.
+              </p>
+
+              {dismissedLoading && dismissedItems.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                  Loading dismissed items...
+                </div>
+              ) : dismissedItems.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-6 text-center">
+                  No dismissed items.
+                </p>
+              ) : (
+                <div className="border border-border/60 rounded-xl divide-y divide-border/40 max-h-[300px] overflow-y-auto">
+                  {dismissedItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="w-full p-2.5 flex items-center justify-between gap-2 text-left text-xs"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-foreground truncate block">
+                          {item.displayName}
+                        </span>
+                        {item.accountName && (
+                          <span className="text-[10px] text-muted-foreground block truncate">
+                            {item.accountName}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-[10px] font-medium shrink-0"
+                        disabled={restoringItemId === item.id}
+                        onClick={() => handleRestoreDismissed(item.id)}
+                      >
+                        {restoringItemId === item.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                        ) : (
+                          <Undo2 className="w-3 h-3 mr-1" />
+                        )}
+                        Undo
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="p-4 bg-muted/20 border-t border-border/60 flex items-center justify-between sm:justify-between gap-2 flex-wrap">
           <p className="w-full order-first text-xs text-muted-foreground">
             Exclusions apply to future scans. Items already detected will stay until you remove them.
+            Dismissed suggestions can be restored from the Dismissed tab.
           </p>
           <Button variant="ghost" size="sm" onClick={onClose} className="text-xs h-8">
             Cancel
