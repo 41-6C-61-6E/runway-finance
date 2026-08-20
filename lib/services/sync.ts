@@ -11,7 +11,7 @@ import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from 
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 import { logger } from '@/lib/logger';
-import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate, toCashFlowAmount } from '@/lib/utils/account-scope';
 
 import { isSimilarDescription } from '@/lib/utils/description-matching';
 import { resolveDataUserId } from '@/lib/sharing';
@@ -306,6 +306,13 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     catById.set(cat.id.toString(), cat);
   }
 
+  // Map account id → type so liability accounts (payments stored as
+  // POSITIVE amounts) can be normalized before the income split.
+  const accountTypeById = new Map<string, string>();
+  for (const acc of userAccounts) {
+    accountTypeById.set(acc.id.toString(), String(acc.type ?? ''));
+  }
+
   const decryptedTxns = await getUserTransactionsFromCache(userId, dek);
 
   const [settings] = await getDb()
@@ -334,7 +341,8 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
     const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
     const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
-    const amount = parseFloat(tx.amount);
+    const rawAmount = parseFloat(tx.amount);
+    const amount = toCashFlowAmount(rawAmount, accountTypeById.get(tx.accountId.toString()));
 
     if (!monthlyData[yearMonth]) {
       monthlyData[yearMonth] = { income: 0, expenses: 0, count: 0 };
@@ -430,6 +438,13 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     catById.set(cat.id.toString(), cat);
   }
 
+  // Map account id → type so liability accounts (payments stored as
+  // POSITIVE amounts) can be normalized to the standard cash-flow sign.
+  const accountTypeById = new Map<string, string>();
+  for (const acc of userAccounts) {
+    accountTypeById.set(acc.id.toString(), String(acc.type ?? ''));
+  }
+
   const decryptedTxns = await getUserTransactionsFromCache(userId, dek);
 
   const [settings] = await getDb()
@@ -487,10 +502,13 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
         yearMonth,
       };
     }
-
-    const absVal = category.categoryType === 'compound'
-      ? Math.abs(parseFloat(tx.amount))
-      : -parseFloat(tx.amount);
+      const rawAmount = parseFloat(tx.amount);
+      // Liability payments (positive raw amounts) are money out of the
+      // account → spending; normalize before accumulating.
+      const amount = toCashFlowAmount(rawAmount, accountTypeById.get(accountId));
+      const absVal = category.categoryType === 'compound'
+        ? Math.abs(rawAmount)
+        : -amount;
     categoryByMonthAndAccount[yearMonth][catId][accountId].amount += absVal;
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }
@@ -569,6 +587,13 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     catById.set(cat.id.toString(), cat);
   }
 
+  // Map account id → type so liability accounts (payments stored as
+  // POSITIVE amounts) can be normalized to the standard cash-flow sign.
+  const accountTypeById = new Map<string, string>();
+  for (const acc of userAccounts) {
+    accountTypeById.set(acc.id.toString(), String(acc.type ?? ''));
+  }
+
   const decryptedTxns = await getUserTransactionsFromCache(userId, dek);
 
   const [settings] = await getDb()
@@ -593,12 +618,15 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     }
     if (excluded) continue;
 
-    const rawAmount = parseFloat(tx.amount);
-    if (category?.categoryType !== 'compound' && rawAmount <= 0) continue;
+  const yearMonth = tx.date.substring(0, 7);
+  const catId = tx.categoryId ? tx.categoryId.toString() : 'uncategorized';
+  const accountId = tx.accountId ? tx.accountId.toString() : 'unknown';
 
-    const yearMonth = tx.date.substring(0, 7);
-    const catId = tx.categoryId ? tx.categoryId.toString() : 'uncategorized';
-    const accountId = tx.accountId ? tx.accountId.toString() : 'unknown';
+    const rawAmount = parseFloat(tx.amount);
+    // Liability payments (positive raw amounts) are NOT income; normalize so
+    // they are skipped here like any other non-positive cash-flow amount.
+    const amount = toCashFlowAmount(rawAmount, accountTypeById.get(accountId));
+    if (category?.categoryType !== 'compound' && amount <= 0) continue;
 
     uniqueCategories.add(catId);
 
@@ -619,8 +647,8 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
     }
 
     const incVal = category?.categoryType === 'compound'
-      ? Math.abs(parseFloat(tx.amount))
-      : parseFloat(tx.amount);
+      ? Math.abs(rawAmount)
+      : amount;
     categoryByMonthAndAccount[yearMonth][catId][accountId].amount += incVal;
     categoryByMonthAndAccount[yearMonth][catId][accountId].count++;
   }

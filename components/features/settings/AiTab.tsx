@@ -5,6 +5,7 @@ import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
 import { DEFAULT_AI_SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from '@/config/defaults';
 import { Slider } from '@/components/ui/slider';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 type Provider = {
   id: string;
@@ -12,6 +13,7 @@ type Provider = {
   endpoint: string;
   model: string;
   apiKey: string;
+  hasApiKey?: boolean;
   isActive: boolean;
   jsonMode: boolean;
 };
@@ -111,14 +113,20 @@ export default function AiTab() {
       setFetchingModels(true);
       setModelsFetchError(null);
       try {
+        const body: Record<string, string> = {
+          endpoint: formEndpoint.trim(),
+        };
+        if (formApiKey.trim()) {
+          body.apiKey = formApiKey.trim();
+        } else if (editingId) {
+          body.providerId = editingId;
+        }
+
         const res = await fetch('/api/ai/models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            endpoint: formEndpoint.trim(),
-            apiKey: formApiKey.trim(),
-          }),
+          body: JSON.stringify(body),
         });
         if (res.ok) {
           const data = await res.json();
@@ -131,7 +139,7 @@ export default function AiTab() {
           const data = await res.json().catch(() => ({}));
           setModelsFetchError(data.error || 'Failed to fetch models');
         }
-      } catch (err) {
+      } catch {
         setModelsFetchError('Failed to connect to model endpoint');
       } finally {
         setFetchingModels(false);
@@ -139,7 +147,7 @@ export default function AiTab() {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [formEndpoint, formApiKey, showForm]);
+  }, [formEndpoint, formApiKey, showForm, editingId]);
 
   const openAddForm = () => {
     setEditingId(null);
@@ -160,7 +168,7 @@ export default function AiTab() {
     setFormName(p.name);
     setFormEndpoint(p.endpoint);
     setFormModel(p.model);
-    setFormApiKey(p.apiKey);
+    setFormApiKey('');
     setFormSetActive(false);
     setFormJsonMode(p.jsonMode ?? false);
     setShowForm(true);
@@ -179,13 +187,16 @@ export default function AiTab() {
       name: formName.trim(),
       endpoint: formEndpoint.trim(),
       model: formModel.trim(),
-      apiKey: formApiKey,
       jsonMode: formJsonMode,
     };
     if (editingId) {
       body.isActive = formSetActive;
+      if (formApiKey.trim() !== '') {
+        body.apiKey = formApiKey.trim();
+      }
     } else {
       body.setActive = formSetActive;
+      body.apiKey = formApiKey.trim();
     }
 
     const res = await fetch(url, {
@@ -213,46 +224,38 @@ export default function AiTab() {
       try {
         let customPrompt: string | undefined;
         try { customPrompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined; } catch { /* ignore */ }
-        const endpoint = formEndpoint.trim().replace(/\/$/, '');
-        const model = formModel.trim();
-        const apiKey = formApiKey;
-        
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-        const startTime = Date.now();
-        const res = await fetch(`${endpoint}/chat/completions`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: 'You are a helpful assistant. Respond directly and quickly. Do NOT output any thinking, reasoning, explanation, or <think> tags.' },
-              { role: 'user', content: customPrompt || DEFAULT_TEST_PROMPT }
-            ],
-            chat_id: 'test-connection',
-          }),
-          signal,
-        });
-        const elapsed = Date.now() - startTime;
-        
-        if (!res.ok) {
-          const text = await res.text();
-          let detail = text.slice(0, 300);
-          try { const json = JSON.parse(text); detail = json.error?.message || json.error || json.message || detail; } catch {}
-          const result = { ok: false, message: `API returned ${res.status} after ${elapsed}ms: ${detail}`, response: '' };
-          setFormTestResult(result);
-          return result;
+        let res: Response;
+        if (editingId && !formApiKey.trim()) {
+          res = await fetch(`/api/ai/providers/${editingId}/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: customPrompt ? JSON.stringify({ prompt: customPrompt }) : undefined,
+            signal,
+          });
+        } else {
+          res = await fetch('/api/ai/test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              endpoint: formEndpoint.trim(),
+              model: formModel.trim(),
+              apiKey: formApiKey.trim(),
+              prompt: customPrompt,
+            }),
+            signal,
+          });
         }
 
-        const data = await res.json();
-        const msg = data.choices?.[0]?.message;
-        const responseContent = msg?.content || msg?.reasoning || msg?.reasoning_content || '(empty response)';
-        const result = { ok: true, message: `Connected to ${model} (${elapsed}ms)`, response: responseContent };
+        const data = await res.json().catch(() => ({ ok: false, message: 'Failed to parse response' }));
+        const result = { ok: !!data.ok, message: data.message || (data.ok ? 'Connection successful' : 'Connection failed'), response: data.response };
         setFormTestResult(result);
         return result;
-      } catch {
-        const result = { ok: false, message: 'Failed to reach server' };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to reach server';
+        const result = { ok: false, message: message.includes('abort') ? 'Request timed out' : 'Failed to reach server' };
         setFormTestResult(result);
         return result;
       } finally {
@@ -404,32 +407,54 @@ export default function AiTab() {
             </div>
           ))}
         </div>
+      </div>
 
-        {/* Add/Edit Provider Form */}
-        {showForm && (
-          <div className="mt-4 p-4 border border-border rounded-xl bg-muted/30 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">{editingId ? 'Edit Provider' : 'Add Provider'}</h3>
+      {/* Add/Edit Provider Dialog */}
+      <Dialog
+        open={showForm}
+        onOpenChange={(open) => {
+          setShowForm(open);
+          if (!open) {
+            setFormTestResult(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg p-6">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Edit AI Provider' : 'Add AI Provider'}</DialogTitle>
+            <DialogDescription>
+              {editingId
+                ? 'Update your AI provider endpoint, model, and authentication settings.'
+                : 'Connect an OpenAI-compatible API endpoint (compatible with Ollama, Open WebUI, OpenAI, and more).'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Name</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Name</label>
               <input
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="My Ollama"
+                placeholder="e.g. OpenAI, Ollama Local"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">API Key</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">API Key</label>
               <input
                 type="password"
                 value={formApiKey}
                 onChange={(e) => setFormApiKey(e.target.value)}
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="sk-... (leave blank if not required)"
+                placeholder={
+                  editingId && providers.find((p) => p.id === editingId)?.hasApiKey
+                    ? '•••••••• (leave blank to keep current key)'
+                    : 'sk-... (leave blank if not required)'
+                }
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1">Endpoint URL</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Endpoint URL</label>
               <input
                 value={formEndpoint}
                 onChange={(e) => setFormEndpoint(e.target.value)}
@@ -438,7 +463,7 @@ export default function AiTab() {
               />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-medium text-foreground">Model Name</label>
                 {fetchingModels && (
                   <span className="text-[10px] text-primary animate-pulse flex items-center gap-1">
@@ -494,59 +519,68 @@ export default function AiTab() {
                 </div>
               )}
             </div>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formJsonMode}
-                onChange={(e) => setFormJsonMode(e.target.checked)}
-                className="mt-0.5 rounded border-border accent-primary"
-              />
-              <div className="flex-1">
-                <span className="text-xs font-medium text-foreground">Enable JSON Mode (response_format)</span>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Forces the model to respond in JSON. Omit/disable this for providers that experience FSM/grammar issues (like local vLLM).
-                </p>
-              </div>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formSetActive}
-                onChange={(e) => setFormSetActive(e.target.checked)}
-                className="rounded border-border accent-primary"
-              />
-              <span className="text-xs text-foreground">Set as active provider</span>
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={handleFormTest}
-                disabled={formTesting || !formEndpoint.trim()}
-                className="px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors disabled:opacity-50"
-              >
-                {formTesting ? 'Testing...' : 'Test Connection'}
-              </button>
-              <button
-                onClick={handleSaveProvider}
-                disabled={!formName.trim() || !formEndpoint.trim() || !formModel.trim()}
-                className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
-              >
-                {editingId ? 'Update' : 'Add'}
-              </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
+
+            <div className="pt-1 space-y-3">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formJsonMode}
+                  onChange={(e) => setFormJsonMode(e.target.checked)}
+                  className="mt-0.5 rounded border-border accent-primary"
+                />
+                <div className="flex-1">
+                  <span className="text-xs font-medium text-foreground">Enable JSON Mode (response_format)</span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Forces the model to respond in JSON. Omit/disable this for providers that experience FSM/grammar issues (like local vLLM).
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formSetActive}
+                  onChange={(e) => setFormSetActive(e.target.checked)}
+                  className="rounded border-border accent-primary"
+                />
+                <span className="text-xs text-foreground">Set as active provider</span>
+              </label>
             </div>
+
             {formTestResult && (
-              <div className={`text-xs px-2 py-1 rounded-lg ${formTestResult.ok ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
+              <div className={`text-xs px-3 py-2 rounded-lg ${formTestResult.ok ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
                 {formTestResult.message}
               </div>
             )}
           </div>
-        )}
-      </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+            <button
+              type="button"
+              onClick={handleFormTest}
+              disabled={formTesting || !formEndpoint.trim()}
+              className="px-3 py-2 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors disabled:opacity-50 sm:mr-auto"
+            >
+              {formTesting ? 'Testing...' : 'Test Connection'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveProvider}
+              disabled={!formName.trim() || !formEndpoint.trim() || !formModel.trim()}
+              className="px-4 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
+            >
+              {editingId ? 'Save Changes' : 'Add Provider'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* System Prompt Editor */}
       <div className="p-5 bg-card border border-border rounded-xl">

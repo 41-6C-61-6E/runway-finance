@@ -3,6 +3,7 @@
 import { useState, Suspense, useEffect } from 'react';
 import { WealthFlowSankey } from '@/components/net-worth/wealth-flow-sankey';
 import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
+import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
 import { ArrowLeftRight } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
@@ -12,26 +13,30 @@ import { AppTabs } from '@/components/ui/app-tabs';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
-type Tab = 'wealth' | 'cash';
+type Tab = 'wealth' | 'cash' | 'income';
 
 function FlowsContent() {
   const { isVisible } = useChartVisibility();
   const showWealth = isVisible('wealthFlowSankey');
   const showCash = isVisible('cashFlowSankey');
+  const showIncome = isVisible('incomeExpenseChart');
 
   const [activeTab, setActiveTab] = useState<Tab>('wealth');
 
   useEffect(() => {
-    if (!showWealth && showCash) {
-      setActiveTab('cash');
-    } else if (showWealth && !showCash) {
-      setActiveTab('wealth');
+    const visible: Tab[] = [];
+    if (showWealth) visible.push('wealth');
+    if (showCash) visible.push('cash');
+    if (showIncome) visible.push('income');
+    if (visible.length > 0 && !visible.includes(activeTab)) {
+      setActiveTab(visible[0]);
     }
-  }, [showWealth, showCash]);
+  }, [showWealth, showCash, showIncome, activeTab]);
 
   const availableTabs = [
     showWealth && { id: 'wealth', label: 'Wealth Flow' },
     showCash && { id: 'cash', label: 'Cash Flow' },
+    showIncome && { id: 'income', label: 'Net Income' },
   ].filter(Boolean) as { id: Tab; label: string }[];
 
   return (
@@ -67,6 +72,14 @@ function FlowsContent() {
                   <div>
                     <CashFlowSankey />
                   </div>
+                </ChartErrorBoundary>
+              </Suspense>
+            )}
+
+            {activeTab === 'income' && showIncome && (
+              <Suspense fallback={<LoadingSpinner category="chart" />}>
+                <ChartErrorBoundary name="Net Income">
+                  <IncomeExpenseChart />
                 </ChartErrorBoundary>
               </Suspense>
             )}

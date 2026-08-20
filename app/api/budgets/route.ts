@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, budgets, categories, categorySpendingSummary, categoryIncomeSummary, transactions, transactionTags, userSettings } from '@/lib/db/schema';
-import { eq, and, or, isNull, isNotNull, sql, inArray, gte, lt, lte } from 'drizzle-orm';
+import { eq, and, or, isNull, sql, inArray, gte, lt, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows, encryptRow } from '@/lib/crypto';
@@ -393,25 +393,16 @@ export async function GET(request: Request) {
     const excludedCategoryIds = new Set(budgetExclusions.categoryIds || []);
     const excludedTagIds = new Set(budgetExclusions.tagIds || []);
 
-    let excludedTransactionIds = new Set<string>();
+    // Direct-match only: a split group is NOT excluded wholesale when one
+    // member carries an excluded tag — only the tagged transaction itself.
+    const excludedTransactionIds = new Set<string>();
     if (excludedTagIds.size > 0) {
       const taggedRows = await db
         .select({ transactionId: transactionTags.transactionId })
         .from(transactionTags)
         .where(inArray(transactionTags.tagId, Array.from(excludedTagIds)));
-      const directTxIds = taggedRows.map((r) => r.transactionId);
-      if (directTxIds.length > 0) {
-        const childRows = await db
-          .select({ id: transactions.id })
-          .from(transactions)
-          .where(inArray(transactions.parentId, directTxIds));
-        const parentRows = await db
-          .select({ parentId: transactions.parentId })
-          .from(transactions)
-          .where(and(inArray(transactions.id, directTxIds), isNotNull(transactions.parentId)));
-        const childIds = childRows.map((c) => c.id);
-        const parentIds = parentRows.map((p) => p.parentId).filter(Boolean) as string[];
-        excludedTransactionIds = new Set([...directTxIds, ...childIds, ...parentIds]);
+      for (const r of taggedRows) {
+        if (r.transactionId) excludedTransactionIds.add(r.transactionId);
       }
     }
 

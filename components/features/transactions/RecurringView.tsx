@@ -503,7 +503,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
         <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/[0.04] border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <Sparkles className="w-4 h-4" />
+              <AlertCircle className="w-4 h-4" />
             </div>
             <div>
               <h4 className="font-bold text-sm text-foreground">

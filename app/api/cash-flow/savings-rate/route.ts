@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { getUserTransactionsFromCache } from '@/lib/services/search-cache';
+import { toCashFlowAmount } from '@/lib/utils/account-scope';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -142,6 +143,11 @@ export async function GET(request: Request) {
       const amount = parseFloat(tx.amount);
       if (isNaN(amount)) continue;
 
+      // Liability accounts store payments as POSITIVE; the standard cash-flow
+      // split below must see the normalized sign. Section B (savings flow)
+      // intentionally keeps the raw amount — it branches on asset account types.
+      const cfAmount = toCashFlowAmount(amount, accountMap.get(tx.accountId)?.type);
+
       if (!monthlyStats[yearMonth]) {
         monthlyStats[yearMonth] = {
           income: 0,
@@ -185,16 +191,16 @@ export async function GET(request: Request) {
           stats.expenses += absAmt;
           addDetail(stats, 'income', tx.description, tx.date, absAmt, acc?.name || 'Account');
           addDetail(stats, 'expenses', tx.description, tx.date, absAmt, acc?.name || 'Account');
-        } else if (amount > 0) {
+        } else if (cfAmount > 0) {
           if (category && !category.isIncome) {
-            stats.expenses -= amount;
-            addDetail(stats, 'expenses', tx.description, tx.date, -amount, acc?.name || 'Account');
+            stats.expenses -= cfAmount;
+            addDetail(stats, 'expenses', tx.description, tx.date, -cfAmount, acc?.name || 'Account');
           } else {
-            stats.income += amount;
-            addDetail(stats, 'income', tx.description, tx.date, amount, acc?.name || 'Account');
+            stats.income += cfAmount;
+            addDetail(stats, 'income', tx.description, tx.date, cfAmount, acc?.name || 'Account');
           }
-        } else if (amount < 0) {
-          const absAmt = Math.abs(amount);
+        } else if (cfAmount < 0) {
+          const absAmt = Math.abs(cfAmount);
           if (category && category.isIncome) {
             stats.income -= absAmt;
             addDetail(stats, 'income', tx.description, tx.date, -absAmt, acc?.name || 'Account');

@@ -15,24 +15,52 @@ import { logger } from '@/lib/logger';
  *   AI_PROVIDER_MODEL       — Model identifier (e.g. "gpt-4o-mini")
  *   AI_PROVIDER_API_KEY     — API key (encrypted per-user)
  */
-function readEnvProvider() {
-  const { AI_PROVIDER_NAME, AI_PROVIDER_ENDPOINT, AI_PROVIDER_MODEL, AI_PROVIDER_API_KEY } = process.env;
+function cleanEnvValue(val?: string): string {
+  if (!val) return '';
+  let trimmed = val.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    trimmed = trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
 
-  if (!AI_PROVIDER_NAME || !AI_PROVIDER_ENDPOINT || !AI_PROVIDER_MODEL || !AI_PROVIDER_API_KEY) {
+/**
+ * Read optional environment variables to define a default AI provider
+ * that will be auto-seeded for every user.
+ *
+ * Env vars:
+ *   AI_PROVIDER_NAME        — Display name (e.g. "OpenAI", "Ollama") [required]
+ *   AI_PROVIDER_ENDPOINT    — Base URL (e.g. "https://api.openai.com/v1") [required]
+ *   AI_PROVIDER_MODEL       — Model identifier (e.g. "gpt-4o-mini") [required]
+ *   AI_PROVIDER_API_KEY     — API key (optional for local providers like Ollama)
+ */
+export function readEnvProvider() {
+  const name = cleanEnvValue(process.env.AI_PROVIDER_NAME);
+  const rawEndpoint = cleanEnvValue(process.env.AI_PROVIDER_ENDPOINT);
+  const model = cleanEnvValue(process.env.AI_PROVIDER_MODEL);
+  const apiKey = cleanEnvValue(process.env.AI_PROVIDER_API_KEY);
+
+  if (!name || !rawEndpoint || !model) {
     return null;
   }
 
+  const endpoint = rawEndpoint.replace(/\/+$/, '');
+
   return {
-    name: AI_PROVIDER_NAME,
-    endpoint: AI_PROVIDER_ENDPOINT,
-    model: AI_PROVIDER_MODEL,
-    apiKey: AI_PROVIDER_API_KEY,
+    name,
+    endpoint,
+    model,
+    apiKey: apiKey || null,
   };
 }
 
 /**
  * Ensure the env-configured AI provider exists for the given user.
- * Idempotent — skips if a provider with the same name + endpoint already exists.
+ * Idempotent — skips if a provider with the same name + endpoint already exists,
+ * preserving any user customizations and manually entered API keys.
  * @param dek Optional DEK for encrypting the API key. Falls back to getServerDEK if not provided.
  */
 export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Promise<void> {
@@ -43,64 +71,35 @@ export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Pro
 
   const db = getDb();
 
-  // Check if this provider already exists for this user
+  // Check if this provider already exists for this user (comparing normalized endpoint)
   const existing = await db
     .select()
     .from(aiProviders)
     .where(
       eq(aiProviders.userId, userId)
     )
-    .limit(10);
+    .limit(50);
 
   const existingProvider = existing.find(
-    (row) => row.name === envProvider.name && row.endpoint === envProvider.endpoint
+    (row) => row.name === envProvider.name && row.endpoint.replace(/\/+$/, '') === envProvider.endpoint
   );
 
+  // If already seeded or configured by user, do not overwrite their key/settings
   if (existingProvider) {
-    if (!dek) {
-      dek = await getServerDEK(userId);
-    }
-    let existingApiKey = '';
-    if (existingProvider.apiKeyEncrypted) {
-      try {
-        existingApiKey = await decryptField(existingProvider.apiKeyEncrypted, dek);
-      } catch (err) {
-        logger.error('[seed-ai-providers] Failed to decrypt existing api key', { error: String(err) });
-      }
-    }
-
-    if (existingApiKey !== envProvider.apiKey || existingProvider.model !== envProvider.model) {
-      logger.info('[seed-ai-providers] Updating existing provider with new env config', {
-        userId,
-        name: envProvider.name,
-        modelChanged: existingProvider.model !== envProvider.model,
-        apiKeyChanged: existingApiKey !== envProvider.apiKey,
-      });
-
-      const apiKeyEncrypted = await encryptField(envProvider.apiKey, dek);
-      await db
-        .update(aiProviders)
-        .set({
-          model: envProvider.model,
-          apiKeyEncrypted,
-          updatedAt: new Date(),
-        })
-        .where(eq(aiProviders.id, existingProvider.id));
-    }
     return;
   }
 
-  // Deactivate any previously active providers so only one is active
+  // Deactivate any previously active providers so the seeded provider is active
   await db
     .update(aiProviders)
     .set({ isActive: false })
     .where(eq(aiProviders.userId, userId));
 
-  // Encrypt the API key using the server-wrapped DEK
+  // Encrypt the API key using the server-wrapped DEK (if apiKey is provided)
   if (!dek) {
     dek = await getServerDEK(userId);
   }
-  const apiKeyEncrypted = await encryptField(envProvider.apiKey, dek);
+  const apiKeyEncrypted = envProvider.apiKey ? await encryptField(envProvider.apiKey, dek) : null;
 
   const [created] = await db.insert(aiProviders).values({
     userId,
@@ -121,5 +120,6 @@ export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Pro
     name: envProvider.name,
     endpoint: envProvider.endpoint,
     model: envProvider.model,
+    hasApiKey: !!envProvider.apiKey,
   });
 }

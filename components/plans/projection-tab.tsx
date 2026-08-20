@@ -482,6 +482,7 @@ export function ProjectionTab({
           taxesPaid: Math.round((y.taxesPaid || 0) / discountFactor),
           effectiveTaxRate: y.effectiveTaxRate || 0,
           niitTax: Math.round((y.niitTax || 0) / discountFactor),
+          amtTax: Math.round((y.amtTax || 0) / discountFactor),
           earlyPenaltyTax: Math.round((y.earlyPenaltyTax || 0) / discountFactor),
           irmaaNotice: y.irmaaNotice,
           earlyWithdrawalWarnings: y.earlyWithdrawalWarnings || [],
@@ -1890,6 +1891,12 @@ function YearDetailModal({ isOpen, yearData, onClose }: { isOpen: boolean; yearD
               <div className="flex justify-between items-center text-rose-500">
                 <span className="font-sans">NIIT (3.8% Net Investment Tax):</span>
                 <span>{formatCurrency(yearData.niitTax)}</span>
+              </div>
+            )}
+            {yearData.amtTax > 0 && (
+              <div className="flex justify-between items-center text-orange-500">
+                <span className="font-sans">AMT (Alternative Minimum Tax):</span>
+                <span>{formatCurrency(yearData.amtTax)}</span>
               </div>
             )}
             {yearData.stateTax > 0 && (

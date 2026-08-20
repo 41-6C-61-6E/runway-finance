@@ -2,6 +2,7 @@ import { getDb } from '@/lib/db';
 import { systemTaxRules } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
+import { HISTORICAL_TAX_RULES } from '@/lib/constants/historical-tax-rules';
 import { logger } from '@/lib/logger';
 
 export type SystemTaxRulesType = typeof DEFAULT_2026_RULES;
@@ -33,33 +34,40 @@ export async function getSystemTaxRules(taxYear: number = 2026): Promise<SystemT
       return deepMergeRules(DEFAULT_2026_RULES, existing[0] as any) as SystemTaxRulesType;
     }
 
-    // Seed global tax rules for the requested year if missing
+    // Seed global tax rules for the requested year if missing.
+    // Years with published historical rules (2024/2025) seed from exact
+    // statutory values; all other years seed from current defaults.
+    const isCurrentYear = taxYear === DEFAULT_2026_RULES.taxYear;
+    const seedBase = isCurrentYear
+      ? DEFAULT_2026_RULES
+      : (HISTORICAL_TAX_RULES[taxYear] ?? DEFAULT_2026_RULES);
+
     const seedValues = {
-      taxYear: DEFAULT_2026_RULES.taxYear,
-      country: DEFAULT_2026_RULES.country,
-      standardDeductionSingle: DEFAULT_2026_RULES.standardDeductionSingle,
-      standardDeductionMfj: DEFAULT_2026_RULES.standardDeductionMfj,
-      standardDeductionHoH: DEFAULT_2026_RULES.standardDeductionHoH,
-      standardDeductionMfs: DEFAULT_2026_RULES.standardDeductionMfs,
-      standardDeduction: DEFAULT_2026_RULES.standardDeduction,
-      additionalStdDeduction65Plus: DEFAULT_2026_RULES.additionalStdDeduction65Plus,
-      ordinaryTaxBrackets: DEFAULT_2026_RULES.ordinaryTaxBrackets,
-      headOfHouseholdBrackets: DEFAULT_2026_RULES.headOfHouseholdBrackets,
-      capitalGainsBrackets: DEFAULT_2026_RULES.capitalGainsBrackets,
-      ficaRules: DEFAULT_2026_RULES.ficaRules,
-      socialSecurityRules: DEFAULT_2026_RULES.socialSecurityRules,
-      earlyPenaltyRules: DEFAULT_2026_RULES.earlyPenaltyRules,
-      niitRules: DEFAULT_2026_RULES.niitRules,
-      acaRules: DEFAULT_2026_RULES.acaRules,
-      niitThreshold: DEFAULT_2026_RULES.niitThreshold,
-      irmaaThresholds: DEFAULT_2026_RULES.irmaaThresholds,
-      ssTaxationThresholds: DEFAULT_2026_RULES.ssTaxationThresholds,
-      contributionLimits: DEFAULT_2026_RULES.contributionLimits,
-      giftEstateExemptions: DEFAULT_2026_RULES.giftEstateExemptions,
-      acaSubsidyTable: DEFAULT_2026_RULES.acaSubsidyTable,
-      fplAmount: DEFAULT_2026_RULES.fplAmount,
-      secureActRules: DEFAULT_2026_RULES.secureActRules,
-      rmdUniformLifetimeTable: DEFAULT_2026_RULES.rmdUniformLifetimeTable,
+      taxYear,
+      country: seedBase.country,
+      standardDeductionSingle: seedBase.standardDeductionSingle,
+      standardDeductionMfj: seedBase.standardDeductionMfj,
+      standardDeductionHoH: seedBase.standardDeductionHoH,
+      standardDeductionMfs: seedBase.standardDeductionMfs,
+      standardDeduction: seedBase.standardDeduction,
+      additionalStdDeduction65Plus: seedBase.additionalStdDeduction65Plus,
+      ordinaryTaxBrackets: seedBase.ordinaryTaxBrackets,
+      headOfHouseholdBrackets: seedBase.headOfHouseholdBrackets,
+      capitalGainsBrackets: seedBase.capitalGainsBrackets,
+      ficaRules: seedBase.ficaRules,
+      socialSecurityRules: seedBase.socialSecurityRules,
+      earlyPenaltyRules: seedBase.earlyPenaltyRules,
+      niitRules: seedBase.niitRules,
+      acaRules: seedBase.acaRules,
+      niitThreshold: seedBase.niitThreshold,
+      irmaaThresholds: seedBase.irmaaThresholds,
+      ssTaxationThresholds: seedBase.ssTaxationThresholds,
+      contributionLimits: seedBase.contributionLimits,
+      giftEstateExemptions: seedBase.giftEstateExemptions,
+      acaSubsidyTable: seedBase.acaSubsidyTable,
+      fplAmount: seedBase.fplAmount,
+      secureActRules: seedBase.secureActRules,
+      rmdUniformLifetimeTable: seedBase.rmdUniformLifetimeTable,
     };
 
     const inserted = await getDb().insert(systemTaxRules).values(seedValues).returning();
@@ -83,10 +91,14 @@ export async function updateSystemTaxRules(taxYear: number = 2026, updates: Reco
   };
 
   if (!existing[0]) {
+    // Seed from historical values when known so a brand-new 2024/2025 row
+    // starts from statutory defaults of that year, not current-year numbers.
+    const seedBase = taxYear === DEFAULT_2026_RULES.taxYear
+      ? DEFAULT_2026_RULES
+      : (HISTORICAL_TAX_RULES[taxYear] ?? DEFAULT_2026_RULES);
     const seedValues = {
       taxYear,
-      country: 'US',
-      ...DEFAULT_2026_RULES,
+      ...seedBase,
       ...payload,
     };
     const inserted = await getDb().insert(systemTaxRules).values(seedValues).returning();

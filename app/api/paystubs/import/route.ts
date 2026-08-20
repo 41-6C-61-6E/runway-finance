@@ -7,7 +7,6 @@ import {
   accounts,
   transactions,
 } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
 import { createTransactionsFromLineItems } from '../route';
 import { getSessionDEK } from '@/lib/crypto-context';
 import {
@@ -15,7 +14,14 @@ import {
   updateCategoryIncomeSummaries,
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
-import { parseDate, normalizeBackendInput } from '@/lib/utils/paystub';
+import {
+  parseDate,
+  normalizeBackendInput,
+  fnv1aDigest64,
+  computeTiesOut,
+  type PaystubTieOutInput,
+} from '@/lib/utils/paystub';
+import { eq, and, lt, desc } from 'drizzle-orm';
 
 interface RawPaystub {
   employeeName?: string;

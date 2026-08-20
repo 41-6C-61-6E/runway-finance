@@ -203,6 +203,7 @@ export const userSettings = pgTable('user_settings', {
   recurringExclusions: jsonb('recurring_exclusions').default({
     categoryIds: [],
     accountIds: [],
+    tagIds: [],
     merchantPatterns: [],
   }),
   notifySyncErrors: boolean('notify_sync_errors').notNull().default(true),

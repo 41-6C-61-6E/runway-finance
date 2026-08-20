@@ -322,7 +322,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   plan_liabilities: ['name', 'balance', 'interestRate', 'monthlyPayment', 'yearsRemaining'],
   plan_events: ['name', 'amount', 'growthRate', 'growthCap', 'startTriggerValue', 'endTriggerValue', 'inflationPerRecurrence'],
   plan_flows: ['name', 'ruleValue', 'matchRate', 'matchLimit', 'startTriggerValue', 'endTriggerValue'],
-  plan_settings: ['fixedInflationRate', 'fixedBenefitCola', 'withholdingDeferred', 'withholdingTaxable', 'incomeTaxModifier', 'capGainsTaxModifier', 'heirFlatIncomeTaxRate', 'realEstateLiquidationRate', 'administrativeCostRate', 'charitableGiving'],
+  plan_settings: ['fixedInflationRate', 'fixedBenefitCola', 'withholdingDeferred', 'withholdingTaxable', 'incomeTaxModifier', 'stateTaxTable', 'projectionMode', 'enableAmt', 'capGainsTaxModifier', 'heirFlatIncomeTaxRate', 'realEstateLiquidationRate', 'administrativeCostRate', 'charitableGiving'],
   recurring_transactions: ['merchantName', 'matchPattern', 'averageAmount', 'lastAmount', 'customName', 'notes'],
 };
 

@@ -92,6 +92,7 @@ export const LIABILITY_ACCOUNT_TYPES = [
   'loan',
   'mortgage',
   'otherLiability',
+  'otherliability',
   'studentloan',
   'autoloan',
   'otherloan',
@@ -103,6 +104,28 @@ export function isAssetAccount(type: string): boolean {
 
 export function isLiabilityAccount(type: string): boolean {
   return LIABILITY_ACCOUNT_TYPES.includes(type) || LIABILITY_ACCOUNT_TYPES.includes(type.toLowerCase());
+}
+
+/**
+ * Normalize a stored transaction amount to the standard "cash-flow" sign
+ * convention used by income/expense splits across the app:
+ *
+ *   positive ⇒ money in  (deposit, income, disbursement)
+ *   negative ⇒ money out (payment, expense)
+ *
+ * Asset accounts already store transactions this way. Liability accounts
+ * (credit cards, loans, mortgages) store the OPPOSITE orientation: a payment
+ * (debt reduction) is a POSITIVE amount and a charge/disbursement is NEGATIVE
+ * (see Plaid ingestion in lib/services/plaid-sync.ts and the liability-aware
+ * balance engine in lib/services/account-history.ts).
+ *
+ * Call sites that classify transactions purely by sign must run the raw amount
+ * through this helper first, otherwise a +2000 mortgage payment gets booked
+ * as income (or subtracted from expenses) instead of an expense.
+ */
+export function toCashFlowAmount(amount: number, accountType?: string | null): number {
+  if (amount === 0) return 0;
+  return isLiabilityAccount(accountType ?? '') ? -amount : amount;
 }
 
 export function isReportableAccount(account: {

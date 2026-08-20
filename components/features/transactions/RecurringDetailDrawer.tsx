@@ -32,7 +32,6 @@ import {
   Tag,
   TrendingUp,
   Clock,
-  Sparkles,
   Check,
   ShieldCheck,
   Pause,
@@ -237,7 +236,7 @@ export default function RecurringDetailDrawer({
                 </span>
               ) : (
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Needs Review
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> Needs Review
                 </span>
               )}
             </div>

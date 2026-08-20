@@ -328,4 +328,68 @@ describe('Savings Rate API Route', () => {
       expect(data[0].savingsRate).toBe(0.0833);
     }
   });
+
+  it('treats liability payments (positive amounts) as expenses, not income', async () => {
+    mockDbState.accounts = [
+      { id: 'acc-checking', name: 'Checking', type: 'checking', userId: 'test-user-id', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'acc-mortgage', name: 'Mortgage', type: 'mortgage', userId: 'test-user-id', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'acc-credit', name: 'Rewards Visa', type: 'credit', userId: 'test-user-id', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockDbState.categories = [
+      { id: 'cat-salary', name: 'Salary', categoryType: 'standard', isIncome: true, excludeFromReports: false },
+      { id: 'cat-mortgage-pmt', name: 'Mortgage Payment', categoryType: 'standard', isIncome: false, excludeFromReports: false },
+      { id: 'cat-grocery', name: 'Grocery', categoryType: 'standard', isIncome: false, excludeFromReports: false },
+    ];
+
+    // Salary deposit in checking: +5000 (income)
+    mockTransactions.push({
+      id: 'tx-salary',
+      accountId: 'acc-checking',
+      amount: '5000.00',
+      date: '2026-06-01',
+      categoryId: 'cat-salary',
+      categoryName: 'Salary',
+      ignored: false,
+    });
+
+    // Mortgage payment: liability accounts store debt reduction as POSITIVE.
+    // Must count as an EXPENSE of 7350 (bug: was income +7350 / expense -7350).
+    mockTransactions.push({
+      id: 'tx-mortgage',
+      accountId: 'acc-mortgage',
+      amount: '7350.00',
+      date: '2026-06-05',
+      categoryId: 'cat-mortgage-pmt',
+      categoryName: 'Mortgage Payment',
+      ignored: false,
+    });
+
+    // Credit card charge: stored as NEGATIVE on a liability account
+    // (debt accrual / money in from the cardholder's cash-flow perspective).
+    mockTransactions.push({
+      id: 'tx-credit',
+      accountId: 'acc-credit',
+      amount: '-400.00',
+      date: '2026-06-07',
+      categoryId: 'cat-grocery',
+      categoryName: 'Grocery',
+      ignored: false,
+    });
+
+    const request = new Request('http://localhost/api/cash-flow/savings-rate?months=2');
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    // Income: 5000 salary (credit charge is NOT income — it offsets expenses,
+    // mirroring refund semantics for asset accounts).
+    expect(data[0].income).toBe(5000);
+    // Expenses: 7350 mortgage payment (normalized from +7350) minus 400
+    // (credit charge normalized to +400, which offsets expenses).
+    expect(data[0].expenses).toBe(6950);
+    // Net cash flow: 5000 - 6950 = -1950
+    expect(data[0].netCashFlow).toBe(-1950);
+    // Savings rate = -1950 / 5000 = -0.39
+    expect(data[0].savingsRate).toBe(-0.39);
+  });
 });

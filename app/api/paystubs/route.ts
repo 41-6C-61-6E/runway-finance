@@ -316,24 +316,29 @@ export async function createTransactionsFromLineItems(
   // EARNINGS: Group earnings items by their resolved account and tag
   const earningsItems = mappedItems.filter((item) => item.section === 'earnings');
   if (earningsItems.length > 0) {
-    const groups: Record<string, { items: typeof earningsItems; accountId: string; tagId: string }> = {};
+    // ── P-3: group key includes categoryId. Previously (account,tag) only, so
+    // "Regular Pay"→Salary and "Bonus"→different-category lines on the same
+    // account+tag collapsed into one transaction carrying the FIRST line's
+    // category (income summaries miscut bonus/OVT). The 99% case (single
+    // "Regular Pay" line) is byte-identical; mixed cases now produce one
+    // transaction per category with the correct category attached.
+    const groups: Record<string, { items: typeof earningsItems; accountId: string; tagId: string; categoryId: string }> = {};
 
     for (const item of earningsItems) {
       const { accountId, tagId } = await resolveAccountAndTagForLine(item.section, item.description);
-      const key = `${accountId}::${tagId}`;
+      const key = `${accountId}::${tagId}::${item.categoryId}`;
       if (!groups[key]) {
-        groups[key] = { items: [], accountId, tagId };
+        groups[key] = { items: [], accountId, tagId, categoryId: item.categoryId };
       }
       groups[key].items.push(item);
     }
 
     for (const groupKey of Object.keys(groups)) {
-      const { items, accountId, tagId } = groups[groupKey];
+      const { items, accountId, tagId, categoryId } = groups[groupKey];
       const totalEarnings = items.reduce(
         (sum, item) => sum + parseFloat(item.amount || '0'),
         0
       );
-      const firstEarningsCategoryId = items[0].categoryId;
       const earningsExternalId = `paystub-${paystub.id}-${items[0].id}`;
 
       const txnValues = {
@@ -345,7 +350,7 @@ export async function createTransactionsFromLineItems(
         description: `Paycheck - ${employerName}`,
         source: 'paystub',
         paystubId: paystub.id,
-        categoryId: firstEarningsCategoryId,
+        categoryId: categoryId,
         reviewed: true,
       };
       const encryptedTxn = dek ? await encryptRow('transactions', txnValues, dek) : txnValues;

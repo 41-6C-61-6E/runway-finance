@@ -20,7 +20,7 @@ import { getSeriesColor } from './account-types';
 import type { Account } from './account-types';
 import type { TimeRange } from '../../charts/chart-filters';
 import { getPreciseDateRange } from '../../../lib/utils/date-window';
-import { formatCurrency, formatPercent } from '../../../lib/utils/format';
+import { formatCurrency } from '../../../lib/utils/format';
 import { isAssetAccount, isLiabilityAccount } from '../../../lib/utils/account-scope';
 import { ChartTooltip, TooltipHeader, TooltipRow } from '../../charts/chart-tooltip';
 import {
@@ -37,22 +37,6 @@ interface GroupDetailPanelProps {
   hierarchyTimeframe: TimeRange;
   onClose: () => void;
 }
-
-const TIMEFRAME_LABELS: Record<TimeRange, string> = {
-  '1d': '1D',
-  '7d': '7D',
-  '30d': '30D',
-  '1m': '1M',
-  '3m': '3M',
-  '6m': '6M',
-  '1y': '1Y',
-  '365d': '365D',
-  '5y': '5Y',
-  ytd: 'YTD',
-  all: 'All',
-  '1d_discrete': '1D',
-  '7d_discrete': '7D',
-};
 
 interface GroupTooltipProps
   extends Omit<TooltipProps<number, string>, 'active' | 'payload'> {
@@ -201,52 +185,8 @@ export default function GroupDetailPanel({
     [composition]
   );
 
-  // Largest account by most recent known balance
-  const largest = composition[0] as CompositionEntry | undefined;
-  const largestPct =
-    largest && compositionTotal ? (largest.value / compositionTotal) * 100 : 0;
-
-  // Share of net worth = group total ÷ latest netWorth point
-  const shareOfNetWorth = useMemo(() => {
-    const groupTotal = trendStats?.current ?? 0;
-    if (!groupTotal) return null;
-    for (let j = historyData.length - 1; j >= 0; j--) {
-      const nw = historyData[j].netWorth;
-      if (nw != null && Math.abs(nw) > 0) {
-        return (Math.abs(groupTotal) / Math.abs(nw)) * 100;
-      }
-    }
-    return null;
-  }, [historyData, trendStats]);
-
-  // Top mover = account with the largest |change| over the timeframe
-  const topMover = useMemo(() => {
-    if (slicedHistory.length < 2) return null;
-    const first = slicedHistory[0];
-    const last = slicedHistory[slicedHistory.length - 1];
-    let best: { acc: Account; change: number; isPositive: boolean } | null = null;
-    for (const acc of accounts) {
-      const change = (last[acc.id] ?? 0) - (first[acc.id] ?? 0);
-      if (Math.abs(change) > 0 && (best === null || Math.abs(change) > Math.abs(best.change))) {
-        best = {
-          acc,
-          change,
-          isPositive: isLiabilityAccount(acc.type) ? change <= 0 : change >= 0,
-        };
-      }
-    }
-    return best;
-  }, [slicedHistory, accounts]);
-
-  const institutionCount = useMemo(() => {
-    const set = new Set<string>();
-    for (const acc of accounts) if (acc.institution) set.add(acc.institution);
-    return set.size;
-  }, [accounts]);
-
   if (!group || accounts.length === 0) return null;
 
-  const timeframeLabel = TIMEFRAME_LABELS[hierarchyTimeframe] ?? 'Period';
   const xAxisTicks = getChartXTicksUnified(chartData, hierarchyTimeframe, false, 'date');
 
   return (
@@ -303,65 +243,6 @@ export default function GroupDetailPanel({
       </div>
 
       <div className="px-2 sm:px-3 pb-4 sm:pb-5 space-y-5">
-        {/* Insight metrics */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-sidebar-border bg-card/50 px-3 py-2.5 min-w-0">
-            <p className="text-[11px] text-muted-foreground">Largest account</p>
-            <p
-              className="text-sm font-semibold text-sidebar-foreground mt-0.5 truncate"
-              title={largest?.name}
-            >
-              {largest ? largest.name : '—'}
-            </p>
-            {largest && (
-              <p className="text-[11px] text-muted-foreground">
-                {largestPct.toFixed(0)}% of group
-              </p>
-            )}
-          </div>
-          <div className="rounded-xl border border-sidebar-border bg-card/50 px-3 py-2.5">
-            <p className="text-[11px] text-muted-foreground">Share of net worth</p>
-            <p className="font-mono text-sm font-bold text-sidebar-foreground mt-0.5">
-              {shareOfNetWorth != null ? formatPercent(shareOfNetWorth, 1) : '—'}
-            </p>
-          </div>
-          <div className="rounded-xl border border-sidebar-border bg-card/50 px-3 py-2.5 min-w-0">
-            <p className="text-[11px] text-muted-foreground">
-              {`Top mover · ${timeframeLabel}`}
-            </p>
-            {topMover ? (
-              <>
-                <p
-                  className="text-sm font-semibold text-sidebar-foreground mt-0.5 truncate"
-                  title={topMover.acc.name}
-                >
-                  {topMover.acc.name}
-                </p>
-                <p
-                  className={`text-[11px] font-medium ${
-                    topMover.isPositive ? 'text-chart-1' : 'text-destructive'
-                  }`}
-                >
-                  {topMover.change >= 0 ? '+' : '−'}
-                  {formatCurrency(Math.abs(topMover.change))}
-                </p>
-              </>
-            ) : (
-              <p className="font-mono text-sm font-bold text-muted-foreground mt-0.5">—</p>
-            )}
-          </div>
-          <div className="rounded-xl border border-sidebar-border bg-card/50 px-3 py-2.5">
-            <p className="text-[11px] text-muted-foreground">
-              Accounts & institutions
-            </p>
-            <p className="font-mono text-sm font-bold text-sidebar-foreground mt-0.5">
-              {accounts.length}
-              <span className="text-muted-foreground font-medium"> / </span>
-              {institutionCount}
-            </p>
-          </div>
-        </div>
-
         {/* Combined group history chart (stacked by account) */}
         <div className="rounded-2xl border border-sidebar-border bg-card/50 shadow-sm overflow-hidden">
           <div className="p-3 sm:p-4 space-y-2">

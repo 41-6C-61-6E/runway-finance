@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1787128423785",
-  "buildTime": "2026-08-19T08:33:43.785Z",
-  "hash": "e364a5b",
-  "fullHash": "e364a5ba3b7db65c51f7ebebaf2751bffa240f4e",
+  "buildNumber": "26.08.1787180558267",
+  "buildTime": "2026-08-19T23:02:38.267Z",
+  "hash": "539b597",
+  "fullHash": "539b59793618ae9bc0e2fe962004af33c7382651",
   "commits": [
+    "feat: add net worth benchmarks component for emergency fund and age-banded comparisons",
     "fix: update AccountHierarchyTree component for responsive design and improve transaction visibility",
     "feat: enhance context providers with useMemo for performance optimization and add cross-tab sync for user settings",
     "feat: centralize query invalidation logic for accounts and transactions",
@@ -202,18 +203,25 @@
     "refactor: wealth flow visualization and calculation",
     "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility",
     "feat: enhance sankey hub visualization with net change delta bars and improved labels",
-    "feat: implement ExpandableDriverRow component to display granular net worth breakdown and account-level transaction details",
-    "feat: add 1D time range, migrate /net-worth to /flows, update sankey hub tooltips, and refine sync/projection logic."
+    "feat: implement ExpandableDriverRow component to display granular net worth breakdown and account-level transaction details"
   ],
   "history": [
+    {
+      "hash": "539b597",
+      "fullHash": "539b59793618ae9bc0e2fe962004af33c7382651",
+      "author": "Alan Racek",
+      "date": "2026-08-19T06:04:12-07:00",
+      "message": "feat: add net worth benchmarks component for emergency fund and age-banded comparisons",
+      "type": "feat",
+      "buildNumber": "26.08.1787180558267"
+    },
     {
       "hash": "e364a5b",
       "fullHash": "e364a5ba3b7db65c51f7ebebaf2751bffa240f4e",
       "author": "Alan Racek",
       "date": "2026-08-18T18:10:25-07:00",
       "message": "fix: update AccountHierarchyTree component for responsive design and improve transaction visibility",
-      "type": "fix",
-      "buildNumber": "26.08.1787128423785"
+      "type": "fix"
     },
     {
       "hash": "a8de407",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-07-04T15:45:51-07:00",
       "message": "feat: implement ExpandableDriverRow component to display granular net worth breakdown and account-level transaction details",
-      "type": "feat"
-    },
-    {
-      "hash": "059f4a3",
-      "fullHash": "059f4a3d07605ba07d1bbd1e67cb9dae61eacd7b",
-      "author": "Alan Racek",
-      "date": "2026-07-04T15:34:16-07:00",
-      "message": "feat: add 1D time range, migrate /net-worth to /flows, update sankey hub tooltips, and refine sync/projection logic.",
       "type": "feat"
     }
   ]

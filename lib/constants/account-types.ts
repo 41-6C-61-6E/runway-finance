@@ -84,6 +84,7 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   autoloan: 'Auto Loan',
   otherloan: 'Other Loan',
   otherLiability: 'Other Liability',
+  otherliability: 'Other Liability',
 };
 
 export function getTypesByGroup(): { group: string; types: { value: string; label: string }[] }[] {

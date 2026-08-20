@@ -140,6 +140,21 @@ export function buildEnginePlan(plan: any, options: BuildEnginePlanOptions = {})
       withholdingDeferred: parseFloat(plan?.settings?.withholdingDeferred || '20.0'),
       withholdingTaxable: parseFloat(plan?.settings?.withholdingTaxable || '10.0'),
       incomeTaxModifier: parseFloat(plan?.settings?.incomeTaxModifier || '0.0'),
+      // ── L-1: optional graduated state table (absent → flat fallback).
+      stateTaxBrackets: Array.isArray(plan?.settings?.stateTaxBrackets)
+        ? plan.settings.stateTaxBrackets
+        : undefined,
+      stateTaxStandardDeduction: plan?.settings?.stateTaxStandardDeduction != null
+        ? parseFloat(plan.settings.stateTaxStandardDeduction)
+        : undefined,
+      stateGrossFloorRate: plan?.settings?.stateGrossFloorRate != null
+        ? parseFloat(plan.settings.stateGrossFloorRate)
+        : undefined,
+      stateCode: plan?.settings?.stateCode || undefined,
+      // T-2: per-year statutory rule selection (default: inflationEscalated).
+      projectionMode: plan?.settings?.projectionMode === 'statutory' ? 'statutory' : 'inflationEscalated',
+      // T-5: opt-in AMT (default off → bit-identical legacy output).
+      enableAmt: Boolean(plan?.settings?.enableAmt),
       capGainsTaxModifier: parseFloat(plan?.settings?.capGainsTaxModifier || '0.0'),
       heirFlatIncomeTaxRate: parseFloat(plan?.settings?.heirFlatIncomeTaxRate || '25.0'),
       stepUpBasis: plan?.settings?.stepUpBasis ?? true,

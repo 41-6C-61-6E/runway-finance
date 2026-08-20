@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
-import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
+import { DEFAULT_2026_RULES, getRmdStartAge } from '@/lib/constants/retirement-defaults';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
 import {
@@ -72,7 +72,8 @@ export function RothConversionTab({
 
   const retirementAge = Number(plan?.retirementAge) || 60;
   const primaryBirthYear = Number(plan?.primaryBirthYear) || 1985;
-  const rmdStartAge = primaryBirthYear >= 1960 ? 75 : 73;
+  // T-7: per birth-year bands (1951–1959→73, 1960→75, ... 1965+→80) — match the engine.
+  const rmdStartAge = getRmdStartAge(primaryBirthYear);
 
   // Helper to convert DB plan to EnginePlan object
   const buildEnginePlanHelper = (enable: boolean, ceiling: string, irmaaGuard: boolean) => {

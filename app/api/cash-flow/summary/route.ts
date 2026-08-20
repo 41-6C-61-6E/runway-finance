@@ -6,6 +6,7 @@ import { monthlyCashFlow, accounts, categories, transactions, userSettings } fro
 import { eq, and, inArray } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
+import { toCashFlowAmount } from '@/lib/utils/account-scope';
 
 export async function GET() {
   const session = await auth();
@@ -93,6 +94,9 @@ export async function GET() {
           eq(accounts.isExcludedFromNetWorth, false)
         ));
 
+      // Liability accounts store payments as POSITIVE; normalize before the income/expense split.
+      const accountTypeById = new Map<string, string>(userAccounts.map(a => [a.id, String(a.type ?? '')]));
+
       if (userAccounts.length > 0) {
         const allCategories = await db
           .select()
@@ -105,6 +109,7 @@ export async function GET() {
             date: transactions.date,
             amount: transactions.amount,
             categoryId: transactions.categoryId,
+            accountId: transactions.accountId,
           })
           .from(transactions)
           .where(
@@ -129,7 +134,7 @@ export async function GET() {
           const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
           const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
           const ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
-          const amount = parseFloat(await decryptField(tx.amount, dek)) || 0;
+          const amount = toCashFlowAmount(parseFloat(await decryptField(tx.amount, dek)) || 0, accountTypeById.get(tx.accountId.toString()));
 
           if (category?.categoryType === 'transfer') continue;
           const isCompound = category?.categoryType === 'compound';

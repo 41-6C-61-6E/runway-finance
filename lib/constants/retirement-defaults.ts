@@ -21,6 +21,22 @@ export interface HistoricalYearReturn {
   inflationRate: number;
 }
 
+/**
+ * Returns the SECURE 2.0 RMD starting age for a primary-birth year.
+ * 1951–1959 → 73 · 1960 → 75 · 1961 → 76 · 1962 → 77 · 1963 → 78 ·
+ * 1964 → 79 · 1965+ → 80
+ */
+export function getRmdStartAge(birthYear: number | null | undefined, fallback = 73): number {
+  if (!birthYear) return fallback;
+  if (birthYear <= 1959) return 73;
+  if (birthYear === 1960) return 75;
+  if (birthYear === 1961) return 76;
+  if (birthYear === 1962) return 77;
+  if (birthYear === 1963) return 78;
+  if (birthYear === 1964) return 79;
+  return 80; // 1965+
+}
+
 export const DEFAULT_2026_RULES = {
   taxYear: 2026,
   country: 'US',
@@ -64,7 +80,9 @@ export const DEFAULT_2026_RULES = {
     addMedicareThresholdSingle: 200000,
     addMedicareThresholdMfj: 250000,
     addMedicareThresholdMfs: 125000,
-    ssWageBaseCap: 176100,
+    // 2026 OASDI taxable maximum — SSA Contribution & Benefit Base (ssa.gov/OACT/COLA/cbb.html):
+    // "For earnings in 2026, this base is $184,500" → max OASDI contribution $11,439.
+    ssWageBaseCap: 184500,
   },
   socialSecurityRules: {
     bendPoint1: 1226,
@@ -115,10 +133,10 @@ export const DEFAULT_2026_RULES = {
   contributionLimits: {
     ira: 7000,
     iraCatchUp: 1000, // age >= 50
-    k401: 23000,
+    k401: 23500,
     k401CatchUp: 7500, // age >= 50
-    hsaSingle: 4150,
-    hsaFamily: 8300,
+    hsaSingle: 4300,
+    hsaFamily: 8550,
     hsaCatchUp: 1000, // age >= 55
   },
   giftEstateExemptions: {
@@ -135,7 +153,9 @@ export const DEFAULT_2026_RULES = {
   ],
   fplAmount: '15060',
   secureActRules: {
-    rmdAge: 73, // age 73 for birth 1951-1959, 75 for 1960+
+    // Fallback band only. Exact SECURE 2.0 start age is per birth year —
+    // see getRmdStartAge() (1951–1959→73, 1960→75, 1961→76, ... 1965+→80).
+    rmdAge: 73,
     inheritedIraYears: 10,
   },
   rmdUniformLifetimeTable: {

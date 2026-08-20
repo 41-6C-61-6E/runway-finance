@@ -58,8 +58,8 @@ interface BenchmarksData {
   windowMonths: number;
   liquidCash: number;
   monthlyIncome: number;
-  monthlyEssentialSpend: number;
-  monthlyTotalSpend: number;
+  /** Sum of the user's active month budgets for Fixed (essential) categories; null when no such budget exists (hides the coverage block). */
+  monthlyEssentialSpend: number | null;
   annualIncome: number;
   savingsRate: number | null;
   netWorth: number;
@@ -122,11 +122,11 @@ export function NetWorthBenchmarks({ birthYear }: NetWorthBenchmarksProps) {
               <>
                 <TooltipHeader>Emergency Fund Coverage</TooltipHeader>
                 <TooltipRow label="Liquid Cash" value={formatCurrency(data.liquidCash)} color="var(--color-chart-2)" />
-                <TooltipRow label="Essential Monthly Spend" value={formatCurrency(data.monthlyEssentialSpend)} color="var(--color-chart-4)" />
+                <TooltipRow label="Essential Monthly Spend" value={formatCurrency(data.monthlyEssentialSpend ?? 0)} color="var(--color-chart-4)" />
                 <TooltipRow label="Coverage" value={`${months.toFixed(1)} months`} color="var(--color-primary)" />
                 <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
                   <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</div>
-                  <div className="text-[10px] text-muted-foreground">Essential = spending in "Fixed" (non-discretionary) categories, averaged over the last {data.windowMonths} months.</div>
+                  <div className="text-[10px] text-muted-foreground">Essential = your month's budgets for "Fixed" (essential) categories.</div>
                   <div className="text-[10px] text-muted-foreground">3–6 months is the common financial-planning recommendation.</div>
                 </div>
               </>
@@ -152,7 +152,7 @@ export function NetWorthBenchmarks({ birthYear }: NetWorthBenchmarksProps) {
               </div>
               <div className="text-[11px] text-muted-foreground">
                 You have {months.toFixed(1)} months of essential expenses saved in liquid cash
-                <span className="opacity-70"> ({formatCurrency(data.monthlyEssentialSpend)}/mo)</span>
+                <span className="opacity-70"> ({formatCurrency(data.monthlyEssentialSpend ?? 0)}/mo)</span>
               </div>
               <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden">
                 <div
@@ -162,6 +162,14 @@ export function NetWorthBenchmarks({ birthYear }: NetWorthBenchmarksProps) {
               </div>
             </div>
           </ChartHoverTooltip>
+        </div>
+      )}
+      {!emergencyFund && data.liquidCash > 0 && (
+        <div className="py-4 first:pt-0 last:pb-0">
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <Wallet className="w-3.5 h-3.5 text-chart-2 shrink-0" />
+            Set budgets for Fixed (essential) categories to see Emergency Fund Coverage.
+          </div>
         </div>
       )}
 

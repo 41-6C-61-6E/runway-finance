@@ -250,7 +250,6 @@ export default function GeneralTab() {
                 pageKey === 'transactions' ? 'Transactions' :
                 pageKey === 'flows' ? 'Flows' :
                 pageKey === 'budgets' ? 'Budgets' :
-                pageKey === 'subscriptions' ? 'Subscriptions' :
                 pageKey === 'realEstate' ? 'Real Estate' :
                 pageKey === 'investments' ? 'Investments' :
                 pageKey === 'dataExplorer' ? 'Data Explorer' :

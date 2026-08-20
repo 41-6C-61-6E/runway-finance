@@ -457,11 +457,12 @@ describe('Retirement Projection Engine', () => {
 
     const output = runRetirementSimulation(highEarnerPlan);
     const yr1 = output.yearlyResults[0];
-    // SS tax = $176,100 * 6.2% = $10,918.20 (using official 2026 wage base cap)
+    // SS tax = $184,500 * 6.2% = $11,439.00 (SSA official 2026 wage base cap,
+    // ssa.gov/OACT/COLA/cbb.html — was the 2025 cap of $176,100 by mistake)
     // Medicare tax = $300,000 * 1.45% = $4,350.00
     // Addl Medicare tax = ($300,000 - $200,000) * 0.9% = $900.00
-    // Total FICA = $16,168.20 (without cap, flat 7.65% would be $22,950)
-    expect(yr1.ficaTax).toBeCloseTo(16168.20, 0);
+    // Total FICA = $16,689.00 (without cap, flat 7.65% would be $22,950)
+    expect(yr1.ficaTax).toBeCloseTo(16689.00, 0);
     expect(yr1.ficaTax).toBeLessThan(22000);
   });
 
@@ -2081,6 +2082,89 @@ describe('Retirement Projection Engine', () => {
     // Remaining deficit of ~$20,000 drawn from taxable brokerage (textbook priority)
     expect(taxableAcc?.balance).toBeCloseTo(80000, -2);
     expect(yr1.discretionaryDeficitWithdrawn).toBeCloseTo(20000, -2);
+  });
+
+  describe('T-5: Alternative Minimum Tax (opt-in)', () => {
+    /**
+     * MFJ high earner with a 12% flat state tax — the classic profile where
+     * 26% AMT (with the state-tax add-back) exceeds the regular 24% federal
+     * bracket band (2026: $206,700–$394,600 MFJ).
+     */
+    const makeHighEarnerPlan = (enableAmt: boolean): EnginePlan => ({
+      id: 'plan_amt',
+      name: 'AMT Plan',
+      hasSpouse: true,
+      primaryBirthYear: 1985,
+      primaryBirthMonth: 1,
+      spouseBirthYear: 1987,
+      spouseBirthMonth: 6,
+      spouseName: 'Spouse',
+      spouseRetirementAge: 60,
+      spouseLifeExpectancyAge: 70,
+      filingStatus: 'married_joint',
+      retirementAge: 60,
+      lifeExpectancyAge: 70,
+      spouseSalary: 0,
+      primarySalary: 400000,
+      primarySalaryYear: new Date().getFullYear(),
+      primarySalaryRaisePct: 0,
+      withdrawalMethod: 'textbook',
+      accounts: [
+        {
+          id: 'acc_1',
+          name: 'Taxable Brokerage',
+          type: 'taxable',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 5.0,
+          dividendYield: 0.0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+          contributionMode: 'fixed',
+          contributionValue: 0,
+        },
+      ],
+      liabilities: [],
+      events: [],
+      flows: [],
+      settings: {
+        fixedInflationRate: 2.5,
+        incomeTaxModifier: 13,
+        administrativeCostRate: 1.0,
+        charitableGiving: 0.0,
+        // T-5 flag under test
+        enableAmt,
+      },
+      rules: DEFAULT_2026_RULES,
+    });
+
+    it('AMT off by default: amtTax is 0 and output is unchanged', () => {
+      const off = runRetirementSimulation(makeHighEarnerPlan(false));
+      expect(off.yearlyResults.every((y) => !y.amtTax || y.amtTax === 0)).toBe(true);
+    });
+
+    it('enabled: early years (22% bracket + SALT add-back) pay AMT, and it folds into taxesPaid', () => {
+      const off = runRetirementSimulation(makeHighEarnerPlan(false));
+      const on = runRetirementSimulation(makeHighEarnerPlan(true));
+
+      // Year 1 (MFJ, 2026 brackets ×2): taxable ordinary = 400k − 30k SD
+      // = 370k → regular federal ≈ 74.5k. AMT base = MAGI 400k + state
+      // add-back (0.13 × 370k = 48.1k) = 448.1k → AMT = 0.26 × (448.1k −
+      // 139k MFJ exemption) ≈ 80.4k → ~5.9k above regular tax.
+      const yr = on.yearlyResults[0];
+      expect(yr.amtTax).toBeGreaterThan(5000);
+      // Taxes include the AMT uplift vs. the disabled run.
+      expect(yr.taxesPaid).toBeGreaterThan(off.yearlyResults[0].taxesPaid);
+
+      // AMT never double-charges regular tax — it's the excess only.
+      expect(yr.amtTax).toBeLessThanOrEqual(yr.amtTax + yr.ordinaryTax + yr.capGainsTax + (yr.niitTax || 0));
+
+      // Later years (escalated income hits the 32%+ brackets) fall back to
+      // regular tax, which outpaces 26% AMT — the AMT excess tapers away.
+      const lastYear = on.yearlyResults[on.yearlyResults.length - 1];
+      expect(lastYear.amtTax || 0).toBeLessThanOrEqual(yr.amtTax!);
+    });
   });
 });
 

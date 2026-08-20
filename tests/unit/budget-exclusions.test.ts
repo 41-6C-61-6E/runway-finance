@@ -235,6 +235,81 @@ describe('Budget Exclusions & Ignored Items', () => {
     expect(groceries.actual).toBe(100);
   });
 
+  it('keeps untagged split children in budget actuals when only the parent carries an excluded tag (direct match)', async () => {
+    mockDbState.budgets = [
+      {
+        id: 'b-groceries',
+        userId: 'test-user-id',
+        categoryId: 'cat-groceries',
+        amount: '400.00',
+        periodType: 'monthly',
+        isRecurring: true,
+        effectiveFrom: '2026-01',
+        effectiveTo: null,
+        categoryName: 'Groceries',
+        categoryColor: '#10b981',
+        isIncome: false,
+        categoryType: 'standard',
+        isDiscretionary: true,
+      },
+    ];
+
+    // Split parent (-200, tagged) with two untagged children, each in the
+    // groceries category. Under the old whole-group semantics the parent's
+    // tag excluded all three rows (actual 0); direct-match semantics only
+    // excludes the tagged parent itself, so both children count.
+    mockDbState.transactions = [
+      {
+        id: 'tx-tag-parent',
+        userId: 'test-user-id',
+        categoryId: 'cat-groceries',
+        amount: '-200.00',
+        date: '2026-08-05',
+        deleted: false,
+        ignored: false,
+      },
+      {
+        id: 'tx-tag-child-1',
+        parentId: 'tx-tag-parent',
+        userId: 'test-user-id',
+        categoryId: 'cat-groceries',
+        amount: '-90.00',
+        date: '2026-08-05',
+        deleted: false,
+        ignored: false,
+      },
+      {
+        id: 'tx-tag-child-2',
+        parentId: 'tx-tag-parent',
+        userId: 'test-user-id',
+        categoryId: 'cat-groceries',
+        amount: '-60.00',
+        date: '2026-08-05',
+        deleted: false,
+        ignored: false,
+      },
+    ];
+
+    // Only the parent carries the excluded tag
+    mockDbState.transactionTags = [
+      {
+        transactionId: 'tx-tag-parent',
+        tagId: 'tag-split',
+      },
+    ];
+
+    const req = new Request('http://localhost:3000/api/budgets?periodType=monthly&periodKey=2026-08');
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    const budgets = data.budgets;
+    const groceriesB = budgets.find((b: any) => b.categoryId === 'cat-groceries');
+    expect(groceriesB).toBeDefined();
+    // Tagged parent (-200) excluded; untagged children (-90, -60) counted
+    expect(groceriesB.actual).toBe(150);
+  });
+
   it('omits default system exclusions (transfers) from Everything Else', async () => {
     mockDbState.transactions = [
       {
