@@ -90,22 +90,35 @@ export async function POST(
 
   const { splits } = parsed.data;
 
-  // 2. Validate split amounts match parent amount
+  // 2. Validate split amounts match parent amount (supporting both standard positive entry and signed algebraic entry)
   const decryptedAmountStr = await decryptField(parentTx.amount, dek);
   const parentAmount = parseFloat(decryptedAmountStr) || 0;
-  const parentAbs = Math.abs(parentAmount);
+  const parentCents = Math.round(parentAmount * 100);
+  const parentAbsCents = Math.abs(parentCents);
 
-  let splitsSum = 0;
+  let splitsSumCents = 0;
+  let allPositive = true;
+  let splitsAbsSumCents = 0;
+
   for (const split of splits) {
     const cleanSplitAmount = parseFloat(split.amount.replace(/[^\d.-]/g, '')) || 0;
-    splitsSum += Math.abs(cleanSplitAmount);
+    const cents = Math.round(cleanSplitAmount * 100);
+    splitsSumCents += cents;
+    splitsAbsSumCents += Math.abs(cents);
+    if (cleanSplitAmount < 0) {
+      allPositive = false;
+    }
   }
 
-  if (Math.round(parentAbs * 100) !== Math.round(splitsSum * 100)) {
+  const isExactSignedMatch = splitsSumCents === parentCents;
+  const isUnsignedPositiveMatch = allPositive && splitsAbsSumCents === parentAbsCents;
+
+  if (!isExactSignedMatch && !isUnsignedPositiveMatch) {
+    const displaySum = isExactSignedMatch ? splitsSumCents / 100 : splitsAbsSumCents / 100;
     return NextResponse.json(
       {
         error: 'validation_error',
-        message: `Sum of splits ($${splitsSum.toFixed(2)}) must equal the transaction amount ($${parentAbs.toFixed(2)})`,
+        message: `Sum of splits ($${displaySum.toFixed(2)}) must equal the transaction amount ($${Math.abs(parentAmount).toFixed(2)})`,
       },
       { status: 400 }
     );
@@ -141,8 +154,10 @@ export async function POST(
       for (let i = 0; i < splits.length; i++) {
         const split = splits[i];
         const cleanAmountNum = parseFloat(split.amount.replace(/[^\d.-]/g, '')) || 0;
-        // Apply original transaction sign (income vs expense)
-        const childAmountNum = parentAmount >= 0 ? Math.abs(cleanAmountNum) : -Math.abs(cleanAmountNum);
+        // If user entered unsigned positive amounts, apply parent sign; otherwise preserve exact signed amount
+        const childAmountNum = isUnsignedPositiveMatch
+          ? (parentAmount >= 0 ? Math.abs(cleanAmountNum) : -Math.abs(cleanAmountNum))
+          : cleanAmountNum;
         const childAmountStr = childAmountNum.toFixed(2);
 
         const parentDesc = parentTx.description ? await decryptField(parentTx.description, dek) : '';

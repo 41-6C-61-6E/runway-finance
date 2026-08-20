@@ -75,34 +75,42 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
     setBiweekly(false);
   }, [mortgage.id, mortgage.extraPrincipal]);
 
+  const originalPropertyPrice = ((mortgage.metadata as any)?.purchasePrice as number) || (mortgage.originalLoanAmount > 0 ? mortgage.originalLoanAmount / 0.8 : undefined);
+
   const amortParams = useMemo(() => ({
     originalBalance: mortgage.originalLoanAmount,
     annualRate: mortgage.interestRate,
     termMonths,
     monthlyPayment: monthlyPI,
     startDate: mortgageStartDate,
-  }), [mortgage.originalLoanAmount, mortgage.interestRate, termMonths, monthlyPI, mortgageStartDate]);
+    originalPropertyPrice,
+    monthlyPmi: pmi,
+  }), [mortgage.originalLoanAmount, mortgage.interestRate, termMonths, monthlyPI, mortgageStartDate, originalPropertyPrice, pmi]);
 
   const { standard, accelerated, standardSummary, acceleratedSummary } = useMemo(
     () => {
       if (!showProjection) {
         const standard = calculateAmortizationSchedule(amortParams);
-        const last = standard[standard.length - 1];
+        const zeroRow = standard.find((r) => r.remainingBalance <= 0);
         const defaultDate = new Date().toISOString().split('T')[0];
+        const isNegative = !zeroRow && standard[standard.length - 1]?.remainingBalance > mortgage.originalLoanAmount;
         return {
           standard,
           accelerated: [],
           standardSummary: {
-            payoffDate: last?.date ?? defaultDate,
+            payoffDate: zeroRow ? zeroRow.date : null,
             totalInterest: standard.reduce((s, r) => s + r.interest, 0),
-            totalPayments: standard.length,
+            totalPayments: zeroRow ? zeroRow.month : standard.length,
+            isNegativeAmortization: isNegative,
           },
           acceleratedSummary: {
-            payoffDate: last?.date ?? defaultDate,
+            payoffDate: zeroRow ? zeroRow.date : null,
             totalInterest: 0,
             totalPayments: 0,
             interestSaved: 0,
             monthsSaved: 0,
+            pmiSaved: 0,
+            isNegativeAmortization: isNegative,
           },
         };
       }
@@ -113,7 +121,7 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
         biweekly,
       });
     },
-    [amortParams, showProjection, extraMonthly, lumpSum, lumpSumDate, biweekly]
+    [amortParams, showProjection, extraMonthly, lumpSum, lumpSumDate, biweekly, mortgage.originalLoanAmount]
   );
 
   const currentBalance = Math.abs(mortgage.balance);
@@ -306,23 +314,46 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
                   </div>
                 </div>
 
+                {standardSummary.isNegativeAmortization && (
+                  <div className="p-2 bg-destructive/10 border border-destructive/20 rounded text-[11px] text-destructive">
+                    <span className="font-semibold">Negative Amortization:</span> Monthly payment does not cover interest accrued. Balance will grow over time.
+                  </div>
+                )}
+
                 {hasExtraPayments && (
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
-                    <div className="text-xs">
+                  <div className="flex items-start justify-between pt-2 border-t border-border gap-2">
+                    <div className="text-xs space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">Payoff:</span>
-                        <span className="font-medium text-chart-1">{formatSafeUTCDate(acceleratedSummary.payoffDate, { month: 'short', year: 'numeric' })}</span>
-                        <span className="text-muted-foreground">(vs {formatSafeUTCDate(standardSummary.payoffDate, { month: 'short', year: 'numeric' })})</span>
+                        <span className="font-medium text-chart-1">
+                          {acceleratedSummary.payoffDate ? formatSafeUTCDate(acceleratedSummary.payoffDate, { month: 'short', year: 'numeric' }) : 'Never'}
+                        </span>
+                        <span className="text-muted-foreground">
+                          (vs {standardSummary.payoffDate ? formatSafeUTCDate(standardSummary.payoffDate, { month: 'short', year: 'numeric' }) : 'Never'})
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">Interest saved:</span>
                         <span className="font-medium text-chart-2 blur-number">{formatCurrency(acceleratedSummary.interestSaved)}</span>
-                        <span className="text-muted-foreground">| {acceleratedSummary.monthsSaved}mo sooner</span>
+                        {acceleratedSummary.monthsSaved > 0 && (
+                          <span className="text-muted-foreground">| {acceleratedSummary.monthsSaved}mo sooner</span>
+                        )}
                       </div>
+                      {acceleratedSummary.pmiSaved !== undefined && acceleratedSummary.pmiSaved > 0 && (
+                        <div className="flex items-center gap-2 text-chart-1">
+                          <span className="text-muted-foreground">PMI saved:</span>
+                          <span className="font-medium blur-number">{formatCurrency(acceleratedSummary.pmiSaved)}</span>
+                          {acceleratedSummary.pmiRemovalDate78 && (
+                            <span className="text-muted-foreground">
+                              (ends {formatSafeUTCDate(acceleratedSummary.pmiRemovalDate78, { month: 'short', year: 'numeric' })})
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={handleReset}
-                      className="text-[10px] text-muted-foreground hover:text-foreground underline cursor-pointer"
+                      className="text-[10px] text-muted-foreground hover:text-foreground underline cursor-pointer shrink-0"
                     >
                       Reset
                     </button>

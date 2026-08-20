@@ -86,7 +86,7 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
   const goalsByAccount = new Map<string, typeof activeGoals>();
   const sharedReservesByAccount = new Map<string, number>();
   
-  // First, calculate individual reserves per goal
+  // First, calculate effective reserve per account (maximum reserve among active goals)
   for (const goal of activeGoals) {
     if (!goal.linkedAccountId) continue;
     if (!goalsByAccount.has(goal.linkedAccountId)) {
@@ -94,11 +94,10 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
     }
     goalsByAccount.get(goal.linkedAccountId)!.push(goal);
     
-    // Track reserve per goal
+    // Deduplicate reserve per account: take the maximum reserve specified among active goals
     const reserve = parseFloat(goal.reserve) || 0;
-    if (sharedReservesByAccount.has(goal.linkedAccountId)) {
-      sharedReservesByAccount.set(goal.linkedAccountId, sharedReservesByAccount.get(goal.linkedAccountId)! + reserve);
-    } else {
+    const currentMax = sharedReservesByAccount.get(goal.linkedAccountId) || 0;
+    if (reserve > currentMax) {
       sharedReservesByAccount.set(goal.linkedAccountId, reserve);
     }
   }
@@ -131,7 +130,8 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
     // Sort goals by sortOrder (ascending) — determined by the reorder UI
     const sortedGoals = [...goals].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
 
-    let remaining = Math.max(0, accountBalance - sharedReservesByAccount.get(accountId)!);
+    const effectiveReserve = sharedReservesByAccount.get(accountId) || 0;
+    let remaining = Math.max(0, accountBalance - effectiveReserve);
     let totalDesiredForAccount = 0;
     const goalAllocations: GoalAllocation[] = [];
     const activeReserves: number[] = [];
@@ -143,7 +143,7 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
       const reserve = parseFloat(goal.reserve) || 0;
       const goalTarget = parseFloat(goal.targetAmount) || 0;
       activeReserves.push(reserve);
-      const availableBalance = Math.max(0, accountBalance - sharedReservesByAccount.get(accountId)!);
+      const availableBalance = Math.max(0, accountBalance - effectiveReserve);
       const desiredAllocation = availableBalance * (percentage / 100);
       const allocatedAmount = Math.min(desiredAllocation, remaining, Math.max(0, goalTarget));
       
@@ -174,65 +174,7 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
       });
     }
 
-    // Enhancement 1: Release funds from completed goals
-    const completedForAccount = completedGoals.filter(g => g.linkedAccountId === accountId);
-    let releasedAmount = 0;
-
-    // Fetch last known allocations for completed goals from DB (not in goalAllocations, which only has active goals)
-    if (completedForAccount.length > 0) {
-      const completedGoalIds = completedForAccount.map(g => g.id);
-      const persistedCompleted = await getDb()
-        .select({ id: financialGoals.id, allocatedAmount: financialGoals.allocatedAmount })
-        .from(financialGoals)
-        .where(inArray(financialGoals.id, completedGoalIds));
-
-      const completedAllocations = new Map<string, number>();
-      for (const pc of persistedCompleted) {
-        const decrypted = await decryptRow('financial_goals', pc, dek);
-        completedAllocations.set(pc.id, parseFloat(decrypted.allocatedAmount) || 0);
-      }
-
-      for (const completedGoal of completedForAccount) {
-        const lastAllocated = completedAllocations.get(completedGoal.id) || 0;
-        if (lastAllocated > 0) {
-          releasedAmount += lastAllocated;
-          remaining += lastAllocated;
-        }
-      }
-    }
-
-    // Redistribute released funds to remaining active goals
-    if (releasedAmount > 0) {
-      const underfundedGoals = goalAllocations
-        .filter(g => g.isUnderfunded && g.status === 'active')
-        .sort((a, b) => a.sortOrder - b.sortOrder);
-
-      let remainingReleased = releasedAmount;
-      
-      for (const goal of underfundedGoals) {
-        if (remainingReleased <= 0) break;
-        
-        const cap = Math.min(goal.desiredAllocation, goal.targetAmount);
-        const shortfall = Math.max(0, cap - goal.allocatedAmount);
-        const additional = Math.min(shortfall, remainingReleased);
-        const additionalRounded = Math.round(additional * 100) / 100;
-        
-        goal.allocatedAmount = Math.round((goal.allocatedAmount + additionalRounded) * 100) / 100;
-        goal.isUnderfunded = goal.allocatedAmount < goal.desiredAllocation && goal.allocatedAmount < goal.targetAmount;
-        remainingReleased = Math.round((remainingReleased - additionalRounded) * 100) / 100;
-      }
-
-      // Update remaining on account
-      for (const goal of goalAllocations) {
-        if (goal.status === 'active') {
-          const totalAllocatedForActiveGoals = goalAllocations
-            .filter(g => g.status === 'active' && !g.isReleased)
-            .reduce((sum, g) => sum + g.allocatedAmount, 0);
-          goal.remainingOnAccount = Math.round((accountBalance - totalAllocatedForActiveGoals) * 100) / 100;
-        }
-      }
-    }
-
+    const availableBalance = Math.max(0, accountBalance - effectiveReserve);
     accountAllocations.push({
       accountId: accountData[0].id,
       accountName: decryptedAccountName,
@@ -241,8 +183,8 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
       totalAllocated: goalAllocations.reduce((sum, g) => sum + g.allocatedAmount, 0),
       remaining,
       goals: goalAllocations,
-      isOverallocated: totalDesiredForAccount > accountBalance,
-      releasedFromCompleted: releasedAmount,
+      isOverallocated: totalDesiredForAccount > availableBalance,
+      releasedFromCompleted: 0,
     });
   }
 
@@ -403,10 +345,11 @@ export async function findSharedAccounts(userId: string): Promise<Map<string, st
  */
 export async function snapshotAllocationsToHistory(userId: string): Promise<void> {
   const allocation = await computeGoalAllocations(userId);
+  const dek = await getSessionDEK();
   
   for (const account of allocation.accounts) {
     for (const goal of account.goals) {
-      await getDb().insert(goalAllocationHistory).values({
+      const encryptedRow = await encryptRow('goal_allocation_history', {
         userId,
         goalId: goal.goalId as any,
         accountId: goal.linkedAccountId as any,
@@ -418,7 +361,8 @@ export async function snapshotAllocationsToHistory(userId: string): Promise<void
         sortOrder: goal.sortOrder,
         isUnderfunded: goal.isUnderfunded,
         remainingOnAccount: formatToCents(goal.remainingOnAccount),
-      });
+      }, dek);
+      await getDb().insert(goalAllocationHistory).values(encryptedRow);
     }
   }
 }
@@ -443,5 +387,5 @@ export async function getGoalAllocationHistory(
     .orderBy(desc(goalAllocationHistory.snapshotDate))
     .limit(limit);
 
-  return history;
+  return await decryptRows('goal_allocation_history', history, dek);
 }

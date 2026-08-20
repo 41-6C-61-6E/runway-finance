@@ -33,7 +33,8 @@ const AGE_BAND_REFERENCES: AgeBandReference[] = [
 ];
 
 function getAgeBand(age: number): AgeBandReference {
-  for (const band of AGE_BAND_REFERENCES) {
+  for (let i = AGE_BAND_REFERENCES.length - 1; i >= 0; i--) {
+    const band = AGE_BAND_REFERENCES[i];
     if (age >= band.minAge) return band;
   }
   return AGE_BAND_REFERENCES[0];

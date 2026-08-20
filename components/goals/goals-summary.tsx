@@ -70,7 +70,7 @@ export function GoalsSummary() {
         Object.entries(byType).forEach(([type, d]) => {
           byTypeWithProgress[type] = {
             ...d,
-            progress: d.target > 0 ? Math.min((d.current / d.target) * 100, 100) : 0,
+            progress: d.target > 0 ? Math.max(0, Math.min((d.current / d.target) * 100, 100)) : 0,
           };
         });
 
@@ -80,7 +80,7 @@ export function GoalsSummary() {
           completedGoals,
           totalTarget,
           totalCurrent,
-          overallProgress: totalTarget > 0 ? Math.min((totalCurrent / totalTarget) * 100, 100) : 0,
+          overallProgress: totalTarget > 0 ? Math.max(0, Math.min((totalCurrent / totalTarget) * 100, 100)) : 0,
           byType: byTypeWithProgress,
         });
       } catch {

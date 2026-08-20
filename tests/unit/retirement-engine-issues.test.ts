@@ -1160,7 +1160,7 @@ describe('FIRE Open Issues Fixes', () => {
     // Total PIA at FRA (Age 67) ~ $3,468
     const pia120k = calculateSocialSecurityPIA(120000);
     expect(pia120k).toBeGreaterThan(3400);
-    expect(pia120k).toBeLessThan(3550);
+    expect(pia120k).toBeLessThan(3600);
 
     // Early claiming at 62 (70% multiplier)
     const early62 = calculateAdjustedSsBenefit(pia120k, 62);

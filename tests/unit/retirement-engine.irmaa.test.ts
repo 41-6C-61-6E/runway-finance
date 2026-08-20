@@ -4,9 +4,9 @@ import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 
 describe('Retirement Engine IRMAA & Statutory Threshold Tests', () => {
-  it('correctly uses 4 surcharge tiers with standard rate at $0 surcharge', () => {
+  it('correctly uses surcharge tiers with standard rate at $0 surcharge', () => {
     const thresholds = DEFAULT_2026_RULES.irmaaThresholds;
-    expect(thresholds).toHaveLength(5); // Tier 0 (base) + 4 surcharge tiers
+    expect(thresholds).toHaveLength(6); // Tier 0 (base) + 5 surcharge tiers
     expect(thresholds[0].partBMonthly).toBe(0);
     expect(thresholds[0].partDMonthly).toBe(0);
     expect(thresholds[1].magiSingle).toBe(103000);
@@ -14,6 +14,9 @@ describe('Retirement Engine IRMAA & Statutory Threshold Tests', () => {
     expect(thresholds[1].partBMonthly).toBe(69.90);
     expect(thresholds[4].magiSingle).toBe(193000);
     expect(thresholds[4].magiJoint).toBe(386000);
+    expect(thresholds[5].magiSingle).toBe(500000);
+    expect(thresholds[5].magiJoint).toBe(750000);
+    expect(thresholds[5].partBMonthly).toBe(419.30);
   });
 
   it('queues IRMAA surcharges with 2-year lookback and does not overcharge base Medicare premiums', () => {

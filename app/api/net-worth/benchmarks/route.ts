@@ -6,6 +6,7 @@ import { accounts, budgets, categories, transactions, userSettings } from '@/lib
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
 import { isAssetAccount, isLiabilityAccount, toCashFlowAmount } from '@/lib/utils/account-scope';
+import { convertCurrency } from '@/lib/constants/currency-rates';
 
 // Account types treated as "liquid" — kept in sync with the net worth
 // side panel's Liquidity section.
@@ -70,12 +71,13 @@ export async function GET() {
   const [allAccounts, allCategories, settings] = await Promise.all([
     db.select().from(accounts).where(eq(accounts.userId, dataUserId)),
     db.select().from(categories).where(eq(categories.userId, dataUserId)),
-    db.select({ paystubEnabled: userSettings.paystubEnabled }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1),
+    db.select({ paystubEnabled: userSettings.paystubEnabled, currency: userSettings.currency }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1),
   ]);
 
   const decryptedAccounts = await decryptRows('accounts', allAccounts, dek);
   const decryptedCategories = await decryptRows('categories', allCategories, dek);
   const isPaystubEnabled = settings[0]?.paystubEnabled ?? false;
+  const baseCurrency = settings[0]?.currency || 'USD';
 
   const accountMap = new Map<string, (typeof decryptedAccounts)[number]>();
   for (const acc of decryptedAccounts) accountMap.set(acc.id, acc);
@@ -167,14 +169,15 @@ export async function GET() {
   let liquidCash = 0;
   let totalAssets = 0;
   let totalLiabilities = 0;
-  for (const acc of decryptedAccounts as any[]) {
+  for (const acc of activeAccounts as any[]) {
     const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
     if (isNaN(balance)) continue;
+    const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
     if (isAssetAccount(acc.type)) {
-      totalAssets += balance;
-      if (LIQUID_TYPES.has(acc.type)) liquidCash += balance;
+      totalAssets += convertedBal;
+      if (LIQUID_TYPES.has(acc.type)) liquidCash += convertedBal;
     } else if (isLiabilityAccount(acc.type)) {
-      totalLiabilities += Math.abs(balance);
+      totalLiabilities += Math.abs(convertedBal);
     }
   }
   const netWorth = totalAssets - totalLiabilities;

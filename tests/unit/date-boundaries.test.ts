@@ -39,8 +39,8 @@ describe('Date Boundaries & DST Transitions (date-window.ts)', () => {
   it('handles 7d_discrete date window calculation', () => {
     const range = getPreciseDateRange('7d_discrete', '2026-03-09');
     expect(range.end).toBe('2026-03-09');
-    // Notice that due to DST spring forward on March 8, 7*24h subtraction in local time yields March 1st 23:00
-    expect(range.start).toBe('2026-03-01');
+    // Using calendar day subtraction ensures exact 7-day span (March 2 to March 9)
+    expect(range.start).toBe('2026-03-02');
   });
 
   it('formats period labels correctly across different timeframes', () => {

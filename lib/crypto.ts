@@ -299,6 +299,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   tags: ['name', 'description'],
   budgets: ['amount', 'notes'],
   financial_goals: ['name', 'description', 'targetAmount', 'currentAmount', 'percentage', 'reserve'],
+  goal_allocation_history: ['accountBalance', 'allocatedAmount', 'desiredAmount', 'remainingOnAccount'],
   net_worth_snapshots: ['totalAssets', 'totalLiabilities', 'netWorth'],
   monthly_cash_flow: ['totalIncome', 'totalExpenses', 'netCashFlow', 'transactionCount'],
   category_spending_summary: ['amount', 'transactionCount'],

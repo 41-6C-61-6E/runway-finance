@@ -58,7 +58,9 @@ export function getProgressBgClass(progress: number): string {
 export function calcGoalProgress(targetAmount: number | string, currentAmount: number | string): number {
   const target = typeof targetAmount === 'string' ? parseFloat(targetAmount) : targetAmount;
   const current = typeof currentAmount === 'string' ? parseFloat(currentAmount) : currentAmount;
-  return target > 0 ? Math.min((current / target) * 100, 100) : 0;
+  if (!target || target <= 0 || isNaN(target)) return 0;
+  if (isNaN(current) || current <= 0) return 0;
+  return Math.max(0, Math.min(100, (current / target) * 100));
 }
 
 /**

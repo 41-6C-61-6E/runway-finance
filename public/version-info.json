@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1787180558267",
-  "buildTime": "2026-08-19T23:02:38.267Z",
-  "hash": "539b597",
-  "fullHash": "539b59793618ae9bc0e2fe962004af33c7382651",
+  "buildNumber": "26.08.1787252506532",
+  "buildTime": "2026-08-20T19:01:46.532Z",
+  "hash": "38ff6a1",
+  "fullHash": "38ff6a1b80786e38243c86c38bea75d65eaf4012",
   "commits": [
+    "fix: update contribution mode in retirement projection test to 'none'",
+    "Add unit tests for various components and utilities",
     "feat: add net worth benchmarks component for emergency fund and age-banded comparisons",
     "fix: update AccountHierarchyTree component for responsive design and improve transaction visibility",
     "feat: enhance context providers with useMemo for performance optimization and add cross-tab sync for user settings",
@@ -201,19 +203,33 @@
     "refactor: improve Sankey hub rendering, add chart navigation, and implement account-level adjusted delta routing",
     "refactor: replace static feedback components with an array-based API in CollapsibleFilterPanel",
     "refactor: wealth flow visualization and calculation",
-    "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility",
-    "feat: enhance sankey hub visualization with net change delta bars and improved labels",
-    "feat: implement ExpandableDriverRow component to display granular net worth breakdown and account-level transaction details"
+    "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility"
   ],
   "history": [
+    {
+      "hash": "38ff6a1",
+      "fullHash": "38ff6a1b80786e38243c86c38bea75d65eaf4012",
+      "author": "Alan Racek",
+      "date": "2026-08-19T17:42:52-07:00",
+      "message": "fix: update contribution mode in retirement projection test to 'none'",
+      "type": "fix",
+      "buildNumber": "26.08.1787252506532"
+    },
+    {
+      "hash": "77a2ffc",
+      "fullHash": "77a2ffc21053471c84bcf1cf91cad7d3a3dfb650",
+      "author": "Alan Racek",
+      "date": "2026-08-19T17:27:52-07:00",
+      "message": "Add unit tests for various components and utilities",
+      "type": "other"
+    },
     {
       "hash": "539b597",
       "fullHash": "539b59793618ae9bc0e2fe962004af33c7382651",
       "author": "Alan Racek",
       "date": "2026-08-19T06:04:12-07:00",
       "message": "feat: add net worth benchmarks component for emergency fund and age-banded comparisons",
-      "type": "feat",
-      "buildNumber": "26.08.1787180558267"
+      "type": "feat"
     },
     {
       "hash": "e364a5b",
@@ -1790,22 +1806,6 @@
       "date": "2026-07-04T19:44:49-07:00",
       "message": "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility",
       "type": "refactor"
-    },
-    {
-      "hash": "fb4b58a",
-      "fullHash": "fb4b58a19cebf9561e3f2dfd024ce1dd58a15f39",
-      "author": "Alan Racek",
-      "date": "2026-07-04T16:16:24-07:00",
-      "message": "feat: enhance sankey hub visualization with net change delta bars and improved labels",
-      "type": "feat"
-    },
-    {
-      "hash": "94ffedd",
-      "fullHash": "94ffeddd600385d607ba117b049363316781ce14",
-      "author": "Alan Racek",
-      "date": "2026-07-04T15:45:51-07:00",
-      "message": "feat: implement ExpandableDriverRow component to display granular net worth breakdown and account-level transaction details",
-      "type": "feat"
     }
   ]
 }

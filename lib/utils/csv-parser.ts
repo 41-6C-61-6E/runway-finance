@@ -382,8 +382,14 @@ export function parseAmount(raw: string): number {
     } else {
       value = value.replace(/,/g, '');
     }
+  } else if (hasDot) {
+    // Only dots present. A single dot is a decimal ("1234.56");
+    // multiple dots are thousands separators ("1.234.567").
+    const dotCount = (value.match(/\./g) || []).length;
+    if (dotCount > 1) {
+      value = value.replace(/\./g, '');
+    }
   }
-  // Only dots present: treat as decimal (or thousands) — parseFloat handles it.
 
   const parsed = parseFloat(value);
   if (isNaN(parsed)) return 0;

@@ -13,6 +13,24 @@ export type TimeFrame =
   | '1d_discrete'
   | '7d_discrete';
 
+function subtractMonthsClamped(date: Date, months: number): void {
+  const originalDay = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() - months);
+  const maxDays = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(originalDay, maxDays));
+}
+
+function subtractYearsClamped(date: Date, years: number): void {
+  const originalDay = date.getDate();
+  const originalMonth = date.getMonth();
+  date.setDate(1);
+  date.setFullYear(date.getFullYear() - years);
+  date.setMonth(originalMonth);
+  const maxDays = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(originalDay, maxDays));
+}
+
 /**
  * Calculates start and end dates for a given standard timeframe.
  */
@@ -34,23 +52,23 @@ export function getDateRange(timeframe: TimeFrame | string = '1y'): [Date, Date]
       break;
     case '1m':
     case 'month':
-      startDate.setMonth(startDate.getMonth() - 1);
+      subtractMonthsClamped(startDate, 1);
       break;
     case '3m':
     case 'quarter':
-      startDate.setMonth(startDate.getMonth() - 3);
+      subtractMonthsClamped(startDate, 3);
       break;
     case '6m':
-      startDate.setMonth(startDate.getMonth() - 6);
+      subtractMonthsClamped(startDate, 6);
       break;
     case '1y':
-      startDate.setFullYear(startDate.getFullYear() - 1);
+      subtractYearsClamped(startDate, 1);
       break;
     case '365d':
       startDate.setDate(startDate.getDate() - 365);
       break;
     case '5y':
-      startDate.setFullYear(startDate.getFullYear() - 5);
+      subtractYearsClamped(startDate, 5);
       break;
     case 'ytd': {
       const now = new Date();
@@ -59,10 +77,11 @@ export function getDateRange(timeframe: TimeFrame | string = '1y'): [Date, Date]
       break;
     }
     case 'all':
-      startDate.setFullYear(1900);
+      startDate.setFullYear(1900, 0, 1);
+      startDate.setHours(0, 0, 0, 0);
       break;
     default:
-      startDate.setFullYear(startDate.getFullYear() - 1);
+      subtractYearsClamped(startDate, 1);
       break;
   }
 
@@ -95,7 +114,7 @@ export function timeframeToMonths(timeframe: TimeFrame | string = '1y'): number 
       return Math.max(1, currentMonth);
     }
     case 'all':
-      return 120;
+      return 360;
     default:
       return 12;
   }

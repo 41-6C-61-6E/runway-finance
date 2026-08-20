@@ -173,6 +173,62 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (pending !== undefined) changedFields.push('pending');
   logger.info('Updating transaction', { transactionId: id, changedFields });
 
+  if (amount !== undefined) {
+    // Check if this transaction is a split parent
+    const childCheck = await getDb()
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(and(eq(transactions.parentId, id), eq(transactions.deleted, false)))
+      .limit(1);
+
+    if (childCheck.length > 0 && categoryId === undefined) {
+      return NextResponse.json(
+        {
+          error: 'has_splits',
+          message: 'Cannot edit amount of a split transaction directly. Please edit the split or revert it first.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if this transaction is a split child
+    if (existing.parentId) {
+      const parentRow = await getDb()
+        .select()
+        .from(transactions)
+        .where(eq(transactions.id, existing.parentId))
+        .limit(1);
+
+      if (parentRow.length > 0) {
+        const parentAmt = parseFloat(await decryptField(parentRow[0].amount, dek)) || 0;
+        const siblingRows = await getDb()
+          .select()
+          .from(transactions)
+          .where(and(eq(transactions.parentId, existing.parentId), eq(transactions.deleted, false)));
+
+        let newSumCents = Math.round((parseFloat(amount) || 0) * 100);
+        for (const sib of siblingRows) {
+          if (sib.id !== id) {
+            const sibAmt = parseFloat(await decryptField(sib.amount, dek)) || 0;
+            newSumCents += Math.round(sibAmt * 100);
+          }
+        }
+
+        const parentCents = Math.round(parentAmt * 100);
+        const parentAbsCents = Math.abs(parentCents);
+        if (newSumCents !== parentCents && Math.abs(newSumCents) !== parentAbsCents) {
+          return NextResponse.json(
+            {
+              error: 'split_sum_mismatch',
+              message: `Split amounts must sum to the parent transaction amount ($${Math.abs(parentAmt).toFixed(2)}).`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+  }
+
   // Sanitize and encrypt text fields
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
   if (payee !== undefined) updateData.payee = sanitizeText(payee, 200);
@@ -280,6 +336,19 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       .update(transactions)
       .set({ deleted: true, updatedAt: new Date() })
       .where(eq(transactions.parentId, id));
+
+    // If this transaction is a split child, auto-revert split by restoring parent ignored = false and deleting sibling splits
+    if (existing.parentId) {
+      await tx
+        .update(transactions)
+        .set({ ignored: false, updatedAt: new Date() })
+        .where(eq(transactions.id, existing.parentId));
+
+      await tx
+        .update(transactions)
+        .set({ deleted: true, updatedAt: new Date() })
+        .where(eq(transactions.parentId, existing.parentId));
+    }
 
     const [res] = await tx
       .update(transactions)

@@ -34,6 +34,8 @@ interface BudgetData {
   isRecurring: boolean;
   fundingAccountId: string | null;
   rollover: boolean;
+  rolloverCarryover?: number;
+  availableBudget?: number;
   notes: string | null;
   monthlyAmount?: number;
   budgeted: number;
@@ -606,6 +608,14 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                           {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
                         </span>
                       )}
+                      {!isEE && b.rollover && b.rolloverCarryover !== undefined && b.rolloverCarryover > 0 && (
+                        <span
+                          title={`Base: ${formatCurrency(b.budgeted)} + Rollover: ${formatCurrency(b.rolloverCarryover)} = Total Available: ${formatCurrency(b.availableBudget || b.budgeted)}`}
+                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded shrink-0"
+                        >
+                          +{formatCurrency(b.rolloverCarryover)} rollover
+                        </span>
+                      )}
                       {isEE && (
                         <button
                           onClick={() => setExpandedCatchAll(!expandedCatchAll)}
@@ -858,6 +868,14 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                     className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
                                   >
                                     {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
+                                  </span>
+                                )}
+                                {!isEE && b.rollover && b.rolloverCarryover !== undefined && b.rolloverCarryover > 0 && (
+                                  <span
+                                    title={`Base: ${formatCurrency(b.budgeted)} + Rollover: ${formatCurrency(b.rolloverCarryover)} = Total Available: ${formatCurrency(b.availableBudget || b.budgeted)}`}
+                                    className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded shrink-0"
+                                  >
+                                    +{formatCurrency(b.rolloverCarryover)} rollover
                                   </span>
                                 )}
 

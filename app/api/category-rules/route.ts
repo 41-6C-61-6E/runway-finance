@@ -9,18 +9,36 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, encryptRow } from '@/lib/crypto';
 import { findDuplicateRule } from '@/lib/services/rules-engine';
 
+const OPERATOR_ENUM = z.enum([
+  'contains',
+  'equals',
+  'starts_with',
+  'ends_with',
+  'regex',
+  'gt',
+  'lt',
+  'gte',
+  'lte',
+  'eq_numeric',
+  'greater_than',
+  'less_than',
+  'greater_than_or_equal',
+  'less_than_or_equal',
+  'equals_numeric',
+]);
+
 const CreateRuleSchema = z.object({
   name: z.string().min(1).max(200),
   priority: z.number().int().default(0),
   isActive: z.boolean().default(true),
   conditionField: z.enum(['description', 'payee', 'amount', 'memo']),
-  conditionOperator: z.enum(['contains', 'equals', 'starts_with', 'ends_with', 'regex']),
+  conditionOperator: OPERATOR_ENUM,
   conditionValue: z.string().min(1).max(500),
   conditionCaseSensitive: z.boolean().default(false),
   // Multi-condition support
   conditions: z.array(z.object({
     field: z.enum(['description', 'payee', 'amount', 'memo']),
-    operator: z.enum(['contains', 'equals', 'starts_with', 'ends_with', 'regex']),
+    operator: OPERATOR_ENUM,
     value: z.string().min(1).max(500),
     caseSensitive: z.boolean().default(false),
   })).optional(),

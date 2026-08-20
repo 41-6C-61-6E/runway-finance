@@ -434,6 +434,7 @@ export async function GET(request: Request) {
     const txRows = await db
       .select({
         id: transactions.id,
+        date: transactions.date,
         categoryId: transactions.categoryId,
         amount: transactions.amount,
         accountId: transactions.accountId,
@@ -448,6 +449,10 @@ export async function GET(request: Request) {
     for (const row of txRows) {
       if (!row.categoryId) continue;
       if (row.ignored) continue;
+      if (row.date) {
+        const txDateStr = typeof row.date === 'string' ? row.date : (row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date));
+        if (txDateStr < bounds.startDate || txDateStr >= bounds.endDate) continue;
+      }
       if (row.accountId && excludedAccountIds.has(row.accountId)) continue;
       if (excludedTransactionIds.has(row.id)) continue;
       if (excludedCategoryIds.has(row.categoryId)) continue;
@@ -499,6 +504,114 @@ export async function GET(request: Request) {
       .filter((c) => c.actual > 0)
       .sort((a, b) => b.actual - a.actual);
 
+    // Calculate rollover carryover for active monthly expense budgets with rollover: true
+    const rolloverCarryoverMap = new Map<string, number>();
+    if (periodType === 'monthly') {
+      const rolloverRows = activeBudgetRows.filter(
+        (r) => r.rollover && !r.isIncome && r.categoryType !== 'compound'
+      );
+
+      if (rolloverRows.length > 0) {
+        const [targetYear, targetMonth] = targetPeriodKey.split('-').map(Number);
+
+        for (const row of rolloverRows) {
+          const fromKey = row.effectiveFrom || '1970-01';
+          const fromRange = parsePeriodRange(fromKey);
+          const fromDate = new Date(fromRange.start);
+          const fromYear = fromDate.getUTCFullYear();
+          const fromMonth = fromDate.getUTCMonth() + 1;
+
+          // Compute list of prior consecutive month keys (up to 12 months back)
+          const priorMonthKeys: string[] = [];
+          for (let offset = 12; offset >= 1; offset--) {
+            const d = new Date(Date.UTC(targetYear, targetMonth - 1 - offset, 1));
+            const y = d.getUTCFullYear();
+            const m = d.getUTCMonth() + 1;
+            const ymKey = `${y}-${String(m).padStart(2, '0')}`;
+            if (y > fromYear || (y === fromYear && m >= fromMonth)) {
+              priorMonthKeys.push(ymKey);
+            }
+          }
+
+          if (priorMonthKeys.length > 0) {
+            const earliestMonthStart = `${priorMonthKeys[0]}-01`;
+            const priorCoveredCatIds = coveredCategoriesMap.get(row.categoryId) || [row.categoryId];
+
+            const priorTxConditions = [
+              eq(transactions.userId, dataUserId),
+              gte(transactions.date, earliestMonthStart),
+              lt(transactions.date, bounds.startDate),
+              eq(transactions.deleted, false),
+              eq(transactions.ignored, false),
+              inArray(transactions.categoryId, priorCoveredCatIds),
+            ];
+            if (!isImportTransactionsEnabled) {
+              priorTxConditions.push(eq(transactions.isImported, false));
+            }
+
+            const priorTxRows = await db
+              .select({
+                id: transactions.id,
+                date: transactions.date,
+                amount: transactions.amount,
+                accountId: transactions.accountId,
+                categoryId: transactions.categoryId,
+              })
+              .from(transactions)
+              .where(and(...priorTxConditions));
+
+            // Group prior actual spending by month (YYYY-MM)
+            const priorMonthlyActuals = new Map<string, number>();
+            for (const tx of priorTxRows) {
+              if (tx.accountId && excludedAccountIds.has(tx.accountId)) continue;
+              if (excludedTransactionIds.has(tx.id)) continue;
+              if (tx.categoryId && excludedCategoryIds.has(tx.categoryId)) continue;
+
+              const decrypted = await decryptField(String(tx.amount), dek);
+              const amt = parseFloat(decrypted);
+              if (isNaN(amt)) continue;
+
+              const txDateStr = typeof tx.date === 'string' ? tx.date : (tx.date instanceof Date ? tx.date.toISOString().split('T')[0] : String(tx.date));
+              const txYm = txDateStr.substring(0, 7);
+              // For expense categories, purchases are negative in DB (-amount is spending)
+              const netSpend = -amt;
+              priorMonthlyActuals.set(txYm, (priorMonthlyActuals.get(txYm) || 0) + netSpend);
+            }
+
+            // Find historical budget records for this category
+            const catHistoricalBudgets = categoryBudgetsMap.get(row.categoryId) || [];
+
+            let accumulatedCarryover = 0;
+            for (const ym of priorMonthKeys) {
+              const ymRange = parsePeriodRange(ym);
+              const matchingBudget = catHistoricalBudgets.find((b) => {
+                if (b.isRecurring) {
+                  const bFrom = b.effectiveFrom ? parsePeriodRange(b.effectiveFrom).start : '1970-01-01';
+                  const bTo = b.effectiveTo ? parsePeriodRange(b.effectiveTo).end : '9999-12-31';
+                  return bFrom <= ymRange.end && bTo >= ymRange.start;
+                } else {
+                  const oneOff = b.yearMonth || b.periodKey;
+                  return oneOff === ym;
+                }
+              });
+
+              const priorBudgeted = matchingBudget ? (parseFloat(matchingBudget.amount) || 0) : row.budgeted;
+              const priorActual = priorMonthlyActuals.get(ym) || 0;
+              const priorRemaining = priorBudgeted - priorActual;
+
+              // Envelope carryforward: surplus adds to carryover pool, deficit reduces it (floored at 0)
+              accumulatedCarryover = Math.max(0, accumulatedCarryover + priorRemaining);
+            }
+
+            // Cap accumulated carryover at 3x monthly budget to prevent unbounded runaway accumulation
+            const maxCap = (row.budgeted || row.nativeAmount) * 3;
+            accumulatedCarryover = Math.min(accumulatedCarryover, maxCap);
+            rolloverCarryoverMap.set(row.categoryId, Math.round(accumulatedCarryover * 100) / 100);
+          }
+        }
+      }
+    }
+
     // Map active budget rows with exact calculated actuals and Everything Else breakout
     let hasExplicitEverythingElse = false;
     const data = activeBudgetRows.map((row) => {
@@ -522,8 +635,10 @@ export async function GET(request: Request) {
         actual = Math.max(actual, totalUnbudgetedActual);
       }
 
-      const remaining = effectiveIsIncome ? actual - budgeted : budgeted - actual;
-      const percentUsed = budgeted > 0 ? (actual / budgeted) * 100 : 0;
+      const rolloverCarryover = rolloverCarryoverMap.get(row.categoryId) || 0;
+      const availableBudget = (row.rollover && !effectiveIsIncome) ? budgeted + rolloverCarryover : budgeted;
+      const remaining = effectiveIsIncome ? actual - budgeted : availableBudget - actual;
+      const percentUsed = availableBudget > 0 ? (actual / availableBudget) * 100 : 0;
       const coveredCategoryIds = coveredCategoriesMap.get(row.categoryId) || [row.categoryId];
 
       return {
@@ -541,6 +656,8 @@ export async function GET(request: Request) {
         isRecurring: row.isRecurring,
         fundingAccountId: row.fundingAccountId,
         rollover: row.rollover,
+        rolloverCarryover,
+        availableBudget,
         notes: row.notes,
         monthlyAmount: row.nativePeriodType === 'monthly'
           ? nativeAmount

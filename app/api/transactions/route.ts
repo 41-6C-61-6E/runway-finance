@@ -346,6 +346,12 @@ export async function GET(request: Request) {
     isNull(transactions.parentId),
   ];
 
+  if (filters.ignored !== undefined) {
+    whereConditions.push(eq(transactions.ignored, filters.ignored));
+  } else if (filters.totalAmountOnly) {
+    whereConditions.push(eq(transactions.ignored, false));
+  }
+
   // Sensitive accounts are hidden from plain sharing members (server-side).
   const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
   if (hiddenAccountIds.length > 0) {

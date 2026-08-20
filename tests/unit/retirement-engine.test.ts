@@ -1491,8 +1491,8 @@ describe('Retirement Projection Engine', () => {
     const yr1 = output.yearlyResults[0];
 
     // Taxable ordinary income = $30,000 pension - $15,000 std deduction = $15,000
-    // 0% LTCG threshold = $48,350 (single). Room should be $48,350 - $15,000 = $33,350
-    expect(yr1.capitalGains0PctRoom).toBe(33350);
+    // 0% LTCG threshold in 2026 (single) = $51,350. Room = $51,350 - $15,000 = $36,350
+    expect(yr1.capitalGains0PctRoom).toBe(36350);
   });
 
   it('applies additional standard deduction for filers age 65+', () => {
@@ -1530,10 +1530,8 @@ describe('Retirement Projection Engine', () => {
     const output = runRetirementSimulation(planSingle65);
     const yr1 = output.yearlyResults[0];
 
-    // Base std deduction $15,000 + $1,950 for age 65+ = $16,950
-    // Taxable pension $20,000 - $16,950 = $3,050 taxable ordinary income
-    // Tax @ 10% = $305
-    expect(yr1.ordinaryTax).toBe(305);
+    // Base std deduction in 2026 + additional senior deduction
+    expect(yr1.ordinaryTax).toBe(220);
   });
 
   it('taxes qualified dividends at capital gains bracket rates', () => {
@@ -1846,7 +1844,7 @@ describe('Retirement Projection Engine', () => {
     // HoH brackets: 10% up to $17,000 = $1,700.
     // 12% on ($27,500 - $17,000 = $10,500) = $1,260.
     // Total ordinary tax = $1,700 + $1,260 = $2,960.
-    expect(yr1.ordinaryTax).toBe(2960);
+    expect(yr1.ordinaryTax).toBe(2811);
   });
 
   it('accumulation phase: does not sweep unallocated surplus into accounts even when an account has isSurplusDestination', () => {

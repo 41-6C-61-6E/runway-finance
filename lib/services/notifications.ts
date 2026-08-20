@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { pushSubscriptions, sentNotifications, budgets, categories, transactions, userSettings, netWorthSnapshots, customAlertRules, accounts, monthlyCashFlow, userNotifications } from '@/lib/db/schema';
+import { pushSubscriptions, sentNotifications, budgets, categories, transactions, transactionTags, userSettings, netWorthSnapshots, customAlertRules, accounts, monthlyCashFlow, userNotifications, simplifinConnections, plaidConnections } from '@/lib/db/schema';
 import { eq, and, or, isNull, gte, lt, inArray, sql, desc } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { calculateWealthFlow } from '@/lib/services/wealth-flow';
@@ -276,6 +276,67 @@ export async function sendPushNotification(
 }
 
 
+function parseNotificationPeriodRange(keyOrDate: string | null | undefined): { start: string; end: string } {
+  if (!keyOrDate) {
+    return { start: '1970-01-01', end: '9999-12-31' };
+  }
+  const s = keyOrDate.trim();
+  if (s.includes('-Q')) {
+    const [y, q] = s.split('-Q').map(Number);
+    const startMonth = (q - 1) * 3 + 1;
+    const endMonth = q * 3;
+    const start = `${y}-${String(startMonth).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(y, endMonth, 0)).getUTCDate();
+    const end = `${y}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { start, end };
+  }
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    const [y, m] = s.split('-').map(Number);
+    const start = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { start, end };
+  }
+  if (/^\d{4}$/.test(s)) {
+    const y = Number(s);
+    return { start: `${y}-01-01`, end: `${y}-12-31` };
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return { start: s, end: s };
+  }
+  return { start: '1970-01-01', end: '9999-12-31' };
+}
+
+function getNotificationPeriodBounds(periodType: string, now: Date) {
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  let start: Date;
+  let next: Date;
+  let periodKey: string;
+
+  if (periodType === 'quarterly') {
+    const q = Math.floor(m / 3);
+    start = new Date(Date.UTC(y, q * 3, 1));
+    next = new Date(Date.UTC(y, (q + 1) * 3, 1));
+    periodKey = `${y}-Q${q + 1}`;
+  } else if (periodType === 'yearly') {
+    start = new Date(Date.UTC(y, 0, 1));
+    next = new Date(Date.UTC(y + 1, 0, 1));
+    periodKey = String(y);
+  } else {
+    // monthly
+    start = new Date(Date.UTC(y, m, 1));
+    next = new Date(Date.UTC(y, m + 1, 1));
+    periodKey = `${y}-${String(m + 1).padStart(2, '0')}`;
+  }
+
+  return {
+    periodKey,
+    startDate: start.toISOString().split('T')[0],
+    endDate: next.toISOString().split('T')[0],
+  };
+}
+
 export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
   try {
     const db = getDb();
@@ -288,24 +349,19 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
     if (!settings || !settings.notifyBudgetAlerts) return;
 
     const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    
-    // Calculate period bounds (monthly)
-    const y = now.getFullYear();
-    const m = now.getMonth();
-    const start = new Date(Date.UTC(y, m, 1));
-    const next = new Date(Date.UTC(y, m + 1, 1));
-    const startDate = start.toISOString().split('T')[0];
-    const endDate = next.toISOString().split('T')[0];
 
-    // Fetch budgets and categories for the current month
+    // Fetch all user budgets where category is not excluded from reports
     const budgetRows = await db
       .select({
         id: budgets.id,
         categoryId: budgets.categoryId,
         amount: budgets.amount,
+        periodType: budgets.periodType,
         isRecurring: budgets.isRecurring,
         yearMonth: budgets.yearMonth,
+        periodKey: budgets.periodKey,
+        effectiveFrom: budgets.effectiveFrom,
+        effectiveTo: budgets.effectiveTo,
         notes: budgets.notes,
         categoryName: categories.name,
         isIncome: categories.isIncome,
@@ -316,12 +372,7 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
       .where(
         and(
           eq(budgets.userId, userId),
-          or(
-            eq(budgets.yearMonth, currentMonth),
-            and(isNull(budgets.yearMonth), eq(budgets.isRecurring, true))
-          ),
-          eq(categories.excludeFromReports, false),
-          eq(budgets.periodType, 'monthly')
+          or(eq(categories.excludeFromReports, false), isNull(categories.excludeFromReports))
         )
       );
 
@@ -336,7 +387,7 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
       }))
     );
 
-    // Fetch all categories for sub-category roll-ups
+    // Fetch all categories for hierarchy mapping
     const allCategories = await db
       .select({
         id: categories.id,
@@ -347,90 +398,156 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
       .from(categories)
       .where(eq(categories.userId, userId));
 
-    const getDescendantIds = (catId: string): string[] => {
-      const children = allCategories.filter((c) => c.parentId === catId);
-      return [catId, ...children.flatMap((c) => getDescendantIds(c.id))];
-    };
+    // Exclusions
+    const budgetExclusions = (settings.budgetExclusions as { categoryIds?: string[]; tagIds?: string[] }) || {};
+    const excludedCategoryIds = new Set(budgetExclusions.categoryIds || []);
+    const excludedTagIds = new Set(budgetExclusions.tagIds || []);
 
-    for (const budget of decryptedBudgets) {
-      if (!budget.categoryId) continue;
-
-      // We only alert for expense budgets (or compound income categories that act as savings targets)
-      if (budget.isIncome && budget.categoryType !== 'compound') continue;
-
-      const budgetCatId = budget.categoryId;
-      const descendants = getDescendantIds(budgetCatId);
-
-      // Fetch transactions
-      const txRows = await db
-        .select({
-          amount: transactions.amount,
-        })
-        .from(transactions)
-        .where(
-          and(
-            eq(transactions.userId, userId),
-            inArray(transactions.categoryId, descendants),
-            gte(transactions.date, startDate),
-            lt(transactions.date, endDate),
-            eq(transactions.deleted, false)
-          )
-        );
-
-      let actualSpent = 0;
-      for (const tx of txRows) {
-        const decAmount = parseFloat(await decryptField(String(tx.amount), dek));
-        if (!isNaN(decAmount)) {
-          actualSpent += decAmount;
-        }
+    const excludedTransactionIds = new Set<string>();
+    if (excludedTagIds.size > 0) {
+      const taggedRows = await db
+        .select({ transactionId: transactionTags.transactionId })
+        .from(transactionTags)
+        .where(inArray(transactionTags.tagId, Array.from(excludedTagIds)));
+      for (const r of taggedRows) {
+        if (r.transactionId) excludedTransactionIds.add(r.transactionId);
       }
-      actualSpent = Math.abs(actualSpent);
+    }
 
-      const threshold = settings.budgetAlertThreshold ?? 80;
-      const warningThresholdAmount = budget.amount * (threshold / 100);
-      // Escalation tier (R4): if spending keeps climbing past 125% of the
-      // budget, re-alert once more. Purely additive key — the 100% alert still
-      // fires first when the budget is crossed between 100% and 125%.
-      const escalationThresholdAmount = budget.amount * 1.25;
+    const userAccounts = await db
+      .select({
+        id: accounts.id,
+        isHidden: accounts.isHidden,
+        isExcludedFromNetWorth: accounts.isExcludedFromNetWorth,
+      })
+      .from(accounts)
+      .where(eq(accounts.userId, userId));
 
-      if (actualSpent >= escalationThresholdAmount) {
-        const escalationKey = `budget:${currentMonth}:${budgetCatId}:125`;
-        const roundedActual = Math.round(actualSpent);
-        const roundedBudget = Math.round(budget.amount);
-        const actualPercentage = Math.round((actualSpent / budget.amount) * 100);
-        await sendPushNotification(
-          userId,
-          `Budget Significantly Over: ${budget.categoryName}`,
-          `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
-          `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
-          'budget_alert',
-          escalationKey
-        );
-      } else if (actualSpent > budget.amount) {
-        const exceededKey = `budget:${currentMonth}:${budgetCatId}:100`;
-        const roundedActual = Math.round(actualSpent);
-        const roundedBudget = Math.round(budget.amount);
-        await sendPushNotification(
-          userId,
-          `Budget Exceeded: ${budget.categoryName}`,
-          `You've spent $${roundedActual} of your $${roundedBudget} budget for ${budget.categoryName}.`,
-          `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
-          'budget_alert',
-          exceededKey
-        );
-      } else if (actualSpent >= warningThresholdAmount) {
-        const warningKey = `budget:${currentMonth}:${budgetCatId}:threshold`;
-        const roundedActual = Math.round(actualSpent);
-        const roundedBudget = Math.round(budget.amount);
-        const actualPercentage = Math.round((actualSpent / budget.amount) * 100);
-        await sendPushNotification(
-          userId,
-          `Budget Warning: ${budget.categoryName}`,
-          `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
-          `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
-          'budget_alert',
-          warningKey
-        );
+    const excludedAccountIds = new Set(
+      userAccounts.filter((a) => a.isHidden || a.isExcludedFromNetWorth).map((a) => a.id)
+    );
+
+    // Group budgets by periodType (monthly, quarterly, yearly)
+    const periodTypes = ['monthly', 'quarterly', 'yearly'] as const;
+
+    for (const pType of periodTypes) {
+      const bounds = getNotificationPeriodBounds(pType, now);
+      const targetPeriodRange = parseNotificationPeriodRange(bounds.periodKey);
+
+      // Filter active budgets for this periodType and active time window
+      const activeForPeriod = decryptedBudgets.filter((b) => {
+        if ((b.periodType || 'monthly') !== pType) return false;
+        if (b.isIncome && b.categoryType !== 'compound') return false;
+        if (!b.categoryId) return false;
+
+        if (b.isRecurring) {
+          const fromDate = b.effectiveFrom ? parseNotificationPeriodRange(b.effectiveFrom).start : '1970-01-01';
+          const toDate = b.effectiveTo ? parseNotificationPeriodRange(b.effectiveTo).end : '9999-12-31';
+          return fromDate <= targetPeriodRange.end && toDate >= targetPeriodRange.start;
+        } else {
+          const oneOffKey = b.yearMonth || b.periodKey || b.effectiveFrom;
+          if (oneOffKey) {
+            const oneOffRange = parseNotificationPeriodRange(oneOffKey);
+            return oneOffRange.start <= targetPeriodRange.end && oneOffRange.end >= targetPeriodRange.start;
+          }
+          return false;
+        }
+      });
+
+      if (activeForPeriod.length === 0) continue;
+
+      // Set of category IDs that have direct budget items in this active period
+      const directBudgetedCategoryIds = new Set(activeForPeriod.map((b) => b.categoryId));
+
+      // Descendants rollup: only roll child categories into parent if child DOES NOT have its own direct budget
+      const getCoveredDescendantIds = (catId: string): string[] => {
+        const children = allCategories.filter((c) => c.parentId === catId && !directBudgetedCategoryIds.has(c.id));
+        return [catId, ...children.flatMap((c) => getCoveredDescendantIds(c.id))];
+      };
+
+      for (const budget of activeForPeriod) {
+        const budgetCatId = budget.categoryId!;
+        if (excludedCategoryIds.has(budgetCatId)) continue;
+
+        const coveredCatIds = getCoveredDescendantIds(budgetCatId).filter((id) => !excludedCategoryIds.has(id));
+        const coveredSet = new Set(coveredCatIds);
+
+        // Fetch non-deleted, non-ignored transactions
+        const txRows = await db
+          .select({
+            id: transactions.id,
+            amount: transactions.amount,
+            accountId: transactions.accountId,
+            categoryId: transactions.categoryId,
+          })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.userId, userId),
+              inArray(transactions.categoryId, coveredCatIds),
+              gte(transactions.date, bounds.startDate),
+              lt(transactions.date, bounds.endDate),
+              eq(transactions.deleted, false)
+            )
+          );
+
+        let actualSpent = 0;
+        for (const tx of txRows) {
+          if (tx.accountId && excludedAccountIds.has(tx.accountId)) continue;
+          if (excludedTransactionIds.has(tx.id)) continue;
+          if (tx.categoryId && excludedCategoryIds.has(tx.categoryId)) continue;
+          if (tx.categoryId && !coveredSet.has(tx.categoryId)) continue;
+
+          const decAmount = parseFloat(await decryptField(String(tx.amount), dek));
+          if (!isNaN(decAmount)) {
+            actualSpent += decAmount;
+          }
+        }
+        actualSpent = Math.abs(actualSpent);
+
+        const threshold = settings.budgetAlertThreshold ?? 80;
+        const warningThresholdAmount = budget.amount * (threshold / 100);
+        const escalationThresholdAmount = budget.amount * 1.25;
+
+        if (actualSpent >= escalationThresholdAmount) {
+          const escalationKey = `budget:${bounds.periodKey}:${budgetCatId}:125`;
+          const roundedActual = Math.round(actualSpent);
+          const roundedBudget = Math.round(budget.amount);
+          const actualPercentage = Math.round((actualSpent / budget.amount) * 100);
+          await sendPushNotification(
+            userId,
+            `Budget Significantly Over: ${budget.categoryName}`,
+            `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
+            `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
+            'budget_alert',
+            escalationKey
+          );
+        } else if (actualSpent > budget.amount) {
+          const exceededKey = `budget:${bounds.periodKey}:${budgetCatId}:100`;
+          const roundedActual = Math.round(actualSpent);
+          const roundedBudget = Math.round(budget.amount);
+          await sendPushNotification(
+            userId,
+            `Budget Exceeded: ${budget.categoryName}`,
+            `You've spent $${roundedActual} of your $${roundedBudget} budget for ${budget.categoryName}.`,
+            `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
+            'budget_alert',
+            exceededKey
+          );
+        } else if (actualSpent >= warningThresholdAmount) {
+          const warningKey = `budget:${bounds.periodKey}:${budgetCatId}:threshold`;
+          const roundedActual = Math.round(actualSpent);
+          const roundedBudget = Math.round(budget.amount);
+          const actualPercentage = Math.round((actualSpent / budget.amount) * 100);
+          await sendPushNotification(
+            userId,
+            `Budget Warning: ${budget.categoryName}`,
+            `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
+            `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
+            'budget_alert',
+            warningKey
+          );
+        }
       }
     }
   } catch (err) {
@@ -1488,17 +1605,21 @@ export async function checkUpcomingBillsAndNotify(userId: string, dek: Uint8Arra
  *
  * Safe to call on every successful sync — it's a no-op when no alert rows exist.
  */
-export async function healSyncAlerts(userId: string, connectionId: string): Promise<void> {
+export async function healSyncAlerts(userId: string, targetId: string): Promise<void> {
   try {
     const db = getDb();
-    const keyPrefix = `sync_error:${connectionId}:`;
+    const syncKeyPrefix = `sync_error:${targetId}:`;
+    const staleKeyPrefix = `stale_sync:${targetId}:`;
 
     await db
       .delete(sentNotifications)
       .where(
         and(
           eq(sentNotifications.userId, userId),
-          sql`${sentNotifications.key} LIKE ${keyPrefix + '%'}`
+          or(
+            sql`${sentNotifications.key} LIKE ${syncKeyPrefix + '%'}`,
+            sql`${sentNotifications.key} LIKE ${staleKeyPrefix + '%'}`
+          )
         )
       );
 
@@ -1508,14 +1629,20 @@ export async function healSyncAlerts(userId: string, connectionId: string): Prom
       .where(
         and(
           eq(userNotifications.userId, userId),
-          eq(userNotifications.type, 'sync_error'),
-          sql`${userNotifications.urlPath} LIKE ${`%connection=${connectionId}`}`
+          or(
+            eq(userNotifications.type, 'sync_error'),
+            eq(userNotifications.type, 'stale_sync')
+          ),
+          or(
+            sql`${userNotifications.urlPath} LIKE ${`%${targetId}%`}`,
+            sql`${userNotifications.urlPath} LIKE ${`%connection=${targetId}`}`
+          )
         )
       );
   } catch (err) {
     logger.debug('[notifications-service] Could not heal sync alerts (non-critical)', {
       userId,
-      connectionId,
+      targetId,
       error: err instanceof Error ? err.message : String(err),
     });
   }
@@ -1627,16 +1754,15 @@ export async function pruneSentNotifications(retentionDays = 90): Promise<number
 // ── Staleness Push Alerts (R10) ───────────────────────────────────────────────
 
 /**
- * R10: daily staleness alerts. Reuses the exact thresholds already implemented
- * in `getAccountsSyncStatus` (48h daily / 9d weekly / 30d manual connections,
- * connection errors, stagnant market balances) — no new tuning.
+ * Sustained sync failure / staleness alerts.
  *
- * For each account currently in `warning` or `error` status we attempt to send
- * a date-keyed notification (`stale_sync:<accountId>:<status>:<yyyy-mm-dd>`), so
- * the same state notifies at most once per day and self-clears as the date rolls.
- * Accounts that already recover keep their existing rows untouched; the
- * sync_error alerts (R1/R9) remain the primary failure signal, and this path is
- * gated on the same `notifySyncErrors` setting.
+ * Requirements:
+ * 1. Only alerts when a sync has been broken for at least 3 days (72 hours).
+ * 2. Aggregates broken accounts by bank connection (1 notification per connection,
+ *    not 1 per individual account) or standalone API manual account.
+ * 3. Throttles repeat alerts to a 7-day cooldown (at most once every 7 days while
+ *    broken), avoiding daily notification spam.
+ * 4. Auto-healed on successful sync via healSyncAlerts.
  */
 export async function checkStaleConnectionsAndNotify(userId: string, dek: Uint8Array): Promise<void> {
   try {
@@ -1653,10 +1779,10 @@ export async function checkStaleConnectionsAndNotify(userId: string, dek: Uint8A
 
     if (!settings || !settings.notifySyncErrors) return;
 
-    // Dynamic imports avoid a circular dependency (sync-health only imports
-    // from '@/lib/sharing' and '@/lib/crypto'; crypto imports nothing from here).
+    // Dynamic imports avoid circular dependencies
     const { getAccountsSyncStatus } = await import('@/lib/services/sync-health');
     const { decryptRows } = await import('@/lib/crypto');
+    const { getConnectionDisplayName } = await import('@/lib/services/scheduler-logger');
 
     const dataUserId = await resolveDataUserId(userId);
     const userAccounts = await db
@@ -1673,30 +1799,179 @@ export async function checkStaleConnectionsAndNotify(userId: string, dek: Uint8A
     const decrypted = await decryptRows('accounts', userAccounts, dek);
     const statuses = await getAccountsSyncStatus(userId, dataUserId, dek, decrypted);
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    // Fetch user connections to check timestamps and labels
+    const groupUserIds = await getShareGroupUserIds(userId);
+    const sfConns = await db
+      .select({
+        id: simplifinConnections.id,
+        label: simplifinConnections.label,
+        lastSyncAt: simplifinConnections.lastSyncAt,
+        lastSyncStatus: simplifinConnections.lastSyncStatus,
+        lastSyncError: simplifinConnections.lastSyncError,
+        createdAt: simplifinConnections.createdAt,
+      })
+      .from(simplifinConnections)
+      .where(inArray(simplifinConnections.userId, groupUserIds));
+
+    const pConns = await db
+      .select({
+        id: plaidConnections.id,
+        label: plaidConnections.label,
+        institutionName: plaidConnections.institutionName,
+        lastSyncAt: plaidConnections.lastSyncAt,
+        lastSyncStatus: plaidConnections.lastSyncStatus,
+        lastSyncError: plaidConnections.lastSyncError,
+        createdAt: plaidConnections.createdAt,
+      })
+      .from(plaidConnections)
+      .where(inArray(plaidConnections.userId, groupUserIds));
+
+    const connsMap = new Map<
+      string,
+      {
+        id: string;
+        label: string;
+        institutionName?: string | null;
+        lastSyncAt: Date | null;
+        lastSyncStatus: string;
+        lastSyncError: string | null;
+        createdAt: Date;
+      }
+    >();
+    for (const c of sfConns) connsMap.set(c.id, c);
+    for (const c of pConns) connsMap.set(c.id, c);
+
+    const now = Date.now();
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const weekEpoch = Math.floor(now / SEVEN_DAYS_MS);
+
+    // Group accounts with error status
+    const brokenConnectionIds = new Set<string>();
+    const brokenManualAccounts: any[] = [];
 
     for (const acc of decrypted) {
       const status = statuses[acc.id];
-      if (!status || status.status === 'ok') continue;
+      if (!status || status.status !== 'error') continue;
 
-      const key = `stale_sync:${acc.id}:${status.status}:${todayStr}`;
-      const title = status.status === 'error' ? 'Sync problem' : 'Sync needs attention';
       const connectionId = acc.connectionId || acc.plaidConnectionId;
-      const linkUrl = connectionId
-        ? `/settings?tab=advanced&connection=${connectionId}`
-        : '/accounts';
+      if (connectionId) {
+        brokenConnectionIds.add(connectionId);
+      } else {
+        brokenManualAccounts.push(acc);
+      }
+    }
+
+    // 1. Process broken bank connections (1 notification per connection)
+    for (const connectionId of brokenConnectionIds) {
+      const conn = connsMap.get(connectionId);
+      const lastSuccessTime = conn?.lastSyncAt
+        ? new Date(conn.lastSyncAt).getTime()
+        : conn?.createdAt
+          ? new Date(conn.createdAt).getTime()
+          : 0;
+
+      // Must be broken for at least 3 days (72 hours)
+      if (now - lastSuccessTime < THREE_DAYS_MS) {
+        continue;
+      }
+
+      // Check 7-day cooldown (no spam: at most once every 7 days while broken)
+      const keyPrefix = `sync_error:${connectionId}:`;
+      const recentAlerts = await db
+        .select({ id: sentNotifications.id, sentAt: sentNotifications.sentAt })
+        .from(sentNotifications)
+        .where(
+          and(
+            eq(sentNotifications.userId, userId),
+            sql`${sentNotifications.key} LIKE ${keyPrefix + '%'}`,
+            gte(sentNotifications.sentAt, new Date(now - SEVEN_DAYS_MS))
+          )
+        )
+        .limit(1);
+
+      if (recentAlerts.length > 0) {
+        // Already alerted within the last 7 days; skip
+        continue;
+      }
+
+      const connectionDisplayName =
+        (await getConnectionDisplayName(connectionId)) ||
+        conn?.institutionName ||
+        conn?.label ||
+        null;
+
+      const title = connectionDisplayName
+        ? `Bank connection problem: ${connectionDisplayName}`
+        : 'Bank connection problem';
+
+      const daysBroken = Math.max(3, Math.round((now - lastSuccessTime) / (1000 * 60 * 60 * 24)));
+      const body = `Your bank connection${connectionDisplayName ? ` to ${connectionDisplayName}` : ''} has not synced in ${daysBroken} days. Tap to review and re-authorize if needed.`;
+      const urlPath = `/settings?tab=advanced&connection=${connectionId}`;
+      const dedupKey = `sync_error:${connectionId}:w${weekEpoch}`;
 
       try {
         await sendPushNotification(
           userId,
-          `${title}: ${acc.name}`,
-          `${status.reason ?? 'This account has not synced recently. We will keep retrying in the background.'} Tap to review the connection.`,
-          linkUrl,
-          'stale_sync',
-          key
+          title,
+          body,
+          urlPath,
+          'sync_error',
+          dedupKey
         );
       } catch (err) {
-        logger.debug('[notifications-service] Staleness alert suppressed or failed (non-fatal):', err);
+        logger.debug('[notifications-service] Connection sync alert suppressed or failed (non-fatal):', err);
+      }
+    }
+
+    // 2. Process broken standalone manual accounts (e.g. Redfin, crypto xpub, metals)
+    for (const acc of brokenManualAccounts) {
+      const lastSuccessTime = acc.balanceDate
+        ? new Date(acc.balanceDate).getTime()
+        : acc.createdAt
+          ? new Date(acc.createdAt).getTime()
+          : 0;
+
+      // Must be broken for at least 3 days (72 hours)
+      if (now - lastSuccessTime < THREE_DAYS_MS) {
+        continue;
+      }
+
+      // Check 7-day cooldown
+      const keyPrefix = `sync_error:${acc.id}:`;
+      const recentAlerts = await db
+        .select({ id: sentNotifications.id, sentAt: sentNotifications.sentAt })
+        .from(sentNotifications)
+        .where(
+          and(
+            eq(sentNotifications.userId, userId),
+            sql`${sentNotifications.key} LIKE ${keyPrefix + '%'}`,
+            gte(sentNotifications.sentAt, new Date(now - SEVEN_DAYS_MS))
+          )
+        )
+        .limit(1);
+
+      if (recentAlerts.length > 0) {
+        continue;
+      }
+
+      const daysBroken = Math.max(3, Math.round((now - lastSuccessTime) / (1000 * 60 * 60 * 24)));
+      const title = `Sync problem: ${acc.name}`;
+      const body = `Account balance has not updated in ${daysBroken} days. Tap to review account settings.`;
+      const urlPath = `/accounts?account=${acc.id}`;
+      const dedupKey = `sync_error:${acc.id}:w${weekEpoch}`;
+
+      try {
+        await sendPushNotification(
+          userId,
+          title,
+          body,
+          urlPath,
+          'sync_error',
+          dedupKey
+        );
+      } catch (err) {
+        logger.debug('[notifications-service] Manual account sync alert suppressed or failed (non-fatal):', err);
       }
     }
   } catch (err) {

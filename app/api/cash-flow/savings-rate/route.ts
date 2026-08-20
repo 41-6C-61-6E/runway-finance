@@ -158,6 +158,7 @@ export async function GET(request: Request) {
           paystubHsa: 0,
           brokerage: 0,
           savingsAccount: 0,
+          hasPaystubEarnings: false,
           details: {
             retirement: [],
             hsa: [],
@@ -192,6 +193,9 @@ export async function GET(request: Request) {
           addDetail(stats, 'income', tx.description, tx.date, absAmt, acc?.name || 'Account');
           addDetail(stats, 'expenses', tx.description, tx.date, absAmt, acc?.name || 'Account');
         } else if (cfAmount > 0) {
+          if (tx.source === 'paystub') {
+            stats.hasPaystubEarnings = true;
+          }
           if (category && !category.isIncome) {
             stats.expenses -= cfAmount;
             addDetail(stats, 'expenses', tx.description, tx.date, -cfAmount, acc?.name || 'Account');
@@ -373,8 +377,10 @@ export async function GET(request: Request) {
         const selectedSavings = retirementVal + hsaVal + brokerageVal + savingsAccountVal + cashVal;
 
         // Calculate adjusted income denominator if requested
+        // When paystub earnings are present, stats.income is already gross income.
+        // Adding paystub pre-tax deductions is only necessary when income is based on net bank deposits.
         let denominator = stats.income;
-        if (adjustIncomeDenominator) {
+        if (adjustIncomeDenominator && !stats.hasPaystubEarnings) {
           if (includePaystubRetirement) denominator += stats.paystubRetirement;
           if (includePaystubHsa) denominator += stats.paystubHsa;
         }

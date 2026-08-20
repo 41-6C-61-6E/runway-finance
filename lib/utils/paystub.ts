@@ -291,6 +291,19 @@ export function isOasdiLine(section: string, description: string): boolean {
 }
 
 /**
+ * Returns true when a pre-tax deduction line is an IRC §125 Cafeteria / POP line
+ * (HSA, FSA, Medical, Dental, Vision insurance premiums) that statutorily
+ * reduces FICA taxable wages under IRC §3121(a)(5)(G).
+ */
+export function isSection125Line(section: string, description: string): boolean {
+  const s = (section || '').toLowerCase();
+  if (s !== 'before_tax_deductions') return false;
+  const d = (description || '').trim();
+  if (/(?:hsa|fsa|dcfsa|medical|health|dental|vision|cafeteria|sec(?:tion)?[\s\-_]*125|pop)\b/i.test(d)) return true;
+  return false;
+}
+
+/**
  * OASDI wage-base state accumulated so far in the tax year for a given paystub.
  */
 export interface OasdiYtdState {
@@ -305,6 +318,10 @@ export interface OasdiYtdState {
 /**
  * Compute the OASDI-relevant YTD state (wages + withheld OASDI) for all of a
  * user's paystubs dated strictly *before* `checkDate` in the same calendar year.
+ *
+ * Under IRC §3121(a)(5)(G), Section 125 pre-tax cafeteria deductions (HSA, FSA,
+ * health/dental/vision premiums) reduce FICA taxable wages before applying the
+ * statutory Social Security wage base cap.
  *
  * Expects `paystubsList` sorted ascending by checkDate and `lineItemsMap` keyed
  * by paystub id (both already in memory from callers).
@@ -322,14 +339,21 @@ export function computeOasdiYtdBefore(
   for (const p of paystubsList) {
     if (!p.checkDate || p.checkDate >= checkDate) continue;
     if (p.checkDate.slice(0, 4) !== year) continue;
-    wagesBefore += Number(p.grossCurrent) || 0;
 
     const items = lineItemsMap.get(p.id) || [];
+    let s125Deductions = 0;
     for (const it of items) {
+      if (isSection125Line(it.section, it.description)) {
+        s125Deductions += Number(it.amount) || 0;
+      }
       if (isOasdiLine(it.section, it.description)) {
         oasdiBefore += Number(it.amount) || 0;
       }
     }
+
+    const gross = Number(p.grossCurrent) || 0;
+    const ficaWages = Math.max(0, gross - s125Deductions);
+    wagesBefore += ficaWages;
   }
 
   return { wagesBefore, oasdiBefore, taxYear };
@@ -341,15 +365,17 @@ export function computeOasdiYtdBefore(
 export function capOasdiAmount(params: {
   expectedOasdi: number;
   gross: number;
+  section125Deductions?: number;
   ytd: OasdiYtdState;
   wageBaseCap: number;
   oasdiRate: number;
 }): number {
-  const { expectedOasdi, gross, ytd, wageBaseCap, oasdiRate } = params;
+  const { expectedOasdi, gross, section125Deductions = 0, ytd, wageBaseCap, oasdiRate } = params;
+  const ficaGross = Math.max(0, gross - section125Deductions);
   const remainingWageBase = Math.max(0, wageBaseCap - ytd.wagesBefore);
   if (remainingWageBase <= 0) {
     return 0;
   }
-  const taxableGross = Math.min(gross, remainingWageBase);
+  const taxableGross = Math.min(ficaGross, remainingWageBase);
   return Math.min(expectedOasdi, taxableGross * oasdiRate);
 }

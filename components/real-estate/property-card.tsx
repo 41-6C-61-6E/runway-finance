@@ -84,6 +84,8 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
 
   const meta = property.metadata || {};
   const propertyType = meta.propertyType as string | undefined;
+  const valuationMethod = (meta.valuationMethod as string) || (property.manualValue !== null ? 'manual' : 'manual');
+  const valuationLabel = valuationMethod === 'redfin' ? 'Redfin AVM' : (valuationMethod === 'hpi' ? 'FHFA HPI' : 'Manual Entry');
   const address = meta.address as string | undefined;
   const bedrooms = meta.bedrooms as number | undefined;
   const bathrooms = meta.bathrooms as number | undefined;
@@ -93,6 +95,8 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
   const zipCode = meta.zipCode as string | undefined;
   const initialValue = meta.initialValue as number | undefined;
 
+  const hasPmi = activeMortgages.some((m) => (m.pmi ?? 0) > 0);
+  const pmiRemovalEligible = property.ltv <= 80 && hasPmi;
 
   const handleSaveValue = () => {
     const val = parseFloat(newValue);
@@ -116,20 +120,28 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
               <Home className="w-4 h-4 text-chart-3" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <h3 className="text-sm font-semibold text-foreground">{property.name}</h3>
                 {propertyType && (
                   <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
                     {PROPERTY_TYPE_LABELS[propertyType] || propertyType}
                   </span>
                 )}
+                <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-muted/60 text-muted-foreground border border-border">
+                  {valuationLabel}
+                </span>
               </div>
-              {isWhollyOwned && (
+              {isWhollyOwned ? (
                 <span className="inline-flex items-center gap-1 text-[10px] text-chart-1 font-medium mt-0.5">
                   <BadgeCheck className="w-3 h-3" />
                   Wholly Owned
                 </span>
-              )}
+              ) : pmiRemovalEligible ? (
+                <span className="inline-flex items-center gap-1 text-[10px] text-chart-1 font-medium mt-0.5">
+                  <BadgeCheck className="w-3 h-3" />
+                  PMI Removal Eligible (≤80% LTV)
+                </span>
+              ) : null}
             </div>
           </div>
         }
@@ -224,7 +236,10 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-muted-foreground mb-0.5">Est. Sale Proceeds</div>
+                    <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1" title="Estimated net proceeds assuming 8% seller closing costs and agent commissions">
+                      <span>Est. Sale Proceeds</span>
+                      <span className="text-[9px] text-muted-foreground/70 font-sans">(net 8%)</span>
+                    </div>
                     <div className="font-mono text-sm font-semibold text-chart-1 blur-number">
                       {formatCurrency(property.saleProceeds)}
                     </div>

@@ -5,9 +5,12 @@ import {
   parseDate,
   normalizeBackendInput,
   isOasdiLine,
+  isSection125Line,
   computeOasdiYtdBefore,
   capOasdiAmount,
-    nextCadenceDate,
+  computeTiesOut,
+  fnv1aDigest64,
+  nextCadenceDate,
 } from '@/lib/utils/paystub';
 
 describe('nextCadenceDate (S-1 semimonthly anchoring)', () => {
@@ -332,6 +335,109 @@ describe('Paystubs Helpers', () => {
       });
       expect(capped).toBeCloseTo(4500 * RATE, 5); // $279
       expect(capped).toBeLessThan(496);
+    });
+
+    it('detects IRC §125 Cafeteria / POP pre-tax lines that reduce FICA wages', () => {
+      expect(isSection125Line('before_tax_deductions', 'Medical Premium')).toBe(true);
+      expect(isSection125Line('before_tax_deductions', 'Dental PPO')).toBe(true);
+      expect(isSection125Line('before_tax_deductions', 'Vision Basic')).toBe(true);
+      expect(isSection125Line('before_tax_deductions', 'HSA Contribution')).toBe(true);
+      expect(isSection125Line('before_tax_deductions', 'Health FSA')).toBe(true);
+      expect(isSection125Line('before_tax_deductions', 'DCFSA Dependent Care')).toBe(true);
+      expect(isSection125Line('before_tax_deductions', 'Section 125 POP')).toBe(true);
+
+      // Non-Section 125 lines must NOT match
+      expect(isSection125Line('before_tax_deductions', '401k Pre-Tax')).toBe(false);
+      expect(isSection125Line('before_tax_deductions', '403b Contribution')).toBe(false);
+      expect(isSection125Line('after_tax_deductions', 'Roth 401k')).toBe(false);
+      expect(isSection125Line('taxes', 'Federal Income Tax')).toBe(false);
+      expect(isSection125Line('earnings', 'Medical Allowance')).toBe(false);
+    });
+
+    it('subtracts Section 125 deductions to track true FICA-taxable wages for OASDI cap (F04-2)', () => {
+      // Worker earns $8,000 gross per bi-weekly paycheck, with $1,000 in Section 125 medical/HSA deductions.
+      // True FICA taxable wages per check = $7,000.
+      const paystubsList = [];
+      const lineItems = new Map<string, any[]>();
+      for (let i = 0; i < 23; i++) {
+        const id = `p${i}`;
+        const date = `2026-${String(Math.min(12, Math.floor(i / 2) + 1)).padStart(2, '0')}-${String((i % 2) * 14 + 15).padStart(2, '0')}`;
+        paystubsList.push({ id, checkDate: date, grossCurrent: '8000.00' });
+        lineItems.set(id, [
+          { section: 'before_tax_deductions', description: 'Medical Insurance', amount: '600.00' },
+          { section: 'before_tax_deductions', description: 'HSA Contribution', amount: '400.00' },
+          { section: 'before_tax_deductions', description: '401k Retirement', amount: '800.00' }, // Not Sec 125!
+          { section: 'taxes', description: 'Social Security', amount: '434.00' }, // 6.2% of 7000
+        ]);
+      }
+
+      const ytd = computeOasdiYtdBefore(paystubsList, lineItems, '2026-12-30');
+      // FICA wages before: 23 * (8000 - 1000) = 161,000 (NOT 23 * 8000 = 184,000!)
+      expect(ytd.wagesBefore).toBe(23 * 7000);
+      expect(ytd.oasdiBefore).toBeCloseTo(23 * 434, 2);
+
+      // On the 24th stub ($8,000 gross, $1,000 Sec 125 = $7,000 FICA wage):
+      // Remaining wage base = $184,500 - $161,000 = $23,500 > $7,000.
+      // Full expected OASDI ($434) is withheld, not capped prematurely!
+      const capped24th = capOasdiAmount({
+        expectedOasdi: 434,
+        gross: 8000,
+        section125Deductions: 1000,
+        ytd,
+        wageBaseCap: WAGE_BASE_2026,
+        oasdiRate: RATE,
+      });
+      expect(capped24th).toBe(434);
+    });
+
+    it('computes tie-out continuity and fnv1a deduplication hashes (F04-4)', () => {
+      const hash1 = fnv1aDigest64('user_1:Employer A:2026-06-15:5000:1000');
+      const hash2 = fnv1aDigest64('user_1:Employer A:2026-06-15:5000:1000');
+      const hash3 = fnv1aDigest64('user_1:Employer A:2026-06-30:5000:1000');
+
+      expect(hash1).toBe(hash2);
+      expect(hash1).not.toBe(hash3);
+      expect(typeof hash1).toBe('string');
+      expect(hash1.length).toBe(16);
+
+      // Tie-out: Paycheck 1 (January 15)
+      const stub1 = {
+        checkDate: '2026-01-15',
+        gross: 5000,
+        taxes: 1000,
+        deductions: 500,
+        net: 3500,
+        grossYtd: 5000,
+        taxesYtd: 1000,
+        deductionsYtd: 500,
+      };
+      expect(computeTiesOut(stub1, [])).toBe(true);
+
+      // Paycheck 2 (January 31) with matching YTD progression
+      const stub2 = {
+        checkDate: '2026-01-31',
+        gross: 5000,
+        taxes: 1000,
+        deductions: 500,
+        net: 3500,
+        grossYtd: 10000,
+        taxesYtd: 2000,
+        deductionsYtd: 1000,
+      };
+      expect(computeTiesOut(stub2, [stub1])).toBe(true);
+
+      // Paycheck 2 with broken YTD progression
+      const brokenStub2 = {
+        checkDate: '2026-01-31',
+        gross: 5000,
+        taxes: 1000,
+        deductions: 500,
+        net: 3500,
+        grossYtd: 12000, // Broken YTD!
+        taxesYtd: 2000,
+        deductionsYtd: 1000,
+      };
+      expect(computeTiesOut(brokenStub2, [stub1])).toBe(false);
     });
   });
 });

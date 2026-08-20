@@ -7,6 +7,12 @@ import { logger } from '@/lib/logger';
 
 export type SystemTaxRulesType = typeof DEFAULT_2026_RULES;
 
+export function getYearDefaultRules(taxYear: number = 2026): SystemTaxRulesType {
+  return taxYear === DEFAULT_2026_RULES.taxYear
+    ? DEFAULT_2026_RULES
+    : (HISTORICAL_TAX_RULES[taxYear] ?? DEFAULT_2026_RULES);
+}
+
 function deepMergeRules<T extends Record<string, any>>(defaults: T, overrides: Partial<T>): T {
   const result: any = { ...defaults };
   for (const key of Object.keys(overrides)) {
@@ -23,6 +29,7 @@ function deepMergeRules<T extends Record<string, any>>(defaults: T, overrides: P
 }
 
 export async function getSystemTaxRules(taxYear: number = 2026): Promise<SystemTaxRulesType> {
+  const defaultBase = getYearDefaultRules(taxYear);
   try {
     const existing = await getDb()
       .select()
@@ -31,54 +38,61 @@ export async function getSystemTaxRules(taxYear: number = 2026): Promise<SystemT
       .limit(1);
 
     if (existing[0]) {
-      return deepMergeRules(DEFAULT_2026_RULES, existing[0] as any) as SystemTaxRulesType;
+      return deepMergeRules(defaultBase, existing[0] as any) as SystemTaxRulesType;
     }
 
     // Seed global tax rules for the requested year if missing.
-    // Years with published historical rules (2024/2025) seed from exact
-    // statutory values; all other years seed from current defaults.
-    const isCurrentYear = taxYear === DEFAULT_2026_RULES.taxYear;
-    const seedBase = isCurrentYear
-      ? DEFAULT_2026_RULES
-      : (HISTORICAL_TAX_RULES[taxYear] ?? DEFAULT_2026_RULES);
-
     const seedValues = {
       taxYear,
-      country: seedBase.country,
-      standardDeductionSingle: seedBase.standardDeductionSingle,
-      standardDeductionMfj: seedBase.standardDeductionMfj,
-      standardDeductionHoH: seedBase.standardDeductionHoH,
-      standardDeductionMfs: seedBase.standardDeductionMfs,
-      standardDeduction: seedBase.standardDeduction,
-      additionalStdDeduction65Plus: seedBase.additionalStdDeduction65Plus,
-      ordinaryTaxBrackets: seedBase.ordinaryTaxBrackets,
-      headOfHouseholdBrackets: seedBase.headOfHouseholdBrackets,
-      capitalGainsBrackets: seedBase.capitalGainsBrackets,
-      ficaRules: seedBase.ficaRules,
-      socialSecurityRules: seedBase.socialSecurityRules,
-      earlyPenaltyRules: seedBase.earlyPenaltyRules,
-      niitRules: seedBase.niitRules,
-      acaRules: seedBase.acaRules,
-      niitThreshold: seedBase.niitThreshold,
-      irmaaThresholds: seedBase.irmaaThresholds,
-      ssTaxationThresholds: seedBase.ssTaxationThresholds,
-      contributionLimits: seedBase.contributionLimits,
-      giftEstateExemptions: seedBase.giftEstateExemptions,
-      acaSubsidyTable: seedBase.acaSubsidyTable,
-      fplAmount: seedBase.fplAmount,
-      secureActRules: seedBase.secureActRules,
-      rmdUniformLifetimeTable: seedBase.rmdUniformLifetimeTable,
+      country: defaultBase.country,
+      standardDeductionSingle: defaultBase.standardDeductionSingle,
+      standardDeductionMfj: defaultBase.standardDeductionMfj,
+      standardDeductionHoH: defaultBase.standardDeductionHoH,
+      standardDeductionMfs: defaultBase.standardDeductionMfs,
+      standardDeduction: defaultBase.standardDeduction,
+      additionalStdDeduction65Plus: defaultBase.additionalStdDeduction65Plus,
+      ordinaryTaxBrackets: defaultBase.ordinaryTaxBrackets,
+      headOfHouseholdBrackets: defaultBase.headOfHouseholdBrackets,
+      capitalGainsBrackets: defaultBase.capitalGainsBrackets,
+      ficaRules: defaultBase.ficaRules,
+      socialSecurityRules: defaultBase.socialSecurityRules,
+      earlyPenaltyRules: defaultBase.earlyPenaltyRules,
+      niitRules: defaultBase.niitRules,
+      acaRules: defaultBase.acaRules,
+      niitThreshold: defaultBase.niitThreshold,
+      irmaaThresholds: defaultBase.irmaaThresholds,
+      ssTaxationThresholds: defaultBase.ssTaxationThresholds,
+      contributionLimits: defaultBase.contributionLimits,
+      giftEstateExemptions: defaultBase.giftEstateExemptions,
+      acaSubsidyTable: defaultBase.acaSubsidyTable,
+      fplAmount: defaultBase.fplAmount,
+      secureActRules: defaultBase.secureActRules,
+      rmdUniformLifetimeTable: defaultBase.rmdUniformLifetimeTable,
     };
 
-    const inserted = await getDb().insert(systemTaxRules).values(seedValues).returning();
-    return deepMergeRules(DEFAULT_2026_RULES, inserted[0] as any) as SystemTaxRulesType;
+    try {
+      const inserted = await getDb().insert(systemTaxRules).values(seedValues).returning();
+      return deepMergeRules(defaultBase, inserted[0] as any) as SystemTaxRulesType;
+    } catch (insertErr) {
+      // If a concurrent insert occurred, re-fetch
+      const reFetched = await getDb()
+        .select()
+        .from(systemTaxRules)
+        .where(eq(systemTaxRules.taxYear, taxYear))
+        .limit(1);
+      if (reFetched[0]) {
+        return deepMergeRules(defaultBase, reFetched[0] as any) as SystemTaxRulesType;
+      }
+      throw insertErr;
+    }
   } catch (err) {
-    logger.error('Failed to fetch/seed system tax rules, falling back to DEFAULT_2026_RULES', { error: err });
-    return DEFAULT_2026_RULES;
+    logger.error('Failed to fetch/seed system tax rules, falling back to defaultBase', { error: err });
+    return defaultBase;
   }
 }
 
 export async function updateSystemTaxRules(taxYear: number = 2026, updates: Record<string, any>): Promise<SystemTaxRulesType> {
+  const defaultBase = getYearDefaultRules(taxYear);
   const existing = await getDb()
     .select()
     .from(systemTaxRules)
@@ -91,18 +105,13 @@ export async function updateSystemTaxRules(taxYear: number = 2026, updates: Reco
   };
 
   if (!existing[0]) {
-    // Seed from historical values when known so a brand-new 2024/2025 row
-    // starts from statutory defaults of that year, not current-year numbers.
-    const seedBase = taxYear === DEFAULT_2026_RULES.taxYear
-      ? DEFAULT_2026_RULES
-      : (HISTORICAL_TAX_RULES[taxYear] ?? DEFAULT_2026_RULES);
     const seedValues = {
       taxYear,
-      ...seedBase,
+      ...defaultBase,
       ...payload,
     };
     const inserted = await getDb().insert(systemTaxRules).values(seedValues).returning();
-    return deepMergeRules(DEFAULT_2026_RULES, inserted[0] as any) as SystemTaxRulesType;
+    return deepMergeRules(defaultBase, inserted[0] as any) as SystemTaxRulesType;
   }
 
   const updated = await getDb()
@@ -111,5 +120,5 @@ export async function updateSystemTaxRules(taxYear: number = 2026, updates: Reco
     .where(eq(systemTaxRules.id, existing[0].id))
     .returning();
 
-  return deepMergeRules(DEFAULT_2026_RULES, updated[0] as any) as SystemTaxRulesType;
+  return deepMergeRules(defaultBase, updated[0] as any) as SystemTaxRulesType;
 }

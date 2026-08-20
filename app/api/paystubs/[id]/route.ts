@@ -1,6 +1,6 @@
 import { auth } from 'auth';
 import { getDb } from '@/lib/db';
-import { paystubs, paystubLineItems, transactions } from '@/lib/db/schema';
+import { paystubs, paystubLineItems, transactions, accounts } from '@/lib/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import {
@@ -138,21 +138,31 @@ export async function PATCH(
       }
     }
 
-    updates.grossCurrent = String(gross);
-    updates.taxesCurrent = String(taxes);
-    updates.deductionsCurrent = String(deductions);
-    updates.netCurrent = String(gross - taxes - deductions);
+    const fmt = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
+    updates.grossCurrent = fmt(gross);
+    updates.taxesCurrent = fmt(taxes);
+    updates.deductionsCurrent = fmt(deductions);
+    updates.netCurrent = fmt(gross - taxes - deductions);
 
     // Update linked transactions
+    // Pre-fetch account types to handle asset deduction sign correctly
+    const userAccounts = await db
+      .select({ id: accounts.id, type: accounts.type })
+      .from(accounts)
+      .where(eq(accounts.userId, dataUserId));
+    const accountTypeById = new Map(userAccounts.map((a) => [a.id, a.type]));
 
-    // Earnings: all earnings items share one transaction — recalculate total
+    const { isAssetAccount } = await import('@/lib/utils/account-scope');
+    const { encryptRow } = await import('@/lib/crypto');
+
+    // Earnings: all earnings items share one transaction — recalculate total and category
     const earningsItems = allLineItems.filter((li) => li.section === 'earnings' && li.transactionId);
     if (earningsItems.length > 0) {
-      const earningsTotal = earningsItems.reduce((sum, li) => sum + parseFloat(li.amount || '0'), 0);
+      const earningsTotal = fmt(earningsItems.reduce((sum, li) => sum + parseFloat(li.amount || '0'), 0));
       const txnId = earningsItems[0].transactionId!;
+      const categoryId = earningsItems[0].categoryId || null;
+      const txnValues = { amount: earningsTotal, categoryId };
       if (dek) {
-        const txnValues = { amount: String(earningsTotal) };
-        const { encryptRow } = await import('@/lib/crypto');
         const encrypted = await encryptRow('transactions', txnValues, dek);
         await db
           .update(transactions)
@@ -161,7 +171,7 @@ export async function PATCH(
       } else {
         await db
           .update(transactions)
-          .set({ amount: String(earningsTotal) })
+          .set(txnValues)
           .where(and(eq(transactions.id, txnId), eq(transactions.userId, dataUserId)));
       }
     }
@@ -170,10 +180,25 @@ export async function PATCH(
     for (const li of allLineItems) {
       if (li.section === 'earnings' || !li.transactionId) continue;
       const amt = parseFloat(li.amount || '0');
-      const negativeAmount = -Math.abs(amt);
+
+      // Fetch transaction's accountId to determine asset vs liability/paystub
+      const [existingTxn] = await db
+        .select({ accountId: transactions.accountId })
+        .from(transactions)
+        .where(eq(transactions.id, li.transactionId))
+        .limit(1);
+
+      const targetType = existingTxn ? accountTypeById.get(existingTxn.accountId) : '';
+      const isDeduction = li.section === 'before_tax_deductions' || li.section === 'after_tax_deductions';
+      const isAssetDest = targetType !== 'paystub' && targetType ? isAssetAccount(targetType) : false;
+      const signedAmount = (isDeduction && isAssetDest) ? Math.abs(amt) : -Math.abs(amt);
+
+      const txnValues = {
+        amount: fmt(signedAmount),
+        categoryId: li.categoryId || null,
+      };
+
       if (dek) {
-        const txnValues = { amount: String(negativeAmount) };
-        const { encryptRow } = await import('@/lib/crypto');
         const encrypted = await encryptRow('transactions', txnValues, dek);
         await db
           .update(transactions)
@@ -182,7 +207,7 @@ export async function PATCH(
       } else {
         await db
           .update(transactions)
-          .set({ amount: String(negativeAmount) })
+          .set(txnValues)
           .where(and(eq(transactions.id, li.transactionId), eq(transactions.userId, dataUserId)));
       }
     }

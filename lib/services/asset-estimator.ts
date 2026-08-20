@@ -27,7 +27,7 @@ export {
   calculateAmortizationSchedule,
   calculateAmortizationWithExtraPayments,
 } from '@/lib/utils/amortization';
-export type { AmortizationParams, AmortizationRow, ExtraPaymentParams } from '@/lib/utils/amortization';
+export type { AmortizationParams, AmortizationRow, ExtraPaymentParams, AmortizationSummary, AcceleratedAmortizationSummary } from '@/lib/utils/amortization';
 
 // ─── FRED API ────────────────────────────────────────────────────────────────
 
