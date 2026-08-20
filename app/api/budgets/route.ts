@@ -450,7 +450,7 @@ export async function GET(request: Request) {
       if (!row.categoryId) continue;
       if (row.ignored) continue;
       if (row.date) {
-        const txDateStr = typeof row.date === 'string' ? row.date : (row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date));
+        const txDateStr = typeof row.date === 'string' ? row.date : ((row.date as unknown) instanceof Date ? (row.date as Date).toISOString().split('T')[0] : String(row.date));
         if (txDateStr < bounds.startDate || txDateStr >= bounds.endDate) continue;
       }
       if (row.accountId && excludedAccountIds.has(row.accountId)) continue;
@@ -571,7 +571,7 @@ export async function GET(request: Request) {
               const amt = parseFloat(decrypted);
               if (isNaN(amt)) continue;
 
-              const txDateStr = typeof tx.date === 'string' ? tx.date : (tx.date instanceof Date ? tx.date.toISOString().split('T')[0] : String(tx.date));
+              const txDateStr = typeof tx.date === 'string' ? tx.date : ((tx.date as unknown) instanceof Date ? (tx.date as Date).toISOString().split('T')[0] : String(tx.date));
               const txYm = txDateStr.substring(0, 7);
               // For expense categories, purchases are negative in DB (-amount is spending)
               const netSpend = -amt;
@@ -693,6 +693,8 @@ export async function GET(request: Request) {
         isRecurring: true,
         fundingAccountId: null,
         rollover: false,
+        rolloverCarryover: 0,
+        availableBudget: 0,
         notes: null,
         monthlyAmount: 0,
         budgeted: 0,
