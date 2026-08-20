@@ -105,6 +105,7 @@ export async function GET(request: Request) {
         paystubHsa: number;
         brokerage: number;
         savingsAccount: number;
+        hasPaystubEarnings: boolean;
         details: {
           retirement: Array<{ description: string; date: string; amount: number; accountName: string }>;
           hsa: Array<{ description: string; date: string; amount: number; accountName: string }>;

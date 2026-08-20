@@ -85,6 +85,7 @@ describe('Financial Review F02: Transactions, Splits, Transfers & Rules Remediat
       payee: 'Safeway',
       memo: 'Weekly shopping',
       amount: '-125.50',
+      categoryId: null,
     };
 
     it('evaluates gt (greater_than) on transaction amount', () => {

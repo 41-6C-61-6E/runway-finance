@@ -121,7 +121,7 @@ export async function POST(request: Request) {
     const parentCategory = existingCategories.find((cat) => cat.id === parentId);
     if (parentCategory) {
       if (categoryType === 'standard' && parentCategory.categoryType && parentCategory.categoryType !== 'standard') {
-        effectiveCategoryType = parentCategory.categoryType;
+        effectiveCategoryType = parentCategory.categoryType as 'standard' | 'compound' | 'transfer';
       }
       if (parentCategory.categoryType === 'transfer' || parentCategory.excludeFromReports) {
         effectiveExcludeFromReports = parentCategory.excludeFromReports ?? effectiveExcludeFromReports;

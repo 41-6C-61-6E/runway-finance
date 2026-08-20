@@ -271,6 +271,7 @@ export async function GET(request: Request) {
     pending: searchParams.get("pending") ?? undefined,
     reviewed: searchParams.get("reviewed") ?? undefined,
     categorizedByAi: searchParams.get("categorizedByAi") ?? undefined,
+    ignored: searchParams.get("ignored") ?? undefined,
     minAmount: searchParams.get("minAmount") ?? undefined,
     maxAmount: searchParams.get("maxAmount") ?? undefined,
     limit: parseInt(searchParams.get("limit") ?? "50", 10),

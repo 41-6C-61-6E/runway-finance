@@ -40,6 +40,15 @@ export const TransactionFilterSchema = z.object({
           : undefined,
     z.boolean().optional(),
   ),
+  ignored: z.preprocess(
+    (val) =>
+      val === "true" || val === true
+        ? true
+        : val === "false" || val === false
+          ? false
+          : undefined,
+    z.boolean().optional(),
+  ),
   tagId: z.string().uuid().optional(),
   tagIds: z.string().optional(),
   excludeTagId: z.string().uuid().optional(),
