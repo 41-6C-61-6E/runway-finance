@@ -32,6 +32,11 @@ export async function GET() {
       .returning();
 
     return Response.json({
+      currency: created?.currency ?? DEFAULTS.currency,
+      locale: created?.locale ?? DEFAULTS.locale,
+      dateFormat: created?.dateFormat ?? DEFAULTS.dateFormat,
+      compactMode: created?.compactMode ?? DEFAULTS.compactMode,
+      theme: created?.theme ?? DEFAULTS.theme,
       timezone: created?.timezone ?? DEFAULTS.timezone,
       privacyMode: created?.privacyMode ?? DEFAULTS.privacyMode,
       accentColor: created?.accentColor ?? DEFAULTS.accentColor,
@@ -94,6 +99,11 @@ export async function GET() {
   }
 
   return Response.json({
+    currency: settings[0].currency ?? DEFAULTS.currency,
+    locale: settings[0].locale ?? DEFAULTS.locale,
+    dateFormat: settings[0].dateFormat ?? DEFAULTS.dateFormat,
+    compactMode: settings[0].compactMode ?? DEFAULTS.compactMode,
+    theme: settings[0].theme ?? DEFAULTS.theme,
     timezone: settings[0].timezone,
     privacyMode: settings[0].privacyMode,
     accentColor: settings[0].accentColor ?? DEFAULTS.accentColor,
@@ -155,6 +165,11 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
+  const currency = body.currency;
+  const locale = body.locale;
+  const dateFormat = body.dateFormat;
+  const compactMode = body.compactMode;
+  const theme = body.theme;
   const timezone = body.timezone;
   const privacyMode = body.privacyMode;
   const accentColor = body.accentColor;
@@ -205,6 +220,28 @@ export async function PATCH(request: Request) {
 	const notifyRecurringPriceChanges = body.notifyRecurringPriceChanges;
 	const notifyUpcomingBills = body.notifyUpcomingBills;
 	const upcomingBillsLeadDays = body.upcomingBillsLeadDays;
+
+  if (currency !== undefined && (typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency.toUpperCase()))) {
+    return Response.json({ error: 'Invalid currency value: must be a 3-letter ISO currency code (e.g. USD, EUR)' }, { status: 400 });
+  }
+
+  if (locale !== undefined && (typeof locale !== 'string' || !/^[a-z]{2}(-[A-Za-z0-9]{2,4})?$/i.test(locale))) {
+    return Response.json({ error: 'Invalid locale format (e.g. en-US, de-DE)' }, { status: 400 });
+  }
+
+  const VALID_DATE_FORMATS = ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD', 'YYYY/MM/DD', 'DD.MM.YYYY'];
+  if (dateFormat !== undefined && (typeof dateFormat !== 'string' || !VALID_DATE_FORMATS.includes(dateFormat))) {
+    return Response.json({ error: 'Invalid dateFormat value' }, { status: 400 });
+  }
+
+  if (compactMode !== undefined && typeof compactMode !== 'boolean') {
+    return Response.json({ error: 'Invalid compactMode value: must be a boolean' }, { status: 400 });
+  }
+
+  const VALID_THEMES = ['daylight', 'moonlight', 'starlight', 'dark', 'light', 'system'];
+  if (theme !== undefined && (typeof theme !== 'string' || !VALID_THEMES.includes(theme))) {
+    return Response.json({ error: 'Invalid theme value' }, { status: 400 });
+  }
 
   if (typeof privacyMode !== 'boolean' && privacyMode !== undefined) {
     return Response.json({ error: 'Invalid privacyMode value' }, { status: 400 });
@@ -459,6 +496,11 @@ export async function PATCH(request: Request) {
       .insert(userSettings)
       .values({
         userId: session.user.id,
+        currency: currency ? currency.toUpperCase() : DEFAULTS.currency,
+        locale: locale ?? DEFAULTS.locale,
+        dateFormat: dateFormat ?? DEFAULTS.dateFormat,
+        compactMode: compactMode ?? DEFAULTS.compactMode,
+        theme: theme ?? DEFAULTS.theme,
         timezone: timezone ?? DEFAULTS.timezone,
         privacyMode,
         accentColor: accentColor ?? DEFAULTS.accentColor,
@@ -470,6 +512,11 @@ export async function PATCH(request: Request) {
       .returning();
 
     return Response.json({
+      currency: created?.currency ?? DEFAULTS.currency,
+      locale: created?.locale ?? DEFAULTS.locale,
+      dateFormat: created?.dateFormat ?? DEFAULTS.dateFormat,
+      compactMode: created?.compactMode ?? DEFAULTS.compactMode,
+      theme: created?.theme ?? DEFAULTS.theme,
       timezone: created?.timezone ?? DEFAULTS.timezone,
       privacyMode: created?.privacyMode,
       accentColor: created?.accentColor,
@@ -513,6 +560,11 @@ export async function PATCH(request: Request) {
 
   const dek = await getSessionDEK();
   const updates: Record<string, any> = {};
+  if (currency !== undefined) updates.currency = currency.toUpperCase();
+  if (locale !== undefined) updates.locale = locale;
+  if (dateFormat !== undefined) updates.dateFormat = dateFormat;
+  if (compactMode !== undefined) updates.compactMode = compactMode;
+  if (theme !== undefined) updates.theme = theme;
   if (timezone !== undefined) updates.timezone = timezone;
   if (privacyMode !== undefined) updates.privacyMode = privacyMode;
   if (accentColor !== undefined) updates.accentColor = accentColor;
@@ -751,6 +803,11 @@ export async function PATCH(request: Request) {
   }
 
     return Response.json({
+      currency: updated.currency ?? DEFAULTS.currency,
+      locale: updated.locale ?? DEFAULTS.locale,
+      dateFormat: updated.dateFormat ?? DEFAULTS.dateFormat,
+      compactMode: updated.compactMode ?? DEFAULTS.compactMode,
+      theme: updated.theme ?? DEFAULTS.theme,
       timezone: updated.timezone,
       privacyMode: updated.privacyMode,
       accentColor: updated.accentColor,

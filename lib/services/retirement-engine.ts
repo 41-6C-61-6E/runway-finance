@@ -621,7 +621,10 @@ export function runRetirementSimulation(
           }
           if (!targetAcc) continue;
 
-          const accOwnerStillWorking = targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation;
+          const isIra = targetAcc.type.includes('ira');
+          const accOwnerStillWorking = (isMfj && isIra)
+            ? isAccumulation
+            : (targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation);
           if (!accOwnerStillWorking) continue;
 
           const cat = getAccountCategory(targetAcc.type);
@@ -698,7 +701,10 @@ export function runRetirementSimulation(
           }
           if (!targetAcc) continue;
 
-          const accOwnerStillWorking = targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation;
+          const isIraFlow = targetAcc.type.includes('ira');
+          const accOwnerStillWorking = (isMfj && isIraFlow)
+            ? isAccumulation
+            : (targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation);
           if (!accOwnerStillWorking) continue;
 
           const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
@@ -1008,7 +1014,10 @@ export function runRetirementSimulation(
           }
           if (!targetAcc) continue;
 
-          const accOwnerStillWorking = targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation;
+          const isIra = targetAcc.type.includes('ira');
+          const accOwnerStillWorking = (isMfj && isIra)
+            ? isAccumulation
+            : (targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation);
           if (!accOwnerStillWorking) continue;
 
           const cat = getAccountCategory(targetAcc.type);
@@ -1086,7 +1095,10 @@ export function runRetirementSimulation(
           }
           if (!targetAcc) continue;
 
-          const accOwnerStillWorking = targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation;
+          const isIraFlow = targetAcc.type.includes('ira');
+          const accOwnerStillWorking = (isMfj && isIraFlow)
+            ? isAccumulation
+            : (targetAcc.owner === 'spouse' ? isSpouseAccumulation : isPrimaryAccumulation);
           if (!accOwnerStillWorking) continue;
 
           const isPreTax = targetAcc.type === 'traditional_401k' || targetAcc.type === 'traditional_ira' || targetAcc.type === 'hsa';
@@ -1270,11 +1282,19 @@ export function runRetirementSimulation(
           deficitWithdrawn += discretionaryDeficitWithdrawn;
         } else if (method === 'tax_optimized') {
           const ordBrackets = rules.ordinaryTaxBrackets || [];
-          const target12Idx = ordBrackets.findIndex((b: any) => Math.abs(b.rate - 0.12) < 0.01);
-          const nextBracketObj = target12Idx >= 0 ? ordBrackets[target12Idx + 1] : undefined;
-          const target12Limit = (nextBracketObj ? nextBracketObj.threshold : 48475) * (isMfj ? 2 : 1) * ruleScale;
+          const ceilingSetting = plan.settings?.rothConversionTargetCeiling || 'top_of_12';
+          let targetCeilingRate = 0.12;
+          if (ceilingSetting === 'top_of_10') targetCeilingRate = 0.10;
+          else if (ceilingSetting === 'top_of_12') targetCeilingRate = 0.12;
+          else if (ceilingSetting === 'top_of_22') targetCeilingRate = 0.22;
+          else if (ceilingSetting === 'top_of_24') targetCeilingRate = 0.24;
+          else if (ceilingSetting === 'top_of_32') targetCeilingRate = 0.32;
+
+          const targetBracketIdx = ordBrackets.findIndex((b: any) => Math.abs(b.rate - targetCeilingRate) < 0.01);
+          const nextBracketObj = targetBracketIdx >= 0 ? ordBrackets[targetBracketIdx + 1] : undefined;
+          const targetLimit = (nextBracketObj ? nextBracketObj.threshold : (targetCeilingRate === 0.10 ? 12400 : 48475)) * bracketMult * ruleScale;
           const currentTaxable = taxableOrdinaryIncome + drawdownsByType.traditional;
-          const bracketRoom = Math.max(0, target12Limit - currentTaxable);
+          const bracketRoom = Math.max(0, targetLimit - currentTaxable);
 
           // Only fill 12% bracket with traditional accounts if allowed or non-penalized
           const tradAccs = Object.values(accountsState).filter(
@@ -1402,13 +1422,24 @@ export function runRetirementSimulation(
       const ceilingSetting = plan.settings.rothConversionTargetCeiling || 'top_of_12';
       let convHeadroom = 0;
 
+      // Calculate dynamic pre-conversion provisional income & taxable Social Security under IRS Pub 915
+      const preConvProvInc = taxableSalary + pensionIncome + otherIncome + drawdownsByType.traditional + totalTaxableGains + totalSsIncome * 0.5;
+      let preConvTaxableSs = 0;
+      if (isMfs) {
+        preConvTaxableSs = Math.min(0.85 * totalSsIncome, 0.85 * preConvProvInc);
+      } else if (preConvProvInc > ssTier2) {
+        preConvTaxableSs = Math.min(0.85 * totalSsIncome, 0.50 * (ssTier2 - ssTier1) + 0.85 * (preConvProvInc - ssTier2));
+      } else if (preConvProvInc > ssTier1) {
+        preConvTaxableSs = Math.min(0.50 * totalSsIncome, 0.50 * (preConvProvInc - ssTier1));
+      }
+      const preConvMagi = salaryIncome + pensionIncome + preConvTaxableSs + otherIncome + drawdownsByType.traditional + totalTaxableGains;
+
       if (ceilingSetting === 'irmaa_tier1') {
         const irmaaList = rules.irmaaThresholds || [];
         if (irmaaList.length > 1) {
           const tier1 = irmaaList[1];
           const baseIrmaaLimit = isMfj ? tier1.magiJoint : tier1.magiSingle;
           const irmaaLimit = baseIrmaaLimit * ruleScale;  // T-2
-          const preConvMagi = salaryIncome + pensionIncome + (totalSsIncome * 0.5) + otherIncome + drawdownsByType.traditional + totalTaxableGains;
           convHeadroom = Math.max(0, irmaaLimit - preConvMagi - 1000);
         }
       } else {
@@ -1428,7 +1459,6 @@ export function runRetirementSimulation(
       }
 
       if (ceilingSetting !== 'irmaa_tier1' && plan.settings.avoidIrmaaCliffs && primaryAge >= 63) {
-        const preConvMagi = salaryIncome + pensionIncome + (totalSsIncome * 0.5) + otherIncome + drawdownsByType.traditional + totalTaxableGains;
         const irmaaGuardList = rules.irmaaThresholds || [];
         for (let idx = 1; idx < irmaaGuardList.length; idx++) {
           const tierObj = irmaaGuardList[idx];
@@ -1754,7 +1784,7 @@ export function runRetirementSimulation(
 
     // FI Target Check
     const targetFiMultiplier = plan.fiTargetMultiplier || 25;
-    if (liquidNetWorth >= targetFiMultiplier * livingExpenses && livingExpenses > 0) {
+    if (netWorth >= targetFiMultiplier * livingExpenses && livingExpenses > 0) {
       if (!milestonesReached.some((m) => m.includes('FI Target'))) {
         milestonesReached.push(`FI Target Achieved (${targetFiMultiplier}× Expenses)`);
       }

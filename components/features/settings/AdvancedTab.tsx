@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { SETTING_DEFINITIONS, API_KEY_FIELD_KEYS, API_KEY_DEFAULTS } from '@/config/defaults';
+import { Switch } from '@/components/ui/switch';
 import { signOut } from 'next-auth/react';
 import { useUserSettings } from '@/components/user-settings-provider';
 import {
@@ -43,6 +44,19 @@ function formatDefault(value: unknown): string {
 
 function packForSave(working: SettingsState): Record<string, unknown> {
   const body: Record<string, unknown> = { ...working };
+
+  for (const def of SETTING_DEFINITIONS) {
+    if (def.type === 'json' && typeof body[def.key] === 'string') {
+      try {
+        body[def.key] = JSON.parse(body[def.key] as string);
+      } catch {
+        throw new Error(`Invalid JSON syntax in setting "${def.label || def.key}"`);
+      }
+    }
+    if (def.type === 'boolean' && typeof body[def.key] === 'string') {
+      body[def.key] = body[def.key] === 'true';
+    }
+  }
 
   const apiKeys: Record<string, string> = {};
   let hasApiKeys = false;
@@ -389,13 +403,15 @@ export default function AdvancedTab() {
                         ))}
                       </select>
                     ) : def.type === 'boolean' ? (
-                      <input
-                        type="text"
-                        value={(currentValue as string) ?? 'false'}
-                        onChange={(e) => updateValue(def.key, e.target.value)}
-                        placeholder="true or false"
-                        className="w-full px-2 py-1 bg-background border border-input rounded text-foreground text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-                      />
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <Switch
+                          checked={currentValue === true || currentValue === 'true'}
+                          onCheckedChange={(checked) => updateValue(def.key, checked)}
+                        />
+                        <span className="text-[11px] font-mono text-muted-foreground">
+                          {currentValue === true || currentValue === 'true' ? 'true' : 'false'}
+                        </span>
+                      </div>
                     ) : def.type === 'json' ? (
                       <textarea
                         value={typeof currentValue === 'object' ? JSON.stringify(currentValue, null, 2) : (currentValue as string ?? '')}

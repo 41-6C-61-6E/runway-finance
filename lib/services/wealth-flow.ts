@@ -3,7 +3,7 @@ import { accounts, userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { decryptRows } from '@/lib/crypto';
 import { convertCurrency, roundToCents } from '@/lib/services/account-history';
-import { getBalancesOnDate, getEarliestBalances } from '@/lib/services/snapshot-balances';
+import { getBalancesOnDate } from '@/lib/services/snapshot-balances';
 import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
 import { isRealEstateType } from '@/lib/constants/account-types';
 import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
@@ -74,9 +74,9 @@ function getAccountGroup(type: string): string {
   if (['investment', 'brokerage', 'retirement', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', 'hsa', 'health', '529', 'crypto', 'metals', 'otherinvestment', 'otherInvestment'].includes(t)) return 'investments';
   if (isRealEstateType(t)) return 'real_estate';
   if (t === 'mortgage') return 'mortgage';
-  if (['credit', 'loan', 'studentloan', 'autoloan', 'otherloan', 'otherliability', 'otherLiability', 'personal_loan', 'heloc'].includes(t)) return 'credit_loans';
+  if (['credit', 'loan', 'studentloan', 'autoloan', 'otherloan', 'otherliability', 'otherLiability', 'personal_loan', 'heloc'].includes(t) || isLiabilityAccount(t)) return 'credit_loans';
   if (['vehicle', 'other', 'otherasset', 'otherAsset'].includes(t) && isAssetAccount(t)) return 'other_assets';
-  return isAssetAccount(t) ? 'other_assets' : 'credit_loans';
+  return isLiabilityAccount(t) ? 'credit_loans' : 'other_assets';
 }
 
 function getSignedNetWorthBalance(balance: number, accountType: string): number {
@@ -155,6 +155,8 @@ export async function calculateWealthFlow(
   if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d' || timeframe === '7d_discrete') {
     dayBeforeStr = startDateStr;
   } else {
+    // For calendar months (1m, 3m, 6m, 1y, ytd) and discrete 1-day (1d_discrete),
+    // starting snapshot is closing balance of the day before start date.
     const dayBeforeDate = new Date(startDateStr + 'T00:00:00Z');
     dayBeforeDate.setUTCDate(dayBeforeDate.getUTCDate() - 1);
     dayBeforeStr = dayBeforeDate.toISOString().split('T')[0];
@@ -188,11 +190,6 @@ export async function calculateWealthFlow(
   const beginningBalances = await getBalances(dayBeforeStr, beginningAccountIds);
   const endingBalances = await getBalances(endDateStr, endingAccountIds);
 
-  const accountIdsWithEndButNoBeg = Object.keys(endingBalances).filter(id => !(id in beginningBalances));
-  const earliestBalances = accountIdsWithEndButNoBeg.length > 0
-    ? await getEarliestBalances(db, userId, accountIdsWithEndButNoBeg, dek)
-    : {};
-
   let beginningNetWorth = 0;
   let endingNetWorth = 0;
 
@@ -207,11 +204,10 @@ export async function calculateWealthFlow(
 
     if (!hasBeg && !hasEnd) continue;
 
+    // If an account had no snapshot on or before the start date, its balance prior to inception was $0.
     const beg = hasBeg
       ? convertCurrency(beginningBalances[id], acc.currency, baseCurrency)
-      : id in earliestBalances
-        ? convertCurrency(earliestBalances[id], acc.currency, baseCurrency)
-        : 0;
+      : 0;
     const end = hasEnd ? convertCurrency(endingBalances[id], acc.currency, baseCurrency) : 0;
 
     const rawDelta = end - beg;

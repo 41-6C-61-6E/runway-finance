@@ -390,6 +390,7 @@ function buildSankeyData(
           label: cat.categoryName,
           color: vibrantColor(cat.categoryColor, false),
           categoryId: cat.categoryId,
+          sourceCategoryId: cat.sourceCategoryId || cat.categoryId,
           value: cat.amount,
           percentage: totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0,
         });
@@ -423,8 +424,19 @@ function buildSankeyData(
     links.push({ source: hubId, target: fallbackId, value: totalExpenses });
   }
 
-
-
+  // Explicit Savings / Retained Cash Surplus Sink Node
+  if (totalIncome > totalExpenses) {
+    const surplus = totalIncome - totalExpenses;
+    const savingsId = '__savings__';
+    nodes.push({
+      id: savingsId,
+      label: 'Cash Surplus',
+      color: '#10b981',
+      value: surplus,
+      percentage: totalIncome > 0 ? (surplus / totalIncome) * 100 : 0,
+    });
+    links.push({ source: hubId, target: savingsId, value: surplus });
+  }
 
   return { nodes, links };
 }

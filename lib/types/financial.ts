@@ -24,6 +24,7 @@ export interface CalculationStep {
   inputs: Record<string, number | string>;
   operation: string;
   output: number;
+  isEstimate?: boolean;
 }
 
 export type TraceFormat = 'currency' | 'percentage' | 'ratio' | 'number' | 'years';
@@ -41,6 +42,7 @@ export interface CalculationTrace {
   result: number;
   format: TraceFormat;
   children?: CalculationTrace[];
+  isEstimate?: boolean;
 }
 
 export interface WealthFlowAccountDetail {

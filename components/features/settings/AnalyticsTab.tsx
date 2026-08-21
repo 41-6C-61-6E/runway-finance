@@ -207,6 +207,81 @@ export default function AnalyticsTab() {
             </div>
           </div>
 
+          {/* ── Forecasting & Projections Defaults ──────────────────────── */}
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Forecasting &amp; Projections</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Configure baseline projection algorithms and lookback horizons for cash flow and account balance forecasts.
+            </p>
+
+            <div className="space-y-6">
+              {/* Forecast Mode */}
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-2">Forecast Calculation Mode</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { value: 'hybrid' as const, label: 'Hybrid', desc: 'Blends recurring bills, active budgets & history' },
+                    { value: 'budget' as const, label: 'Budget-Driven', desc: 'Projects forward strictly from operating budget targets' },
+                    { value: 'historical' as const, label: 'Historical Trend', desc: 'Extrapolates recent monthly cash flow run-rates' },
+                  ].map((mode) => {
+                    const isActive = defaults.forecastMode === mode.value;
+                    return (
+                      <button
+                        key={mode.value}
+                        type="button"
+                        onClick={() => updateDefaults({ forecastMode: mode.value })}
+                        className={`flex flex-col items-start p-3 text-left rounded-lg border transition-all ${
+                          isActive
+                            ? 'border-foreground bg-muted/50 shadow-sm'
+                            : 'border-border hover:border-foreground/30 hover:bg-muted/20'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="text-xs font-semibold text-foreground">{mode.label}</span>
+                          {isActive && <Check className="w-3.5 h-3.5 text-primary" />}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground leading-snug">{mode.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Forecast Lookback Horizon */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-foreground">Historical Lookback Window</h3>
+                  <span className="text-xs font-semibold text-primary">{defaults.forecastLookbackMonths} {defaults.forecastLookbackMonths === 1 ? 'Month' : 'Months'}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Number of prior months evaluated to compute average historical spending and income run-rates.
+                </p>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="24"
+                    step="1"
+                    value={defaults.forecastLookbackMonths}
+                    onChange={(e) => updateDefaults({ forecastLookbackMonths: Number(e.target.value) })}
+                    className="flex-1 accent-primary cursor-pointer"
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    max="24"
+                    value={defaults.forecastLookbackMonths}
+                    onChange={(e) => {
+                      const val = Math.max(1, Math.min(24, Number(e.target.value) || 1));
+                      updateDefaults({ forecastLookbackMonths: val });
+                    }}
+                    className="w-16 px-2 py-1 bg-background border border-input rounded text-foreground text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* ── Chart Visibility ─────────────────────────────────────────── */}
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-1">Chart Visibility</h2>

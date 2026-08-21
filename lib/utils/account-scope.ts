@@ -78,6 +78,11 @@ export const LIABILITY_CATEGORY_MAP: Record<string, string> = {
   credit: 'Credit Cards',
   loan: 'Loans',
   mortgage: 'Mortgages',
+  studentloan: 'Student Loans',
+  autoloan: 'Auto Loans',
+  otherloan: 'Other Loans',
+  personal_loan: 'Loans',
+  heloc: 'Loans',
   otherLiability: 'Other Debt',
   otherliability: 'Other Debt',
 };
@@ -96,6 +101,8 @@ export const LIABILITY_ACCOUNT_TYPES = [
   'studentloan',
   'autoloan',
   'otherloan',
+  'personal_loan',
+  'heloc',
 ];
 
 export function isAssetAccount(type: string): boolean {

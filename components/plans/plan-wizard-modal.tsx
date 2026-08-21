@@ -66,7 +66,7 @@ export function PlanWizardModal({
   const [spouseBirthMonth, setSpouseBirthMonth] = useState(1);
   const [spouseRetirementAge, setSpouseRetirementAge] = useState<number | ''>(60);
   const [spouseLifeExpectancyAge, setSpouseLifeExpectancyAge] = useState<number | ''>(100);
-  const [spouseSsMonthlyAmount, setSpouseSsMonthlyAmount] = useState<number | ''>(2000);
+  const [spouseSsMonthlyAmount, setSpouseSsMonthlyAmount] = useState<number | ''>(0);
   const [spouseSsStartAge, setSpouseSsStartAge] = useState<number | ''>(67);
   const [enableSpousalSsBenefit, setEnableSpousalSsBenefit] = useState(true);
 
@@ -77,7 +77,7 @@ export function PlanWizardModal({
   const [spouseSalaryRaisePct, setSpouseSalaryRaisePct] = useState('3.0');
 
   // Form State - SS & FI Target
-  const [primarySsMonthlyAmount, setPrimarySsMonthlyAmount] = useState<number | ''>(2500);
+  const [primarySsMonthlyAmount, setPrimarySsMonthlyAmount] = useState<number | ''>(0);
   const [primarySsStartAge, setPrimarySsStartAge] = useState<number | ''>(67);
   const [fiTargetMultiplier, setFiTargetMultiplier] = useState<number | ''>(25);
 
@@ -236,7 +236,7 @@ export function PlanWizardModal({
       setSpouseBirthMonth(1);
       setSpouseRetirementAge(60);
       setSpouseLifeExpectancyAge(100);
-      setSpouseSsMonthlyAmount(2000);
+      setSpouseSsMonthlyAmount(0);
       setSpouseSsStartAge(67);
       setEnableSpousalSsBenefit(true);
 
@@ -244,7 +244,7 @@ export function PlanWizardModal({
       setSpouseSalary(0);
       setPrimarySalaryRaisePct('3.0');
       setSpouseSalaryRaisePct('3.0');
-      setPrimarySsMonthlyAmount(2500);
+      setPrimarySsMonthlyAmount(0);
       setPrimarySsStartAge(67);
       setFiTargetMultiplier(25);
 

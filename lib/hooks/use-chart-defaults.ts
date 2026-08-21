@@ -4,16 +4,21 @@ import { useState, useEffect, useCallback } from 'react';
 
 export type ChartTimeRange = '1m' | '3m' | '6m' | '1y' | '5y' | 'ytd' | 'all';
 export type ChartTypeOption = 'line' | 'bar';
+export type ForecastModeOption = 'hybrid' | 'historical' | 'budget';
 
 type ChartDefaults = {
   defaultTimeRange: ChartTimeRange;
   defaultChartType: ChartTypeOption;
+  forecastMode: ForecastModeOption;
+  forecastLookbackMonths: number;
 };
 
 export function useChartDefaults() {
   const [defaults, setDefaults] = useState<ChartDefaults>({
     defaultTimeRange: '1y',
     defaultChartType: 'line',
+    forecastMode: 'hybrid',
+    forecastLookbackMonths: 3,
   });
   const [loading, setLoading] = useState(true);
 
@@ -24,6 +29,8 @@ export function useChartDefaults() {
         setDefaults({
           defaultTimeRange: (data.defaultChartTimeRange as ChartTimeRange) || '1y',
           defaultChartType: (data.defaultChartType as ChartTypeOption) || 'line',
+          forecastMode: (data.forecastMode as ForecastModeOption) || 'hybrid',
+          forecastLookbackMonths: typeof data.forecastLookbackMonths === 'number' ? data.forecastLookbackMonths : 3,
         });
       })
       .catch(() => {})
@@ -36,9 +43,11 @@ export function useChartDefaults() {
       const merged = { ...defaults, ...next };
       setDefaults(merged);
       try {
-        const body: Record<string, string> = {};
+        const body: Record<string, any> = {};
         if (next.defaultTimeRange !== undefined) body.defaultChartTimeRange = next.defaultTimeRange;
         if (next.defaultChartType !== undefined) body.defaultChartType = next.defaultChartType;
+        if (next.forecastMode !== undefined) body.forecastMode = next.forecastMode;
+        if (next.forecastLookbackMonths !== undefined) body.forecastLookbackMonths = next.forecastLookbackMonths;
         const res = await fetch('/api/user-settings', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
