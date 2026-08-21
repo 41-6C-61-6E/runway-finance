@@ -23,19 +23,20 @@ function ensureJsonObject(val: any, fallback: Record<string, any> = {}): Record<
 }
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const db = getDb();
-  const dek = await getSessionDEK();
+    const db = getDb();
+    const dek = await getSessionDEK().catch(() => null);
 
-  let settings = await db
-    .select()
-    .from(userSettings)
-    .where(eq(userSettings.userId, session.user.id))
-    .limit(1);
+    let settings = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, session.user.id))
+      .limit(1);
 
   if (!settings || settings.length === 0) {
     const [created] = await db
@@ -108,8 +109,12 @@ export async function GET() {
   let apiKeys: Record<string, string> = {};
   if (settings[0].apiKeys) {
     try {
-      const decrypted = await decryptField(settings[0].apiKeys, dek);
-      apiKeys = JSON.parse(decrypted);
+      if (dek) {
+        const decrypted = await decryptField(settings[0].apiKeys, dek);
+        apiKeys = JSON.parse(decrypted);
+      } else {
+        apiKeys = JSON.parse(settings[0].apiKeys);
+      }
     } catch { /* return empty */ }
   }
 
@@ -172,15 +177,23 @@ export async function GET() {
     deletePendingOlderThan30Days: settings[0].deletePendingOlderThan30Days ?? DEFAULTS.deletePendingOlderThan30Days,
     deletePendingDays: settings[0].deletePendingDays ?? DEFAULTS.deletePendingDays,
   });
+  } catch (err) {
+    console.error('Failed to retrieve user settings:', err);
+    return Response.json(
+      { error: err instanceof Error ? err.message : 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PATCH(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const body = await request.json();
+    const body = await request.json();
   const currency = body.currency;
   const locale = body.locale;
   const dateFormat = body.dateFormat;
@@ -597,7 +610,7 @@ export async function PATCH(request: Request) {
     });
   }
 
-  const dek = await getSessionDEK();
+  const dek = await getSessionDEK().catch(() => null);
   const updates: Record<string, any> = {};
   if (currency !== undefined) updates.currency = currency.toUpperCase();
   if (locale !== undefined) updates.locale = locale;
@@ -637,7 +650,9 @@ export async function PATCH(request: Request) {
 	if (aiAnalysisTimeoutSeconds !== undefined) updates.aiAnalysisTimeoutSeconds = aiAnalysisTimeoutSeconds;
 	if (aiActiveProviderId !== undefined) updates.aiActiveProviderId = aiActiveProviderId;
 	if (useMarketDataForSnapshots !== undefined) updates.useMarketDataForSnapshots = useMarketDataForSnapshots;
-	if (apiKeys !== undefined) updates.apiKeys = await encryptField(JSON.stringify(apiKeys), dek);
+	if (apiKeys !== undefined) {
+		updates.apiKeys = dek ? await encryptField(JSON.stringify(apiKeys), dek) : JSON.stringify(apiKeys);
+	}
 	if (accountTagVisibility !== undefined) {
 		const existingVisibility = ensureJsonObject(settings[0].accountTagVisibility, DEFAULTS.accountTagVisibility as Record<string, any>);
 		updates.accountTagVisibility = { ...existingVisibility, ...accountTagVisibility };
@@ -835,67 +850,83 @@ export async function PATCH(request: Request) {
     }
   }
 
+  const resultSetting = updated || settings[0];
+  if (!resultSetting) {
+    return Response.json({ error: 'Failed to update user settings' }, { status: 500 });
+  }
+
   let updatedApiKeys: Record<string, string> = {};
-  if (updated.apiKeys) {
+  if (resultSetting.apiKeys) {
     try {
-      updatedApiKeys = JSON.parse(await decryptField(updated.apiKeys, dek));
+      if (dek) {
+        updatedApiKeys = JSON.parse(await decryptField(resultSetting.apiKeys, dek));
+      } else {
+        updatedApiKeys = JSON.parse(resultSetting.apiKeys);
+      }
     } catch { /* return empty */ }
   }
 
-    return Response.json({
-      currency: updated.currency ?? DEFAULTS.currency,
-      locale: updated.locale ?? DEFAULTS.locale,
-      dateFormat: updated.dateFormat ?? DEFAULTS.dateFormat,
-      compactMode: updated.compactMode ?? DEFAULTS.compactMode,
-      textSize: updated.textSize ?? DEFAULTS.textSize,
-      theme: updated.theme ?? DEFAULTS.theme,
-      timezone: updated.timezone,
-      privacyMode: updated.privacyMode,
-      accentColor: updated.accentColor,
-      chartVisibility: updated.chartVisibility ?? DEFAULTS.chartVisibility,
-      chartColorScheme: updated.chartColorScheme ?? DEFAULTS.chartColorScheme,
-      forecastMode: updated.forecastMode ?? DEFAULTS.forecastMode,
-      forecastLookbackMonths: updated.forecastLookbackMonths ?? DEFAULTS.forecastLookbackMonths,
-      hiddenPages: updated.hiddenPages ?? DEFAULTS.hiddenPages,
-      showSyntheticData: updated.showSyntheticData ?? DEFAULTS.showSyntheticData,
-      showImportedData: updated.showImportedData ?? DEFAULTS.showImportedData,
-      useMarketDataForSnapshots: updated.useMarketDataForSnapshots ?? DEFAULTS.useMarketDataForSnapshots,
-      defaultChartTimeRange: updated.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
-      defaultChartType: updated.defaultChartType ?? DEFAULTS.defaultChartType,
-      reduceTransparency: updated.reduceTransparency ?? DEFAULTS.reduceTransparency,
-      hideAccountSubheadings: updated.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
-      hideAccountsSidebarByDefault: updated.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
-    chartSelections: updated.chartSelections ?? DEFAULTS.chartSelections,
-    cardCollapsedStates: updated.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
-    paystubEnabled: updated.paystubEnabled ?? DEFAULTS.paystubEnabled,
-    aiSystemPrompt: updated.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
-    aiAutoAnalyze: updated.aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
-    aiAutoApprove: updated.aiAutoApprove ?? DEFAULTS.aiAutoApprove,
-    aiAutoApproveThreshold: updated.aiAutoApproveThreshold ?? DEFAULTS.aiAutoApproveThreshold,
-    aiBatchSize: updated.aiBatchSize ?? DEFAULTS.aiBatchSize,
-    aiAnalysisTimeoutSeconds: updated.aiAnalysisTimeoutSeconds ?? DEFAULTS.aiAnalysisTimeoutSeconds,
-    aiActiveProviderId: updated.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
+  return Response.json({
+    currency: resultSetting.currency ?? DEFAULTS.currency,
+    locale: resultSetting.locale ?? DEFAULTS.locale,
+    dateFormat: resultSetting.dateFormat ?? DEFAULTS.dateFormat,
+    compactMode: resultSetting.compactMode ?? DEFAULTS.compactMode,
+    textSize: resultSetting.textSize ?? DEFAULTS.textSize,
+    theme: resultSetting.theme ?? DEFAULTS.theme,
+    timezone: resultSetting.timezone,
+    privacyMode: resultSetting.privacyMode,
+    accentColor: resultSetting.accentColor,
+    chartVisibility: resultSetting.chartVisibility ?? DEFAULTS.chartVisibility,
+    chartColorScheme: resultSetting.chartColorScheme ?? DEFAULTS.chartColorScheme,
+    forecastMode: resultSetting.forecastMode ?? DEFAULTS.forecastMode,
+    forecastLookbackMonths: resultSetting.forecastLookbackMonths ?? DEFAULTS.forecastLookbackMonths,
+    hiddenPages: resultSetting.hiddenPages ?? DEFAULTS.hiddenPages,
+    showSyntheticData: resultSetting.showSyntheticData ?? DEFAULTS.showSyntheticData,
+    showImportedData: resultSetting.showImportedData ?? DEFAULTS.showImportedData,
+    useMarketDataForSnapshots: resultSetting.useMarketDataForSnapshots ?? DEFAULTS.useMarketDataForSnapshots,
+    defaultChartTimeRange: resultSetting.defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
+    defaultChartType: resultSetting.defaultChartType ?? DEFAULTS.defaultChartType,
+    reduceTransparency: resultSetting.reduceTransparency ?? DEFAULTS.reduceTransparency,
+    hideAccountSubheadings: resultSetting.hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
+    hideAccountsSidebarByDefault: resultSetting.hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
+    chartSelections: resultSetting.chartSelections ?? DEFAULTS.chartSelections,
+    cardCollapsedStates: resultSetting.cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
+    paystubEnabled: resultSetting.paystubEnabled ?? DEFAULTS.paystubEnabled,
+    aiSystemPrompt: resultSetting.aiSystemPrompt ?? DEFAULTS.aiSystemPrompt,
+    aiAutoAnalyze: resultSetting.aiAutoAnalyze ?? DEFAULTS.aiAutoAnalyze,
+    aiAutoApprove: resultSetting.aiAutoApprove ?? DEFAULTS.aiAutoApprove,
+    aiAutoApproveThreshold: resultSetting.aiAutoApproveThreshold ?? DEFAULTS.aiAutoApproveThreshold,
+    aiBatchSize: resultSetting.aiBatchSize ?? DEFAULTS.aiBatchSize,
+    aiAnalysisTimeoutSeconds: resultSetting.aiAnalysisTimeoutSeconds ?? DEFAULTS.aiAnalysisTimeoutSeconds,
+    aiActiveProviderId: resultSetting.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
     apiKeys: updatedApiKeys,
-    accountTagVisibility: updated.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
-    budgetExclusions: updated.budgetExclusions ?? DEFAULTS.budgetExclusions,
-    notifySyncErrors: updated.notifySyncErrors,
-    notifyBudgetAlerts: updated.notifyBudgetAlerts,
-    notifyLargeTransactions: updated.notifyLargeTransactions,
-    largeTransactionThreshold: updated.largeTransactionThreshold,
-    birthYear: updated.birthYear ?? null,
-    notifyMonthlySummary: updated.notifyMonthlySummary,
-    budgetAlertThreshold: updated.budgetAlertThreshold,
-    notifyGoalMilestones: updated.notifyGoalMilestones,
-    notifyNetWorthMilestones: updated.notifyNetWorthMilestones,
-    netWorthMilestoneInterval: updated.netWorthMilestoneInterval,
-    notifyWeeklyNetWorthChange: updated.notifyWeeklyNetWorthChange,
-    weeklyNetWorthAlertDay: updated.weeklyNetWorthAlertDay,
-    notifyAiProposals: updated.notifyAiProposals,
-    maxNotificationsPerPeriod: updated.maxNotificationsPerPeriod,
-    notificationLimiterPeriodMinutes: updated.notificationLimiterPeriodMinutes,
-    recurringExclusions: updated.recurringExclusions ?? DEFAULTS.recurringExclusions,
-    notifyRecurringPriceChanges: updated.notifyRecurringPriceChanges ?? DEFAULTS.notifyRecurringPriceChanges,
-    notifyUpcomingBills: updated.notifyUpcomingBills ?? DEFAULTS.notifyUpcomingBills,
-    upcomingBillsLeadDays: updated.upcomingBillsLeadDays ?? DEFAULTS.upcomingBillsLeadDays,
+    accountTagVisibility: resultSetting.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
+    budgetExclusions: resultSetting.budgetExclusions ?? DEFAULTS.budgetExclusions,
+    notifySyncErrors: resultSetting.notifySyncErrors,
+    notifyBudgetAlerts: resultSetting.notifyBudgetAlerts,
+    notifyLargeTransactions: resultSetting.notifyLargeTransactions,
+    largeTransactionThreshold: resultSetting.largeTransactionThreshold,
+    birthYear: resultSetting.birthYear ?? null,
+    notifyMonthlySummary: resultSetting.notifyMonthlySummary,
+    budgetAlertThreshold: resultSetting.budgetAlertThreshold,
+    notifyGoalMilestones: resultSetting.notifyGoalMilestones,
+    notifyNetWorthMilestones: resultSetting.notifyNetWorthMilestones,
+    netWorthMilestoneInterval: resultSetting.netWorthMilestoneInterval,
+    notifyWeeklyNetWorthChange: resultSetting.notifyWeeklyNetWorthChange,
+    weeklyNetWorthAlertDay: resultSetting.weeklyNetWorthAlertDay,
+    notifyAiProposals: resultSetting.notifyAiProposals,
+    maxNotificationsPerPeriod: resultSetting.maxNotificationsPerPeriod,
+    notificationLimiterPeriodMinutes: resultSetting.notificationLimiterPeriodMinutes,
+    recurringExclusions: resultSetting.recurringExclusions ?? DEFAULTS.recurringExclusions,
+    notifyRecurringPriceChanges: resultSetting.notifyRecurringPriceChanges ?? DEFAULTS.notifyRecurringPriceChanges,
+    notifyUpcomingBills: resultSetting.notifyUpcomingBills ?? DEFAULTS.notifyUpcomingBills,
+    upcomingBillsLeadDays: resultSetting.upcomingBillsLeadDays ?? DEFAULTS.upcomingBillsLeadDays,
   });
+  } catch (err) {
+    console.error('Failed to update user settings:', err);
+    return Response.json(
+      { error: err instanceof Error ? err.message : 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }
