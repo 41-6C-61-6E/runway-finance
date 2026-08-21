@@ -57,7 +57,7 @@ export function OnboardingChecklist() {
 
         if (!cancelled) {
           const hasPlanWithProfile = Array.isArray(plans) && plans.length > 0 && plans.some((p: any) => p.primaryBirthYear || Number(p.primarySalary) > 0);
-          const hasUserSettingsProfile = settings?.birthYear != null;
+          const hasUserSettingsProfile = (settings as any)?.birthYear != null;
 
           setState({
             profileConfigured: hasPlanWithProfile || hasUserSettingsProfile,
