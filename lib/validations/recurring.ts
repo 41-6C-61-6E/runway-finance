@@ -14,14 +14,21 @@ export const RecurringFilterSchema = z.object({
 
 export const RecurringPatchSchema = z.object({
   id: z.string().uuid().optional(),
+  merchantName: z.string().min(1).max(200).optional(),
+  matchPattern: z.string().max(200).optional(),
+  accountId: z.string().uuid().nullable().optional(),
+  categoryId: z.string().uuid().nullable().optional(),
+  frequency: z.enum(['weekly', 'biweekly', 'semi_monthly', 'monthly', 'quarterly', 'semi_annual', 'annual']).optional(),
+  averageAmount: z.coerce.number().positive().finite().optional(),
+  lastAmount: z.coerce.number().positive().finite().optional(),
+  lastDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  nextExpectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  flowType: z.enum(['expense', 'income']).optional(),
   isConfirmed: z.boolean().optional(),
   isDismissed: z.boolean().optional(),
   isPaused: z.boolean().optional(),
   customName: z.string().max(200).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
-  categoryId: z.string().uuid().nullable().optional(),
-  frequency: z.enum(['weekly', 'biweekly', 'semi_monthly', 'monthly', 'quarterly', 'semi_annual', 'annual']).optional(),
-  averageAmount: z.coerce.number().positive().finite().optional(),
 });
 
 export const RecurringBulkPatchSchema = z.object({

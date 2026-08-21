@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Search, Sparkles, Plus, Repeat, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { MarkAsRecurringModal } from './MarkAsRecurringModal';
 
 
 
@@ -226,22 +227,26 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   }, [transaction]);
 
   const [matchingRecurring, setMatchingRecurring] = useState<any>(null);
-  const [markingRecurring, setMarkingRecurring] = useState(false);
-  const [recurringFrequency, setRecurringFrequency] = useState<'weekly' | 'monthly' | 'quarterly' | 'annual'>('monthly');
+  const [recurringModalOpen, setRecurringModalOpen] = useState(false);
 
   useEffect(() => {
     if (transaction && open) {
       const desc = (transaction.payee || transaction.description || '').trim();
       if (desc) {
-        fetch(`/api/recurring?search=${encodeURIComponent(desc)}`)
+        fetch('/api/recurring?status=all&includeDismissed=false')
           .then((r) => (r.ok ? r.json() : null))
           .then((data) => {
             if (data?.items?.length > 0) {
-              const matched = data.items.find((i: any) =>
-                desc.toLowerCase().includes((i.matchPattern || i.merchantName).toLowerCase()) ||
-                (i.matchPattern || i.merchantName).toLowerCase().includes(desc.toLowerCase())
-              );
-              setMatchingRecurring(matched || data.items[0]);
+              const d = desc.toLowerCase();
+              const matched = data.items.find((i: any) => {
+                if (i.isDismissed) return false;
+                const patterns = (i.matchPattern || i.merchantName || '')
+                  .split('|')
+                  .map((p: string) => p.trim().toLowerCase())
+                  .filter(Boolean);
+                return patterns.some((p: string) => d.includes(p) || p.includes(d));
+              });
+              setMatchingRecurring(matched || null);
             } else {
               setMatchingRecurring(null);
             }
@@ -252,51 +257,6 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
       }
     }
   }, [transaction, open]);
-
-  const handleMarkAsRecurring = async () => {
-    if (!transaction) return;
-    setMarkingRecurring(true);
-    try {
-      const merchantName = transaction.payee || transaction.description || '';
-
-      const checkRes = await fetch(`/api/recurring?status=active&search=${encodeURIComponent(merchantName)}`);
-      if (checkRes.ok) {
-        const checkData = await checkRes.json();
-        if (Array.isArray(checkData?.items) && checkData.items.length > 0) {
-          toast.warning('Already tracked as a recurring item');
-          return;
-        }
-      }
-
-      const amt = Math.abs(parseFloat(transaction.amount || '0') || 0);
-      const isIncome = (parseFloat(transaction.amount || '0') || 0) > 0;
-      const res = await fetch('/api/recurring', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchantName,
-          amount: amt,
-          frequency: recurringFrequency,
-          categoryId: transaction.categoryId || null,
-          accountId: transaction.accountId || null,
-          lastDate: transaction.date,
-          flowType: isIncome ? 'income' : 'expense',
-          isConfirmed: true,
-        }),
-      });
-      if (res.ok) {
-        const created = await res.json();
-        setMatchingRecurring(created);
-        toast.success('Marked as recurring transaction');
-      } else {
-        toast.error('Failed to mark as recurring');
-      }
-    } catch {
-      toast.error('Failed to mark as recurring');
-    } finally {
-      setMarkingRecurring(false);
-    }
-  };
 
   const fetchCategories = useCallback(async () => {
     setCategoriesLoading(true);
@@ -514,7 +474,8 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   const remainingAmount = parentAbs - splitsSum;
 
   return (
-    <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
+    <>
+      <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="overflow-y-auto">
         <SheetHeader className="mb-6">
           <SheetTitle>{mode === 'create' ? 'Add Transaction' : 'Transaction Details'}</SheetTitle>
@@ -644,49 +605,54 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                 </div>
 
                 {/* Recurring Status Banner / Action */}
-                <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Repeat className="w-4 h-4 text-primary shrink-0" />
+                <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      matchingRecurring ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      <Repeat className="w-4 h-4" />
+                    </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-foreground truncate">
-                        {matchingRecurring
-                          ? `Recurring: ${matchingRecurring.displayName}`
-                          : 'Recurring Status'}
+                      <div className="font-semibold text-foreground truncate flex items-center gap-1.5">
+                        {matchingRecurring ? matchingRecurring.displayName : 'Recurring Status'}
+                        {matchingRecurring && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold uppercase tracking-wider">
+                            {matchingRecurring.frequency}
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-muted-foreground truncate">
                         {matchingRecurring
-                          ? `${matchingRecurring.frequency} • Next: ${matchingRecurring.nextExpectedDate || 'N/A'}`
+                          ? `Next due: ${matchingRecurring.nextExpectedDate || 'N/A'}${matchingRecurring.isPaused ? ' (Paused)' : ''}`
                           : 'Not tracked as recurring'}
                       </div>
                     </div>
                   </div>
 
-                  {!matchingRecurring && mode === 'edit' && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <select
-                        value={recurringFrequency}
-                        onChange={(e) => setRecurringFrequency(e.target.value as 'weekly' | 'monthly' | 'quarterly' | 'annual')}
-                        aria-label="Recurring frequency"
-                        className="h-7 text-xs bg-background border border-input rounded-lg px-1.5 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                      >
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="quarterly">Quarterly</option>
-                        <option value="annual">Annual</option>
-                      </select>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {matchingRecurring ? (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handleMarkAsRecurring}
-                        disabled={markingRecurring}
-                        className="h-7 text-xs px-2.5 shrink-0 font-medium"
+                        onClick={() => setRecurringModalOpen(true)}
+                        className="h-7 text-xs px-2.5 font-medium rounded-lg"
                       >
-                        <Plus className="w-3 h-3 mr-1" />
-                        {markingRecurring ? 'Marking...' : 'Mark Recurring'}
+                        Edit Rule
                       </Button>
-                    </div>
-                  )}
+                    ) : mode === 'edit' && (
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        onClick={() => setRecurringModalOpen(true)}
+                        className="h-7 text-xs px-2.5 font-medium rounded-lg shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Mark Recurring
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-4 pt-1">
@@ -1300,5 +1266,17 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
         </div>
       </SheetContent>
     </Sheet>
+
+    <MarkAsRecurringModal
+      open={recurringModalOpen}
+      onOpenChange={setRecurringModalOpen}
+      transaction={transaction}
+      initialRecurringItem={matchingRecurring}
+      onSuccess={(item) => {
+        setMatchingRecurring(item);
+        onSuccess?.();
+      }}
+    />
+  </>
   );
 }

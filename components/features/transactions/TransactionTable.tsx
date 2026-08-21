@@ -50,6 +50,7 @@ import {
   X,
   AlertCircle,
   RotateCcw,
+  Repeat,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
@@ -232,6 +233,25 @@ export default function TransactionTable({
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isFetchError, setIsFetchError] = useState(false);
+  const [recurringPatterns, setRecurringPatterns] = useState<{ id: string; name: string; pattern: string; frequency: string }[]>([]);
+
+  useEffect(() => {
+    fetch('/api/recurring?status=active', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.items && Array.isArray(data.items)) {
+          setRecurringPatterns(
+            data.items.map((i: any) => ({
+              id: i.id,
+              name: i.displayName || i.merchantName,
+              pattern: (i.matchPattern || i.merchantName || '').toLowerCase(),
+              frequency: i.frequency,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
 
   const flattenedTransactions = useMemo(() => {
@@ -1053,6 +1073,31 @@ export default function TransactionTable({
                     </TooltipContent>
                   </Tooltip>
                 )}
+                {(() => {
+                  const desc = (tx.payee || tx.description || '').toLowerCase();
+                  if (!desc || recurringPatterns.length === 0) return null;
+                  const match = recurringPatterns.find((r) => {
+                    const alts = r.pattern.split('|').map((p) => p.trim()).filter(Boolean);
+                    return alts.some((p) => desc.includes(p) || p.includes(desc));
+                  });
+                  if (!match) return null;
+                  return (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
+                          aria-label={`Recurring transaction: ${match.name}`}
+                        >
+                          <Repeat className="w-2.5 h-2.5" />
+                          <span className="capitalize hidden sm:inline">{match.frequency}</span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Recurring: {match.name} ({match.frequency})
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })()}
                 {tx.splits && tx.splits.length > 0 && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1796,6 +1841,31 @@ export default function TransactionTable({
                             </TooltipContent>
                           </Tooltip>
                         )}
+                        {(() => {
+                          const desc = (tx.payee || tx.description || '').toLowerCase();
+                          if (!desc || recurringPatterns.length === 0) return null;
+                          const match = recurringPatterns.find((r) => {
+                            const alts = r.pattern.split('|').map((p) => p.trim()).filter(Boolean);
+                            return alts.some((p) => desc.includes(p) || p.includes(desc));
+                          });
+                          if (!match) return null;
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
+                                  aria-label={`Recurring: ${match.name}`}
+                                >
+                                  <Repeat className="w-2.5 h-2.5" />
+                                  <span className="capitalize text-[8px]">{match.frequency}</span>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                Recurring: {match.name} ({match.frequency})
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })()}
                         {!(tx as any).isSplitChild && (
                           <button
                             onClick={(e) => {

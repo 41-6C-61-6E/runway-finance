@@ -10,6 +10,7 @@ import {
   getMaxRecencyDays,
   mergeRecurringTransactions,
   mergeRecurringExclusions,
+  previewMatchingTransactions,
 } from '@/lib/services/recurring-detection';
 import { detectRecurringTransactions } from '@/lib/services/recurring-detection';
 import { encryptRow, decryptRow } from '@/lib/crypto';
@@ -566,6 +567,57 @@ describe('Recurring Detection Engine', () => {
         { recurringExclusions: { merchantPatterns: ['b', 'c'] } },
       ]);
       expect(res.merchantPatterns).toEqual(['b', 'a', 'c']);
+    });
+  });
+
+  describe('previewMatchingTransactions', () => {
+    it('returns empty preview for empty pattern', async () => {
+      const res = await previewMatchingTransactions('user-1', testDek, '');
+      expect(res.count).toBe(0);
+      expect(res.totalAmount).toBe(0);
+      expect(res.recentTransactions).toHaveLength(0);
+    });
+
+    it('matches and aggregates transactions matching pattern', async () => {
+      const tx1 = await encryptRow('transactions', {
+        id: 't-1',
+        userId: 'user-1',
+        accountId: 'acc-1',
+        date: '2026-06-01',
+        amount: '-15.99',
+        description: 'NETFLIX.COM',
+        deleted: false,
+        ignored: false,
+      }, testDek);
+      const tx2 = await encryptRow('transactions', {
+        id: 't-2',
+        userId: 'user-1',
+        accountId: 'acc-1',
+        date: '2026-07-01',
+        amount: '-15.99',
+        description: 'Netflix Monthly',
+        deleted: false,
+        ignored: false,
+      }, testDek);
+      const tx3 = await encryptRow('transactions', {
+        id: 't-3',
+        userId: 'user-1',
+        accountId: 'acc-1',
+        date: '2026-08-01',
+        amount: '-15.99',
+        description: 'Netflix Premium',
+        deleted: false,
+        ignored: false,
+      }, testDek);
+
+      mockDetectState.transactions = [tx1, tx2, tx3];
+
+      const res = await previewMatchingTransactions('user-1', testDek, 'netflix');
+      expect(res.count).toBe(3);
+      expect(res.averageAmount).toBe(15.99);
+      expect(res.totalAmount).toBe(47.97);
+      expect(res.suggestedFrequency).toBe('monthly');
+      expect(res.latestDate).toBe('2026-08-01');
     });
   });
 });

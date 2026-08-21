@@ -6,9 +6,22 @@ import { logger } from '@/lib/logger';
 import { getUserTransactionsFromCache } from '@/lib/services/search-cache';
 import { getShareGroupUserIds } from '@/lib/sharing';
 
-const LOG_TAG = '[recurring-detection]';
+import {
+  type FrequencyType,
+  normalizeMerchantName,
+  patternMatches,
+  addFrequencyPeriod,
+  calculateNextExpectedDate,
+} from '@/lib/utils/recurring';
+export {
+  type FrequencyType,
+  normalizeMerchantName,
+  patternMatches,
+  addFrequencyPeriod,
+  calculateNextExpectedDate,
+};
 
-export type FrequencyType = 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual';
+const LOG_TAG = '[recurring-detection]';
 
 interface RecurringExclusions {
   categoryIds?: string[];
@@ -50,80 +63,6 @@ export function mergeRecurringExclusions(
     union('merchantPatterns', ex.merchantPatterns ?? []);
   }
   return merged;
-}
-
-/**
- * Normalizes merchant / payee name by stripping processor prefixes, terminal IDs, store numbers, and date tokens.
- */
-export function normalizeMerchantName(raw: string): string {
-  if (!raw || typeof raw !== 'string') return 'Unknown';
-
-  let s = raw.trim();
-
-  // Strip common processor prefixes
-  const prefixes = [
-    /^(SQ\s*\*|TST\*\s*|SP\s*\*|PAYPAL\s*\*|UBER\s*\*|LYFT\s*\*|STRIPE\s*\*|VENMO\s*\*|RECURRING\s+PAYMENT\s+TO\s+|RECURRING\s+PAYMENT\s+|CHECKCARD\s+|PURCHASE\s+AUTHORIZED\s+ON\s+)/i,
-    /^(DEBIT\s+CARD\s+PURCHASE\s+|POS\s+PURCHASE\s+|PREAUTHORIZED\s+ACH\s+)/i,
-  ];
-
-  for (const prefix of prefixes) {
-    s = s.replace(prefix, '').trim();
-  }
-
-  // Normalize common merchant brands
-  s = s.replace(/^AMZN\s*Mktp\s*(US\*)?/i, 'Amazon');
-  s = s.replace(/^AMZN\s*MKTP/i, 'Amazon');
-  s = s.replace(/^AMAZON\.COM\*/i, 'Amazon');
-  s = s.replace(/^GOOGLE\s*\*(\s*SERVICES)?/i, 'Google');
-
-  // Strip card masks and trailing card numbers (e.g. *1234, XXXXX1234)
-  s = s.replace(/\s*\*+\d{4}\b/g, '').trim();
-  s = s.replace(/\b[\*xX]{2,}\d{2,4}\b/g, '').trim();
-
-  // Strip phone numbers (e.g. 800-123-4567, 8881234567)
-  s = s.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '').trim();
-
-  // Strip store numbers / terminal IDs (e.g., #1234, Store 5521, Term 09, Loc 482)
-  s = s.replace(/\b(store|term|terminal|loc|location|unit|station|branch)\s*#?\s*\d+\b/gi, '').trim();
-  s = s.replace(/#\d+\b/g, '').trim();
-
-  // Strip dates (e.g. 08/17, 2026-08-17, Aug 17)
-  s = s.replace(/\b\d{4}-\d{2}-\d{2}\b/g, '').trim();
-  s = s.replace(/\b(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])(\/\d{2,4})?\b/g, '').trim();
-
-  // Strip trailing reference IDs / alphanumeric sequences that contain numbers
-  s = s.replace(/\s+[A-Z0-9]*\d+[A-Z0-9]*\b/g, '').trim();
-
-  // Strip trailing state codes (e.g. "Seattle WA", "San Francisco CA US")
-  s = s.replace(/\s+(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(\s+US)?$/i, '').trim();
-
-  // Collapse multiple spaces and special characters
-  s = s.replace(/[\s\-_*]+/g, ' ').trim();
-
-  // If we ended up with an empty string, fallback to original cleaned
-  if (s.length < 2) {
-    s = raw.replace(/[\s\-_*]+/g, ' ').trim();
-  }
-
-  // Capitalize words nicely in Title Case (e.g. Netflix.com, Apple.com/bill)
-  return s
-    .split(' ')
-    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : ''))
-    .join(' ');
-}
-
-/**
- * Case-insensitive pattern match. Pattern supports `|`-separated alternatives.
- */
-export function patternMatches(description: string, pattern: string): boolean {
-  if (!description || !pattern) return false;
-  const desc = description.toLowerCase().trim();
-  const alternatives = pattern
-    .split('|')
-    .map((p) => p.trim().toLowerCase())
-    .filter(Boolean);
-  if (alternatives.length === 0) return false;
-  return alternatives.some((p) => desc.includes(p) || normalizeMerchantName(desc).toLowerCase() === p);
 }
 
 /**
@@ -184,69 +123,7 @@ export function classifyFrequency(intervals: number[]): {
   return { frequency: null, regularity: 0 };
 }
 
-/**
- * Adds frequency period to a date, preserving original anchor day-of-month.
- */
-export function addFrequencyPeriod(dateStr: string, frequency: FrequencyType, anchorDay?: number): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  if (isNaN(d.getTime())) return dateStr;
 
-  const year = d.getUTCFullYear();
-  const month = d.getUTCMonth();
-  const day = d.getUTCDate();
-  const effectiveDay = anchorDay ?? day;
-
-  if (frequency === 'semi_monthly') {
-    const target = new Date(Date.UTC(year, month, 1));
-    if (day < 15) {
-      target.setUTCDate(15);
-    } else {
-      const nextMonth = new Date(Date.UTC(year, month + 1, 1));
-      const daysInNext = new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth() + 1, 0)).getUTCDate();
-      target.setUTCFullYear(nextMonth.getUTCFullYear());
-      target.setUTCMonth(nextMonth.getUTCMonth());
-      target.setUTCDate(Math.min(effectiveDay <= 15 ? 1 : effectiveDay, daysInNext));
-    }
-    return target.toISOString().split('T')[0];
-  }
-
-  const monthDelta =
-    frequency === 'monthly' ? 1
-    : frequency === 'quarterly' ? 3
-    : frequency === 'semi_annual' ? 6
-    : frequency === 'annual' ? 12
-    : 0;
-  const dayDelta = frequency === 'weekly' ? 7 : frequency === 'biweekly' ? 14 : 0;
-
-  const target = new Date(Date.UTC(year, month + monthDelta, 1));
-  const daysInTargetMonth = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
-  target.setUTCDate(Math.min(effectiveDay, daysInTargetMonth) + dayDelta);
-
-  return target.toISOString().split('T')[0];
-}
-
-/**
- * Calculates next expected date from the last date, stepping forward to present/future.
- */
-export function calculateNextExpectedDate(lastDateStr: string, frequency: FrequencyType, referenceDateStr?: string, anchorDay?: number): string {
-  const origDate = new Date(lastDateStr + 'T00:00:00Z');
-  const effectiveAnchor = anchorDay ?? (isNaN(origDate.getTime()) ? undefined : origDate.getUTCDate());
-  const todayStr = referenceDateStr || new Date().toISOString().split('T')[0];
-  let next = addFrequencyPeriod(lastDateStr, frequency, effectiveAnchor);
-
-  // If lastDate was recent and next is already >= today, return next
-  if (next >= todayStr) return next;
-
-  // Otherwise step forward until next is >= today, or up to 2 steps forward
-  let current = next;
-  let iterations = 0;
-  while (current < todayStr && iterations < 50) {
-    current = addFrequencyPeriod(current, frequency, effectiveAnchor);
-    iterations++;
-  }
-
-  return current;
-}
 
 /**
  * Converts frequency to monthly amount multiplier.
@@ -1032,14 +909,21 @@ export async function updateRecurringTransaction(
   userId: string,
   dek: Uint8Array,
   updates: {
+    merchantName?: string;
+    matchPattern?: string;
+    accountId?: string | null;
+    categoryId?: string | null;
+    frequency?: FrequencyType;
+    averageAmount?: number;
+    lastAmount?: number;
+    lastDate?: string;
+    nextExpectedDate?: string | null;
+    flowType?: 'income' | 'expense';
     isConfirmed?: boolean;
     isDismissed?: boolean;
     isPaused?: boolean;
     customName?: string | null;
     notes?: string | null;
-    categoryId?: string | null;
-    frequency?: FrequencyType;
-    averageAmount?: number;
   }
 ) {
   const db = getDb();
@@ -1048,17 +932,21 @@ export async function updateRecurringTransaction(
     updatedAt: new Date(),
   };
 
+  if (updates.merchantName !== undefined) updateData.merchantName = updates.merchantName;
+  if (updates.matchPattern !== undefined) updateData.matchPattern = updates.matchPattern;
+  if (updates.accountId !== undefined) updateData.accountId = updates.accountId;
+  if (updates.categoryId !== undefined) updateData.categoryId = updates.categoryId;
+  if (updates.frequency !== undefined) updateData.frequency = updates.frequency;
+  if (updates.averageAmount !== undefined) updateData.averageAmount = String(updates.averageAmount);
+  if (updates.lastAmount !== undefined) updateData.lastAmount = String(updates.lastAmount);
+  if (updates.lastDate !== undefined) updateData.lastDate = updates.lastDate;
+  if (updates.nextExpectedDate !== undefined) updateData.nextExpectedDate = updates.nextExpectedDate;
+  if (updates.flowType !== undefined) updateData.flowType = updates.flowType;
   if (updates.isConfirmed !== undefined) updateData.isConfirmed = updates.isConfirmed;
   if (updates.isDismissed !== undefined) updateData.isDismissed = updates.isDismissed;
   if (updates.isPaused !== undefined) updateData.isPaused = updates.isPaused;
   if (updates.customName !== undefined) updateData.customName = updates.customName;
   if (updates.notes !== undefined) updateData.notes = updates.notes;
-  if (updates.categoryId !== undefined) updateData.categoryId = updates.categoryId;
-  if (updates.frequency !== undefined) updateData.frequency = updates.frequency;
-  if (updates.averageAmount !== undefined) {
-    updateData.averageAmount = String(updates.averageAmount);
-    updateData.lastAmount = String(updates.averageAmount);
-  }
 
   const encrypted = await encryptRow('recurring_transactions', updateData, dek);
 
@@ -1071,6 +959,88 @@ export async function updateRecurringTransaction(
   if (!updated) return null;
   const [decrypted] = await decryptRows('recurring_transactions', [updated], dek);
   return decrypted;
+}
+
+/**
+ * Previews transactions that match a given pattern or merchant name.
+ */
+export async function previewMatchingTransactions(
+  userId: string,
+  dek: Uint8Array,
+  pattern: string,
+  accountId?: string | null
+) {
+  if (!pattern || pattern.trim().length === 0) {
+    return { count: 0, totalAmount: 0, averageAmount: 0, latestDate: null, suggestedFrequency: null, recentTransactions: [] };
+  }
+
+  const db = getDb();
+  const floorDate = new Date();
+  floorDate.setMonth(floorDate.getMonth() - 24);
+  const floorStr = floorDate.toISOString().split('T')[0];
+
+  const allUserTxns = await db
+    .select()
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.deleted, false),
+        eq(transactions.ignored, false),
+        gte(transactions.date, floorStr)
+      )
+    )
+    .orderBy(desc(transactions.date));
+
+  const decryptedTxns = await decryptRows('transactions', allUserTxns, dek);
+
+  const matched = decryptedTxns.filter((tx) => {
+    if (accountId && tx.accountId !== accountId) return false;
+    const desc = tx.payee || tx.description || '';
+    return patternMatches(desc, pattern);
+  });
+
+  if (matched.length === 0) {
+    return { count: 0, totalAmount: 0, averageAmount: 0, latestDate: null, suggestedFrequency: null, recentTransactions: [] };
+  }
+
+  const sortedAsc = [...matched].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const amounts = matched.map((t) => Math.abs(parseFloat(t.amount || '0') || 0));
+  const totalAmount = Math.round(amounts.reduce((sum, a) => sum + a, 0) * 100) / 100;
+  const averageAmount = Math.round((totalAmount / (amounts.length || 1)) * 100) / 100;
+
+  // Calculate intervals
+  let suggestedFrequency: FrequencyType | null = null;
+  if (sortedAsc.length >= 2) {
+    const intervals: number[] = [];
+    for (let i = 1; i < sortedAsc.length; i++) {
+      const d1 = new Date((sortedAsc[i - 1].date as string).split('T')[0] + 'T00:00:00Z');
+      const d2 = new Date((sortedAsc[i].date as string).split('T')[0] + 'T00:00:00Z');
+      const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff > 0) intervals.push(diff);
+    }
+    if (intervals.length > 0) {
+      const classified = classifyFrequency(intervals);
+      suggestedFrequency = classified.frequency;
+    }
+  }
+
+  return {
+    count: matched.length,
+    totalAmount,
+    averageAmount,
+    latestDate: (sortedAsc[sortedAsc.length - 1].date as string).split('T')[0],
+    suggestedFrequency,
+    recentTransactions: matched.slice(0, 5).map((t) => ({
+      id: t.id,
+      date: typeof t.date === 'string' ? t.date.split('T')[0] : new Date(t.date).toISOString().split('T')[0],
+      amount: parseFloat(t.amount || '0') || 0,
+      description: t.description,
+      payee: t.payee,
+      accountId: t.accountId,
+      categoryId: t.categoryId,
+    })),
+  };
 }
 
 /**

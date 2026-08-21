@@ -58,14 +58,25 @@ describe('Recurring Validations', () => {
   });
 
   describe('RecurringPatchSchema & BulkPatch', () => {
-    it('validates single patch payload', () => {
+    it('validates single patch payload with extended fields', () => {
       const parsed = RecurringPatchSchema.parse({
+        merchantName: 'Spotify USA',
+        matchPattern: 'spotify|spotify usa',
         customName: 'Netflix Premium',
         isPaused: true,
         frequency: 'monthly',
+        averageAmount: 14.99,
+        lastAmount: 14.99,
+        lastDate: '2026-08-01',
+        nextExpectedDate: '2026-09-01',
+        flowType: 'expense',
       });
+      expect(parsed.merchantName).toBe('Spotify USA');
+      expect(parsed.matchPattern).toBe('spotify|spotify usa');
       expect(parsed.customName).toBe('Netflix Premium');
       expect(parsed.isPaused).toBe(true);
+      expect(parsed.averageAmount).toBe(14.99);
+      expect(parsed.flowType).toBe('expense');
     });
 
     it('validates bulk patch items', () => {

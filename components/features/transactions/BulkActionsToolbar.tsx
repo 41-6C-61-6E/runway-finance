@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Repeat } from 'lucide-react';
+import { MarkAsRecurringModal } from './MarkAsRecurringModal';
 
 interface BulkActionsToolbarProps {
   selectedIds: string[];
@@ -30,10 +31,27 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
   const [tagSearch, setTagSearch] = useState('');
   const tagRef = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [recurringModalOpen, setRecurringModalOpen] = useState(false);
+  const [selectedTxs, setSelectedTxs] = useState<any[]>([]);
 
   useEffect(() => {
     setConfirmDelete(false);
   }, [selectedIds]);
+
+  const handleOpenRecurringModal = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      const res = await fetch(`/api/transactions?ids=${selectedIds.slice(0, 50).join(',')}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        const txs = Array.isArray(data) ? data : data.transactions || [];
+        setSelectedTxs(txs);
+      }
+    } catch {
+      // fallback
+    }
+    setRecurringModalOpen(true);
+  };
 
   useEffect(() => {
     if (categoryDropdownOpen) {
@@ -200,6 +218,14 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
         Mark Reviewed
       </button>
       <button
+        onClick={handleOpenRecurringModal}
+        disabled={actionLoading !== null}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+      >
+        <Repeat className="w-3.5 h-3.5" />
+        Mark Recurring
+      </button>
+      <button
         onClick={() => handleBulkPatch({ ignored: true })}
         disabled={actionLoading !== null}
         className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted hover:bg-accent rounded-lg transition-colors disabled:opacity-50"
@@ -334,6 +360,15 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
       >
         Clear Selection
       </button>
+
+      <MarkAsRecurringModal
+        open={recurringModalOpen}
+        onOpenChange={setRecurringModalOpen}
+        transactions={selectedTxs}
+        onSuccess={() => {
+          onClear();
+        }}
+      />
     </div>
   );
 }
