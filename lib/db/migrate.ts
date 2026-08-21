@@ -98,7 +98,13 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       { name: 'notify_weekly_net_worth_change', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
       { name: 'weekly_net_worth_alert_day', type: "TEXT NOT NULL DEFAULT 'sunday'" },
       { name: 'delete_pending_days', type: 'INTEGER NOT NULL DEFAULT 10' },
-      { name: 'budget_exclusions', type: "JSONB DEFAULT '{\"categoryIds\":[],\"tagIds\":[]}'::jsonb" }
+      { name: 'budget_exclusions', type: "JSONB DEFAULT '{\"categoryIds\":[],\"tagIds\":[]}'::jsonb" },
+      { name: 'recurring_exclusions', type: "JSONB DEFAULT '{\"categoryIds\":[],\"accountIds\":[],\"merchantPatterns\":[]}'::jsonb" },
+      { name: 'notify_recurring_price_changes', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'notify_upcoming_bills', type: 'BOOLEAN NOT NULL DEFAULT FALSE' },
+      { name: 'upcoming_bills_lead_days', type: 'INTEGER NOT NULL DEFAULT 3' },
+      { name: 'birth_year', type: 'INTEGER' },
+      { name: 'text_size', type: "TEXT NOT NULL DEFAULT 'default'" }
     ];
 
     for (const col of columnsToCheck) {

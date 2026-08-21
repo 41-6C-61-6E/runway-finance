@@ -1,9 +1,13 @@
 {
-  "buildNumber": "26.08.1787270680055",
-  "buildTime": "2026-08-21T00:04:40.055Z",
-  "hash": "1e3891f",
-  "fullHash": "1e3891fabeb9b8d6d1bc7180c360c86e9b93dc0d",
+  "buildNumber": "26.08.1787283520129",
+  "buildTime": "2026-08-21T03:38:40.129Z",
+  "hash": "292aecd",
+  "fullHash": "292aecdc1105cb3d916aae29ddff424230924ce2",
   "commits": [
+    "feat: implement robust JSON parsing for settings updates, extend user settings schema, and add onboarding checklist unit tests.",
+    "feat: add FIRE plan export modal with LLM audit prompt, PDF printing, and unit tests",
+    "feat: calculate property LTV in API and safely access user settings in onboarding checklist",
+    "feat: implement historical sequence monte carlo model and improve IRA/Roth conversion tax logic",
     "fix: update type handling, schema validation, and API structures across transaction and budget routes",
     "refactor: implement comprehensive financial remediation suite and unit tests for accounts, debt-to-asset metrics, age-cohort benchmarks, and currency conversion logic",
     "fix: update contribution mode in retirement projection test to 'none'",
@@ -199,21 +203,49 @@
     "fix: clear stale account snapshots during startup healing and update service worker cache version",
     "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup",
     "refactor: inline loading and error states within Sankey chart components for improved rendering logic",
-    "refactor: introduce account activity checking logic to standardize net worth calculations and currency conversion across services",
-    "style: remove border radius from sankey chart rectangles",
-    "refactor: modularize wealth flow calculation by extracting balance fetching and updating account grouping logic",
-    "refactor: improve Sankey hub rendering, add chart navigation, and implement account-level adjusted delta routing",
-    "refactor: replace static feedback components with an array-based API in CollapsibleFilterPanel"
+    "refactor: introduce account activity checking logic to standardize net worth calculations and currency conversion across services"
   ],
   "history": [
+    {
+      "hash": "292aecd",
+      "fullHash": "292aecdc1105cb3d916aae29ddff424230924ce2",
+      "author": "Alan Racek",
+      "date": "2026-08-20T20:35:44-07:00",
+      "message": "feat: implement robust JSON parsing for settings updates, extend user settings schema, and add onboarding checklist unit tests.",
+      "type": "feat",
+      "buildNumber": "26.08.1787283520129"
+    },
+    {
+      "hash": "7cfc3b4",
+      "fullHash": "7cfc3b4463b993e15f5bc524b3a98570ff704a7c",
+      "author": "Alan Racek",
+      "date": "2026-08-20T20:16:20-07:00",
+      "message": "feat: add FIRE plan export modal with LLM audit prompt, PDF printing, and unit tests",
+      "type": "feat"
+    },
+    {
+      "hash": "00fd5c3",
+      "fullHash": "00fd5c36af58671f6e2c3c858024b1d7beab0296",
+      "author": "Alan Racek",
+      "date": "2026-08-20T18:09:41-07:00",
+      "message": "feat: calculate property LTV in API and safely access user settings in onboarding checklist",
+      "type": "feat"
+    },
+    {
+      "hash": "66ac968",
+      "fullHash": "66ac96817e50aa6b631244d96adaf1d432c1e4b1",
+      "author": "Alan Racek",
+      "date": "2026-08-20T17:22:32-07:00",
+      "message": "feat: implement historical sequence monte carlo model and improve IRA/Roth conversion tax logic",
+      "type": "feat"
+    },
     {
       "hash": "1e3891f",
       "fullHash": "1e3891fabeb9b8d6d1bc7180c360c86e9b93dc0d",
       "author": "Alan Racek",
       "date": "2026-08-20T13:12:02-07:00",
       "message": "fix: update type handling, schema validation, and API structures across transaction and budget routes",
-      "type": "fix",
-      "buildNumber": "26.08.1787270680055"
+      "type": "fix"
     },
     {
       "hash": "63184f4",
@@ -1773,38 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-07-05T20:00:38-07:00",
       "message": "refactor: introduce account activity checking logic to standardize net worth calculations and currency conversion across services",
-      "type": "refactor"
-    },
-    {
-      "hash": "827bf3a",
-      "fullHash": "827bf3a93ae2983ae6c3d5fc797db1007fdf2e36",
-      "author": "Alan Racek",
-      "date": "2026-07-05T17:57:15-07:00",
-      "message": "style: remove border radius from sankey chart rectangles",
-      "type": "style"
-    },
-    {
-      "hash": "e3d5515",
-      "fullHash": "e3d55153e874a8c9bc1ced04e5560939b0c421d0",
-      "author": "Alan Racek",
-      "date": "2026-07-05T17:55:12-07:00",
-      "message": "refactor: modularize wealth flow calculation by extracting balance fetching and updating account grouping logic",
-      "type": "refactor"
-    },
-    {
-      "hash": "a22c5cb",
-      "fullHash": "a22c5cb43f56643d2f7750fa96c32764087d0058",
-      "author": "Alan Racek",
-      "date": "2026-07-05T16:29:31-07:00",
-      "message": "refactor: improve Sankey hub rendering, add chart navigation, and implement account-level adjusted delta routing",
-      "type": "refactor"
-    },
-    {
-      "hash": "5c4e33a",
-      "fullHash": "5c4e33a0766b16cc957771a98094c0433003707b",
-      "author": "Alan Racek",
-      "date": "2026-07-05T11:15:20-07:00",
-      "message": "refactor: replace static feedback components with an array-based API in CollapsibleFilterPanel",
       "type": "refactor"
     }
   ]

@@ -172,17 +172,15 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const toggleAccountsCollapsed = useCallback(() => {
-    setAccountsCollapsed((prev) => {
-      const next = !prev;
-      setCookie('hideAccountsSidebarByDefault', next ? 'true' : 'false');
-      if (userSettings) {
-        setTimeout(() => {
-          userSettings.updateSetting('hideAccountsSidebarByDefault', next);
-        }, 0);
-      }
-      return next;
-    });
-  }, [userSettings]);
+    const next = !accountsCollapsed;
+    setAccountsCollapsed(next);
+    setCookie('hideAccountsSidebarByDefault', next ? 'true' : 'false');
+    if (userSettings && !userSettings.loading) {
+      userSettings.updateSetting('hideAccountsSidebarByDefault', next).catch((err) => {
+        console.warn('Failed to persist accounts sidebar collapse preference:', err);
+      });
+    }
+  }, [accountsCollapsed, userSettings]);
 
   const value = useMemo(
     () => ({
