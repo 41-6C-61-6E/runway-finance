@@ -43,7 +43,7 @@ export function OnboardingChecklist() {
           fetch('/api/accounts', { credentials: 'include' }),
           fetch('/api/budgets', { credentials: 'include' }),
           fetch('/api/financial-goals', { credentials: 'include' }),
-          fetch('/api/plans', { credentials: 'include' }),
+          fetch('/api/retirement/plans', { credentials: 'include' }),
           fetch('/api/user-settings', { credentials: 'include' }),
         ]);
 
