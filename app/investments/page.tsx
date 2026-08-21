@@ -5,6 +5,13 @@ import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { AppTabs } from '@/components/ui/app-tabs';
+import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
+
+const INVESTMENT_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'holdings', label: 'Holdings & Portfolio' },
+  { id: 'income', label: 'Income & Activity' },
+];
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { InvestmentsSummary } from '@/components/investments/investments-summary';
 import { PerformanceChart } from '@/components/investments/performance-chart';
@@ -153,98 +160,101 @@ export default function InvestmentsPage() {
               </div>
             )}
 
-            {/* ── Tabs Selector ── */}
-            <AppTabs
-              tabs={[
-                { id: 'overview', label: 'Overview' },
-                { id: 'holdings', label: 'Holdings & Portfolio' },
-                { id: 'income', label: 'Income & Activity' },
-              ]}
-              activeTab={activeTab}
-              onChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
-              variant="underline"
-              className="mb-5 sm:mb-6"
-            />
-
-            {/* ── Overview Tab Content ── */}
-            {activeTab === 'overview' && (
-              <div className="space-y-5 sm:space-y-6">
-                {(isVisible('performanceChart') || isVisible('taxBreakdown')) && (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
-                    {isVisible('performanceChart') && (
-                      <div className="lg:col-span-2">
-                        <PerformanceChart />
-                      </div>
-                    )}
-                    {isVisible('taxBreakdown') && (
-                      <div className="lg:col-span-1">
-                        <TaxBreakdown accounts={data.accounts} />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {isVisible('holdingsAllocationChart') && (
-                  <div>
-                    <HoldingsAllocation holdings={data.holdings} accounts={data.accounts} />
-                  </div>
-                )}
+            {/* ── Tabs & Sub-Navigation ── */}
+            <MobileTabSwipeContainer
+              tabs={INVESTMENT_TABS}
+              activeTabId={activeTab}
+              onTabChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
+            >
+              <div className="hidden md:block mb-5 sm:mb-6">
+                <AppTabs
+                  tabs={INVESTMENT_TABS}
+                  activeTab={activeTab}
+                  onChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
+                  variant="underline"
+                />
               </div>
-            )}
 
-            {/* ── Holdings Tab Content ── */}
-            {activeTab === 'holdings' && (
-              <div className="space-y-5 sm:space-y-6">
-                {isVisible('topHoldings') && (
-                  <div>
-                    <HoldingSparklineCards
-                      holdings={data.holdings}
-                      quotes={quotes}
-                      onSelectHolding={handleSelectHolding}
-                    />
-                  </div>
-                )}
+              {/* ── Overview Tab Content ── */}
+              {activeTab === 'overview' && (
+                <div className="space-y-5 sm:space-y-6">
+                  {(isVisible('performanceChart') || isVisible('taxBreakdown')) && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
+                      {isVisible('performanceChart') && (
+                        <div className="lg:col-span-2">
+                          <PerformanceChart />
+                        </div>
+                      )}
+                      {isVisible('taxBreakdown') && (
+                        <div className="lg:col-span-1">
+                          <TaxBreakdown accounts={data.accounts} />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                {isVisible('holdingsTable') && (
-                  <div>
-                    <div className="bg-card border border-border rounded-xl shadow-sm p-4 sm:p-5">
-                      <div className="mb-4 border-b border-border/60 pb-2">
-                        <h3 className="text-sm sm:text-base font-semibold text-foreground">Holdings Portfolio</h3>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                          A list of all securities and cash assets currently held across your linked accounts. Click any holding to view historical performance and position details.
-                        </p>
-                      </div>
-                      <HoldingsTable
+                  {isVisible('holdingsAllocationChart') && (
+                    <div>
+                      <HoldingsAllocation holdings={data.holdings} accounts={data.accounts} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Holdings Tab Content ── */}
+              {activeTab === 'holdings' && (
+                <div className="space-y-5 sm:space-y-6">
+                  {isVisible('topHoldings') && (
+                    <div>
+                      <HoldingSparklineCards
                         holdings={data.holdings}
-                        accounts={data.accounts}
                         quotes={quotes}
                         onSelectHolding={handleSelectHolding}
                       />
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
 
-            {/* ── Income & Activity Tab Content ── */}
-            {activeTab === 'income' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch">
-                {isVisible('incomeDividends') && (
-                  <div>
-                    <IncomeDividendsPanel
-                      monthlyIncome={incomeData?.monthlyIncome || []}
-                      totalAnnualIncome={incomeData?.totalAnnual || 0}
-                      loading={loading}
-                    />
-                  </div>
-                )}
-                {isVisible('recentActivity') && (
-                  <div>
-                    <RecentActivity transactions={incomeData?.transactions || []} />
-                  </div>
-                )}
-              </div>
-            )}
+                  {isVisible('holdingsTable') && (
+                    <div>
+                      <div className="bg-card border border-border rounded-xl shadow-sm p-4 sm:p-5">
+                        <div className="mb-4 border-b border-border/60 pb-2">
+                          <h3 className="text-sm sm:text-base font-semibold text-foreground">Holdings Portfolio</h3>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                            A list of all securities and cash assets currently held across your linked accounts. Click any holding to view historical performance and position details.
+                          </p>
+                        </div>
+                        <HoldingsTable
+                          holdings={data.holdings}
+                          accounts={data.accounts}
+                          quotes={quotes}
+                          onSelectHolding={handleSelectHolding}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Income & Activity Tab Content ── */}
+              {activeTab === 'income' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch">
+                  {isVisible('incomeDividends') && (
+                    <div>
+                      <IncomeDividendsPanel
+                        monthlyIncome={incomeData?.monthlyIncome || []}
+                        totalAnnualIncome={incomeData?.totalAnnual || 0}
+                        loading={loading}
+                      />
+                    </div>
+                  )}
+                  {isVisible('recentActivity') && (
+                    <div>
+                      <RecentActivity transactions={incomeData?.transactions || []} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </MobileTabSwipeContainer>
 
             {/* ── Holding Detail Slide-Out Sheet ── */}
             <HoldingDetailSheet

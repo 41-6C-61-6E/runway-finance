@@ -56,11 +56,12 @@ interface InvestmentsSummaryProps {
     totalUnrealizedGainLoss: number | null;
     totalUnrealizedReturnPct: number | null;
     holdingsCount: number;
+    twrPct?: number;
   };
   accounts: Account[];
   holdings: Holding[];
   totalAnnualIncome?: number;
-  portfolioHistory?: { date: string; value: number }[]; // last 30 days
+  portfolioHistory?: { date: string; value: number; twr?: number }[]; // last 30 days
   quotes?: QuoteData[];
 }
 

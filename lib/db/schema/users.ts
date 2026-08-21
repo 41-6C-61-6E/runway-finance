@@ -161,6 +161,7 @@ export const userSettings = pgTable('user_settings', {
   theme: text('theme').notNull().default('moonlight'),
   accentColor: text('accent_color').notNull().default('violet'),
   compactMode: boolean('compact_mode').notNull().default(false),
+  textSize: text('text_size').notNull().default('default'),
   dateFormat: text('date_format').notNull().default('MM/DD/YYYY'),
   privacyMode: boolean('privacy_mode').notNull().default(false),
   chartVisibility: jsonb('chart_visibility').default({}),

@@ -29,6 +29,18 @@ body,
   min-height: 100dvh;
 }
 
+/* Text Size Scaling Settings */
+html.text-size-sm {
+  font-size: 14px;
+}
+html.text-size-default,
+html.text-size-base {
+  font-size: 16px;
+}
+html.text-size-lg {
+  font-size: 18px;
+}
+
 /* Prevent iOS Safari from zooming in when tapping inputs/selects */
 @supports (-webkit-touch-callout: none) {
   @media screen and (max-width: 768px) {

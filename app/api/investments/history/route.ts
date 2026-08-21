@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
+import { accounts, accountSnapshots, userSettings, transactions } from '@/lib/db/schema';
 import { eq, and, gte, lte, lt, desc, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
@@ -11,7 +11,6 @@ import { filterReportableAccounts, isInvestmentAccount } from '@/lib/utils/accou
 import { getDateRange, type TimeFrame } from '@/lib/utils/timeframe';
 
 const LOG_TAG = '[api-investments-history]';
-
 
 function formatInTimezone(date: Date, tz: string): string {
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -41,7 +40,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
 
-  logger.info(`${LOG_TAG} Fetching historical investment balances`, { timeframe });
+  logger.info(`${LOG_TAG} Fetching historical investment balances and TWR`, { timeframe });
 
   try {
     // 1. Get all investment accounts for this user
@@ -59,7 +58,7 @@ export async function GET(request: Request) {
     if (investmentAccounts.length === 0) {
       return NextResponse.json({
         data: [],
-        summary: { current: 0, previous: 0, change: 0, percentChange: 0 },
+        summary: { current: 0, previous: 0, change: 0, percentChange: 0, twrPct: 0 },
       });
     }
 
@@ -138,6 +137,38 @@ export async function GET(request: Request) {
       )
       .orderBy(accountSnapshots.snapshotDate);
 
+    // 5. Fetch transactions in range to compute daily net cash flows for TWR
+    const inRangeTransactions = await getDb()
+      .select({
+        date: transactions.date,
+        amount: transactions.amount,
+        accountId: transactions.accountId,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, dataUserId),
+          inArray(transactions.accountId, accountIds),
+          eq(transactions.deleted, false),
+          gte(transactions.date, startStr),
+          lte(transactions.date, endStr)
+        )
+      );
+
+    const dailyCashFlows = new Map<string, number>();
+    for (const tx of inRangeTransactions) {
+      try {
+        const decryptedAmt = await decryptField(tx.amount, dek);
+        const amt = parseFloat(decryptedAmt);
+        if (!isNaN(amt)) {
+          const d = String(tx.date);
+          dailyCashFlows.set(d, (dailyCashFlows.get(d) || 0) + amt);
+        }
+      } catch {
+        // Skip individual decryption errors
+      }
+    }
+
     // Decrypt snapshot balances helper
     const decryptSnap = async (snap: typeof snapshotsInRange[number]) => {
       let balance = 0;
@@ -158,7 +189,7 @@ export async function GET(request: Request) {
     const decryptedBefore = await Promise.all(snapshotsBefore.map(decryptSnap));
     const decryptedInRange = await Promise.all(snapshotsInRange.map(decryptSnap));
 
-    // 5. Initialize forward-fill state
+    // 6. Initialize forward-fill state
     const latestByAccount = new Map<string, number>();
 
     // Seed from historical balances prior to range
@@ -203,9 +234,13 @@ export async function GET(request: Request) {
       curr.setUTCDate(curr.getUTCDate() + 1);
     }
 
-    // 6. Build daily forward-filled points
+    // 7. Build daily forward-filled points and compute Time-Weighted Return (TWR)
     const dailyPoints: AggregatablePoint[] = [];
-    for (const dateStr of datesInRange) {
+    let cumulativeTwrFactor = 1.0;
+    let prevTotalValue = 0;
+
+    for (let idx = 0; idx < datesInRange.length; idx++) {
+      const dateStr = datesInRange[idx];
       const daySnaps = snapshotsByDate.get(dateStr);
       if (daySnaps) {
         for (const snap of daySnaps) {
@@ -219,16 +254,37 @@ export async function GET(request: Request) {
         totalValue += bal;
       }
 
-      dailyPoints.push({
-        date: dateStr,
-        value: totalValue,
-      });
+      if (idx === 0) {
+        prevTotalValue = totalValue;
+        dailyPoints.push({
+          date: dateStr,
+          value: totalValue,
+          twr: 0,
+        });
+      } else {
+        const netCashFlow = dailyCashFlows.get(dateStr) || 0;
+        if (prevTotalValue > 0) {
+          // Single-period return removing the effect of external cash flows:
+          // r_t = (Ending Value - Net Cash Flow) / Beginning Value - 1
+          const r_t = (totalValue - netCashFlow) / prevTotalValue - 1;
+          const factor = Math.max(0, 1 + r_t);
+          cumulativeTwrFactor *= factor;
+        }
+        const currentTwrPct = (cumulativeTwrFactor - 1) * 100;
+        prevTotalValue = totalValue;
+
+        dailyPoints.push({
+          date: dateStr,
+          value: totalValue,
+          twr: Math.round(currentTwrPct * 100) / 100,
+        });
+      }
     }
 
     if (dailyPoints.length === 0) {
       return NextResponse.json({
         data: [],
-        summary: { current: 0, previous: 0, change: 0, percentChange: 0 },
+        summary: { current: 0, previous: 0, change: 0, percentChange: 0, twrPct: 0 },
       });
     }
 
@@ -239,9 +295,10 @@ export async function GET(request: Request) {
     const previousVal = Number(previousPoint.value);
     const change = currentVal - previousVal;
     const percentChange = previousVal !== 0 ? (change / previousVal) * 100 : 0;
+    const twrPct = Math.round((cumulativeTwrFactor - 1) * 10000) / 100;
 
     // Aggregate down to a smaller dataset if timeframe is long
-    const aggregated = aggregateChartData(dailyPoints, ['value']);
+    const aggregated = aggregateChartData(dailyPoints, ['value', 'twr']);
 
     return NextResponse.json({
       data: aggregated,
@@ -250,6 +307,7 @@ export async function GET(request: Request) {
         previous: previousVal,
         change,
         percentChange,
+        twrPct,
       },
     });
   } catch (error) {

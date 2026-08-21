@@ -38,9 +38,17 @@ function Tooltip({
     handleOpenChange(nextOpen);
   }, [handleOpenChange]);
 
-  // App-wide mobile touch listener to dismiss open tooltips when tapping anywhere
+  // App-wide mobile touch listener to dismiss open tooltips when tapping anywhere or scrolling
   React.useEffect(() => {
     if (!open) return;
+
+    const handleGlobalScroll = () => {
+      if (typeof window !== 'undefined' && (window.innerWidth < 768 || 'ontouchstart' in window)) {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleGlobalScroll, { passive: true, capture: true });
 
     const timer = setTimeout(() => {
       const handleGlobalDismiss = () => {
@@ -55,6 +63,7 @@ function Tooltip({
 
     return () => {
       clearTimeout(timer);
+      window.removeEventListener('scroll', handleGlobalScroll, true);
     };
   }, [open, setOpen]);
 
@@ -69,12 +78,67 @@ function Tooltip({
   );
 }
 
-const TooltipTrigger = TooltipPrimitive.Trigger;
+const TooltipTrigger = React.forwardRef<
+  React.ElementRef<typeof TooltipPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Trigger>
+>(({ onTouchStart, onTouchMove, onTouchEnd, onClick, ...props }, ref) => {
+  const { open, setOpen } = React.useContext(TooltipContext);
+  const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
+  const isDraggingRef = React.useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLElement>) => {
+    onTouchStart?.(e as any);
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+    isDraggingRef.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLElement>) => {
+    onTouchMove?.(e as any);
+    if (!touchStartRef.current || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    if (Math.hypot(dx, dy) > 8) {
+      isDraggingRef.current = true;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLElement>) => {
+    onTouchEnd?.(e as any);
+    if (!touchStartRef.current) return;
+    const elapsed = Date.now() - touchStartRef.current.time;
+    const wasDragging = isDraggingRef.current;
+    touchStartRef.current = null;
+    isDraggingRef.current = false;
+
+    // If user dragged to scroll, don't toggle tooltip
+    if (wasDragging) return;
+
+    // Short tap (< 300ms) toggles tooltip on mobile
+    if (elapsed < 300 && typeof window !== 'undefined' && (window.innerWidth < 768 || 'ontouchstart' in window)) {
+      setOpen(!open);
+    }
+  };
+
+  return (
+    <TooltipPrimitive.Trigger
+      ref={ref}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onClick={onClick}
+      {...props}
+    />
+  );
+});
+TooltipTrigger.displayName = TooltipPrimitive.Trigger.displayName;
 
 const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 6, collisionPadding = 16, onClick, onPointerDown, ...props }, ref) => {
+>(({ className, sideOffset = 6, collisionPadding = 12, onClick, onPointerDown, ...props }, ref) => {
   const { setOpen } = React.useContext(TooltipContext);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -96,6 +160,7 @@ const TooltipContent = React.forwardRef<
       <TooltipPrimitive.Content
         ref={ref}
         sideOffset={sideOffset}
+        avoidCollisions={true}
         collisionPadding={collisionPadding}
         onClick={handleClick}
         onPointerDown={handlePointerDown}
@@ -104,7 +169,7 @@ const TooltipContent = React.forwardRef<
           setOpen(false);
         }}
         className={cn(
-          "z-[100] max-w-xs overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl cursor-pointer select-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
+          "z-[100] max-w-[calc(100vw-24px)] sm:max-w-xs overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl cursor-pointer select-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 break-words",
           className
         )}
         {...props}

@@ -511,7 +511,7 @@ export function NetWorthSidePanel() {
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xl font-bold text-foreground font-mono">
+                  <span className="text-xl font-bold text-foreground font-mono blur-number">
                     {milestone.label}
                   </span>
                   <span className="inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full border font-mono bg-primary/10 text-primary border-primary/20">

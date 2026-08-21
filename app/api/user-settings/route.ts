@@ -36,6 +36,7 @@ export async function GET() {
       locale: created?.locale ?? DEFAULTS.locale,
       dateFormat: created?.dateFormat ?? DEFAULTS.dateFormat,
       compactMode: created?.compactMode ?? DEFAULTS.compactMode,
+      textSize: created?.textSize ?? DEFAULTS.textSize,
       theme: created?.theme ?? DEFAULTS.theme,
       timezone: created?.timezone ?? DEFAULTS.timezone,
       privacyMode: created?.privacyMode ?? DEFAULTS.privacyMode,
@@ -103,6 +104,7 @@ export async function GET() {
     locale: settings[0].locale ?? DEFAULTS.locale,
     dateFormat: settings[0].dateFormat ?? DEFAULTS.dateFormat,
     compactMode: settings[0].compactMode ?? DEFAULTS.compactMode,
+    textSize: settings[0].textSize ?? DEFAULTS.textSize,
     theme: settings[0].theme ?? DEFAULTS.theme,
     timezone: settings[0].timezone,
     privacyMode: settings[0].privacyMode,
@@ -169,6 +171,7 @@ export async function PATCH(request: Request) {
   const locale = body.locale;
   const dateFormat = body.dateFormat;
   const compactMode = body.compactMode;
+  const textSize = body.textSize;
   const theme = body.theme;
   const timezone = body.timezone;
   const privacyMode = body.privacyMode;
@@ -236,6 +239,11 @@ export async function PATCH(request: Request) {
 
   if (compactMode !== undefined && typeof compactMode !== 'boolean') {
     return Response.json({ error: 'Invalid compactMode value: must be a boolean' }, { status: 400 });
+  }
+
+  const VALID_TEXT_SIZES = ['sm', 'default', 'lg', 'base'];
+  if (textSize !== undefined && (typeof textSize !== 'string' || !VALID_TEXT_SIZES.includes(textSize))) {
+    return Response.json({ error: 'Invalid textSize value: must be sm, default, or lg' }, { status: 400 });
   }
 
   const VALID_THEMES = ['daylight', 'moonlight', 'starlight', 'dark', 'light', 'system'];
@@ -500,6 +508,7 @@ export async function PATCH(request: Request) {
         locale: locale ?? DEFAULTS.locale,
         dateFormat: dateFormat ?? DEFAULTS.dateFormat,
         compactMode: compactMode ?? DEFAULTS.compactMode,
+        textSize: textSize ?? DEFAULTS.textSize,
         theme: theme ?? DEFAULTS.theme,
         timezone: timezone ?? DEFAULTS.timezone,
         privacyMode,
@@ -516,6 +525,7 @@ export async function PATCH(request: Request) {
       locale: created?.locale ?? DEFAULTS.locale,
       dateFormat: created?.dateFormat ?? DEFAULTS.dateFormat,
       compactMode: created?.compactMode ?? DEFAULTS.compactMode,
+      textSize: created?.textSize ?? DEFAULTS.textSize,
       theme: created?.theme ?? DEFAULTS.theme,
       timezone: created?.timezone ?? DEFAULTS.timezone,
       privacyMode: created?.privacyMode,
@@ -564,6 +574,7 @@ export async function PATCH(request: Request) {
   if (locale !== undefined) updates.locale = locale;
   if (dateFormat !== undefined) updates.dateFormat = dateFormat;
   if (compactMode !== undefined) updates.compactMode = compactMode;
+  if (textSize !== undefined) updates.textSize = textSize;
   if (theme !== undefined) updates.theme = theme;
   if (timezone !== undefined) updates.timezone = timezone;
   if (privacyMode !== undefined) updates.privacyMode = privacyMode;
@@ -807,6 +818,7 @@ export async function PATCH(request: Request) {
       locale: updated.locale ?? DEFAULTS.locale,
       dateFormat: updated.dateFormat ?? DEFAULTS.dateFormat,
       compactMode: updated.compactMode ?? DEFAULTS.compactMode,
+      textSize: updated.textSize ?? DEFAULTS.textSize,
       theme: updated.theme ?? DEFAULTS.theme,
       timezone: updated.timezone,
       privacyMode: updated.privacyMode,

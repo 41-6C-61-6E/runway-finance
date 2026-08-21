@@ -4,6 +4,16 @@ import { createContext, useContext, useCallback, useMemo, useEffect, useRef, typ
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 
+// Early bootstrap saved text size before React renders
+if (typeof window !== 'undefined') {
+  try {
+    const savedTextSize = localStorage.getItem('finance-text-size');
+    if (savedTextSize) {
+      document.documentElement.classList.add(`text-size-${savedTextSize}`);
+    }
+  } catch {}
+}
+
 type UserSettingsContextType = {
   settings: Record<string, any>;
   updateSetting: (key: string, value: any) => Promise<void>;
@@ -27,6 +37,17 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Apply text size class to root html element
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const textSize = settings.textSize || 'default';
+    document.documentElement.classList.remove('text-size-sm', 'text-size-default', 'text-size-base', 'text-size-lg');
+    document.documentElement.classList.add(`text-size-${textSize}`);
+    try {
+      localStorage.setItem('finance-text-size', textSize);
+    } catch {}
+  }, [settings.textSize]);
+
   // Cross-tab sync: when another tab changes a setting, refresh this tab's cache.
   // BroadcastChannel only delivers to OTHER contexts, so we never echo our own writes.
   useEffect(() => {
@@ -47,6 +68,16 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
   }, [refetch]);
 
   const updateSetting = useCallback(async (key: string, value: any) => {
+    if (key === 'textSize') {
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.remove('text-size-sm', 'text-size-default', 'text-size-base', 'text-size-lg');
+        document.documentElement.classList.add(`text-size-${value}`);
+        try {
+          localStorage.setItem('finance-text-size', value);
+        } catch {}
+      }
+    }
+
     // Optimistically update local query cache
     queryClient.setQueryData<Record<string, any>>(queryKeys.userSettings.all, (prev = {}) => {
       if (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility' || key === 'budgetExclusions') {
