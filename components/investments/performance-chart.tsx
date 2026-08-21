@@ -30,17 +30,19 @@ import { Activity, ArrowUpRight, ArrowDownRight, DollarSign, Percent } from 'luc
 interface HistoryPoint {
   date: string;
   value: number;
+  twr?: number; // Time-weighted return %
   benchmark?: number; // SPY % normalized
   portfolioPct?: number; // portfolio % normalized from start
 }
 
 interface HistoryResponse {
-  data: { date: string; value: number }[];
+  data: { date: string; value: number; twr?: number }[];
   summary: {
     current: number;
     previous: number;
     change: number;
     percentChange: number;
+    twrPct?: number;
   };
 }
 
@@ -49,7 +51,7 @@ interface BenchmarkPoint {
   close: number;
 }
 
-type DisplayMode = 'dollar' | 'percent';
+type DisplayMode = 'dollar' | 'percent' | 'twr';
 
 async function fetchBenchmark(timeframe: TimeRange): Promise<BenchmarkPoint[]> {
   try {
@@ -77,7 +79,7 @@ export function PerformanceChart() {
   const [timeframe, setTimeframe] = useState<TimeRange>('1y');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('dollar');
   const [showBenchmark, setShowBenchmark] = useState(false);
-  const [chartData, setChartData] = useState<{ date: string; value: number }[]>([]);
+  const [chartData, setChartData] = useState<{ date: string; value: number; twr?: number }[]>([]);
   const [benchmarkData, setBenchmarkData] = useState<BenchmarkPoint[]>([]);
   const [summary, setSummary] = useState<HistoryResponse['summary'] | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -167,8 +169,11 @@ export function PerformanceChart() {
     const finalSmaWindow = Math.min(smaTargetPoints, maxSmaAllowed);
     const smaWindow = Math.max(1, finalSmaWindow);
 
-    const fields: ('value')[] = ['value'];
-    const medianFiltered = computeMedianFilter(chartData, fields, medianWindow);
+    const fields: ('value' | 'twr')[] = ['value'];
+    if (chartData.some(d => d.twr !== undefined)) {
+      fields.push('twr');
+    }
+    const medianFiltered = computeMedianFilter(chartData as any, fields, medianWindow);
 
     if (smaWindow > 1) {
       return computeMovingAverage(medianFiltered, fields, smaWindow);
@@ -191,16 +196,17 @@ export function PerformanceChart() {
       }
     }
 
-    return smoothedChartData.map((d) => {
+    return smoothedChartData.map((d: any) => {
       const portfolioPct = baseValue > 0 ? ((d.value - baseValue) / baseValue) * 100 : 0;
       const benchmarkPct = benchMap.get(d.date);
       // In dollar mode, map benchmark to equivalent indexed dollar value: baseValue * (1 + benchmarkPct / 100)
       const benchmarkVal = benchmarkPct !== undefined ? baseValue * (1 + benchmarkPct / 100) : undefined;
-      const benchmark = displayMode === 'percent' ? benchmarkPct : benchmarkVal;
+      const benchmark = displayMode === 'dollar' ? benchmarkVal : benchmarkPct;
 
       return {
         date: d.date,
         value: d.value,
+        twr: d.twr ?? 0,
         portfolioPct,
         ...(benchmark !== undefined ? { benchmark, benchmarkPct } : {}),
       } as HistoryPoint & { benchmarkPct?: number };
@@ -209,6 +215,16 @@ export function PerformanceChart() {
 
   const yDomain = useMemo((): [number, number] => {
     if (mergedData.length === 0) return [0, 1000];
+
+    if (displayMode === 'twr') {
+      const twrs = mergedData.map((d) => d.twr ?? 0);
+      const benchPcts = showBenchmark ? mergedData.map((d: any) => d.benchmarkPct ?? 0) : [];
+      const all = [...twrs, ...benchPcts];
+      const rawMin = Math.min(...all);
+      const rawMax = Math.max(...all);
+      const pad = Math.max(Math.abs(rawMax - rawMin) * 0.1, 2);
+      return [rawMin - pad, rawMax + pad];
+    }
 
     if (displayMode === 'percent') {
       const pcts = mergedData.map((d) => d.portfolioPct ?? 0);
@@ -238,27 +254,35 @@ export function PerformanceChart() {
   }, [timeframe]);
 
   const formatYTick = useCallback((v: number) => {
-    if (displayMode === 'percent') return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+    if (displayMode === 'percent' || displayMode === 'twr') return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
     return formatChartYAxisCurrency(v, yDomain[0], yDomain[1]);
   }, [displayMode, yDomain]);
 
   const CustomTooltip = useCallback(({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
     const point = payload[0]?.payload as HistoryPoint & { benchmarkPct?: number };
+    const getPortfolioVal = () => {
+      if (displayMode === 'twr') {
+        return `${(point.twr ?? 0) >= 0 ? '+' : ''}${(point.twr ?? 0).toFixed(2)}% (TWR)`;
+      }
+      if (displayMode === 'percent') {
+        return `${(point.portfolioPct ?? 0) >= 0 ? '+' : ''}${(point.portfolioPct ?? 0).toFixed(2)}%`;
+      }
+      return formatCurrency(point.value);
+    };
+
     return (
       <ChartTooltip>
         <TooltipHeader>{formatSafeUTCDate(point.date, { month: 'short', day: 'numeric', year: 'numeric' })}</TooltipHeader>
         <TooltipRow
-          label="Portfolio"
-          value={displayMode === 'percent'
-            ? `${(point.portfolioPct ?? 0) >= 0 ? '+' : ''}${(point.portfolioPct ?? 0).toFixed(2)}%`
-            : formatCurrency(point.value)}
+          label={displayMode === 'twr' ? 'Portfolio TWR' : 'Portfolio'}
+          value={getPortfolioVal()}
           color="var(--color-chart-1)"
         />
         {showBenchmark && point.benchmarkPct !== undefined && (
           <TooltipRow
             label="SPY (Benchmark)"
-            value={displayMode === 'percent'
+            value={displayMode === 'percent' || displayMode === 'twr'
               ? `${point.benchmarkPct >= 0 ? '+' : ''}${point.benchmarkPct.toFixed(2)}%`
               : `${formatCurrency(point.benchmark!)} (${point.benchmarkPct >= 0 ? '+' : ''}${point.benchmarkPct.toFixed(2)}%)`}
             color="var(--color-chart-3)"
@@ -315,7 +339,7 @@ export function PerformanceChart() {
     );
   }
 
-  const portfolioKey = displayMode === 'percent' ? 'portfolioPct' : 'value';
+  const portfolioKey = displayMode === 'twr' ? 'twr' : (displayMode === 'percent' ? 'portfolioPct' : 'value');
   const portfolioColor = 'var(--color-chart-1)';
   const benchmarkColor = 'var(--color-chart-3)';
 
@@ -351,6 +375,7 @@ export function PerformanceChart() {
                   {([
                     { value: 'dollar' as DisplayMode, icon: DollarSign, label: '$' },
                     { value: 'percent' as DisplayMode, icon: Percent, label: '%' },
+                    { value: 'twr' as DisplayMode, icon: Percent, label: 'TWR' },
                   ]).map((opt) => (
                     <button
                       key={opt.value}
@@ -492,6 +517,20 @@ export function PerformanceChart() {
                     <span className="text-muted-foreground">Ending Value:</span>
                     <span className="font-semibold text-foreground financial-value blur-number">{formatCurrency(summary.current)}</span>
                   </div>
+                  {summary.twrPct !== undefined && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Portfolio TWR:</span>
+                      <span className={`font-semibold financial-value blur-number ${summary.twrPct >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                        {summary.twrPct >= 0 ? '+' : ''}{summary.twrPct.toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {displayMode === 'twr' && (
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-border/40">
+                      <span className="text-muted-foreground">Mode:</span>
+                      <span className="font-semibold text-primary">Time-Weighted Return</span>
+                    </div>
+                  )}
                   {displayMode === 'percent' && (
                     <div className="flex items-center justify-between text-xs pt-1 border-t border-border/40">
                       <span className="text-muted-foreground">Mode:</span>

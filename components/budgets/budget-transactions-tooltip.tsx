@@ -167,11 +167,40 @@ export function BudgetItemTransactionsIcon({
   const txList: TransactionItem[] = data?.data ?? [];
   const totalCount: number = data?.total ?? txList.length;
 
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const isDraggingRef = useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+    isDraggingRef.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    if (Math.hypot(dx, dy) > 8) {
+      isDraggingRef.current = true;
+    }
+  };
+
   const handleLinkClick = (e: React.MouseEvent) => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768 && !open) {
-      e.preventDefault();
-      setOpen(true);
-      return;
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      if (isDraggingRef.current) {
+        e.preventDefault();
+        return;
+      }
+      const elapsed = touchStartRef.current ? Date.now() - touchStartRef.current.time : 0;
+      // If short tap (< 350ms) and tooltip is closed, show tooltip instead of immediately navigating
+      if (elapsed < 350 && !open) {
+        e.preventDefault();
+        setOpen(true);
+        return;
+      }
+      // If long tap (> 350ms), allow navigation to proceed
     }
     setOpen(false);
   };
@@ -183,6 +212,8 @@ export function BudgetItemTransactionsIcon({
           <Link
             href={targetUrl}
             onClick={handleLinkClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             aria-label={`View transactions for ${categoryName}`}

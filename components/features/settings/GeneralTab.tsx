@@ -18,6 +18,7 @@ export default function GeneralTab() {
   const [locale, setLocale] = useState('en-US');
   const [dateFormat, setDateFormat] = useState('MM/DD/YYYY');
   const [compactMode, setCompactMode] = useState(false);
+  const [textSize, setTextSize] = useState('default');
   const [devMode, setDevMode] = useState<boolean | null>(null);
   const [devModeLoading, setDevModeLoading] = useState(false);
 
@@ -41,6 +42,7 @@ export default function GeneralTab() {
         setLocale(data.locale ?? 'en-US');
         setDateFormat(data.dateFormat ?? 'MM/DD/YYYY');
         setCompactMode(data.compactMode ?? false);
+        setTextSize(data.textSize ?? 'default');
       })
       .catch(() => setAccentColor('violet'));
   }, []);
@@ -122,6 +124,25 @@ export default function GeneralTab() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ compactMode: val }),
+      });
+    } catch {}
+  };
+
+  const handleTextSizeChange = async (val: string) => {
+    setTextSize(val);
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.remove('text-size-sm', 'text-size-default', 'text-size-base', 'text-size-lg');
+      document.documentElement.classList.add(`text-size-${val}`);
+      try {
+        localStorage.setItem('finance-text-size', val);
+      } catch {}
+    }
+    try {
+      await fetch('/api/user-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ textSize: val }),
       });
     } catch {}
   };
@@ -337,6 +358,23 @@ export default function GeneralTab() {
               checked={compactMode}
               onCheckedChange={handleCompactModeChange}
             />
+          </div>
+
+          {/* Text Size */}
+          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Text Size</h3>
+              <p className="text-xs text-muted-foreground mt-1">Adjust typography scaling across tables, cards, charts, and headings</p>
+            </div>
+            <select
+              value={textSize}
+              onChange={(e) => handleTextSizeChange(e.target.value)}
+              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="sm">Small (Compact - 14px)</option>
+              <option value="default">Default (Standard - 16px)</option>
+              <option value="lg">Large (Comfortable - 18px)</option>
+            </select>
           </div>
 
 

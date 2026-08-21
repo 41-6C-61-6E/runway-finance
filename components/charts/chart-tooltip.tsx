@@ -34,19 +34,24 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
     el.style.transform = 'none';
 
     const rect = el.getBoundingClientRect();
+    const margin = 12;
     let tx = 0;
     let ty = 0;
 
-    if (rect.right > window.innerWidth) {
-      tx = -(rect.right - window.innerWidth + 12);
-    } else if (rect.left < 0) {
-      tx = -rect.left + 12;
+    // Check horizontal bounds with bidirectional safety
+    if (rect.right > window.innerWidth - margin) {
+      tx -= (rect.right - (window.innerWidth - margin));
+    }
+    if (rect.left + tx < margin) {
+      tx += (margin - (rect.left + tx));
     }
 
-    if (rect.bottom > window.innerHeight) {
-      ty = -(rect.bottom - window.innerHeight + 12);
-    } else if (rect.top < 0) {
-      ty = -rect.top + 12;
+    // Check vertical bounds with bidirectional safety
+    if (rect.bottom > window.innerHeight - margin) {
+      ty -= (rect.bottom - (window.innerHeight - margin));
+    }
+    if (rect.top + ty < margin) {
+      ty += (margin - (rect.top + ty));
     }
 
     setTranslateX(tx);

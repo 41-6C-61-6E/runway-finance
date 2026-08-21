@@ -11,6 +11,7 @@ import { SettingsTab } from '@/components/plans/settings-tab';
 import { PlanWizardModal } from '@/components/plans/plan-wizard-modal';
 import { DeletePlanDialog } from '@/components/plans/delete-plan-dialog';
 import { PlanManagementMenu } from '@/components/plans/plan-management-menu';
+import { FirePlanExportModal } from '@/components/plans/fire-plan-export-modal';
 
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
@@ -29,6 +30,9 @@ export default function PlansPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardMode, setWizardMode] = useState<'create' | 'edit'>('create');
   const [editingPlanTarget, setEditingPlanTarget] = useState<any>(null);
+
+  // Export Plan Modal State
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   // Delete Plan Dialog State
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -325,6 +329,7 @@ export default function PlansPage() {
                 onOpenWizardEdit={(plan) => openEditPlanWizard(plan)}
                 onSetDefaultPlan={handleSetDefaultPlan}
                 onResetDefaultPlan={handleResetDefaultPlan}
+                onOpenExport={() => setExportModalOpen(true)}
                 onOpenDeleteConfirm={(plan) => {
                   setPlanToDelete(plan);
                   setDeleteDialogOpen(true);
@@ -411,6 +416,16 @@ export default function PlansPage() {
         }}
         onConfirmDelete={handleConfirmDeletePlan}
       />
+
+      {/* FIRE Plan Export Modal */}
+      {selectedPlan && (
+        <FirePlanExportModal
+          open={exportModalOpen}
+          onOpenChange={setExportModalOpen}
+          plan={selectedPlan}
+          accounts={accountsList}
+        />
+      )}
     </div>
   );
 }

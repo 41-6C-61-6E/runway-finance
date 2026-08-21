@@ -113,18 +113,41 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
       return display;
     }
 
+    /** Clean up any orphaned SVG overlays whose target element has been unmounted */
+    function cleanupOrphanedOverlays() {
+      document.querySelectorAll('[data-privacy-svg-overlay]').forEach(wrapper => {
+        const uid = wrapper.getAttribute('data-privacy-svg-overlay');
+        const target = uid ? document.querySelector(`[data-privacy-uid="${uid}"]`) : null;
+        if (!target || !document.body.contains(target)) {
+          wrapper.remove();
+        }
+      });
+    }
+
     /** Pixelate a regular HTML element by appending a canvas child */
     function pixelateHtmlElement(el: Element) {
       const htmlEl = el as HTMLElement;
-      if (htmlEl.querySelector('canvas[data-privacy-overlay]')) return;
-
       const text = htmlEl.textContent?.trim();
-      if (!text) return;
+      if (!text) {
+        htmlEl.querySelector('canvas[data-privacy-overlay]')?.remove();
+        return;
+      }
 
       const rect = htmlEl.getBoundingClientRect();
       const width = Math.ceil(rect.width);
       const height = Math.ceil(rect.height);
       if (width === 0 || height === 0) return;
+
+      const existingCanvas = htmlEl.querySelector('canvas[data-privacy-overlay]') as HTMLCanvasElement | null;
+      if (existingCanvas) {
+        const prevText = existingCanvas.getAttribute('data-privacy-text');
+        const prevW = existingCanvas.getAttribute('data-privacy-w');
+        const prevH = existingCanvas.getAttribute('data-privacy-h');
+        if (prevText === text && prevW === String(width) && prevH === String(height)) {
+          return;
+        }
+        existingCanvas.remove();
+      }
 
       const computed = window.getComputedStyle(htmlEl);
       const canvas = createPixelCanvas(
@@ -136,6 +159,9 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
 
       canvas.style.cssText = `position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;`;
       canvas.setAttribute('data-privacy-overlay', 'true');
+      canvas.setAttribute('data-privacy-text', text);
+      canvas.setAttribute('data-privacy-w', String(width));
+      canvas.setAttribute('data-privacy-h', String(height));
       canvas.setAttribute('aria-hidden', 'true');
       htmlEl.appendChild(canvas);
     }
@@ -143,8 +169,12 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
     /** Pixelate an SVG <text> element using a fixed-position overlay div.
      *  Reads the fill color FIRST, then hides the text, then overlays. */
     function pixelateSvgText(el: SVGTextElement) {
-      // Skip if already processed
-      if (el.hasAttribute('data-privacy-uid')) return;
+      // If already processed and still valid, reposition instead
+      const existingUid = el.getAttribute('data-privacy-uid');
+      if (existingUid) {
+        const existingWrapper = document.querySelector(`[data-privacy-svg-overlay="${existingUid}"]`);
+        if (existingWrapper) return;
+      }
 
       const text = el.textContent?.trim();
       if (!text) return;
@@ -190,22 +220,46 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
       document.body.appendChild(wrapper);
     }
 
-    /** Reposition all fixed SVG overlays (e.g. after scroll) */
+    /** Reposition all fixed SVG overlays (e.g. after scroll) and remove disconnected ones */
     function repositionSvgOverlays() {
+      cleanupOrphanedOverlays();
+
       document.querySelectorAll('[data-privacy-uid]').forEach(el => {
         const uid = el.getAttribute('data-privacy-uid');
         if (!uid) return;
         const wrapper = document.querySelector(`[data-privacy-svg-overlay="${uid}"]`) as HTMLElement;
         if (!wrapper) return;
+
+        if (!document.body.contains(el)) {
+          wrapper.remove();
+          return;
+        }
+
         const rect = el.getBoundingClientRect();
+        const width = Math.ceil(rect.width);
+        const height = Math.ceil(rect.height);
+
+        // Hide wrapper if target has 0 dimensions or is completely offscreen
+        if (
+          width === 0 || height === 0 ||
+          rect.bottom < 0 || rect.top > window.innerHeight ||
+          rect.right < 0 || rect.left > window.innerWidth
+        ) {
+          wrapper.style.display = 'none';
+          return;
+        }
+
+        wrapper.style.display = 'block';
         wrapper.style.left = `${rect.left}px`;
         wrapper.style.top = `${rect.top}px`;
-        wrapper.style.width = `${Math.ceil(rect.width)}px`;
-        wrapper.style.height = `${Math.ceil(rect.height)}px`;
+        wrapper.style.width = `${width}px`;
+        wrapper.style.height = `${height}px`;
       });
     }
 
     function pixelateAll() {
+      cleanupOrphanedOverlays();
+
       // HTML and SVG elements with privacy classes
       document.querySelectorAll('.financial-value, .blur-number').forEach(el => {
         if (el instanceof SVGElement) {
@@ -224,6 +278,8 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
       document.querySelectorAll('.recharts-legend-item-text').forEach(el => {
         pixelateHtmlElement(el);
       });
+
+      repositionSvgOverlays();
     }
 
     // Initial pass (after paint so dimensions are available)
@@ -237,13 +293,14 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
       if (rafId) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(pixelateAll);
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-    // Reposition fixed SVG overlays on scroll
+    // Reposition fixed SVG overlays on scroll (using capture: true to catch all subcontainer scrolls)
     function handleScroll() {
-      repositionSvgOverlays();
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(repositionSvgOverlays);
     }
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
 
     // Handle window resize — re-create canvases at new dimensions
     function handleResize() {
@@ -254,7 +311,7 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
 
     return () => {
       observer.disconnect();
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll, true);
       window.removeEventListener('resize', handleResize);
       if (rafId) cancelAnimationFrame(rafId);
       cleanupPixelation();

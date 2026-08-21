@@ -11,9 +11,10 @@ import {
   Check,
   Flame,
   ChevronDown,
+  FileDown,
+  Sparkles,
 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-
 
 export interface PlanManagementMenuProps {
   plans: any[];
@@ -24,6 +25,7 @@ export interface PlanManagementMenuProps {
   onSetDefaultPlan: (planId: string) => Promise<void>;
   onResetDefaultPlan: (planId: string) => Promise<void>;
   onOpenDeleteConfirm: (plan: any) => void;
+  onOpenExport?: () => void;
   updating?: boolean;
 }
 
@@ -36,6 +38,7 @@ export function PlanManagementMenu({
   onSetDefaultPlan,
   onResetDefaultPlan,
   onOpenDeleteConfirm,
+  onOpenExport,
   updating = false,
 }: PlanManagementMenuProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -111,6 +114,21 @@ export function PlanManagementMenu({
               {isCurrentDefault ? 'Primary Baseline Plan' : 'Scenario Plan'}
             </p>
           </div>
+
+          {/* Export FIRE Plan */}
+          {onOpenExport && (
+            <button
+              type="button"
+              onClick={() => {
+                setDropdownOpen(false);
+                onOpenExport();
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-orange-500/10 hover:text-orange-500 rounded-lg transition-colors text-left cursor-pointer"
+            >
+              <FileDown className="w-3.5 h-3.5 shrink-0 text-orange-500" />
+              <span>Export Plan (PDF / AI)</span>
+            </button>
+          )}
 
           {/* Re-run Wizard */}
           <button

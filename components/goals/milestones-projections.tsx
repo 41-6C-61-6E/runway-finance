@@ -534,7 +534,7 @@ export function MilestonesProjections() {
                     dataKey="date"
                     tickLine={false}
                     axisLine={{ stroke: 'var(--color-border)' }}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                     ticks={xAxisTicks}
                     tickFormatter={formatDateLabel}
                     minTickGap={30}
@@ -543,7 +543,7 @@ export function MilestonesProjections() {
                   <YAxis
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
                     width={55}
                     tickFormatter={(v: number) => formatChartYAxisCurrency(v, 0, yDomainMax)}
                   />
