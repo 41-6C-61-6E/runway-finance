@@ -8,6 +8,20 @@ import { decryptField, encryptField, decryptRows } from '@/lib/crypto';
 import { DEFAULTS } from '@/config/defaults';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 
+function ensureJsonObject(val: any, fallback: Record<string, any> = {}): Record<string, any> {
+  if (!val) return fallback;
+  if (typeof val === 'object' && !Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {}
+  }
+  return fallback;
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -511,9 +525,24 @@ export async function PATCH(request: Request) {
         textSize: textSize ?? DEFAULTS.textSize,
         theme: theme ?? DEFAULTS.theme,
         timezone: timezone ?? DEFAULTS.timezone,
-        privacyMode,
+        privacyMode: privacyMode ?? DEFAULTS.privacyMode,
         accentColor: accentColor ?? DEFAULTS.accentColor,
         chartColorScheme: chartColorScheme ?? DEFAULTS.chartColorScheme,
+        chartVisibility: chartVisibility ?? DEFAULTS.chartVisibility,
+        forecastMode: forecastMode ?? DEFAULTS.forecastMode,
+        forecastLookbackMonths: forecastLookbackMonths ?? DEFAULTS.forecastLookbackMonths,
+        hiddenPages: hiddenPages ?? DEFAULTS.hiddenPages,
+        showSyntheticData: showSyntheticData ?? DEFAULTS.showSyntheticData,
+        showImportedData: showImportedData ?? DEFAULTS.showImportedData,
+        useMarketDataForSnapshots: useMarketDataForSnapshots ?? DEFAULTS.useMarketDataForSnapshots,
+        defaultChartTimeRange: defaultChartTimeRange ?? DEFAULTS.defaultChartTimeRange,
+        defaultChartType: defaultChartType ?? DEFAULTS.defaultChartType,
+        reduceTransparency: reduceTransparency ?? DEFAULTS.reduceTransparency,
+        hideAccountSubheadings: hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
+        hideAccountsSidebarByDefault: hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
+        chartSelections: chartSelections ?? DEFAULTS.chartSelections,
+        cardCollapsedStates: cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
+        paystubEnabled: paystubEnabled ?? DEFAULTS.paystubEnabled,
         accountTagVisibility: accountTagVisibility ?? DEFAULTS.accountTagVisibility,
         budgetExclusions: budgetExclusions ?? DEFAULTS.budgetExclusions,
         recurringExclusions: recurringExclusions ?? DEFAULTS.recurringExclusions,
@@ -592,11 +621,11 @@ export async function PATCH(request: Request) {
   if (hideAccountSubheadings !== undefined) updates.hideAccountSubheadings = hideAccountSubheadings;
   if (hideAccountsSidebarByDefault !== undefined) updates.hideAccountsSidebarByDefault = hideAccountsSidebarByDefault;
   if (chartSelections !== undefined) {
-    const existingSelections = (settings[0].chartSelections as Record<string, any>) || {};
+    const existingSelections = ensureJsonObject(settings[0].chartSelections, {});
     updates.chartSelections = { ...existingSelections, ...chartSelections };
   }
   if (cardCollapsedStates !== undefined) {
-    const existingStates = (settings[0].cardCollapsedStates as Record<string, any>) || {};
+    const existingStates = ensureJsonObject(settings[0].cardCollapsedStates, {});
     updates.cardCollapsedStates = { ...existingStates, ...cardCollapsedStates };
   }
 	if (paystubEnabled !== undefined) updates.paystubEnabled = paystubEnabled;
@@ -610,11 +639,11 @@ export async function PATCH(request: Request) {
 	if (useMarketDataForSnapshots !== undefined) updates.useMarketDataForSnapshots = useMarketDataForSnapshots;
 	if (apiKeys !== undefined) updates.apiKeys = await encryptField(JSON.stringify(apiKeys), dek);
 	if (accountTagVisibility !== undefined) {
-		const existingVisibility = (settings[0].accountTagVisibility as Record<string, any>) || {};
+		const existingVisibility = ensureJsonObject(settings[0].accountTagVisibility, DEFAULTS.accountTagVisibility as Record<string, any>);
 		updates.accountTagVisibility = { ...existingVisibility, ...accountTagVisibility };
 	}
   if (budgetExclusions !== undefined) {
-    const existingEx = (settings[0].budgetExclusions as Record<string, any>) || { categoryIds: [], tagIds: [] };
+    const existingEx = ensureJsonObject(settings[0].budgetExclusions, { categoryIds: [], tagIds: [] });
     updates.budgetExclusions = {
       categoryIds: budgetExclusions.categoryIds ?? existingEx.categoryIds ?? [],
       tagIds: budgetExclusions.tagIds ?? existingEx.tagIds ?? [],

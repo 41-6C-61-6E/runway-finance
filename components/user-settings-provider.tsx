@@ -101,13 +101,14 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to update setting');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${res.status}`);
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.userSettings.all });
       // Notify other open tabs so they refresh their settings cache.
       channelRef.current?.postMessage({ type: 'settings-changed', key });
     } catch (e) {
-      console.error(`Failed to update setting ${key}`, e);
+      console.error(`Failed to update setting ${key}:`, e);
       queryClient.invalidateQueries({ queryKey: queryKeys.userSettings.all });
     }
   }, [queryClient]);
