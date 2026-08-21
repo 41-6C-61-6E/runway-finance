@@ -578,7 +578,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
               const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
               return (
-                <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
+                <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
@@ -759,7 +759,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                     {incomeBudgets.map((b) => {
                       const isTargetMet = b.remaining >= 0;
                       return (
-                        <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors">
+                        <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
                           <td className={`px-2.5 sm:px-3.5 py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
                             <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
                               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
@@ -840,7 +840,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
                       return (
                         <Fragment key={b.id}>
-                          <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
+                          <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
                             <td className={`px-2.5 sm:px-3.5 py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
                               <div className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-wrap">
                                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
