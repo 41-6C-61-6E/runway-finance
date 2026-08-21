@@ -148,7 +148,7 @@ export default function InvestmentsPage() {
           <div className="space-y-5 sm:space-y-6">
             {/* ── Summary Metrics ── */}
             {isVisible('investmentsSummary') && (
-              <div>
+              <div className="hidden md:block">
                 <InvestmentsSummary
                   summary={data.summary}
                   accounts={data.accounts}

@@ -310,7 +310,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
             )}
           </button>
         </TooltipTrigger>
-        <TooltipContent side="bottom">Bugs & Feedback</TooltipContent>
+        <TooltipContent side="bottom" className="hidden md:block">Bugs & Feedback</TooltipContent>
       </Tooltip>
 
       {open && (

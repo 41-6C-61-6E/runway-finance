@@ -25,7 +25,8 @@ import { computeMovingAverage, computeMedianFilter } from '@/lib/utils/chart-agg
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Activity, ArrowUpRight, ArrowDownRight, DollarSign, Percent } from 'lucide-react';
+import { Activity, ArrowUpRight, ArrowDownRight, DollarSign, Percent, Info } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 interface HistoryPoint {
   date: string;
@@ -519,7 +520,56 @@ export function PerformanceChart() {
                   </div>
                   {summary.twrPct !== undefined && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Portfolio TWR:</span>
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-help transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded"
+                              aria-label="Portfolio Time-Weighted Return explanation and calculation"
+                            >
+                              <span className="underline decoration-dotted underline-offset-2">Portfolio TWR:</span>
+                              <Info className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" align="center" className="max-w-xs sm:max-w-sm p-3.5 space-y-2 text-xs">
+                            <div className="flex items-center justify-between border-b border-border/50 pb-1.5 font-semibold text-foreground">
+                              <span>Time-Weighted Return (TWR)</span>
+                              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">
+                                Metric Guide
+                              </span>
+                            </div>
+                            <div className="space-y-1.5 text-muted-foreground leading-relaxed">
+                              <p>
+                                <strong className="text-foreground">What it is:</strong> Measures true portfolio performance over time by removing the distorting impact of cash deposits, transfers, and withdrawals.
+                              </p>
+                              <p>
+                                <strong className="text-foreground">Calculation:</strong> Evaluates daily sub-period returns between cash flows:
+                              </p>
+                              <div className="bg-muted/60 border border-border/50 rounded p-1.5 font-mono text-[11px] text-foreground text-center">
+                                r<sub>t</sub> = (Ending Val - Net Cash Flow) / Beginning Val - 1
+                              </div>
+                              <p className="text-[11px]">
+                                Daily factors are compounded across the timeframe: <span className="font-mono text-foreground">∏(1 + r<sub>t</sub>) - 1</span>.
+                              </p>
+                              <p>
+                                <strong className="text-foreground">What the number means:</strong>
+                              </p>
+                              <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                                <li>
+                                  <span className="text-chart-1 font-medium">Positive (+%)</span> indicates net investment growth from market performance.
+                                </li>
+                                <li>
+                                  <span className="text-destructive font-medium">Negative (-%)</span> indicates net investment losses.
+                                </li>
+                                <li>
+                                  Deposits won&apos;t artificially inflate your return, and withdrawals won&apos;t penalize it—providing an accurate comparison against benchmarks like SPY.
+                                </li>
+                              </ul>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <span className={`font-semibold financial-value blur-number ${summary.twrPct >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
                         {summary.twrPct >= 0 ? '+' : ''}{summary.twrPct.toFixed(2)}%
                       </span>

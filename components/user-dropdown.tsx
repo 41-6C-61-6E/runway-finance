@@ -192,7 +192,7 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
             {initial}
           </button>
         </TooltipTrigger>
-        <TooltipContent side="bottom">User menu</TooltipContent>
+        <TooltipContent side="bottom" className="hidden md:block">User menu</TooltipContent>
       </Tooltip>
       {open && (
         <div className="absolute right-[-12px] sm:right-0 top-full mt-1 w-56 py-1 bg-card border border-border rounded-lg shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
+import { cn } from '@/lib/utils';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import {
@@ -63,6 +64,7 @@ interface InvestmentsSummaryProps {
   totalAnnualIncome?: number;
   portfolioHistory?: { date: string; value: number; twr?: number }[]; // last 30 days
   quotes?: QuoteData[];
+  className?: string;
 }
 
 function MiniSparkline({ data, isPositive }: { data: number[]; isPositive: boolean }) {
@@ -153,6 +155,7 @@ export function InvestmentsSummary({
   totalAnnualIncome,
   portfolioHistory,
   quotes,
+  className,
 }: InvestmentsSummaryProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('investmentsSummary');
 
@@ -273,7 +276,7 @@ export function InvestmentsSummary({
   ];
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+    <div className={cn('hidden md:block bg-card border border-border rounded-xl shadow-sm overflow-hidden', className)}>
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
