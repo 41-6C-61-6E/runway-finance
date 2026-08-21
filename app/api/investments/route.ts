@@ -83,9 +83,9 @@ export async function GET(request: Request) {
       let gainLoss = null;
       let returnPct = null;
 
-      if (cost != null && cost > 0) {
+      if (cost != null && cost >= 0) {
         gainLoss = value - cost;
-        returnPct = (gainLoss / cost) * 100;
+        returnPct = cost > 0 ? (gainLoss / cost) * 100 : null;
         
         totalCostBasis += cost;
         totalValueForCostBasis += value;

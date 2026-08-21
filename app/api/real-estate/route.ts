@@ -105,8 +105,9 @@ export async function GET(request: Request) {
           0
         );
         const equity = propertyValue - Math.abs(totalMortgageBalance);
-        const ltv = propertyValue > 0 ? (Math.abs(totalMortgageBalance) / propertyValue) * 100 : 0;
-        const sellerClosingCostPercent = 8.0;
+        const sellerClosingCostPercent = typeof meta.sellerClosingCostPercent === 'number' && meta.sellerClosingCostPercent >= 0
+          ? meta.sellerClosingCostPercent
+          : 8.0;
         const saleProceeds = propertyValue * (1 - sellerClosingCostPercent / 100) - Math.abs(totalMortgageBalance);
 
         const snapshotsConditions = [
@@ -188,6 +189,7 @@ export async function GET(request: Request) {
           }),
           equity,
           ltv,
+          sellerClosingCostPercent,
           saleProceeds: Math.max(0, saleProceeds),
           snapshots: decryptedSnapshots,
           mortgageSnapshots: decryptedMortgageSnapshots,

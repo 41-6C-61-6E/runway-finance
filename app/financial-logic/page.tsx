@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Calculator } from 'lucide-react';
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isFireEligibleAccount } from '@/lib/utils/account-scope';
 import { ASSET_ACCOUNT_TYPES, LIABILITY_ACCOUNT_TYPES } from '@/lib/utils/account-scope';
 import {
   buildNetWorthTraces,
@@ -11,6 +11,7 @@ import {
   buildInvestmentsTrace,
   buildBudgetTrace,
   buildGoalsTrace,
+  buildFireTrace,
 } from '@/lib/services/trace-engine';
 import { CalculationTraceOverlay, formatTraceResult } from '@/components/financial-logic/calculation-trace';
 import type { AccountData, CalculationTrace } from '@/lib/types/financial';
@@ -33,6 +34,14 @@ interface FetchedData {
   };
   budgets: { incomeBudgeted: number; incomeActual: number; expenseBudgeted: number; expenseActual: number };
   goals: { totalTarget: number; totalCurrent: number; overallProgress: number };
+  fire: {
+    fireNumber: number;
+    currentInvestableAssets: number;
+    percentToFire: number;
+    yearsToFI: number;
+    safeWithdrawalRate: number;
+    targetAnnualExpenses: number;
+  };
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -42,12 +51,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   investments: 'Investments',
   budgets: 'Budgets',
   goals: 'Goals',
+  fire: 'FIRE & Retirement',
 };
 
-const CATEGORY_ORDER = ['netWorth', 'cashFlow', 'realEstate', 'investments', 'budgets', 'goals'];
+const CATEGORY_ORDER = ['netWorth', 'cashFlow', 'realEstate', 'investments', 'budgets', 'goals', 'fire'];
 
 function GroupedTraceTree({ traces }: { traces: CalculationTrace[] }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(traces.map((t) => t.id)));
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(traces.map((t) => t.category)));
   const [expandedTrace, setExpandedTrace] = useState<Set<string>>(new Set());
 
   const grouped = useMemo(() => {
@@ -81,9 +91,8 @@ function GroupedTraceTree({ traces }: { traces: CalculationTrace[] }) {
     <div className="space-y-3">
       {CATEGORY_ORDER.filter((c) => grouped[c]?.length).map((cat) => {
         const catTraces = grouped[cat];
-        const catResult = catTraces.reduce((s, t) => s + t.result, 0);
         return (
-          <div key={cat} className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div key={cat} id={cat} className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
             <button
               onClick={() => toggle(cat)}
               className="flex items-center justify-between w-full px-5 py-3.5 hover:bg-muted/30 transition-colors"
@@ -95,14 +104,14 @@ function GroupedTraceTree({ traces }: { traces: CalculationTrace[] }) {
                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 )}
                 <Calculator className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-semibold text-foreground">{CATEGORY_LABELS[cat]}</span>
+                <span className="text-sm font-semibold text-foreground">{CATEGORY_LABELS[cat] || cat}</span>
                 <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded font-medium">
-                  {catTraces.length} metrics
+                  {catTraces.length} metric{catTraces.length === 1 ? '' : 's'}
                 </span>
               </div>
               <div className="flex items-center gap-3 text-xs">
                 {catTraces.slice(0, 2).map((t) => (
-                  <span key={t.id} className="text-muted-foreground">
+                  <span key={t.id} className="text-muted-foreground hidden sm:inline">
                     {t.title}: <span className="font-mono text-foreground font-medium">{formatTraceResult(t.result, t.format)}</span>
                   </span>
                 ))}
@@ -121,7 +130,7 @@ function GroupedTraceTree({ traces }: { traces: CalculationTrace[] }) {
                         <span className="text-xs text-muted-foreground w-4">
                           {expandedTrace.has(trace.id) ? '−' : '+'}
                         </span>
-                        <span className="text-sm text-foreground">{trace.title}</span>
+                        <span className="text-sm text-foreground font-medium">{trace.title}</span>
                       </div>
                       <span className="text-sm font-mono font-medium text-foreground">
                         {formatTraceResult(trace.result, trace.format)}
@@ -156,6 +165,7 @@ function AccountClassificationTable({ accounts }: { accounts: AccountData[] }) {
             ? 'Liability'
             : 'Uncategorized',
         excluded: !!a.isHidden || !!a.isExcludedFromNetWorth,
+        fireEligible: isFireEligibleAccount(a),
       })),
     [accounts]
   );
@@ -175,7 +185,8 @@ function AccountClassificationTable({ accounts }: { accounts: AccountData[] }) {
               <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Type</th>
               <th className="text-right py-2 pr-4 font-medium text-muted-foreground">Balance</th>
               <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Classification</th>
-              <th className="text-left py-2 font-medium text-muted-foreground">Status</th>
+              <th className="text-left py-2 pr-4 font-medium text-muted-foreground">FIRE Status</th>
+              <th className="text-left py-2 font-medium text-muted-foreground">Net Worth Scope</th>
             </tr>
           </thead>
           <tbody>
@@ -188,6 +199,13 @@ function AccountClassificationTable({ accounts }: { accounts: AccountData[] }) {
                 </td>
                 <td className="py-1.5 pr-4">
                   <ClassificationBadge label={row.classification} />
+                </td>
+                <td className="py-1.5 pr-4">
+                  {row.fireEligible ? (
+                    <span className="text-chart-1/80 text-[10px] font-mono">Investable</span>
+                  ) : (
+                    <span className="text-muted-foreground text-[10px] font-mono">Excluded</span>
+                  )}
                 </td>
                 <td className="py-1.5">
                   {row.excluded ? (
@@ -249,29 +267,62 @@ export default function FinancialLogicPage() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-                const [accountsRes, cashFlowRes, realEstateRes, investmentsRes, budgetsRes, goalsRes] = await Promise.all([
+        const [accountsRes, cashFlowRes, realEstateRes, investmentsRes, budgetsRes, goalsRes, plansRes] = await Promise.all([
           fetch('/api/accounts?includeHidden=true'),
           fetch('/api/cash-flow/summary'),
           fetch('/api/real-estate'),
           fetch('/api/investments'),
           fetch('/api/cash-flow/budgets?month=' + new Date().toISOString().slice(0, 7)),
           fetch('/api/financial-goals'),
+          fetch('/api/retirement/plans'),
         ]);
 
         const accounts: AccountData[] = accountsRes.ok ? await accountsRes.json() : [];
         const cashFlow = cashFlowRes.ok ? await cashFlowRes.json() : {};
         const realEstate = realEstateRes.ok ? await realEstateRes.json() : {};
         const investments = investmentsRes.ok ? await investmentsRes.json() : { accounts: [], holdings: [], summary: { totalBalance: 0, totalCostBasis: null, totalUnrealizedGainLoss: null, totalUnrealizedReturnPct: null, holdingsCount: 0 } };
-        const budgets = budgetsRes.ok ? await budgetsRes.json() : { income: [], expenses: [] };
+        const rawBudgets = budgetsRes.ok ? await budgetsRes.json() : [];
         const goals = goalsRes.ok ? await goalsRes.json() : [];
+        const plans = plansRes.ok ? await plansRes.json() : [];
 
-        const incomeBudgeted = (budgets.income ?? []).reduce((s: number, b: any) => s + (parseFloat(b.budgeted ?? b.amount ?? 0) || 0), 0);
-        const incomeActual = (budgets.income ?? []).reduce((s: number, b: any) => s + (parseFloat(b.actual ?? 0) || 0), 0);
-        const expenseBudgeted = (budgets.expenses ?? []).reduce((s: number, b: any) => s + (parseFloat(b.budgeted ?? b.amount ?? 0) || 0), 0);
-        const expenseActual = (budgets.expenses ?? []).reduce((s: number, b: any) => s + (parseFloat(b.actual ?? 0) || 0), 0);
+        // Parse flat or nested budget structures safely
+        const budgetArray = Array.isArray(rawBudgets) ? rawBudgets : (rawBudgets.budgets ?? []);
+        const incomeItems = budgetArray.filter((b: any) => b.type === 'income');
+        const expenseItems = budgetArray.filter((b: any) => b.type === 'expense');
 
+        const incomeBudgeted = incomeItems.reduce((s: number, b: any) => s + (parseFloat(b.budgeted ?? b.amount ?? 0) || 0), 0);
+        const incomeActual = incomeItems.reduce((s: number, b: any) => s + (parseFloat(b.actual ?? 0) || 0), 0);
+        const expenseBudgeted = expenseItems.reduce((s: number, b: any) => s + (parseFloat(b.budgeted ?? b.amount ?? 0) || 0), 0);
+        const expenseActual = expenseItems.reduce((s: number, b: any) => s + (parseFloat(b.actual ?? 0) || 0), 0);
+
+        // Sum goals with dynamic allocated amounts for linked accounts
         const totalTarget = Array.isArray(goals) ? goals.reduce((s: number, g: any) => s + (parseFloat(g.targetAmount) || 0), 0) : 0;
-        const totalCurrent = Array.isArray(goals) ? goals.reduce((s: number, g: any) => s + (parseFloat(g.currentAmount) || 0), 0) : 0;
+        const totalCurrent = Array.isArray(goals) ? goals.reduce((s: number, g: any) => s + (parseFloat(g.allocatedAmount ?? g.currentAmount) || 0), 0) : 0;
+
+        // Compute FIRE metrics
+        const reportableFireAccounts = accounts.filter(
+          (a) => !a.isHidden && !a.isExcludedFromNetWorth && isFireEligibleAccount(a)
+        );
+        const currentInvestableAssets = reportableFireAccounts.reduce((sum, a) => {
+          const b = typeof a.balance === 'string' ? parseFloat(a.balance) : a.balance;
+          return sum + (isNaN(b) ? 0 : b);
+        }, 0);
+
+        const primaryPlan = Array.isArray(plans) && plans.length > 0 ? plans[0] : null;
+        const targetAnnualExpenses = primaryPlan?.annualRetirementExpenses ?? (expenseActual > 0 ? expenseActual * 12 : 40000);
+        const safeWithdrawalRate = primaryPlan?.safeWithdrawalRate ?? 0.04;
+        const fireNumber = safeWithdrawalRate > 0 ? targetAnnualExpenses / safeWithdrawalRate : 1000000;
+        const percentToFire = fireNumber > 0 ? (currentInvestableAssets / fireNumber) * 100 : 0;
+        const annualSavings = Math.max(0, (cashFlow.totalIncome ?? 0) - (cashFlow.totalExpenses ?? 0)) * 12;
+        const expectedGrowthRate = 0.07;
+        let yearsToFI = 0;
+        if (currentInvestableAssets < fireNumber) {
+          const needed = fireNumber - currentInvestableAssets;
+          const denom = Math.log(1 + expectedGrowthRate);
+          yearsToFI = denom > 0 && annualSavings > 0
+            ? Math.log((needed * expectedGrowthRate) / annualSavings + 1) / denom
+            : (annualSavings > 0 ? needed / annualSavings : 99);
+        }
 
         setData({
           accounts,
@@ -282,10 +333,10 @@ export default function FinancialLogicPage() {
             savingsRate: cashFlow.savingsRate ?? 0,
           },
           realEstate: {
-            totalValue: realEstate.totalValue ?? 0,
-            totalMortgage: realEstate.totalMortgage ?? 0,
-            totalEquity: realEstate.totalEquity ?? 0,
-            overallLtv: realEstate.overallLtv ?? 0,
+            totalValue: realEstate.summary?.totalValue ?? 0,
+            totalMortgage: realEstate.summary?.totalMortgage ?? 0,
+            totalEquity: realEstate.summary?.totalEquity ?? 0,
+            overallLtv: realEstate.summary?.overallLtv ?? 0,
             properties: realEstate.properties ?? [],
           },
           investments,
@@ -294,6 +345,14 @@ export default function FinancialLogicPage() {
             totalTarget,
             totalCurrent,
             overallProgress: totalTarget > 0 ? Math.min((totalCurrent / totalTarget) * 100, 100) : 0,
+          },
+          fire: {
+            fireNumber,
+            currentInvestableAssets,
+            percentToFire,
+            yearsToFI: isFinite(yearsToFI) ? Math.max(0, yearsToFI) : 0,
+            safeWithdrawalRate,
+            targetAnnualExpenses,
           },
         });
       } finally {
@@ -310,9 +369,23 @@ export default function FinancialLogicPage() {
       buildCashFlowTrace(data.cashFlow),
       buildRealEstateTrace(data.realEstate),
       buildInvestmentsTrace(data.investments),
-      buildBudgetTrace({ ...data.budgets, totalBudgeted: data.budgets.incomeBudgeted, totalActual: data.budgets.incomeActual, remaining: data.budgets.incomeActual - data.budgets.incomeBudgeted, percentUsed: data.budgets.incomeBudgeted > 0 ? (data.budgets.incomeActual / data.budgets.incomeBudgeted) * 100 : 0, type: 'income' }),
-      buildBudgetTrace({ totalBudgeted: data.budgets.expenseBudgeted, totalActual: data.budgets.expenseActual, remaining: data.budgets.expenseBudgeted - data.budgets.expenseActual, percentUsed: data.budgets.expenseBudgeted > 0 ? (data.budgets.expenseActual / data.budgets.expenseBudgeted) * 100 : 0, type: 'expense' }),
+      buildBudgetTrace({
+        ...data.budgets,
+        totalBudgeted: data.budgets.incomeBudgeted,
+        totalActual: data.budgets.incomeActual,
+        remaining: data.budgets.incomeActual - data.budgets.incomeBudgeted,
+        percentUsed: data.budgets.incomeBudgeted > 0 ? (data.budgets.incomeActual / data.budgets.incomeBudgeted) * 100 : 0,
+        type: 'income',
+      }),
+      buildBudgetTrace({
+        totalBudgeted: data.budgets.expenseBudgeted,
+        totalActual: data.budgets.expenseActual,
+        remaining: data.budgets.expenseBudgeted - data.budgets.expenseActual,
+        percentUsed: data.budgets.expenseBudgeted > 0 ? (data.budgets.expenseActual / data.budgets.expenseBudgeted) * 100 : 0,
+        type: 'expense',
+      }),
       buildGoalsTrace(data.goals),
+      buildFireTrace(data.fire),
     ];
   }, [data]);
 

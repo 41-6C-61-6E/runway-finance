@@ -37,6 +37,8 @@ export const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }>
   studentloan: { group: 'Loans',        subGroup: 'Student Loans' },
   autoloan:    { group: 'Loans',        subGroup: 'Auto Loans' },
   otherloan:   { group: 'Loans',        subGroup: 'Other Loans' },
+  personal_loan: { group: 'Loans',       subGroup: 'Personal Loans' },
+  heloc:       { group: 'Loans',         subGroup: 'HELOC' },
   otherLiability: { group: 'Liabilities', subGroup: 'Liabilities' },
 };
 
@@ -83,6 +85,8 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   studentloan: 'Student Loan',
   autoloan: 'Auto Loan',
   otherloan: 'Other Loan',
+  personal_loan: 'Personal Loan',
+  heloc: 'HELOC',
   otherLiability: 'Other Liability',
   otherliability: 'Other Liability',
 };

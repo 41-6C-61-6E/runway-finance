@@ -2,7 +2,7 @@ import { EnginePlan, EngineAccount, runRetirementSimulation } from './retirement
 import { HISTORICAL_RETURNS_DATA } from '@/lib/constants/retirement-defaults';
 
 export interface MonteCarloOptions {
-  model: 'historical_bootstrap' | 'normal_distribution' | 'constant';
+  model: 'historical_bootstrap' | 'historical_sequence' | 'normal_distribution' | 'constant';
   numberOfTrials: number; // e.g. 250
   meanAnnualReturn: number; // e.g. 0.07 (7%)
   returnStdDev: number; // e.g. 0.12 (12%)
@@ -66,6 +66,10 @@ export function runMonteCarloSimulation(
 
     // Generate yearly return sequence for this trial
     const yearlyMarketData: Array<{ growth: number; dividend: number }> = [];
+    const histSequenceStartIdx = model === 'historical_sequence'
+      ? Math.floor(rng() * HISTORICAL_RETURNS_DATA.length)
+      : 0;
+
     for (let y = 0; y < totalYears; y++) {
       if (model === 'constant') {
         const divYield = Math.min(0.015, Math.max(0, meanReturn));
@@ -82,6 +86,20 @@ export function runMonteCarloSimulation(
         const divYield = Math.min(0.015, Math.max(0, boundedReturn));
         const priceGrowth = boundedReturn - divYield;
         yearlyMarketData.push({ growth: priceGrowth, dividend: divYield });
+      } else if (model === 'historical_sequence') {
+        const histIndex = (histSequenceStartIdx + y) % HISTORICAL_RETURNS_DATA.length;
+        const histData = HISTORICAL_RETURNS_DATA[histIndex];
+
+        const stockPriceGrowth = histData.stocksGrowth - histData.stocksYield;
+        const stockDivYield = histData.stocksYield;
+
+        const bondPriceGrowth = histData.bondsGrowth;
+        const bondYield = histData.bondsYield;
+
+        const blendedPriceGrowth = equityRatio * stockPriceGrowth + bondRatio * bondPriceGrowth;
+        const blendedDivYield = equityRatio * stockDivYield + bondRatio * bondYield;
+
+        yearlyMarketData.push({ growth: blendedPriceGrowth, dividend: blendedDivYield });
       } else {
         const randomIndex = Math.floor(rng() * HISTORICAL_RETURNS_DATA.length);
         const histData = HISTORICAL_RETURNS_DATA[randomIndex];

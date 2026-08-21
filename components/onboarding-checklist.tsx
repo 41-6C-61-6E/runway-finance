@@ -1,16 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCircle2, Circle, Landmark, Target, Wallet, X } from 'lucide-react';
+import { CheckCircle2, Circle, Landmark, Target, UserCheck, Wallet, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type ChecklistState = {
+  profileConfigured: boolean;
   accounts: number;
   budgets: number;
   goals: number;
 };
 
 const initialState: ChecklistState = {
+  profileConfigured: false,
   accounts: 0,
   budgets: 0,
   goals: 0,
@@ -37,20 +39,28 @@ export function OnboardingChecklist() {
 
     async function load() {
       try {
-        const [accountsRes, budgetsRes, goalsRes] = await Promise.all([
+        const [accountsRes, budgetsRes, goalsRes, plansRes, settingsRes] = await Promise.all([
           fetch('/api/accounts', { credentials: 'include' }),
           fetch('/api/budgets', { credentials: 'include' }),
           fetch('/api/financial-goals', { credentials: 'include' }),
+          fetch('/api/plans', { credentials: 'include' }),
+          fetch('/api/user-settings', { credentials: 'include' }),
         ]);
 
-        const [accounts, budgets, goals] = await Promise.all([
+        const [accounts, budgets, goals, plans, settings] = await Promise.all([
           accountsRes.ok ? accountsRes.json() : [],
           budgetsRes.ok ? budgetsRes.json() : { budgets: [] },
           goalsRes.ok ? goalsRes.json() : [],
+          plansRes.ok ? plansRes.json() : [],
+          settingsRes.ok ? settingsRes.json() : {},
         ]);
 
         if (!cancelled) {
+          const hasPlanWithProfile = Array.isArray(plans) && plans.length > 0 && plans.some((p: any) => p.primaryBirthYear || Number(p.primarySalary) > 0);
+          const hasUserSettingsProfile = settings?.birthYear != null;
+
           setState({
+            profileConfigured: hasPlanWithProfile || hasUserSettingsProfile,
             accounts: Array.isArray(accounts) ? accounts.length : 0,
             budgets: Array.isArray(budgets?.budgets) ? budgets.budgets.length : 0,
             goals: Array.isArray(goals) ? goals.length : 0,
@@ -68,6 +78,13 @@ export function OnboardingChecklist() {
   }, []);
 
   const items = useMemo(() => [
+    {
+      done: state.profileConfigured,
+      icon: UserCheck,
+      title: 'Financial Profile',
+      text: 'Set filing status, birth year, salary & retirement target.',
+      href: '/plans',
+    },
     {
       done: state.accounts > 0,
       icon: Landmark,

@@ -52,47 +52,6 @@ describe('Financial Review F03: Accounts, Balances, Debt Metrics & Net Worth Rem
     });
   });
 
-  describe('F03-2: Age-Cohort Benchmark Resolution', () => {
-    interface AgeBandReference {
-      minAge: number;
-      label: string;
-      savingsRateMedian: number;
-      netWorthToIncomeMedian: number;
-    }
-
-    const AGE_BAND_REFERENCES: AgeBandReference[] = [
-      { minAge: 18, label: '18–29', savingsRateMedian: 10, netWorthToIncomeMedian: 0.2 },
-      { minAge: 30, label: '30–39', savingsRateMedian: 12, netWorthToIncomeMedian: 1.1 },
-      { minAge: 40, label: '40–49', savingsRateMedian: 15, netWorthToIncomeMedian: 2.5 },
-      { minAge: 50, label: '50–59', savingsRateMedian: 18, netWorthToIncomeMedian: 4.2 },
-      { minAge: 60, label: '60+', savingsRateMedian: 22, netWorthToIncomeMedian: 6.5 },
-    ];
-
-    function getAgeBand(age: number): AgeBandReference {
-      for (let i = AGE_BAND_REFERENCES.length - 1; i >= 0; i--) {
-        const band = AGE_BAND_REFERENCES[i];
-        if (age >= band.minAge) return band;
-      }
-      return AGE_BAND_REFERENCES[0];
-    }
-
-    it('resolves demographic age cohorts accurately across all brackets', () => {
-      expect(getAgeBand(22).label).toBe('18–29');
-      expect(getAgeBand(22).netWorthToIncomeMedian).toBe(0.2);
-
-      expect(getAgeBand(35).label).toBe('30–39');
-      expect(getAgeBand(35).netWorthToIncomeMedian).toBe(1.1);
-
-      expect(getAgeBand(45).label).toBe('40–49');
-      expect(getAgeBand(45).netWorthToIncomeMedian).toBe(2.5);
-
-      expect(getAgeBand(55).label).toBe('50–59');
-      expect(getAgeBand(55).netWorthToIncomeMedian).toBe(4.2);
-
-      expect(getAgeBand(68).label).toBe('60+');
-      expect(getAgeBand(68).netWorthToIncomeMedian).toBe(6.5);
-    });
-  });
 
   describe('F03-4: Debt Subtypes Inclusion in Debt Breakdown Categories', () => {
     const DEBT_DISPLAY_CATEGORIES: Record<string, { label: string }> = {

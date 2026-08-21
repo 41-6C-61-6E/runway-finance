@@ -13,9 +13,13 @@ import { useHiddenPages, HIDDEN_PAGE_KEYS, DEV_MODE_PAGE_KEYS } from '@/lib/hook
 
 export default function GeneralTab() {
   const [accentColor, setAccentColor] = useState('violet');
+  const [currency, setCurrency] = useState('USD');
+  const [timezone, setTimezone] = useState('America/New_York');
+  const [locale, setLocale] = useState('en-US');
+  const [dateFormat, setDateFormat] = useState('MM/DD/YYYY');
+  const [compactMode, setCompactMode] = useState(false);
   const [devMode, setDevMode] = useState<boolean | null>(null);
   const [devModeLoading, setDevModeLoading] = useState(false);
-  const [birthYear, setBirthYear] = useState<string>('');
 
   const { privacyMode, togglePrivacyMode, loading: privacyModeLoading } = usePrivacyMode();
   const { hideSubheadings, updateHideSubheadings } = useAccountSubheadings();
@@ -32,7 +36,11 @@ export default function GeneralTab() {
       .then((res) => res.json())
       .then((data) => {
         setAccentColor(data.accentColor ?? 'violet');
-        setBirthYear(data.birthYear != null ? String(data.birthYear) : '');
+        setCurrency(data.currency ?? 'USD');
+        setTimezone(data.timezone ?? 'America/New_York');
+        setLocale(data.locale ?? 'en-US');
+        setDateFormat(data.dateFormat ?? 'MM/DD/YYYY');
+        setCompactMode(data.compactMode ?? false);
       })
       .catch(() => setAccentColor('violet'));
   }, []);
@@ -58,28 +66,66 @@ export default function GeneralTab() {
     } catch {}
   }, []);
 
-    const handleBirthYearChange = useCallback((value: string) => {
-      setBirthYear(value);
-      const trimmed = value.trim();
-      if (trimmed === '') {
-        fetch('/api/user-settings', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ birthYear: null }),
-        }).catch(() => {});
-        return;
-      }
-      const year = Number(trimmed);
-      const currentYear = new Date().getFullYear();
-      if (!Number.isInteger(year) || year < 1900 || year > currentYear) return;
-      fetch('/api/user-settings', {
+  const handleCurrencyChange = async (val: string) => {
+    setCurrency(val);
+    try {
+      await fetch('/api/user-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ birthYear: year }),
-      }).catch(() => {});
-    }, []);
+        body: JSON.stringify({ currency: val }),
+      });
+    } catch {}
+  };
+
+  const handleTimezoneChange = async (val: string) => {
+    setTimezone(val);
+    try {
+      await fetch('/api/user-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ timezone: val }),
+      });
+    } catch {}
+  };
+
+  const handleLocaleChange = async (val: string) => {
+    setLocale(val);
+    try {
+      await fetch('/api/user-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ locale: val }),
+      });
+    } catch {}
+  };
+
+  const handleDateFormatChange = async (val: string) => {
+    setDateFormat(val);
+    try {
+      await fetch('/api/user-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ dateFormat: val }),
+      });
+    } catch {}
+  };
+
+  const handleCompactModeChange = async (val: boolean) => {
+    setCompactMode(val);
+    try {
+      await fetch('/api/user-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ compactMode: val }),
+      });
+    } catch {}
+  };
+
 
   const handleToggleDevMode = async () => {
     setDevModeLoading(true);
@@ -164,24 +210,135 @@ export default function GeneralTab() {
             </div>
           </div>
 
-          {/* Birth Year */}
+          {/* Base Currency */}
           <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium text-foreground">Birth Year</h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Used for age-based benchmark comparisons (savings rate &amp; net worth) on the Net Worth page. Optional.
-              </p>
+              <h3 className="text-sm font-medium text-foreground">Base Currency</h3>
+              <p className="text-xs text-muted-foreground mt-1">Default currency symbol and denomination used across net worth, budgets, and plans</p>
             </div>
-            <input
-              type="number"
-              min={1900}
-              max={new Date().getFullYear()}
-              value={birthYear}
-              onChange={(e) => handleBirthYearChange(e.target.value)}
-              placeholder="1990"
-              className="w-28 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+            <select
+              value={currency}
+              onChange={(e) => handleCurrencyChange(e.target.value)}
+              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="USD">USD ($) - US Dollar</option>
+              <option value="EUR">EUR (€) - Euro</option>
+              <option value="GBP">GBP (£) - British Pound</option>
+              <option value="CAD">CAD (C$) - Canadian Dollar</option>
+              <option value="AUD">AUD (A$) - Australian Dollar</option>
+              <option value="JPY">JPY (¥) - Japanese Yen</option>
+              <option value="CHF">CHF (CHF) - Swiss Franc</option>
+              <option value="INR">INR (₹) - Indian Rupee</option>
+              <option value="SGD">SGD (S$) - Singapore Dollar</option>
+              <option value="NZD">NZD (NZ$) - New Zealand Dollar</option>
+              <option value="CNY">CNY (¥) - Chinese Yuan</option>
+              <option value="BRL">BRL (R$) - Brazilian Real</option>
+              <option value="SEK">SEK (kr) - Swedish Krona</option>
+              <option value="NOK">NOK (kr) - Norwegian Krone</option>
+              <option value="DKK">DKK (kr) - Danish Krone</option>
+              <option value="MXN">MXN ($) - Mexican Peso</option>
+            </select>
+          </div>
+
+          {/* Timezone */}
+          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Timezone</h3>
+              <p className="text-xs text-muted-foreground mt-1">Timezone used for daily syncs, date boundaries, and automated alerts</p>
+            </div>
+            <select
+              value={timezone}
+              onChange={(e) => handleTimezoneChange(e.target.value)}
+              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring max-w-xs"
+            >
+              <optgroup label="Americas">
+                <option value="America/New_York">Eastern Time (New York)</option>
+                <option value="America/Chicago">Central Time (Chicago)</option>
+                <option value="America/Denver">Mountain Time (Denver)</option>
+                <option value="America/Los_Angeles">Pacific Time (Los Angeles)</option>
+                <option value="America/Anchorage">Alaska Time (Anchorage)</option>
+                <option value="Pacific/Honolulu">Hawaii Time (Honolulu)</option>
+                <option value="America/Toronto">Toronto</option>
+                <option value="America/Vancouver">Vancouver</option>
+                <option value="America/Sao_Paulo">São Paulo</option>
+              </optgroup>
+              <optgroup label="Europe">
+                <option value="Europe/London">London (GMT/BST)</option>
+                <option value="Europe/Paris">Paris / Berlin (CET/CEST)</option>
+                <option value="Europe/Zurich">Zurich</option>
+                <option value="Europe/Amsterdam">Amsterdam</option>
+                <option value="Europe/Dublin">Dublin</option>
+              </optgroup>
+              <optgroup label="Asia / Pacific">
+                <option value="Asia/Tokyo">Tokyo (JST)</option>
+                <option value="Asia/Shanghai">Shanghai / Beijing (CST)</option>
+                <option value="Asia/Singapore">Singapore (SGT)</option>
+                <option value="Asia/Kolkata">India (IST)</option>
+                <option value="Australia/Sydney">Sydney (AEST)</option>
+                <option value="Australia/Melbourne">Melbourne (AEST)</option>
+                <option value="Pacific/Auckland">Auckland (NZST)</option>
+              </optgroup>
+              <optgroup label="UTC">
+                <option value="UTC">Coordinated Universal Time (UTC)</option>
+              </optgroup>
+            </select>
+          </div>
+
+          {/* Locale / Number Format */}
+          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Locale & Language</h3>
+              <p className="text-xs text-muted-foreground mt-1">Number, currency, and decimal separator formatting</p>
+            </div>
+            <select
+              value={locale}
+              onChange={(e) => handleLocaleChange(e.target.value)}
+              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="en-US">English (United States) - 1,234.56</option>
+              <option value="en-GB">English (United Kingdom) - 1,234.56</option>
+              <option value="en-CA">English (Canada) - 1,234.56</option>
+              <option value="de-DE">Deutsch (Germany) - 1.234,56</option>
+              <option value="fr-FR">Français (France) - 1 234,56</option>
+              <option value="es-ES">Español (Spain) - 1.234,56</option>
+              <option value="ja-JP">日本語 (Japan) - 1,234</option>
+              <option value="zh-CN">简体中文 (China) - 1,234.56</option>
+              <option value="it-IT">Italiano (Italy) - 1.234,56</option>
+              <option value="pt-BR">Português (Brasil) - 1.234,56</option>
+            </select>
+          </div>
+
+          {/* Date Format */}
+          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Date Format</h3>
+              <p className="text-xs text-muted-foreground mt-1">How calendar dates are displayed across ledger tables and statements</p>
+            </div>
+            <select
+              value={dateFormat}
+              onChange={(e) => handleDateFormatChange(e.target.value)}
+              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="MM/DD/YYYY">MM/DD/YYYY (US Standard)</option>
+              <option value="DD/MM/YYYY">DD/MM/YYYY (International Standard)</option>
+              <option value="YYYY-MM-DD">YYYY-MM-DD (ISO 8601)</option>
+              <option value="YYYY/MM/DD">YYYY/MM/DD (East Asian)</option>
+              <option value="DD.MM.YYYY">DD.MM.YYYY (European Dot)</option>
+            </select>
+          </div>
+
+          {/* Compact Mode */}
+          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-foreground">Compact Mode</h3>
+              <p className="text-xs text-muted-foreground mt-1">Increase table data density and reduce padding across desktop views</p>
+            </div>
+            <Switch
+              checked={compactMode}
+              onCheckedChange={handleCompactModeChange}
             />
           </div>
+
 
           {/* Privacy Mode */}
           <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">

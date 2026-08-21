@@ -255,24 +255,34 @@ describe('wealth-flow service (snapshot-only)', () => {
     expect(decCash!.accounts![0].id).toBe('checking-2');
   });
 
-  it('uses earliest snapshot as beginning balance for new accounts', async () => {
+  it('correctly captures inflow from new accounts created mid-period and preserves transfer parity', async () => {
     mockState.mockAccounts = [
-      { id: 'new-checking', userId: 'user_1', name: 'New Account', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'new-brokerage', userId: 'user_1', name: 'New Brokerage', type: 'brokerage', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
     ];
+    // User started month with $10,000 in checking, transferred $5,000 to new brokerage opened mid-month
     mockState.mockAccountSnapshots.push(
-      { accountId: 'new-checking', snapshotDate: '2026-06-15', balance: '5000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-05-31', balance: '10000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '5000.00' },
+      { accountId: 'new-brokerage', snapshotDate: '2026-06-15', balance: '5000.00' },
+      { accountId: 'new-brokerage', snapshotDate: '2026-06-30', balance: '5000.00' },
     );
 
     const result = await runWealthFlow('2026-06-01', '2026-06-30');
 
-    expect(result.summary.beginningNetWorth).toBe(5000);
-    expect(result.summary.endingNetWorth).toBe(5000);
+    expect(result.summary.beginningNetWorth).toBe(10000);
+    expect(result.summary.endingNetWorth).toBe(10000);
     expect(result.summary.netWorthChange).toBe(0);
-    expect(result.summary.totalIncreases).toBe(0);
-    expect(result.summary.totalDecreases).toBe(0);
+    expect(result.summary.totalIncreases).toBe(5000);
+    expect(result.summary.totalDecreases).toBe(5000);
 
-    const incCash = result.nodes.find(n => n.id === 'inc_cash');
-    expect(incCash).toBeUndefined();
+    const incInvestments = result.nodes.find(n => n.id === 'inc_investments');
+    expect(incInvestments).toBeDefined();
+    expect(incInvestments!.value).toBe(5000);
+
+    const decCash = result.nodes.find(n => n.id === 'dec_cash');
+    expect(decCash).toBeDefined();
+    expect(decCash!.value).toBe(5000);
   });
 
   it('skips accounts with neither beginning nor ending snapshot', async () => {
@@ -415,5 +425,72 @@ describe('wealth-flow service (snapshot-only)', () => {
     expect(result.summary.netWorthChange).toBe(3000);
 
     vi.useRealTimers();
+  });
+
+  it('correctly handles HELOC balance increase as debt accumulation (net worth decrease)', async () => {
+    mockState.mockAccounts = [
+      { id: 'heloc-1', userId: 'user_1', name: 'Home Equity Line', type: 'heloc', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'heloc-1', snapshotDate: '2026-05-31', balance: '-5000.00' },
+      { accountId: 'heloc-1', snapshotDate: '2026-06-30', balance: '-25000.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    expect(result.summary.beginningNetWorth).toBe(-5000);
+    expect(result.summary.endingNetWorth).toBe(-25000);
+    expect(result.summary.netWorthChange).toBe(-20000);
+
+    const decCreditLoans = result.nodes.find(n => n.id === 'dec_credit_loans');
+    expect(decCreditLoans).toBeDefined();
+    expect(decCreditLoans!.value).toBe(20000);
+  });
+
+  it('correctly handles personal loan balance decrease as debt repayment (net worth increase)', async () => {
+    mockState.mockAccounts = [
+      { id: 'loan-1', userId: 'user_1', name: 'Personal Loan', type: 'personal_loan', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'loan-1', snapshotDate: '2026-05-31', balance: '-10000.00' },
+      { accountId: 'loan-1', snapshotDate: '2026-06-30', balance: '-7000.00' },
+    );
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    expect(result.summary.beginningNetWorth).toBe(-10000);
+    expect(result.summary.endingNetWorth).toBe(-7000);
+    expect(result.summary.netWorthChange).toBe(3000);
+
+    const incCreditLoans = result.nodes.find(n => n.id === 'inc_credit_loans');
+    expect(incCreditLoans).toBeDefined();
+    expect(incCreditLoans!.value).toBe(3000);
+  });
+
+  it('verifies exact mathematical identity: sum(group deltas) === totalNetWorthChange', async () => {
+    mockState.mockAccounts = [
+      { id: 'chk-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'inv-1', userId: 'user_1', name: 'Brokerage', type: 'brokerage', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'heloc-1', userId: 'user_1', name: 'HELOC', type: 'heloc', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+      { id: 'mtg-1', userId: 'user_1', name: 'Mortgage', type: 'mortgage', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'chk-1', snapshotDate: '2026-05-31', balance: '5000.00' },
+      { accountId: 'chk-1', snapshotDate: '2026-06-30', balance: '8000.00' }, // +3000
+      { accountId: 'inv-1', snapshotDate: '2026-05-31', balance: '50000.00' },
+      { accountId: 'inv-1', snapshotDate: '2026-06-30', balance: '54000.00' }, // +4000
+      { accountId: 'heloc-1', snapshotDate: '2026-05-31', balance: '-5000.00' },
+      { accountId: 'heloc-1', snapshotDate: '2026-06-30', balance: '-10000.00' }, // -5000
+      { accountId: 'mtg-1', snapshotDate: '2026-05-31', balance: '-300000.00' },
+      { accountId: 'mtg-1', snapshotDate: '2026-06-30', balance: '-298000.00' }, // +2000
+    );
+
+    const result = await runWealthFlow('2026-06-01', '2026-06-30');
+
+    // Expected net worth change: +3000 + 4000 - 5000 + 2000 = +4000
+    expect(result.summary.netWorthChange).toBe(4000);
+    expect(result.summary.totalIncreases).toBe(9000);
+    expect(result.summary.totalDecreases).toBe(5000);
+    expect(result.summary.totalIncreases - result.summary.totalDecreases).toBe(result.summary.netWorthChange);
   });
 });

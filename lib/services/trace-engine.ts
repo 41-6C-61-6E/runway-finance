@@ -20,8 +20,12 @@ function devValidateAccountTypes(accounts: AccountData[]): void {
 
 export function buildNetWorthTraces(accounts: AccountData[]): CalculationTrace[] {
   devValidateAccountTypes(accounts);
-  const assetsTrace = buildTotalAssetsTrace(accounts);
-  const liabilitiesTrace = buildTotalLiabilitiesTrace(accounts);
+  // Filter reportable accounts to ensure strict parity with /overview and /net-worth
+  const reportableAccounts = accounts.filter(
+    (a) => !a.isHidden && !a.isExcludedFromNetWorth
+  );
+  const assetsTrace = buildTotalAssetsTrace(reportableAccounts);
+  const liabilitiesTrace = buildTotalLiabilitiesTrace(reportableAccounts);
   const debtTrace = buildDebtToAssetTraceFrom(assetsTrace, liabilitiesTrace);
   const netWorth: CalculationTrace = {
     id: 'netWorth',
@@ -49,7 +53,8 @@ function buildTotalAssetsTrace(accounts: AccountData[]): CalculationTrace {
   let totalAssets = 0;
   const assetAccounts = accounts.filter((a) => isAssetAccount(a.type));
   for (const acc of assetAccounts) {
-    const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+    const rawBal = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+    const balance = isNaN(rawBal) ? 0 : rawBal;
     totalAssets += balance;
     steps.push({
       label: `${acc.name || acc.id}`,
@@ -78,7 +83,8 @@ function buildTotalLiabilitiesTrace(accounts: AccountData[]): CalculationTrace {
   let totalLiabilities = 0;
   const liabilityAccounts = accounts.filter((a) => isLiabilityAccount(a.type));
   for (const acc of liabilityAccounts) {
-    const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+    const rawBal = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+    const balance = isNaN(rawBal) ? 0 : rawBal;
     const absBalance = Math.abs(balance);
     totalLiabilities += absBalance;
     steps.push({
@@ -105,7 +111,13 @@ function buildTotalLiabilitiesTrace(accounts: AccountData[]): CalculationTrace {
 
 /** Builds a debt-to-asset ratio trace from pre-computed asset/liability traces (internal). */
 function buildDebtToAssetTraceFrom(assetsTrace: CalculationTrace, liabilitiesTrace: CalculationTrace): CalculationTrace {
-  const ratio = assetsTrace.result > 0 ? liabilitiesTrace.result / assetsTrace.result : 0;
+  const ratio = assetsTrace.result > 0
+    ? liabilitiesTrace.result / assetsTrace.result
+    : (liabilitiesTrace.result > 0 ? Infinity : 0);
+  const operationStr = assetsTrace.result > 0
+    ? `${liabilitiesTrace.result} / ${assetsTrace.result}`
+    : (liabilitiesTrace.result > 0 ? `${liabilitiesTrace.result} / 0 (infinite leverage)` : '0 / 0');
+
   return {
     id: 'debtToAsset',
     title: 'Debt-to-Asset Ratio',
@@ -119,7 +131,7 @@ function buildDebtToAssetTraceFrom(assetsTrace: CalculationTrace, liabilitiesTra
     steps: [
       { label: 'Total Assets', inputs: { totalAssets: assetsTrace.result }, operation: 'from account balances', output: assetsTrace.result },
       { label: 'Total Liabilities', inputs: { totalLiabilities: liabilitiesTrace.result }, operation: 'from account balances', output: liabilitiesTrace.result },
-      { label: 'Ratio', inputs: { totalLiabilities: liabilitiesTrace.result, totalAssets: assetsTrace.result }, operation: `${liabilitiesTrace.result} / ${assetsTrace.result}`, output: ratio },
+      { label: 'Ratio', inputs: { totalLiabilities: liabilitiesTrace.result, totalAssets: assetsTrace.result }, operation: operationStr, output: ratio },
     ],
     result: ratio,
   };
@@ -127,8 +139,11 @@ function buildDebtToAssetTraceFrom(assetsTrace: CalculationTrace, liabilitiesTra
 
 /** Convenience wrapper: builds debt-to-asset ratio trace directly from accounts. */
 export function buildDebtToAssetTrace(accounts: AccountData[]): CalculationTrace {
-  const assets = buildTotalAssetsTrace(accounts);
-  const liabilities = buildTotalLiabilitiesTrace(accounts);
+  const reportableAccounts = accounts.filter(
+    (a) => !a.isHidden && !a.isExcludedFromNetWorth
+  );
+  const assets = buildTotalAssetsTrace(reportableAccounts);
+  const liabilities = buildTotalLiabilitiesTrace(reportableAccounts);
   return buildDebtToAssetTraceFrom(assets, liabilities);
 }
 
@@ -140,23 +155,28 @@ export function buildCashFlowTrace(data: {
   netIncome?: number;
   savingsRate?: number;
 }): CalculationTrace {
+  const inc = data.totalIncome ?? 0;
+  const exp = data.totalExpenses ?? 0;
+  const net = data.netIncome ?? (inc - exp);
+  const savingsRate = data.savingsRate ?? (inc > 0 ? (net / inc) * 100 : 0);
+
   return {
     id: 'cashFlow',
     title: 'Cash Flow Summary',
     category: 'cashFlow',
     formula: 'Net Income = Total Income − Total Expenses. Savings Rate = Net Income / Total Income × 100',
     dataSource: '/api/cash-flow/summary',
-    filters: [],
+    filters: ['deleted = false', 'pending = false', 'ignored = false', 'excludeFromReports = false', 'categoryType != transfer'],
     typesIncluded: [],
     typesExcluded: [],
     format: 'currency',
     steps: [
-      { label: 'Total Income', inputs: {}, operation: 'from monthly cash flow summary', output: data.totalIncome ?? 0 },
-      { label: 'Total Expenses', inputs: {}, operation: 'from monthly cash flow summary', output: data.totalExpenses ?? 0 },
-      { label: 'Net Income', inputs: { totalIncome: data.totalIncome ?? 0, totalExpenses: data.totalExpenses ?? 0 }, operation: `${data.totalIncome ?? 0} − ${data.totalExpenses ?? 0}`, output: data.netIncome ?? 0 },
-      { label: 'Savings Rate', inputs: { netIncome: data.netIncome ?? 0, totalIncome: data.totalIncome ?? 0 }, operation: `${data.netIncome ?? 0} / ${data.totalIncome ?? 0} × 100`, output: data.savingsRate ?? 0 },
+      { label: 'Total Income', inputs: {}, operation: 'from monthly cash flow summary', output: inc },
+      { label: 'Total Expenses', inputs: {}, operation: 'from monthly cash flow summary', output: exp },
+      { label: 'Net Income', inputs: { totalIncome: inc, totalExpenses: exp }, operation: `${inc} − ${exp}`, output: net },
+      { label: 'Savings Rate', inputs: { netIncome: net, totalIncome: inc }, operation: inc > 0 ? `${net} / ${inc} × 100` : '0%', output: savingsRate },
     ],
-    result: data.netIncome ?? 0,
+    result: net,
   };
 }
 
@@ -167,32 +187,51 @@ export function buildRealEstateTrace(data: {
   totalMortgage?: number;
   totalEquity?: number;
   overallLtv?: number;
-  properties?: Array<{ name: string; value: number; mortgageBalance: number; equity: number }>;
+  properties?: Array<{ name: string; value: number; mortgageBalance: number; equity: number; isSynthetic?: boolean }>;
 }): CalculationTrace {
   const propertySteps = (data.properties ?? []).map((p) => ({
     label: p.name,
     inputs: { value: p.value, mortgage: p.mortgageBalance, equity: p.equity },
     operation: `${p.value} − ${p.mortgageBalance} = ${p.equity}`,
     output: p.equity,
+    isEstimate: !!p.isSynthetic,
   }));
+  const totVal = data.totalValue ?? 0;
+  const totMtg = data.totalMortgage ?? 0;
+  const totEq = data.totalEquity ?? (totVal - totMtg);
+  const ltv = data.overallLtv ?? (totVal > 0 ? (totMtg / totVal) * 100 : 0);
+
   return {
     id: 'realEstate',
     title: 'Real Estate Summary',
     category: 'realEstate',
-    formula: 'Total Value = Σ property values. Total Mortgage = Σ |mortgage balances|. Total Equity = Σ (value − |mortgage|). LTV = Total Mortgage / Total Value × 100',
+    formula: 'Total Value = Σ property values. Total Mortgage = Σ |linked mortgage balances|. Total Equity = Σ (value − |mortgage|). LTV = Total Mortgage / Total Value × 100',
     dataSource: '/api/real-estate',
-    filters: ['isHidden = false', 'isExcludedFromNetWorth = false', 'type = realestate or mortgage'],
-    typesIncluded: ['realestate', 'mortgage'],
+    filters: ['isHidden = false', 'isExcludedFromNetWorth = false', 'type = realestate or mortgage (linked)'],
+    typesIncluded: [
+      'realestate',
+      'primaryhome',
+      'secondaryhome',
+      'rentalproperty',
+      'commercial',
+      'land',
+      'otherrealestate',
+      'single-family',
+      'condo',
+      'townhouse',
+      'multi-family',
+      'mortgage',
+    ],
     typesExcluded: [],
     format: 'currency',
     steps: [
       ...propertySteps,
-      { label: 'Total Value', inputs: {}, operation: 'sum of all property balances', output: data.totalValue ?? 0 },
-      { label: 'Total Mortgage', inputs: {}, operation: 'sum of absolute mortgage balances', output: data.totalMortgage ?? 0 },
-      { label: 'Total Equity', inputs: { totalValue: data.totalValue ?? 0, totalMortgage: data.totalMortgage ?? 0 }, operation: `${data.totalValue ?? 0} − ${data.totalMortgage ?? 0}`, output: data.totalEquity ?? 0 },
-      { label: 'LTV Ratio', inputs: { totalMortgage: data.totalMortgage ?? 0, totalValue: data.totalValue ?? 0 }, operation: `${data.totalMortgage ?? 0} / ${data.totalValue ?? 0} × 100`, output: data.overallLtv ?? 0 },
+      { label: 'Total Value', inputs: {}, operation: 'sum of all property values', output: totVal },
+      { label: 'Total Mortgage', inputs: {}, operation: 'sum of linked absolute mortgage balances', output: totMtg },
+      { label: 'Total Equity', inputs: { totalValue: totVal, totalMortgage: totMtg }, operation: `${totVal} − ${totMtg}`, output: totEq },
+      { label: 'LTV Ratio', inputs: { totalMortgage: totMtg, totalValue: totVal }, operation: totVal > 0 ? `${totMtg} / ${totVal} × 100` : '0%', output: ltv },
     ],
-    result: data.totalEquity ?? 0,
+    result: totEq,
   };
 }
 
@@ -206,23 +245,46 @@ export function buildFireTrace(data: {
   safeWithdrawalRate?: number;
   targetAnnualExpenses?: number;
 }): CalculationTrace {
+  const expenses = data.targetAnnualExpenses ?? 0;
+  const swr = data.safeWithdrawalRate ?? 0.04;
+  const fireNum = data.fireNumber ?? (swr > 0 ? expenses / swr : 0);
+  const assets = data.currentInvestableAssets ?? 0;
+  const pct = data.percentToFire ?? (fireNum > 0 ? (assets / fireNum) * 100 : 0);
+  const years = data.yearsToFI ?? 0;
+
   return {
     id: 'fire',
     title: 'FIRE Metrics',
     category: 'fire',
-    formula: 'FIRE Number = Target Annual Expenses / Safe Withdrawal Rate. % to FIRE = Current Investable Assets / FIRE Number × 100. Years to FI uses logarithmic future value formula.',
-    dataSource: 'user settings + account balances (investment accounts)',
-    filters: [],
-    typesIncluded: [],
-    typesExcluded: [],
+    formula: 'FIRE Number = Target Annual Expenses / Safe Withdrawal Rate. % to FIRE = Current Investable Assets / FIRE Number × 100. Years to FI uses logarithmic compound growth formula.',
+    dataSource: 'user settings + account balances (FIRE-eligible accounts)',
+    filters: ['isHidden = false', 'isExcludedFromNetWorth = false', 'isFireEligibleAccount = true'],
+    typesIncluded: [
+      'checking',
+      'savings',
+      'investment',
+      'brokerage',
+      'retirement',
+      'rothira',
+      'traditionalira',
+      '401k',
+      '403b',
+      'sepira',
+      'simpleira',
+      '529',
+      'hsa',
+      'health',
+      'crypto',
+    ],
+    typesExcluded: ['realestate', 'mortgage', 'credit', 'loan', 'autoloan', 'studentloan', 'vehicle'],
     format: 'percentage',
     steps: [
-      { label: 'FIRE Number', inputs: { targetAnnualExpenses: data.targetAnnualExpenses ?? 0, safeWithdrawalRate: data.safeWithdrawalRate ?? 0 }, operation: `${data.targetAnnualExpenses ?? 0} / ${data.safeWithdrawalRate ?? 0}`, output: data.fireNumber ?? 0 },
-      { label: 'Current Investable Assets', inputs: {}, operation: 'sum of investment account balances', output: data.currentInvestableAssets ?? 0 },
-      { label: '% to FIRE', inputs: { currentInvestableAssets: data.currentInvestableAssets ?? 0, fireNumber: data.fireNumber ?? 0 }, operation: `${data.currentInvestableAssets ?? 0} / ${data.fireNumber ?? 0} × 100`, output: data.percentToFire ?? 0 },
-      { label: 'Years to FI', inputs: {}, operation: 'logarithmic future value formula', output: data.yearsToFI ?? 0 },
+      { label: 'FIRE Number', inputs: { targetAnnualExpenses: expenses, safeWithdrawalRate: swr }, operation: swr > 0 ? `${expenses} / ${swr}` : '0', output: fireNum },
+      { label: 'Current Investable Assets', inputs: {}, operation: 'sum of FIRE-eligible investable account balances', output: assets },
+      { label: '% to FIRE', inputs: { currentInvestableAssets: assets, fireNumber: fireNum }, operation: fireNum > 0 ? `(${assets} / ${fireNum}) × 100` : '0%', output: pct },
+      { label: 'Years to FI', inputs: {}, operation: 'logarithmic compound growth formula with annual savings', output: years, isEstimate: true },
     ],
-    result: data.percentToFire ?? 0,
+    result: pct,
   };
 }
 
@@ -237,26 +299,46 @@ export function buildBudgetTrace(data: {
 }): CalculationTrace {
   const id = data.type === 'income' ? 'budgetIncome' : 'budgetExpenses';
   const title = data.type === 'income' ? 'Budget Income' : 'Budget Expenses';
+  const budgeted = data.totalBudgeted ?? 0;
+  const actual = data.totalActual ?? 0;
+  const remaining = data.remaining ?? (data.type === 'income' ? actual - budgeted : budgeted - actual);
+  const percentUsed = data.percentUsed ?? (budgeted > 0 ? (actual / budgeted) * 100 : 0);
+
   const formula = data.type === 'income'
     ? 'Variance = Actual − Budgeted. % Achieved = Actual / Budgeted × 100'
-    : 'Remaining = Budgeted − Actual. % Used = Actual / Budgeted × 100';
+    : 'Remaining = Available Budget − Actual. % Used = Actual / Available Budget × 100';
+
+  const percentStepOp = budgeted > 0
+    ? `${actual} / ${budgeted} × 100`
+    : (actual > 0 ? 'N/A (unbudgeted spending)' : '0%');
+
   return {
     id,
     title,
     category: 'budgets',
     formula,
     dataSource: '/api/budgets or /api/cash-flow/budgets',
-    filters: [],
+    filters: ['excludeFromReports = false', 'deleted = false', 'ignored = false'],
     typesIncluded: [],
     typesExcluded: [],
     format: 'currency',
     steps: [
-      { label: 'Budgeted', inputs: {}, operation: 'sum of all budget items', output: data.totalBudgeted ?? 0 },
-      { label: 'Actual', inputs: {}, operation: 'from category spending summaries', output: data.totalActual ?? 0 },
-      { label: data.type === 'income' ? 'Variance' : 'Remaining', inputs: { budgeted: data.totalBudgeted ?? 0, actual: data.totalActual ?? 0 }, operation: data.type === 'income' ? `${data.totalActual ?? 0} − ${data.totalBudgeted ?? 0}` : `${data.totalBudgeted ?? 0} − ${data.totalActual ?? 0}`, output: data.remaining ?? 0 },
-      { label: data.type === 'income' ? '% Achieved' : '% Used', inputs: { actual: data.totalActual ?? 0, budgeted: data.totalBudgeted ?? 0 }, operation: `${data.totalActual ?? 0} / ${data.totalBudgeted ?? 0} × 100`, output: data.percentUsed ?? 0 },
+      { label: 'Budgeted', inputs: {}, operation: 'sum of active budget items (scaled by period)', output: budgeted },
+      { label: 'Actual', inputs: {}, operation: 'from category transaction spending summaries', output: actual },
+      {
+        label: data.type === 'income' ? 'Variance' : 'Remaining',
+        inputs: { budgeted, actual },
+        operation: data.type === 'income' ? `${actual} − ${budgeted}` : `${budgeted} − ${actual}`,
+        output: remaining,
+      },
+      {
+        label: data.type === 'income' ? '% Achieved' : '% Used',
+        inputs: { actual, budgeted },
+        operation: percentStepOp,
+        output: percentUsed,
+      },
     ],
-    result: data.remaining ?? 0,
+    result: remaining,
   };
 }
 
@@ -268,22 +350,31 @@ export function buildGoalsTrace(data: {
   overallProgress?: number;
   count?: number;
 }): CalculationTrace {
+  const target = data.totalTarget ?? 0;
+  const current = data.totalCurrent ?? 0;
+  const progress = data.overallProgress ?? (target > 0 ? Math.min((current / target) * 100, 100) : 0);
+
   return {
     id: 'goals',
     title: 'Goals Summary',
     category: 'goals',
-    formula: 'Overall Progress = Total Current / Total Target × 100 (capped at 100%)',
+    formula: 'Overall Progress = min(Total Saved / Total Target × 100, 100%)',
     dataSource: '/api/financial-goals',
-    filters: [],
+    filters: ['status != archived'],
     typesIncluded: [],
     typesExcluded: [],
     format: 'percentage',
     steps: [
-      { label: 'Total Target', inputs: {}, operation: 'sum of all goal target amounts', output: data.totalTarget ?? 0 },
-      { label: 'Total Saved', inputs: {}, operation: 'sum of all goal current amounts', output: data.totalCurrent ?? 0 },
-      { label: 'Overall Progress', inputs: { totalCurrent: data.totalCurrent ?? 0, totalTarget: data.totalTarget ?? 0 }, operation: `${data.totalCurrent ?? 0} / ${data.totalTarget ?? 0} × 100`, output: data.overallProgress ?? 0 },
+      { label: 'Total Target', inputs: {}, operation: 'sum of active goal target amounts', output: target },
+      { label: 'Total Saved', inputs: {}, operation: 'sum of dynamic allocated/saved amounts across linked accounts', output: current },
+      {
+        label: 'Overall Progress',
+        inputs: { totalCurrent: current, totalTarget: target },
+        operation: target > 0 ? `min((${current} / ${target}) × 100, 100%)` : '0%',
+        output: progress,
+      },
     ],
-    result: data.overallProgress ?? 0,
+    result: progress,
   };
 }
 
@@ -348,6 +439,7 @@ export function buildInvestmentsTrace(data: {
     const accCostBasis = accHoldings.reduce((sum, h) => sum + (h.costBasis ?? 0), 0);
     const accGainLoss = accHoldings.reduce((sum, h) => sum + (h.unrealizedGainLoss ?? 0), 0);
     const accReturnPct = accCostBasis > 0 ? (accGainLoss / accCostBasis) * 100 : 0;
+    const accValueForCostBasis = accCostBasis + accGainLoss;
 
     const accSteps: CalculationTrace['steps'] = [
       {
@@ -367,8 +459,8 @@ export function buildInvestmentsTrace(data: {
       });
       accSteps.push({
         label: 'Unrealized Gain/Loss',
-        inputs: { value: acc.balance, cost: accCostBasis },
-        operation: `${acc.balance} − ${accCostBasis}`,
+        inputs: { value: accValueForCostBasis, cost: accCostBasis },
+        operation: `${accValueForCostBasis} − ${accCostBasis}`,
         output: accGainLoss,
       });
       accSteps.push({
@@ -383,7 +475,7 @@ export function buildInvestmentsTrace(data: {
       id: `investmentAccount_${acc.id}`,
       title: `${acc.name} (${acc.institution || 'Brokerage'})`,
       category: 'investments',
-      formula: 'Unrealized Gain/Loss = Balance − Cost Basis',
+      formula: 'Unrealized Gain/Loss = Value of Holdings with Cost Basis − Cost Basis',
       dataSource: `/api/investments → account ${acc.id}`,
       filters: [],
       typesIncluded: [acc.type],
@@ -405,6 +497,8 @@ export function buildInvestmentsTrace(data: {
       'investment',
       'brokerage',
       'retirement',
+      'otherinvestment',
+      'otherInvestment',
       'rothira',
       'traditionalira',
       '401k',

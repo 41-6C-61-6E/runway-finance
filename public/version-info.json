@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1787252506532",
-  "buildTime": "2026-08-20T19:01:46.532Z",
-  "hash": "38ff6a1",
-  "fullHash": "38ff6a1b80786e38243c86c38bea75d65eaf4012",
+  "buildNumber": "26.08.1787270680055",
+  "buildTime": "2026-08-21T00:04:40.055Z",
+  "hash": "1e3891f",
+  "fullHash": "1e3891fabeb9b8d6d1bc7180c360c86e9b93dc0d",
   "commits": [
+    "fix: update type handling, schema validation, and API structures across transaction and budget routes",
+    "refactor: implement comprehensive financial remediation suite and unit tests for accounts, debt-to-asset metrics, age-cohort benchmarks, and currency conversion logic",
     "fix: update contribution mode in retirement projection test to 'none'",
     "Add unit tests for various components and utilities",
     "feat: add net worth benchmarks component for emergency fund and age-banded comparisons",
@@ -201,19 +203,33 @@
     "style: remove border radius from sankey chart rectangles",
     "refactor: modularize wealth flow calculation by extracting balance fetching and updating account grouping logic",
     "refactor: improve Sankey hub rendering, add chart navigation, and implement account-level adjusted delta routing",
-    "refactor: replace static feedback components with an array-based API in CollapsibleFilterPanel",
-    "refactor: wealth flow visualization and calculation",
-    "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility"
+    "refactor: replace static feedback components with an array-based API in CollapsibleFilterPanel"
   ],
   "history": [
+    {
+      "hash": "1e3891f",
+      "fullHash": "1e3891fabeb9b8d6d1bc7180c360c86e9b93dc0d",
+      "author": "Alan Racek",
+      "date": "2026-08-20T13:12:02-07:00",
+      "message": "fix: update type handling, schema validation, and API structures across transaction and budget routes",
+      "type": "fix",
+      "buildNumber": "26.08.1787270680055"
+    },
+    {
+      "hash": "63184f4",
+      "fullHash": "63184f416912bdbce0607318713672485b18479e",
+      "author": "Alan Racek",
+      "date": "2026-08-20T12:45:11-07:00",
+      "message": "refactor: implement comprehensive financial remediation suite and unit tests for accounts, debt-to-asset metrics, age-cohort benchmarks, and currency conversion logic",
+      "type": "refactor"
+    },
     {
       "hash": "38ff6a1",
       "fullHash": "38ff6a1b80786e38243c86c38bea75d65eaf4012",
       "author": "Alan Racek",
       "date": "2026-08-19T17:42:52-07:00",
       "message": "fix: update contribution mode in retirement projection test to 'none'",
-      "type": "fix",
-      "buildNumber": "26.08.1787252506532"
+      "type": "fix"
     },
     {
       "hash": "77a2ffc",
@@ -1789,22 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-07-05T11:15:20-07:00",
       "message": "refactor: replace static feedback components with an array-based API in CollapsibleFilterPanel",
-      "type": "refactor"
-    },
-    {
-      "hash": "12ed5dc",
-      "fullHash": "12ed5dcbc1d920cf0b64e40ad6cd75078140ca94",
-      "author": "Alan Racek",
-      "date": "2026-07-05T10:45:05-07:00",
-      "message": "refactor: wealth flow visualization and calculation",
-      "type": "refactor"
-    },
-    {
-      "hash": "6727c44",
-      "fullHash": "6727c44ca341e867424818a74556d2df24e12332",
-      "author": "Alan Racek",
-      "date": "2026-07-04T19:44:49-07:00",
-      "message": "refactor: update wealth flow snapshot logic, cache version, and snapshot testing utility",
       "type": "refactor"
     }
   ]
