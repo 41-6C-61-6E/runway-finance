@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1787326343816",
-  "buildTime": "2026-08-21T15:32:23.816Z",
-  "hash": "9e5001d",
-  "fullHash": "9e5001d47c24c1525608f08b1058f10f86ce04ff",
+  "buildNumber": "26.08.1787327174952",
+  "buildTime": "2026-08-21T15:46:14.952Z",
+  "hash": "4984411",
+  "fullHash": "4984411b64ea745d700c19dffd102b42d7e2ccc0",
   "commits": [
+    "feat: hide investments summary on mobile and add unit tests for investment UI components",
     "feat: implement recurring transaction preview API and modularize recurring detection utilities",
     "feat: add text size user setting and support non-encrypted operation modes for settings",
     "feat: implement robust JSON parsing for settings updates, extend user settings schema, and add onboarding checklist unit tests.",
@@ -202,18 +203,25 @@
     "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections.",
     "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync",
     "refactor: update Sankey visualization logic and initialize net worth reporting variables",
-    "fix: clear stale account snapshots during startup healing and update service worker cache version",
-    "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup"
+    "fix: clear stale account snapshots during startup healing and update service worker cache version"
   ],
   "history": [
+    {
+      "hash": "4984411",
+      "fullHash": "4984411b64ea745d700c19dffd102b42d7e2ccc0",
+      "author": "Alan Racek",
+      "date": "2026-08-21T08:33:12-07:00",
+      "message": "feat: hide investments summary on mobile and add unit tests for investment UI components",
+      "type": "feat",
+      "buildNumber": "26.08.1787327174952"
+    },
     {
       "hash": "9e5001d",
       "fullHash": "9e5001d47c24c1525608f08b1058f10f86ce04ff",
       "author": "Alan Racek",
       "date": "2026-08-20T22:03:56-07:00",
       "message": "feat: implement recurring transaction preview API and modularize recurring detection utilities",
-      "type": "feat",
-      "buildNumber": "26.08.1787326343816"
+      "type": "feat"
     },
     {
       "hash": "fc62a7e",
@@ -1798,14 +1806,6 @@
       "date": "2026-07-05T21:29:17-07:00",
       "message": "fix: clear stale account snapshots during startup healing and update service worker cache version",
       "type": "fix"
-    },
-    {
-      "hash": "35ca5d8",
-      "fullHash": "35ca5d8e262706c4e8cdc8745995ebb42928767d",
-      "author": "Alan Racek",
-      "date": "2026-07-05T21:17:28-07:00",
-      "message": "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup",
-      "type": "feat"
     }
   ]
 }
