@@ -82,7 +82,7 @@ export default function SettingsDropdown({ onOpenChange }: SettingsDropdownProps
             <Settings className="w-5 h-5" />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="bottom">Settings</TooltipContent>
+        <TooltipContent side="bottom" className="hidden md:block">Settings</TooltipContent>
       </Tooltip>
       {open && (
         <div className="absolute right-[-40px] sm:right-0 top-full mt-1 w-48 py-1 bg-popover border border-border rounded-lg shadow-lg z-50">

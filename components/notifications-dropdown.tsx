@@ -385,7 +385,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
             )}
           </button>
         </TooltipTrigger>
-        <TooltipContent side="bottom">Notifications</TooltipContent>
+        <TooltipContent side="bottom" className="hidden md:block">Notifications</TooltipContent>
       </Tooltip>
 
       {open && (

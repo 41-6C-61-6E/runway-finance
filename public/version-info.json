@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1787283520129",
-  "buildTime": "2026-08-21T03:38:40.129Z",
-  "hash": "292aecd",
-  "fullHash": "292aecdc1105cb3d916aae29ddff424230924ce2",
+  "buildNumber": "26.08.1787326343816",
+  "buildTime": "2026-08-21T15:32:23.816Z",
+  "hash": "9e5001d",
+  "fullHash": "9e5001d47c24c1525608f08b1058f10f86ce04ff",
   "commits": [
+    "feat: implement recurring transaction preview API and modularize recurring detection utilities",
+    "feat: add text size user setting and support non-encrypted operation modes for settings",
     "feat: implement robust JSON parsing for settings updates, extend user settings schema, and add onboarding checklist unit tests.",
     "feat: add FIRE plan export modal with LLM audit prompt, PDF printing, and unit tests",
     "feat: calculate property LTV in API and safely access user settings in onboarding checklist",
@@ -201,19 +203,33 @@
     "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync",
     "refactor: update Sankey visualization logic and initialize net worth reporting variables",
     "fix: clear stale account snapshots during startup healing and update service worker cache version",
-    "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup",
-    "refactor: inline loading and error states within Sankey chart components for improved rendering logic",
-    "refactor: introduce account activity checking logic to standardize net worth calculations and currency conversion across services"
+    "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup"
   ],
   "history": [
+    {
+      "hash": "9e5001d",
+      "fullHash": "9e5001d47c24c1525608f08b1058f10f86ce04ff",
+      "author": "Alan Racek",
+      "date": "2026-08-20T22:03:56-07:00",
+      "message": "feat: implement recurring transaction preview API and modularize recurring detection utilities",
+      "type": "feat",
+      "buildNumber": "26.08.1787326343816"
+    },
+    {
+      "hash": "fc62a7e",
+      "fullHash": "fc62a7e5ca314a26bff1db06a72681352fc0b94f",
+      "author": "Alan Racek",
+      "date": "2026-08-20T20:53:01-07:00",
+      "message": "feat: add text size user setting and support non-encrypted operation modes for settings",
+      "type": "feat"
+    },
     {
       "hash": "292aecd",
       "fullHash": "292aecdc1105cb3d916aae29ddff424230924ce2",
       "author": "Alan Racek",
       "date": "2026-08-20T20:35:44-07:00",
       "message": "feat: implement robust JSON parsing for settings updates, extend user settings schema, and add onboarding checklist unit tests.",
-      "type": "feat",
-      "buildNumber": "26.08.1787283520129"
+      "type": "feat"
     },
     {
       "hash": "7cfc3b4",
@@ -1790,22 +1806,6 @@
       "date": "2026-07-05T21:17:28-07:00",
       "message": "feat: add self-healing service for accounts incorrectly disabled or mismatched during remap and register on startup",
       "type": "feat"
-    },
-    {
-      "hash": "2e4fc43",
-      "fullHash": "2e4fc4375ae968637b033de7eba7a53ce0d2699d",
-      "author": "Alan Racek",
-      "date": "2026-07-05T20:59:38-07:00",
-      "message": "refactor: inline loading and error states within Sankey chart components for improved rendering logic",
-      "type": "refactor"
-    },
-    {
-      "hash": "623ed92",
-      "fullHash": "623ed9226f5d92b8ac865ab049220785ad299a85",
-      "author": "Alan Racek",
-      "date": "2026-07-05T20:00:38-07:00",
-      "message": "refactor: introduce account activity checking logic to standardize net worth calculations and currency conversion across services",
-      "type": "refactor"
     }
   ]
 }
