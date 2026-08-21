@@ -29,6 +29,7 @@ import RecurringDetailDrawer from './RecurringDetailDrawer';
 import { RecurringSettingsMenu } from './RecurringSettingsMenu';
 import { RecurringBulkActionsToolbar } from './RecurringBulkActionsToolbar';
 import { MergeRecurringModal } from './MergeRecurringModal';
+import { MarkAsRecurringModal } from './MarkAsRecurringModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { formatCurrency } from '@/lib/utils/format';
 import { toast } from 'sonner';
@@ -443,11 +444,22 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
             </div>
           }
           rightActions={
-            <RecurringSettingsMenu
-              onScan={handleScan}
-              onRefresh={refreshRecurring}
-              scanning={scanning}
-            />
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setCreateModalOpen(true)}
+                className="h-8 text-xs font-semibold px-3 rounded-lg shadow-xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Add Recurring
+              </Button>
+              <RecurringSettingsMenu
+                onScan={handleScan}
+                onRefresh={refreshRecurring}
+                scanning={scanning}
+              />
+            </div>
           }
           className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
         >
@@ -684,131 +696,14 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
         />
       )}
 
-      {/* Manual Create Modal */}
-      <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold">Add Recurring Item</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateManual} className="space-y-3 pt-2">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">
-                Merchant / Subscription Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={newMerchant}
-                onChange={(e) => setNewMerchant(e.target.value)}
-                placeholder="e.g. Netflix, Spotify, Gym"
-                className="w-full px-3 py-2 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Expected Amount ($) *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={newAmount}
-                  onChange={(e) => setNewAmount(e.target.value)}
-                  placeholder="14.99"
-                  className="w-full px-3 py-2 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">
-                  Frequency *
-                </label>
-                <select
-                  value={newFrequency}
-                  onChange={(e) => setNewFrequency(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="weekly">Weekly</option>
-                  <option value="biweekly">Bi-weekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="semi_annual">Semi-annual</option>
-                  <option value="annual">Annual</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Category</label>
-                <select
-                  value={newCategoryId}
-                  onChange={(e) => setNewCategoryId(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">Uncategorized</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Account</label>
-                <select
-                  value={newAccountId}
-                  onChange={(e) => setNewAccountId(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">None / Any Account</option>
-                  {accountsList.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Last Date</label>
-                <input
-                  type="date"
-                  value={newLastDate}
-                  onChange={(e) => setNewLastDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-foreground mb-1">Flow Type</label>
-                <select
-                  value={newFlowType}
-                  onChange={(e) => setNewFlowType(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="expense">Expense / Outflow</option>
-                  <option value="income">Income / Inflow</option>
-                </select>
-              </div>
-            </div>
-
-            <DialogFooter className="pt-3">
-              <Button type="button" variant="outline" onClick={() => setCreateModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={creating} className="font-semibold">
-                {creating ? 'Creating...' : 'Create Subscription'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* ── Add / Mark as Recurring Modal ── */}
+      <MarkAsRecurringModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSuccess={() => {
+          refreshRecurring();
+        }}
+      />
     </div>
   );
 }
