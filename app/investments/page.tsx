@@ -11,6 +11,7 @@ const INVESTMENT_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'holdings', label: 'Holdings & Portfolio' },
   { id: 'income', label: 'Income & Activity' },
+  { id: 'escape-velocity', label: 'Escape Velocity', badge: '🚀' },
 ];
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { InvestmentsSummary } from '@/components/investments/investments-summary';
@@ -22,6 +23,7 @@ import { IncomeDividendsPanel } from '@/components/investments/income-dividends-
 import { RecentActivity } from '@/components/investments/recent-activity';
 import { HoldingsTable } from '@/components/investments/holdings-table';
 import { HoldingDetailSheet } from '@/components/investments/holding-detail-modal';
+import { EscapeVelocityTab } from '@/components/investments/escape-velocity-tab';
 import { CandlestickChart, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 import { useQuery } from '@tanstack/react-query';
@@ -41,7 +43,7 @@ interface InvestmentsData {
 
 export default function InvestmentsPage() {
   const { isVisible } = useChartVisibility();
-  const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'income'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'income' | 'escape-velocity'>('overview');
   const [selectedHolding, setSelectedHolding] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -164,13 +166,13 @@ export default function InvestmentsPage() {
             <MobileTabSwipeContainer
               tabs={INVESTMENT_TABS}
               activeTabId={activeTab}
-              onTabChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
+              onTabChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income' | 'escape-velocity')}
             >
               <div className="hidden md:block mb-5 sm:mb-6">
                 <AppTabs
                   tabs={INVESTMENT_TABS}
                   activeTab={activeTab}
-                  onChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
+                  onChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income' | 'escape-velocity')}
                   variant="underline"
                 />
               </div>
@@ -253,6 +255,14 @@ export default function InvestmentsPage() {
                     </div>
                   )}
                 </div>
+              )}
+              {/* ── Escape Velocity Tab Content ── */}
+              {activeTab === 'escape-velocity' && (
+                <EscapeVelocityTab
+                  totalPortfolioValue={data.summary.totalBalance}
+                  totalAnnualIncome={incomeData?.totalAnnual}
+                  portfolioHistory={portfolioHistory}
+                />
               )}
             </MobileTabSwipeContainer>
 

@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1787327174952",
-  "buildTime": "2026-08-21T15:46:14.952Z",
-  "hash": "4984411",
-  "fullHash": "4984411b64ea745d700c19dffd102b42d7e2ccc0",
+  "buildNumber": "26.08.1787359059816",
+  "buildTime": "2026-08-22T00:37:39.816Z",
+  "hash": "cfee09b",
+  "fullHash": "cfee09bcb44df1a1ec5b0cf6462f47a61de66c3d",
   "commits": [
+    "feat: upgrade mortgage payoff visualization and add equity progress bar to property cards",
+    "feat: add row group identifiers to budget table and implement unit tests for transaction icon components",
     "feat: hide investments summary on mobile and add unit tests for investment UI components",
     "feat: implement recurring transaction preview API and modularize recurring detection utilities",
     "feat: add text size user setting and support non-encrypted operation modes for settings",
@@ -201,19 +203,33 @@
     "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
     "feat: use earliest snapshot as starting balance for new accounts and fix sankey chart rendering logic",
     "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections.",
-    "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync",
-    "refactor: update Sankey visualization logic and initialize net worth reporting variables",
-    "fix: clear stale account snapshots during startup healing and update service worker cache version"
+    "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync"
   ],
   "history": [
+    {
+      "hash": "cfee09b",
+      "fullHash": "cfee09bcb44df1a1ec5b0cf6462f47a61de66c3d",
+      "author": "Alan Racek",
+      "date": "2026-08-21T17:31:47-07:00",
+      "message": "feat: upgrade mortgage payoff visualization and add equity progress bar to property cards",
+      "type": "feat",
+      "buildNumber": "26.08.1787359059816"
+    },
+    {
+      "hash": "d1adf91",
+      "fullHash": "d1adf91eb9fa91a081068ad200dc0924b3e085df",
+      "author": "Alan Racek",
+      "date": "2026-08-21T10:54:49-07:00",
+      "message": "feat: add row group identifiers to budget table and implement unit tests for transaction icon components",
+      "type": "feat"
+    },
     {
       "hash": "4984411",
       "fullHash": "4984411b64ea745d700c19dffd102b42d7e2ccc0",
       "author": "Alan Racek",
       "date": "2026-08-21T08:33:12-07:00",
       "message": "feat: hide investments summary on mobile and add unit tests for investment UI components",
-      "type": "feat",
-      "buildNumber": "26.08.1787327174952"
+      "type": "feat"
     },
     {
       "hash": "9e5001d",
@@ -1790,22 +1806,6 @@
       "date": "2026-07-06T08:20:52-07:00",
       "message": "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync",
       "type": "feat"
-    },
-    {
-      "hash": "cd22cca",
-      "fullHash": "cd22cca77b443494a402ab18a7af3cdab8d76a00",
-      "author": "Alan Racek",
-      "date": "2026-07-05T21:40:31-07:00",
-      "message": "refactor: update Sankey visualization logic and initialize net worth reporting variables",
-      "type": "refactor"
-    },
-    {
-      "hash": "b351307",
-      "fullHash": "b35130734ab24d108a9ec045fbe7029c201b1279",
-      "author": "Alan Racek",
-      "date": "2026-07-05T21:29:17-07:00",
-      "message": "fix: clear stale account snapshots during startup healing and update service worker cache version",
-      "type": "fix"
     }
   ]
 }
