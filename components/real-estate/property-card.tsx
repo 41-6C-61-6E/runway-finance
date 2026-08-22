@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
-import { Home, BadgeCheck, Pencil, X, Link2 } from 'lucide-react';
+import { Home, BadgeCheck, Pencil, X, Link2, TrendingUp } from 'lucide-react';
 import { MortgagePaydownChart } from './mortgage-paydown-chart';
+import { PropertyEquityProgressBar } from './property-equity-progress-bar';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { cn } from '@/lib/utils';
-
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
   'single-family': 'Single Family',
@@ -56,7 +56,14 @@ interface PropertyCardProps {
   onEditProperty?: () => void;
 }
 
-export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOverrideValue, onEditMortgage, onEditProperty }: PropertyCardProps) {
+export function PropertyCard({
+  property,
+  onLinkMortgage,
+  onUnlinkMortgage,
+  onOverrideValue,
+  onEditMortgage,
+  onEditProperty,
+}: PropertyCardProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed(`propertyCard-${property.id}`);
   const [editingValue, setEditingValue] = useState(false);
   const [newValue, setNewValue] = useState(String(property.value));
@@ -65,12 +72,17 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
 
   const { isVisible } = useChartVisibility();
 
-  const activeMortgages = property.linkedMortgages.filter(
-    (m) => !m.metadata || !['paid_off', 'refinanced'].includes((m.metadata as any)?.mortgageStatus)
-  );
-  const closedMortgages = property.linkedMortgages.filter(
-    (m) => m.metadata && ['paid_off', 'refinanced'].includes((m.metadata as any)?.mortgageStatus)
-  );
+  const activeMortgages = useMemo(() => {
+    return property.linkedMortgages.filter(
+      (m) => !m.metadata || !['paid_off', 'refinanced'].includes((m.metadata as any)?.mortgageStatus)
+    );
+  }, [property.linkedMortgages]);
+
+  const closedMortgages = useMemo(() => {
+    return property.linkedMortgages.filter(
+      (m) => m.metadata && ['paid_off', 'refinanced'].includes((m.metadata as any)?.mortgageStatus)
+    );
+  }, [property.linkedMortgages]);
 
   const defaultMortgageId = activeMortgages[0]?.id || null;
   const currentMortgageId = selectedMortgageId || defaultMortgageId;
@@ -80,12 +92,18 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
   const currentTab = isPayoffVisible ? activeTab : 'overview';
 
   const isWhollyOwned = activeMortgages.length === 0;
-  const ltvColor = property.ltv > 80 ? 'text-destructive' : property.ltv > 60 ? 'text-chart-3' : 'text-chart-1';
+  const ltvColor =
+    property.ltv > 80
+      ? 'text-destructive bg-destructive/10 border-destructive/20'
+      : property.ltv > 60
+      ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20'
+      : 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
 
   const meta = property.metadata || {};
   const propertyType = meta.propertyType as string | undefined;
   const valuationMethod = (meta.valuationMethod as string) || (property.manualValue !== null ? 'manual' : 'manual');
-  const valuationLabel = valuationMethod === 'redfin' ? 'Redfin AVM' : (valuationMethod === 'hpi' ? 'FHFA HPI' : 'Manual Entry');
+  const valuationLabel =
+    valuationMethod === 'redfin' ? 'Redfin AVM' : valuationMethod === 'hpi' ? 'FHFA HPI' : 'Manual Entry';
   const address = meta.address as string | undefined;
   const bedrooms = meta.bedrooms as number | undefined;
   const bathrooms = meta.bathrooms as number | undefined;
@@ -98,6 +116,10 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
   const hasPmi = activeMortgages.some((m) => (m.pmi ?? 0) > 0);
   const pmiRemovalEligible = property.ltv <= 80 && hasPmi;
 
+  // Capital gain calculation if purchase price is present
+  const capitalGain = purchasePrice && purchasePrice > 0 ? property.value - purchasePrice : null;
+  const capitalGainPct = purchasePrice && purchasePrice > 0 ? ((property.value - purchasePrice) / purchasePrice) * 100 : null;
+
   const handleSaveValue = () => {
     const val = parseFloat(newValue);
     if (!isNaN(val) && val > 0) {
@@ -107,16 +129,18 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
   };
 
   return (
-    <div className={cn(
-      "@container bg-card border border-border rounded-xl shadow-sm flex flex-col justify-between transition-all",
-      isCollapsed ? "h-auto" : "h-full min-h-[320px]"
-    )}>
+    <div
+      className={cn(
+        '@container bg-card border border-border rounded-xl shadow-sm flex flex-col justify-between transition-all duration-200',
+        isCollapsed ? 'h-auto' : 'h-full min-h-[320px]'
+      )}
+    >
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         title={
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-chart-3/20 flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-chart-3/15 flex items-center justify-center shrink-0 border border-chart-3/20">
               <Home className="w-4 h-4 text-chart-3" />
             </div>
             <div>
@@ -132,12 +156,12 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                 </span>
               </div>
               {isWhollyOwned ? (
-                <span className="inline-flex items-center gap-1 text-[10px] text-chart-1 font-medium mt-0.5">
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                   <BadgeCheck className="w-3 h-3" />
                   Wholly Owned
                 </span>
               ) : pmiRemovalEligible ? (
-                <span className="inline-flex items-center gap-1 text-[10px] text-chart-1 font-medium mt-0.5">
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                   <BadgeCheck className="w-3 h-3" />
                   PMI Removal Eligible (≤80% LTV)
                 </span>
@@ -163,18 +187,35 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                   type="number"
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
-                  className="w-20 px-1 py-0.5 text-xs bg-background border border-input rounded text-foreground font-mono focus:outline-none"
+                  className="w-24 px-1.5 py-0.5 text-xs bg-background border border-input rounded text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-primary"
                   autoFocus
                 />
-                <button onClick={handleSaveValue} className="p-0.5 rounded hover:bg-muted text-chart-1" type="button"><BadgeCheck className="w-3.5 h-3.5" /></button>
-                <button onClick={() => setEditingValue(false)} className="p-0.5 rounded hover:bg-muted text-destructive" type="button"><X className="w-3.5 h-3.5" /></button>
+                <button
+                  onClick={handleSaveValue}
+                  className="p-0.5 rounded hover:bg-muted text-emerald-600 dark:text-emerald-400"
+                  type="button"
+                >
+                  <BadgeCheck className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setEditingValue(false)}
+                  className="p-0.5 rounded hover:bg-muted text-destructive"
+                  type="button"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             ) : (
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <span className="text-sm font-semibold text-foreground font-mono blur-number">{formatCurrency(property.value)}</span>
+                <span className="text-sm font-semibold text-foreground font-mono blur-number">
+                  {formatCurrency(property.value)}
+                </span>
                 {!isCollapsed && (
                   <button
-                    onClick={() => { setEditingValue(true); setNewValue(String(property.value)); }}
+                    onClick={() => {
+                      setEditingValue(true);
+                      setNewValue(String(property.value));
+                    }}
                     className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors cursor-pointer"
                     title="Override estimated value"
                     type="button"
@@ -206,11 +247,11 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
               />
             )}
 
-
             {currentTab === 'overview' ? (
-              <>
+              <div className="space-y-4">
+                {/* Sync Error Alert */}
                 {meta.syncError && (
-                  <div className="mb-4 p-2.5 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive font-medium flex items-start gap-2">
+                  <div className="p-2.5 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive font-medium flex items-start gap-2">
                     <span className="mt-0.5">⚠️</span>
                     <div className="flex-grow min-w-0">
                       <span className="font-semibold block mb-0.5">Sync Failed</span>
@@ -227,130 +268,237 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                   </div>
                 )}
 
-                {/* Core Metrics (Container-Responsive) */}
-                <div className="grid grid-cols-1 @sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
-                  <div>
-                    <div className="text-[10px] text-muted-foreground mb-0.5">Equity</div>
-                    <div className="font-mono text-sm font-semibold text-chart-2 blur-number">
+                {/* Core Financial Metrics Grid */}
+                <div className="grid grid-cols-2 @sm:grid-cols-4 gap-2.5">
+                  <div className="p-2.5 bg-muted/20 border border-border/40 rounded-lg flex flex-col justify-between">
+                    <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                      Total Equity
+                    </div>
+                    <div className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400 blur-number">
                       {formatCurrency(property.equity)}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1" title="Estimated net proceeds assuming 8% seller closing costs and agent commissions">
-                      <span>Est. Sale Proceeds</span>
-                      <span className="text-[9px] text-muted-foreground/70 font-sans">(net 8%)</span>
+
+                  <div className="p-2.5 bg-muted/20 border border-border/40 rounded-lg flex flex-col justify-between">
+                    <div
+                      className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1 flex items-center justify-between"
+                      title="Estimated net proceeds assuming 8% seller closing costs and agent commissions"
+                    >
+                      <span>Est. Net Proceeds</span>
+                      <span className="text-[9px] text-muted-foreground/70 font-sans lowercase">(net 8%)</span>
                     </div>
-                    <div className="font-mono text-sm font-semibold text-chart-1 blur-number">
+                    <div className="font-mono text-sm font-bold text-chart-1 blur-number">
                       {formatCurrency(property.saleProceeds)}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-[10px] text-muted-foreground mb-0.5">LTV</div>
-                    <div className={`font-mono text-sm font-semibold blur-number ${ltvColor}`}>
-                      {property.ltv.toFixed(1)}%
+
+                  <div className="p-2.5 bg-muted/20 border border-border/40 rounded-lg flex flex-col justify-between">
+                    <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                      Loan-to-Value
                     </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-sm font-bold text-foreground blur-number">
+                        {property.ltv.toFixed(1)}%
+                      </span>
+                      <span
+                        className={cn(
+                          'px-1.5 py-0.2 rounded text-[9px] font-semibold border uppercase tracking-wider',
+                          ltvColor
+                        )}
+                      >
+                        {property.ltv <= 60 ? 'Healthy' : property.ltv <= 80 ? 'Moderate' : 'High'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-muted/20 border border-border/40 rounded-lg flex flex-col justify-between">
+                    <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3 text-muted-foreground" />
+                      <span>Appreciation</span>
+                    </div>
+                    {capitalGain !== null && capitalGainPct !== null ? (
+                      <div className="font-mono text-xs font-semibold flex items-baseline gap-1 blur-number">
+                        <span
+                          className={
+                            capitalGain >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
+                          }
+                        >
+                          {capitalGain >= 0 ? '+' : ''}
+                          {formatCurrency(capitalGain)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          ({capitalGainPct >= 0 ? '+' : ''}
+                          {capitalGainPct.toFixed(0)}%)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="font-mono text-xs text-muted-foreground italic">
+                        {property.value > 0 ? 'Current Value' : '—'}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Mortgages List */}
-                {activeMortgages.length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Mortgages</span>
-                      <button
-                        onClick={() => onLinkMortgage(property.id)}
-                        className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer"
-                        type="button"
-                      >
-                        <Link2 className="w-3 h-3" />
-                        Add
-                      </button>
-                    </div>
-                    {activeMortgages.map((m) => {
-                      const payoffProgress = m.originalLoanAmount > 0
-                        ? ((m.originalLoanAmount - Math.abs(m.balance)) / m.originalLoanAmount) * 100
-                        : 0;
-                      return (
-                        <div key={m.id} className="p-3 bg-muted/30 border border-border rounded-lg group">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="text-xs font-semibold text-foreground truncate min-w-0 flex-1">{m.name}</span>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {onEditMortgage && (
+                {/* Real Estate Asset Breakdown Progress Bar */}
+                <div className="p-3 bg-muted/20 border border-border/50 rounded-xl">
+                  <PropertyEquityProgressBar
+                    propertyValue={property.value}
+                    purchasePrice={purchasePrice}
+                    initialValue={initialValue}
+                    linkedMortgages={property.linkedMortgages}
+                  />
+                </div>
+
+                {/* Mortgages Section */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Mortgages</span>
+                      <span className="text-muted-foreground font-normal font-mono text-[10px]">
+                        ({activeMortgages.length})
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => onLinkMortgage(property.id)}
+                      className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer px-2 py-0.5 rounded-md hover:bg-primary/10"
+                      type="button"
+                    >
+                      <Link2 className="w-3 h-3" />
+                      Link Mortgage
+                    </button>
+                  </div>
+
+                  {activeMortgages.length > 0 ? (
+                    <div className="space-y-2">
+                      {activeMortgages.map((m) => {
+                        const payoffProgress =
+                          m.originalLoanAmount > 0
+                            ? ((m.originalLoanAmount - Math.abs(m.balance)) / m.originalLoanAmount) * 100
+                            : 0;
+
+                        return (
+                          <div
+                            key={m.id}
+                            className="p-3 bg-muted/30 hover:bg-muted/40 border border-border rounded-lg transition-colors group"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-foreground truncate">{m.name}</span>
+                                  {m.interestRate > 0 && (
+                                    <span className="px-1.5 py-0.2 text-[9px] font-mono font-medium rounded bg-muted text-muted-foreground border border-border">
+                                      {m.interestRate.toFixed(2)}% APR
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="font-mono text-xs font-bold text-foreground blur-number">
+                                  {formatCurrency(Math.abs(m.balance))}
+                                </span>
+                                {onEditMortgage && (
+                                  <button
+                                    onClick={() => onEditMortgage(m)}
+                                    className="p-1 rounded hover:bg-muted text-muted-foreground/60 hover:text-foreground transition-colors cursor-pointer"
+                                    title="Edit mortgage attributes"
+                                    type="button"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => onEditMortgage(m)}
-                                  className="p-1 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors cursor-pointer"
-                                  title="Edit attributes"
+                                  onClick={() => onUnlinkMortgage(m.id)}
+                                  className="p-1 rounded hover:bg-muted text-muted-foreground/60 hover:text-destructive transition-colors cursor-pointer"
+                                  title="Unlink mortgage"
                                   type="button"
                                 >
-                                  <Pencil className="w-3 h-3" />
+                                  <X className="w-3.5 h-3.5" />
                                 </button>
-                              )}
-                              <button
-                                onClick={() => onUnlinkMortgage(m.id)}
-                                className="p-1 rounded hover:bg-muted text-muted-foreground/50 hover:text-destructive transition-colors cursor-pointer"
-                                title="Unlink mortgage"
-                                type="button"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                              <span className="font-mono text-xs font-semibold text-muted-foreground blur-number ml-0.5">{formatCurrency(Math.abs(m.balance))}</span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-1">
-                            <div className="h-full bg-chart-2 rounded-full transition-all" style={{ width: `${Math.min(payoffProgress, 100)}%` }} />
-                          </div>
-                          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                            <span>{payoffProgress.toFixed(1)}% paid off</span>
-                            {m.interestRate > 0 && <span className="blur-number">{m.interestRate.toFixed(2)}% APR</span>}
-                            {m.monthlyPayment > 0 && <span className="blur-number">{formatCurrency(m.monthlyPayment)}/mo</span>}
-                          </div>
-                          {((m.escrow !== undefined && m.escrow > 0) ||
-                            (m.pmi !== undefined && m.pmi > 0) ||
-                            (m.extraPrincipal !== undefined && m.extraPrincipal > 0)) && (
-                            <div className="mt-2 pt-2 border-t border-border/50 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
-                              {m.escrow !== undefined && m.escrow > 0 && (
-                                <div className="flex justify-between">
-                                  <span>Escrow</span>
-                                  <span className="font-mono blur-number">{formatCurrency(m.escrow)}</span>
-                                </div>
-                              )}
-                              {m.pmi !== undefined && m.pmi > 0 && (
-                                <div className="flex justify-between">
-                                  <span>PMI</span>
-                                  <span className="font-mono blur-number">{formatCurrency(m.pmi)}</span>
-                                </div>
-                              )}
-                              {m.extraPrincipal !== undefined && m.extraPrincipal > 0 && (
-                                <div className="flex justify-between text-chart-1 font-medium">
-                                  <span>Extra Principal</span>
-                                  <span className="font-mono blur-number">{formatCurrency(m.extraPrincipal)}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
 
-                {closedMortgages.length > 0 && (
-                  <div className="space-y-2 mb-4 pt-2 border-t border-border/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Closed Mortgages</span>
+                            {/* Mini Paydown Bar */}
+                            <div className="space-y-1">
+                              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden flex gap-0.5">
+                                <div
+                                  className="h-full bg-emerald-500 rounded-full transition-all"
+                                  style={{ width: `${Math.min(payoffProgress, 100)}%` }}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                <span>{payoffProgress.toFixed(1)}% paid off</span>
+                                {m.monthlyPayment > 0 && (
+                                  <span className="blur-number">{formatCurrency(m.monthlyPayment)}/mo</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Additional attributes badges if present */}
+                            {((m.escrow !== undefined && m.escrow > 0) ||
+                              (m.pmi !== undefined && m.pmi > 0) ||
+                              (m.extraPrincipal !== undefined && m.extraPrincipal > 0)) && (
+                              <div className="mt-2 pt-2 border-t border-border/40 grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+                                {m.escrow !== undefined && m.escrow > 0 && (
+                                  <div>
+                                    <span className="text-muted-foreground/80 block">Escrow</span>
+                                    <span className="font-mono font-medium text-foreground blur-number">
+                                      {formatCurrency(m.escrow)}
+                                    </span>
+                                  </div>
+                                )}
+                                {m.pmi !== undefined && m.pmi > 0 && (
+                                  <div>
+                                    <span className="text-muted-foreground/80 block">PMI</span>
+                                    <span className="font-mono font-medium text-foreground blur-number">
+                                      {formatCurrency(m.pmi)}
+                                    </span>
+                                  </div>
+                                )}
+                                {m.extraPrincipal !== undefined && m.extraPrincipal > 0 && (
+                                  <div>
+                                    <span className="text-emerald-600 dark:text-emerald-400 block font-medium">
+                                      Extra Principal
+                                    </span>
+                                    <span className="font-mono font-medium text-emerald-600 dark:text-emerald-400 blur-number">
+                                      {formatCurrency(m.extraPrincipal)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
+                  ) : isWhollyOwned ? (
+                    <div className="p-3 bg-muted/20 border border-dashed border-border rounded-lg text-center text-xs text-muted-foreground">
+                      No mortgages linked to this property.
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Closed Mortgages History */}
+                {closedMortgages.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-border/30">
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider block">
+                      Closed Mortgages
+                    </span>
                     <div className="space-y-1.5">
                       {closedMortgages.map((m) => {
                         const mMeta = m.metadata || {};
                         const isRefi = mMeta.mortgageStatus === 'refinanced';
                         const closedLabel = isRefi ? 'Refinanced' : 'Paid Off';
                         const closedDate = isRefi ? String(mMeta.refinanceDate || '') : String(mMeta.payoffDate || '');
+
                         return (
-                          <div key={m.id} className="p-3 bg-muted/20 border border-border/40 rounded-lg flex items-center justify-between text-xs group">
+                          <div
+                            key={m.id}
+                            className="p-2.5 bg-muted/20 border border-border/40 rounded-lg flex items-center justify-between text-xs group"
+                          >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-muted-foreground truncate">{m.name}</span>
-                                <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
+                                <span className="px-1.5 py-0.2 text-[9px] font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
                                   {closedLabel}
                                 </span>
                               </div>
@@ -368,7 +516,7 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                                   title="Edit attributes"
                                   type="button"
                                 >
-                                  <Pencil className="w-3.5 h-3.5" />
+                                  <Pencil className="w-3 h-3" />
                                 </button>
                               )}
                               <button
@@ -388,26 +536,19 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                   </div>
                 )}
 
-                {isWhollyOwned && (
-                  <button
-                    onClick={() => onLinkMortgage(property.id)}
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2 cursor-pointer"
-                    type="button"
-                  >
-                    <Link2 className="w-3 h-3" />
-                    Link a mortgage
-                  </button>
-                )}
-
                 {/* Property Details Section */}
-                {(purchasePrice !== undefined || purchaseDate || zipCode || address || initialValue !== undefined) && (
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider block mb-2">Property Details</span>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                {(purchasePrice !== undefined || purchaseDate || zipCode || address || initialValue !== undefined || bedrooms !== undefined || bathrooms !== undefined || squareFootage !== undefined) && (
+                  <div className="pt-3 border-t border-border/40">
+                    <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider block mb-2">
+                      Property Details
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
                       {purchasePrice !== undefined && purchasePrice > 0 && (
                         <div className="flex justify-between items-center py-0.5">
                           <span className="text-muted-foreground">Purchase Price</span>
-                          <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(purchasePrice)}</span>
+                          <span className="font-mono font-medium text-foreground blur-number">
+                            {formatCurrency(purchasePrice)}
+                          </span>
                         </div>
                       )}
                       {purchaseDate && (
@@ -425,13 +566,9 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                       {initialValue !== undefined && initialValue > 0 && (
                         <div className="flex justify-between items-center py-0.5">
                           <span className="text-muted-foreground">Initial Value</span>
-                          <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(initialValue)}</span>
-                        </div>
-                      )}
-                      {address && (
-                        <div className="flex justify-between items-center py-0.5 col-span-2 border-t border-border/30 pt-1.5 mt-1">
-                          <span className="text-muted-foreground">Address</span>
-                          <span className="text-foreground truncate max-w-[200px]" title={address}>{address}</span>
+                          <span className="font-mono font-medium text-foreground blur-number">
+                            {formatCurrency(initialValue)}
+                          </span>
                         </div>
                       )}
                       {bedrooms !== undefined && (
@@ -452,14 +589,21 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
                           <span className="text-foreground font-mono">{squareFootage.toLocaleString()}</span>
                         </div>
                       )}
-
+                      {address && (
+                        <div className="flex justify-between items-center py-0.5 col-span-2 sm:col-span-3 border-t border-border/30 pt-1.5 mt-0.5">
+                          <span className="text-muted-foreground">Address</span>
+                          <span className="text-foreground truncate max-w-[280px]" title={address}>
+                            {address}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-              </>
+              </div>
             ) : (
               <div className="space-y-4">
-                {/* Mortgage Selector if multiple */}
+                {/* Mortgage Selector if multiple active */}
                 {activeMortgages.length > 1 && (
                   <div className="flex flex-wrap gap-1.5 p-1 bg-muted/40 rounded-lg border border-border mb-3">
                     {activeMortgages.map((m) => (
@@ -497,3 +641,4 @@ export function PropertyCard({ property, onLinkMortgage, onUnlinkMortgage, onOve
     </div>
   );
 }
+
