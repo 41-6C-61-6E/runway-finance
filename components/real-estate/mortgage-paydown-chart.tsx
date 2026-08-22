@@ -190,14 +190,50 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
         </div>
       )}
 
-      {/* Payoff Progress */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-          <span>Payoff Progress</span>
-          <span className="blur-number">{payoffProgress.toFixed(1)}%</span>
+      {/* Mortgage Payoff Progress */}
+      <div className="mb-4 space-y-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-semibold text-foreground">Mortgage Payoff</span>
+          <div className="flex items-center gap-1.5 font-mono text-[11px]">
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold blur-number">
+              {payoffProgress.toFixed(1)}% Paid
+            </span>
+            <span className="text-muted-foreground">/</span>
+            <span className="text-slate-500 dark:text-slate-400 blur-number">
+              {(100 - Math.min(payoffProgress, 100)).toFixed(1)}% Owed
+            </span>
+          </div>
         </div>
-        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-          <div className="h-full bg-chart-2 rounded-full transition-all" style={{ width: `${Math.min(payoffProgress, 100)}%` }} />
+        <div className="w-full h-3 bg-muted/60 dark:bg-muted/40 rounded-full p-0.5 overflow-hidden flex items-stretch gap-0.5 border border-border/40 shadow-inner">
+          <div
+            className="h-full bg-emerald-500 dark:bg-emerald-500/90 rounded-l-full transition-all duration-300 shadow-xs"
+            style={{ width: `${Math.min(payoffProgress, 100)}%` }}
+            title={`Paid Off: ${formatCurrency(Math.max(0, mortgage.originalLoanAmount - currentBalance))} (${payoffProgress.toFixed(1)}%)`}
+          />
+          <div
+            className="h-full bg-slate-400/40 dark:bg-slate-700/70 rounded-r-full flex-1 transition-all duration-300 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:4px_4px]"
+            title={`Remaining Balance: ${formatCurrency(currentBalance)} (${(100 - Math.min(payoffProgress, 100)).toFixed(1)}%)`}
+          />
+        </div>
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+          <span>
+            Paid:{' '}
+            <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-medium blur-number">
+              {formatCurrency(Math.max(0, mortgage.originalLoanAmount - currentBalance))}
+            </strong>
+          </span>
+          <span>
+            Original:{' '}
+            <strong className="text-foreground font-mono font-medium blur-number">
+              {formatCurrency(mortgage.originalLoanAmount)}
+            </strong>
+          </span>
+          <span>
+            Owed:{' '}
+            <strong className="text-slate-600 dark:text-slate-400 font-mono font-medium blur-number">
+              {formatCurrency(currentBalance)}
+            </strong>
+          </span>
         </div>
       </div>
 
