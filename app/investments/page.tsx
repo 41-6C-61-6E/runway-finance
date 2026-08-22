@@ -11,10 +11,9 @@ const INVESTMENT_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'holdings', label: 'Holdings & Portfolio' },
   { id: 'income', label: 'Income & Activity' },
-  { id: 'escape-velocity', label: 'Escape Velocity', badge: '🚀' },
+  { id: 'escape-velocity', label: 'Escape Velocity' },
 ];
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
-import { InvestmentsSummary } from '@/components/investments/investments-summary';
 import { PerformanceChart } from '@/components/investments/performance-chart';
 import { TaxBreakdown } from '@/components/investments/tax-breakdown';
 import { HoldingSparklineCards } from '@/components/investments/holding-sparkline-cards';
@@ -76,7 +75,7 @@ export default function InvestmentsPage() {
   const { data: historyRes, isLoading: historyLoading } = useQuery<{ data: any[] }>({
     queryKey: ['investments-history'],
     queryFn: async () => {
-      const res = await fetch('/api/investments/history?timeframe=1m', { credentials: 'include' });
+      const res = await fetch('/api/investments/history?timeframe=1y', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch history data');
       return res.json();
     },
@@ -148,20 +147,6 @@ export default function InvestmentsPage() {
       <PageContent>
         {hasAccounts && data ? (
           <div className="space-y-5 sm:space-y-6">
-            {/* ── Summary Metrics ── */}
-            {isVisible('investmentsSummary') && (
-              <div className="hidden md:block">
-                <InvestmentsSummary
-                  summary={data.summary}
-                  accounts={data.accounts}
-                  holdings={data.holdings}
-                  totalAnnualIncome={incomeData?.totalAnnual}
-                  portfolioHistory={portfolioHistory}
-                  quotes={quotes}
-                />
-              </div>
-            )}
-
             {/* ── Tabs & Sub-Navigation ── */}
             <MobileTabSwipeContainer
               tabs={INVESTMENT_TABS}

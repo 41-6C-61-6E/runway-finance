@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1787359059816",
-  "buildTime": "2026-08-22T00:37:39.816Z",
-  "hash": "cfee09b",
-  "fullHash": "cfee09bcb44df1a1ec5b0cf6462f47a61de66c3d",
+  "buildNumber": "26.08.1787368598150",
+  "buildTime": "2026-08-22T03:16:38.150Z",
+  "hash": "bc11fc8",
+  "fullHash": "bc11fc8201c6deccfd7380c79dac8098fc6c6b7f",
   "commits": [
+    "feat: implement escape velocity tab in investments page and update version info metadata",
     "feat: upgrade mortgage payoff visualization and add equity progress bar to property cards",
     "feat: add row group identifiers to budget table and implement unit tests for transaction icon components",
     "feat: hide investments summary on mobile and add unit tests for investment UI components",
@@ -202,18 +203,25 @@
     "chore: automate service worker generation during build and implement commit history preservation in versioning script",
     "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
     "feat: use earliest snapshot as starting balance for new accounts and fix sankey chart rendering logic",
-    "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections.",
-    "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync"
+    "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections."
   ],
   "history": [
+    {
+      "hash": "bc11fc8",
+      "fullHash": "bc11fc8201c6deccfd7380c79dac8098fc6c6b7f",
+      "author": "Alan Racek",
+      "date": "2026-08-21T17:54:00-07:00",
+      "message": "feat: implement escape velocity tab in investments page and update version info metadata",
+      "type": "feat",
+      "buildNumber": "26.08.1787368598150"
+    },
     {
       "hash": "cfee09b",
       "fullHash": "cfee09bcb44df1a1ec5b0cf6462f47a61de66c3d",
       "author": "Alan Racek",
       "date": "2026-08-21T17:31:47-07:00",
       "message": "feat: upgrade mortgage payoff visualization and add equity progress bar to property cards",
-      "type": "feat",
-      "buildNumber": "26.08.1787359059816"
+      "type": "feat"
     },
     {
       "hash": "d1adf91",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-07-06T09:19:30-07:00",
       "message": "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections.",
-      "type": "feat"
-    },
-    {
-      "hash": "937a8c7",
-      "fullHash": "937a8c73c75b8092ca86cc1959502b9df057032e",
-      "author": "Alan Racek",
-      "date": "2026-07-06T08:20:52-07:00",
-      "message": "feat: add optional user setting to automatically delete pending transactions older than 30 days during sync",
       "type": "feat"
     }
   ]
