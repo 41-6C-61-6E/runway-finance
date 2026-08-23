@@ -26,6 +26,11 @@ export interface MonthlyFlowDatum {
   delta: number | null;
 }
 
+export interface IncomeSource {
+  payee: string;
+  total: number;
+}
+
 export interface IncomeSummary {
   contributions: number;
   withdrawals: number;
@@ -33,13 +38,11 @@ export interface IncomeSummary {
   growth: number;
   losses: number;
   net: number;
-  /** Sum of income across the trailing 12 months (legacy field). */
-  rawTotalAnnual: number;
-  /** Sum of income across the selected range. */
-  totalIncomePeriod: number;
   /** Annualized income yield % vs average starting balance, or null. */
   annualizedIncomePct: number | null;
   reinvested: number;
+  /** Top income (dividend + interest) payees in the selected range. */
+  topIncomeSources: IncomeSource[];
   monthCount: number;
   monthsWithSnapshots: number;
 }
@@ -51,6 +54,10 @@ export interface ClassifiedTransaction {
   description: string;
   payee: string | null;
   pending: boolean;
+  /** Database account id (for deep links into the full transactions view). */
+  accountId: string;
+  /** Plaid external id (for "view original in Plaid" style links). */
+  externalId?: string | null;
   accountName: string;
   institutionName: string;
   type: TransactionType;
@@ -59,15 +66,17 @@ export interface ClassifiedTransaction {
 export interface IncomeResponse {
   months: MonthlyFlowDatum[];
   summary: IncomeSummary;
-  byType: Partial<Record<TransactionType, number>>;
-  reinvested: number;
+  /** Inclusive range start (YYYY-MM-DD). */
+  start: string;
+  /** Exclusive range end (YYYY-MM-DD — first day of the month after the range). */
+  end: string;
   transactions: ClassifiedTransaction[];
   hasSnapshots: boolean;
 }
 
 /**
  * Shared TanStack query for the investments income/flow breakdown.
- * Keyed by timeframe so the page, the "How My Capital Is Working" chart, and
+ * Keyed by timeframe so the page, the "Capital Flow" chart, and
  * the Recent Activity panel dedupe to a single request per range.
  */
 export function useInvestmentIncomeData(timeframe: IncomeTimeframeValue) {

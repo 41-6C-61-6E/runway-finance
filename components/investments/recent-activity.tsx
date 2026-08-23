@@ -2,58 +2,138 @@
 
 import { useState } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatSafeUTCDate } from '@/lib/utils/date';
+import { formatSafeUTCDate, shiftDaysUTC } from '@/lib/utils/date';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { ArrowLeftRight, Landmark, Clock, ArrowRight, TrendingUp, TrendingDown, CircleDollarSign, Banknote, Minus, RefreshCw, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Landmark,
+  Clock,
+  ArrowRight,
+  ArrowDownRight,
+  ArrowUpRight,
+  CircleDollarSign,
+  Minus,
+  RefreshCw,
+  ArrowDownLeft,
+} from 'lucide-react';
 
-import type { TransactionType } from '@/app/api/investments/income/route';
-
-interface ClassifiedTransaction {
-  id: string;
-  date: string;
-  amount: number;
-  description: string;
-  payee: string | null;
-  pending: boolean;
-  accountName: string;
-  institutionName: string;
-  type: TransactionType;
-}
+import type { ClassifiedTransaction } from '@/lib/hooks/use-investment-income';
+import { CASHFLOW_SERIES } from '@/components/investments/income-dividends-panel';
+import type { TransactionType } from '@/lib/utils/investment-flows';
 
 interface RecentActivityProps {
   transactions: ClassifiedTransaction[];
+  /** Inclusive range start (YYYY-MM-DD) — shown as a subtitle and used for deep links. */
+  startDate?: string;
+  /** Exclusive range end (YYYY-MM-DD, first day of the month after the range). */
+  endDate?: string;
+  /** Controlled active filter (see FILTER_OPTIONS values). Omit to manage internally. */
+  value?: string;
+  onValueChange?: (value: string) => void;
 }
 
-const TYPE_CONFIG: Record<TransactionType, { label: string; icon: React.ComponentType<{className?: string}>; color: string; bg: string }> = {
-  dividend:     { label: 'Dividend',     icon: CircleDollarSign, color: 'text-chart-1',      bg: 'bg-chart-1/10 border-chart-1/20' },
-  interest:     { label: 'Interest',     icon: CircleDollarSign, color: 'text-chart-1',      bg: 'bg-chart-1/10 border-chart-1/20' },
-  reinvestment: { label: 'Reinvest',     icon: RefreshCw,        color: 'text-chart-2',      bg: 'bg-chart-2/10 border-chart-2/20' },
-  buy:          { label: 'Buy',          icon: TrendingUp,       color: 'text-primary',      bg: 'bg-primary/10 border-primary/20' },
-  sell:         { label: 'Sell',         icon: TrendingDown,     color: 'text-destructive',  bg: 'bg-destructive/10 border-destructive/20' },
-  fee:          { label: 'Fee',          icon: Minus,            color: 'text-amber-500',    bg: 'bg-amber-500/10 border-amber-500/20' },
-  deposit:      { label: 'Deposit',      icon: ArrowDownLeft,    color: 'text-chart-2',      bg: 'bg-chart-2/10 border-chart-2/20' },
-  withdrawal:   { label: 'Withdrawal',   icon: ArrowUpRight,     color: 'text-muted-foreground', bg: 'bg-muted/20 border-border' },
-  transfer:     { label: 'Transfer',     icon: ArrowLeftRight,   color: 'text-muted-foreground', bg: 'bg-muted/20 border-border' },
-  other:        { label: 'Activity',     icon: ArrowLeftRight,   color: 'text-muted-foreground', bg: 'bg-muted/20 border-border' },
+/* ── Type → visual identity (colors mirror the chart series where they map) ── */
+
+const SERIES_COLOR_FOR: Partial<Record<TransactionType, string>> = {
+  dividend: 'var(--color-chart-1)', // income
+  interest: 'var(--color-chart-1)',
+  deposit: 'var(--color-chart-4)', // contributions
+  withdrawal: 'var(--color-chart-5)', // withdrawals
+  fee: 'var(--color-chart-5)', // withdrawals & fees
 };
 
-const FILTER_OPTIONS: { label: string; value: TransactionType | 'all' }[] = [
+interface TypeConfig {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  bg: string;
+  /** Amount tint (null = neutral). */
+  amountClass: string | null;
+}
+
+const TYPE_CONFIG: Record<TransactionType, TypeConfig> = {
+  dividend: { label: 'Dividend', icon: CircleDollarSign, color: 'text-chart-1', bg: 'bg-chart-1/10 border-chart-1/20', amountClass: 'text-chart-1' },
+  interest: { label: 'Interest', icon: CircleDollarSign, color: 'text-chart-1', bg: 'bg-chart-1/10 border-chart-1/20', amountClass: 'text-chart-1' },
+  reinvestment: { label: 'Reinvest', icon: RefreshCw, color: 'text-chart-2', bg: 'bg-chart-2/10 border-chart-2/20', amountClass: null },
+  // Buys/sells are internal reallocations (no net cash in/out), so they stay
+  // visually neutral — they are not chart series.
+  buy: { label: 'Buy', icon: ArrowDownRight, color: 'text-muted-foreground', bg: 'bg-muted/20 border-border', amountClass: null },
+  sell: { label: 'Sell', icon: ArrowUpRight, color: 'text-muted-foreground', bg: 'bg-muted/20 border-border', amountClass: null },
+  fee: { label: 'Fee', icon: Minus, color: 'text-chart-5', bg: 'bg-chart-5/10 border-chart-5/20', amountClass: 'text-chart-5' },
+  deposit: { label: 'Deposit', icon: ArrowDownLeft, color: 'text-chart-4', bg: 'bg-chart-4/10 border-chart-4/20', amountClass: 'text-chart-4' },
+  withdrawal: { label: 'Withdrawal', icon: ArrowUpRight, color: 'text-chart-5', bg: 'bg-chart-5/10 border-chart-5/20', amountClass: null },
+  transfer: { label: 'Transfer', icon: ArrowLeftRight, color: 'text-muted-foreground', bg: 'bg-muted/20 border-border', amountClass: null },
+  other: { label: 'Activity', icon: ArrowLeftRight, color: 'text-muted-foreground', bg: 'bg-muted/20 border-border', amountClass: null },
+};
+
+/** Filter pills map to *groups* of transaction types (not single types). */
+const FILTER_OPTIONS: { label: string; value: string }[] = [
   { label: 'All', value: 'all' },
-  { label: 'Dividends', value: 'dividend' },
-  { label: 'Buys', value: 'buy' },
-  { label: 'Sells', value: 'sell' },
-  { label: 'Fees', value: 'fee' },
+  { label: 'Income', value: 'income' },
+  { label: 'Contributions', value: 'contributions' },
+  { label: 'Withdrawals', value: 'withdrawals' },
+  { label: 'Fees', value: 'fees' },
+  { label: 'Trades', value: 'trades' },
+  { label: 'Reinvests', value: 'reinvests' },
+  { label: 'Transfers', value: 'transfers' },
 ];
 
-export function RecentActivity({ transactions }: RecentActivityProps) {
+const FILTER_TYPES: Record<string, TransactionType[]> = {
+  income: ['dividend', 'interest'],
+  contributions: ['deposit'],
+  withdrawals: ['withdrawal'],
+  fees: ['fee'],
+  trades: ['buy', 'sell'],
+  reinvests: ['reinvestment'],
+  transfers: ['transfer'],
+};
+
+/** Human-friendly amount phrasing, based on raw transaction sign. */
+function amountLabel(tx: ClassifiedTransaction): string {
+  if (tx.type === 'buy' && tx.amount < 0) return `Bought ${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'sell' && tx.amount > 0) return `Sold ${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'reinvestment' && tx.amount < 0) return `Reinvested ${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'dividend' || tx.type === 'interest') return `Received ${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'deposit' && tx.amount > 0) return `Deposited ${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'withdrawal' && tx.amount < 0) return `Withdrew ${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'fee' && tx.amount < 0) return `Fee ${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'transfer') return `${tx.amount < 0 ? 'Out' : 'In'} ${formatCurrency(Math.abs(tx.amount))}`;
+  return `${tx.amount < 0 ? '−' : '+'}${formatCurrency(Math.abs(tx.amount))}`;
+}
+
+export function RecentActivity({ transactions, startDate, endDate, value, onValueChange }: RecentActivityProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('recentActivity');
-  const [filter, setFilter] = useState<TransactionType | 'all'>('all');
+  const [internalFilter, setInternalFilter] = useState<string>('all');
+  // Controlled (shared with the Capital Flow chart) or internal filter.
+  const filter = value ?? internalFilter;
+  const setFilter = onValueChange ?? setInternalFilter;
   const [showAll, setShowAll] = useState(false);
 
-  const filtered = filter === 'all' ? transactions : transactions.filter((tx) => tx.type === filter);
+  const filtered =
+    filter === 'all' ? transactions : transactions.filter((tx) => (FILTER_TYPES[filter] ?? []).includes(tx.type));
   const displayed = showAll ? filtered : filtered.slice(0, 12);
+
+  const filterLabel = FILTER_OPTIONS.find((f) => f.value === filter)?.label ?? 'All';
+
+  // The API's range end is exclusive; the transactions view's endDate is inclusive.
+  const inclusiveEnd = endDate ? shiftDaysUTC(endDate, -1) : undefined;
+
+  /** Deep link to the full transactions view, scoped to this range. */
+  const buildDeepLink = (extra?: Partial<Record<string, string>>): string => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (inclusiveEnd) params.set('endDate', inclusiveEnd);
+    if (extra?.search) params.set('search', extra.search);
+    if (extra?.accountId) params.set('accountId', extra.accountId);
+    return `/transactions?${params.toString()}`;
+  };
+
+  const rangeLabel =
+    startDate && inclusiveEnd
+      ? `${formatSafeUTCDate(startDate, { month: 'short', year: 'numeric' })} – ${formatSafeUTCDate(inclusiveEnd, { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : null;
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm h-full flex flex-col">
@@ -63,7 +143,12 @@ export function RecentActivity({ transactions }: RecentActivityProps) {
         title={
           <div className="flex items-center gap-2">
             <ArrowLeftRight className="w-4 h-4 text-primary shrink-0" />
-            <span>Recent Activity</span>
+            <span>Activity</span>
+            {rangeLabel && (
+              <span className="text-[10px] font-medium text-muted-foreground/80 hidden sm:inline truncate max-w-[160px]" title={rangeLabel}>
+                {rangeLabel}
+              </span>
+            )}
           </div>
         }
       />
@@ -74,84 +159,101 @@ export function RecentActivity({ transactions }: RecentActivityProps) {
             <AppTabs
               tabs={FILTER_OPTIONS.map((opt) => ({ id: opt.value, label: opt.label }))}
               activeTab={filter}
-              onChange={(val) => setFilter(val as any)}
+              onChange={(val) => {
+                setFilter(val as string);
+                setShowAll(false);
+              }}
+              variant="pills"
               size="sm"
               className="mb-1"
             />
           )}
 
-
           {transactions.length > 0 ? (
-            <div className="flex-1 flex flex-col">
-              <div className="divide-y divide-border/20">
-                {displayed.length > 0 ? displayed.map((tx) => {
-                  const typeConfig = TYPE_CONFIG[tx.type];
-                  const TypeIcon = typeConfig.icon;
-                  const isOutflow = tx.amount < 0;
-                  const displayAmount = Math.abs(tx.amount);
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="divide-y divide-border/20 overflow-y-auto max-h-[420px] pr-1 -mr-1">
+                {displayed.length > 0 ? (
+                  displayed.map((tx) => {
+                    const typeConfig = TYPE_CONFIG[tx.type];
+                    const TypeIcon = typeConfig.icon;
+                    const series = CASHFLOW_SERIES.find((s) => SERIES_COLOR_FOR[tx.type] === s.color);
+                    return (
+                      <a
+                        key={tx.id}
+                        href={buildDeepLink({ search: tx.payee || tx.description })}
+                        title={`${filterLabel} entry — click to view in Transactions`}
+                        className="flex items-center justify-between py-2.5 first:pt-0 gap-3 block group transition-colors hover:bg-muted/20 -mx-2 px-2 rounded-md"
+                      >
+                        {/* Type icon pill */}
+                        <div
+                          className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wide ${typeConfig.color} ${typeConfig.bg}`}
+                          title={`${typeConfig.label}${series ? ` · shown as “${series.label}” in the chart` : ' · internal activity, not shown in the chart'}`}
+                        >
+                          <TypeIcon className="w-2.5 h-2.5" />
+                          <span>{typeConfig.label}</span>
+                        </div>
 
-                  return (
-                    <div key={tx.id} className="flex items-center justify-between py-2.5 first:pt-0 gap-3">
-                      {/* Type icon pill */}
-                      <div className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wide ${typeConfig.color} ${typeConfig.bg}`}>
-                        <TypeIcon className="w-2.5 h-2.5" />
-                        <span>{typeConfig.label}</span>
-                      </div>
-
-                      {/* Description */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs font-semibold text-foreground truncate block" title={tx.payee || tx.description}>
-                            {tx.payee || tx.description}
-                          </span>
-                          {tx.pending && (
-                            <span className="flex items-center gap-0.5 px-1 py-0.5 text-[8px] font-bold rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none shrink-0">
-                              <Clock className="w-2.5 h-2.5" /> Pending
+                        {/* Description */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-foreground truncate block group-hover:text-primary transition-colors" title={tx.payee || tx.description}>
+                              {tx.payee || tx.description || amountLabel(tx)}
                             </span>
-                          )}
+                            {tx.pending && (
+                              <span className="flex items-center gap-0.5 px-1 py-0.5 text-[8px] font-bold rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none shrink-0">
+                                <Clock className="w-2.5 h-2.5" /> Pending
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                            <span className="shrink-0">{formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                            <span className="opacity-40">•</span>
+                            <span className="flex items-center gap-1 truncate shrink min-w-0">
+                              <Landmark className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate">{tx.accountName}</span>
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
-                          <span className="shrink-0">{formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                          <span className="opacity-40">•</span>
-                          <span className="flex items-center gap-1 truncate shrink min-w-0">
-                            <Landmark className="w-2.5 h-2.5 shrink-0" />
-                            <span className="truncate">{tx.accountName}</span>
+
+                        {/* Amount */}
+                        <div className="shrink-0 text-right">
+                          <span
+                            className={`font-mono text-xs font-semibold tabular-nums blur-number ${typeConfig.amountClass ?? 'text-foreground'}`}
+                            title={amountLabel(tx)}
+                          >
+                            {tx.amount < 0 ? '−' : '+'}
+                            {formatCurrency(Math.abs(tx.amount))}
                           </span>
                         </div>
-                      </div>
-
-                      {/* Amount */}
-                      <div className="shrink-0 text-right">
-                        <span className={`font-mono text-xs font-semibold tabular-nums blur-number ${
-                          tx.type === 'dividend' || tx.type === 'interest' || tx.type === 'reinvestment'
-                            ? 'text-chart-1'
-                            : tx.type === 'fee' ? 'text-amber-500'
-                            : isOutflow ? 'text-foreground' : 'text-foreground'
-                        }`}>
-                          {isOutflow ? '-' : '+'}{formatCurrency(displayAmount)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <div className="py-6 text-center text-xs text-muted-foreground/60 italic">
-                    No {filter !== 'all' ? filter : ''} transactions found.
-                  </div>
+                      </a>
+                    );
+                  })
+                ) : (
+                  <div className="py-6 text-center text-xs text-muted-foreground/60 italic">No {filterLabel.toLowerCase()} entries found.</div>
                 )}
               </div>
 
               {/* Show more / View all */}
               <div className="mt-3 pt-2 border-t border-border/20 flex gap-2 shrink-0">
-                {filtered.length > 12 && !showAll && (
+                {!showAll && filtered.length > 12 && (
                   <button
                     onClick={() => setShowAll(true)}
                     className="flex-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors py-1.5 bg-muted/20 border border-border/40 rounded-lg"
                   >
-                    Show all {filtered.length} transactions
+                    Show all {filtered.length} entries
+                  </button>
+                )}
+                {showAll && filtered.length > 12 && (
+                  <button
+                    onClick={() => setShowAll(false)}
+                    className="flex-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors py-1.5 bg-muted/20 border border-border/40 rounded-lg"
+                  >
+                    Show less
                   </button>
                 )}
                 <a
-                  href="/transactions"
+                  href={buildDeepLink()}
+                  data-testid="view-all-transactions"
                   className="flex items-center justify-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors flex-1 py-1.5 bg-muted/20 border border-border/40 rounded-lg"
                 >
                   <span>View in Transactions</span>

@@ -7,6 +7,7 @@ export type TimeFrame =
   | '6m'
   | '1y'
   | '365d'
+  | '3y'
   | '5y'
   | 'ytd'
   | 'all'
@@ -67,6 +68,9 @@ export function getDateRange(timeframe: TimeFrame | string = '1y'): [Date, Date]
     case '365d':
       startDate.setDate(startDate.getDate() - 365);
       break;
+      case '3y':
+        subtractYearsClamped(startDate, 3);
+        break;
     case '5y':
       subtractYearsClamped(startDate, 5);
       break;
@@ -107,6 +111,8 @@ export function timeframeToMonths(timeframe: TimeFrame | string = '1y'): number 
     case '1y':
     case '365d':
       return 12;
+      case '3y':
+        return 36;
     case '5y':
       return 60;
     case 'ytd': {
@@ -150,6 +156,8 @@ export function timeframeToLabel(timeframe: TimeFrame | string): string {
     case '1y':
     case '365d':
       return 'Past Year';
+      case '3y':
+        return 'Past 3 Years';
     case '5y':
       return 'Past 5 Years';
     case 'ytd':

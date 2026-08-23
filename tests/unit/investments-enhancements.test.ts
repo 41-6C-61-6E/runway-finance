@@ -21,7 +21,7 @@ vi.mock('@/lib/db', () => ({
   }),
 }));
 
-import { classifyTransaction } from '@/app/api/investments/income/route';
+import { classifyTransaction } from '@/lib/utils/investment-flows';
 
 describe('Investment Income Classification', () => {
   it('classifies dividend transactions with various broker descriptions', () => {

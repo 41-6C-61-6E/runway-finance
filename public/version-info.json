@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1787511263433",
-  "buildTime": "2026-08-23T18:54:23.433Z",
-  "hash": "594136e",
-  "fullHash": "594136e407f8be0ec57e8d9dd2746dc0fa20f51d",
+  "buildNumber": "26.08.1787518947744",
+  "buildTime": "2026-08-23T21:02:27.744Z",
+  "hash": "f3d4a40",
+  "fullHash": "f3d4a403e566112a810b098c56348e96f2bc32a8",
   "commits": [
+    "feat: enhance usePersistentState to support skipRestore option for authoritative state management feat: allow computeGoalAllocations to accept explicit DEK for non-request contexts fix: ensure notifications use exact window labels for clarity in alerts refactor: update syncConnection to pass DEK explicitly for background operations refactor: ensure wealth-flow calculations use snapshots for discrete timeframes fix: update issue status schema to reflect new status options chore: update service worker and version info for new build test: add unit tests for BugReportingDropdown status updates and error resilience test: implement tests for useDateWindow to ensure correct handling of deep links feat: introduce useInvestmentIncomeData hook for investment income queries feat: add utility functions for investment transaction classification and monthly flow calculations",
     "delete: remove unit tests for escape velocity projection calculations",
     "feat: implement escape velocity projection engine and associated tests",
     "feat: implement escape velocity tab in investments page and update version info metadata",
@@ -202,18 +203,25 @@
     "feat: include paystub accounts in cash flow calculations regardless of virtual status",
     "feat: add hideFromTransactions setting to categories and optimize cash flow data fetching using month-aligned summary tables.",
     "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page",
-    "chore: automate service worker generation during build and implement commit history preservation in versioning script",
-    "refactor: replace FIRE trace with comprehensive investments calculation and summary integration"
+    "chore: automate service worker generation during build and implement commit history preservation in versioning script"
   ],
   "history": [
+    {
+      "hash": "f3d4a40",
+      "fullHash": "f3d4a403e566112a810b098c56348e96f2bc32a8",
+      "author": "Alan Racek",
+      "date": "2026-08-23T13:31:24-07:00",
+      "message": "feat: enhance usePersistentState to support skipRestore option for authoritative state management feat: allow computeGoalAllocations to accept explicit DEK for non-request contexts fix: ensure notifications use exact window labels for clarity in alerts refactor: update syncConnection to pass DEK explicitly for background operations refactor: ensure wealth-flow calculations use snapshots for discrete timeframes fix: update issue status schema to reflect new status options chore: update service worker and version info for new build test: add unit tests for BugReportingDropdown status updates and error resilience test: implement tests for useDateWindow to ensure correct handling of deep links feat: introduce useInvestmentIncomeData hook for investment income queries feat: add utility functions for investment transaction classification and monthly flow calculations",
+      "type": "feat",
+      "buildNumber": "26.08.1787518947744"
+    },
     {
       "hash": "594136e",
       "fullHash": "594136e407f8be0ec57e8d9dd2746dc0fa20f51d",
       "author": "Alan Racek",
       "date": "2026-08-22T18:51:27-07:00",
       "message": "delete: remove unit tests for escape velocity projection calculations",
-      "type": "delete",
-      "buildNumber": "26.08.1787511263433"
+      "type": "delete"
     },
     {
       "hash": "6768ce7",
@@ -1798,14 +1806,6 @@
       "date": "2026-07-06T10:12:03-07:00",
       "message": "chore: automate service worker generation during build and implement commit history preservation in versioning script",
       "type": "chore"
-    },
-    {
-      "hash": "9064086",
-      "fullHash": "9064086ad59a48c3671032348a6d1806aa5c2019",
-      "author": "Alan Racek",
-      "date": "2026-07-06T09:54:00-07:00",
-      "message": "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
-      "type": "refactor"
     }
   ]
 }

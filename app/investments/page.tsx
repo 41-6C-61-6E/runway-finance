@@ -9,8 +9,8 @@ import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
 const INVESTMENT_TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'holdings', label: 'Holdings & Portfolio' },
-  { id: 'income', label: 'Income & Activity' },
+  { id: 'holdings', label: 'Holdings' },
+  { id: 'income', label: 'Activity' },
 ];
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { PerformanceChart } from '@/components/investments/performance-chart';
@@ -24,6 +24,7 @@ import { HoldingDetailSheet } from '@/components/investments/holding-detail-moda
 import { CandlestickChart, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 import { useQuery } from '@tanstack/react-query';
+import { useInvestmentIncomeData, type IncomeTimeframeValue, type IncomeResponse } from '@/lib/hooks/use-investment-income';
 
 interface InvestmentsData {
   accounts: any[];
@@ -43,10 +44,17 @@ export default function InvestmentsPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'income'>('overview');
   const [selectedHolding, setSelectedHolding] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [incomeTimeframe, setIncomeTimeframe] = useState<IncomeTimeframeValue>('1y');
+  const [activityFilter, setActivityFilter] = useState<string>('all');
 
   const handleSelectHolding = (h: any) => {
     setSelectedHolding(h);
     setIsDetailOpen(true);
+  };
+
+  /** Chart summary tiles / legend focus the activity list on a flow group. */
+  const handleFocusActivity = (filter: string) => {
+    setActivityFilter(filter);
   };
 
   // 1. Fetch main investments data
@@ -60,14 +68,8 @@ export default function InvestmentsPage() {
   });
 
   // 2. Fetch classified income
-  const { data: incomeData = null, isLoading: incomeLoading } = useQuery<{ monthlyIncome: any[]; totalAnnual: number; transactions: any[] } | null>({
-    queryKey: ['investments-income'],
-    queryFn: async () => {
-      const res = await fetch('/api/investments/income', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch income data');
-      return res.json();
-    },
-  });
+  const { data: incomeActivity, isLoading: incomeLoading } = useInvestmentIncomeData(incomeTimeframe);
+  const { data: incomeOneYear } = useInvestmentIncomeData('1y');
 
   // Extract unique tickers from holdings
   const tickers = data?.holdings
@@ -214,15 +216,21 @@ export default function InvestmentsPage() {
                   {isVisible('incomeDividends') && (
                     <div>
                       <IncomeDividendsPanel
-                        monthlyIncome={incomeData?.monthlyIncome || []}
-                        totalAnnualIncome={incomeData?.totalAnnual || 0}
-                        loading={loading}
+                        value={incomeTimeframe}
+                        onValueChange={setIncomeTimeframe}
+                        onFocusActivity={handleFocusActivity}
                       />
                     </div>
                   )}
                   {isVisible('recentActivity') && (
                     <div>
-                      <RecentActivity transactions={incomeData?.transactions || []} />
+                      <RecentActivity
+                        transactions={incomeActivity?.transactions || []}
+                        startDate={incomeActivity?.start}
+                        endDate={incomeActivity?.end}
+                        value={activityFilter}
+                        onValueChange={setActivityFilter}
+                      />
                     </div>
                   )}
                 </div>
@@ -237,7 +245,7 @@ export default function InvestmentsPage() {
               allHoldings={data.holdings}
               accounts={data.accounts}
               quote={selectedQuote}
-              recentTransactions={incomeData?.transactions || []}
+              recentTransactions={incomeOneYear?.transactions || []}
             />
           </div>
         ) : (

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, transactions, accountSnapshots } from '@/lib/db/schema';
-import { eq, and, desc, inArray, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, inArray, gte, lt, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
@@ -14,14 +14,10 @@ import {
   addMonthsClamped,
   monthsBetween,
   buildMonthlyFlows,
-  type TransactionType,
 } from '@/lib/utils/investment-flows';
 import { timeframeToMonths } from '@/lib/utils/timeframe';
 
 const LOG_TAG = '[api-investments-income]';
-
-// Kept for backward compatibility with existing imports/tests.
-export type { TransactionType } from '@/lib/utils/investment-flows';
 
 function round2(v: number): number {
   return Math.round(v * 100) / 100;
@@ -74,12 +70,16 @@ export async function GET(request: Request) {
     if (investmentAccounts.length === 0) {
       return NextResponse.json({
         months: monthsBetween(startMonth, endMonth).map((m) => ({ month: m, contributions: 0, withdrawals: 0, income: 0, growth: 0, losses: 0, net: 0, delta: null })),
+        start: startStr,
+        end: endStr, // exclusive (1st of the month after the range)
         summary: {
           contributions: 0, withdrawals: 0, income: 0, growth: 0, losses: 0, net: 0,
-          rawTotalAnnual: 0, totalIncomePeriod: 0, annualizedIncomePct: null,
-          reinvested: 0, monthCount: monthsBetween(startMonth, endMonth).length, monthsWithSnapshots: 0,
+          annualizedIncomePct: null,
+          reinvested: 0,
+          topIncomeSources: [],
+          monthCount: monthsBetween(startMonth, endMonth).length,
+          monthsWithSnapshots: 0,
         },
-        byType: {},
         transactions: [],
         hasSnapshots: false,
       });
@@ -107,7 +107,9 @@ export async function GET(request: Request) {
           eq(transactions.ignored, false),
           inArray(transactions.accountId, accountIds),
           gte(transactions.date, startStr),
-          lte(transactions.date, endStr)
+          // endStr is the exclusive bound (1st of the month after the range):
+          // use lt so a txn dated exactly on that day is not misattributed.
+          lt(transactions.date, endStr)
         )
       )
       .orderBy(desc(transactions.date));
@@ -216,7 +218,6 @@ export async function GET(request: Request) {
     const withdrawals: Record<string, number> = {};
     const income: Record<string, number> = {};
     const cashFlows: Record<string, number> = {};
-    const byType: Record<string, number> = {};
 
     const accById = new Map(investmentAccounts.map((a) => [a.id, a]));
     const classified = decryptedTxns
@@ -232,11 +233,12 @@ export async function GET(request: Request) {
           description: tx.description,
           payee: tx.payee,
           pending: !!tx.pending,
+            accountId: tx.accountId,
+            externalId: tx.externalId,
           accountName: acc?.name ?? 'Investment Account',
           institutionName: acc?.institution ?? 'Brokerage',
           type,
         };
-        byType[type] = round2((byType[type] ?? 0) + amt);
 
         const bucket = bucketCashFlow(type, amt);
         const ym = yearMonthOf(rec.date);
@@ -284,6 +286,19 @@ export async function GET(request: Request) {
       classified.filter((t) => t.type === 'reinvestment').reduce((s, t) => s + Math.abs(t.amount), 0)
     );
 
+    // Top income sources (dividends + interest) payee by payee.
+    const incomeByPayee = new Map<string, number>();
+    for (const t of classified) {
+      if ((t.type === 'dividend' || t.type === 'interest') && t.amount > 0) {
+        const key = (t.payee ?? 'Unknown payee').trim();
+        incomeByPayee.set(key, round2((incomeByPayee.get(key) ?? 0) + t.amount));
+      }
+    }
+    const topIncomeSources = [...incomeByPayee.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([payee, total]) => ({ payee, total }));
+
     const summary = {
       contributions: contributionsTotal,
       withdrawals: withdrawalsTotal,
@@ -291,12 +306,9 @@ export async function GET(request: Request) {
       growth: growthTotal,
       losses: lossesTotal,
       net: netTotal,
-      rawTotalAnnual: round2(
-        monthly.filter((m) => m.month >= addMonthsClamped(endMonth, -11)).reduce((s, m) => s + m.income, 0)
-      ),
-      totalIncomePeriod: incomeTotal,
       annualizedIncomePct,
       reinvested,
+      topIncomeSources,
       monthCount: months.length,
       monthsWithSnapshots: withDeltas.length,
     };
@@ -304,8 +316,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       months: monthly,
       summary,
-      byType,
-      reinvested,
+      start: startStr,
+      end: endStr, // exclusive (1st of the month after the range)
       transactions: classified,
       hasSnapshots,
     });
