@@ -29,9 +29,20 @@ interface Issue {
   reporterName: string | null;
 }
 
+// Values stored in the DB (must match UpdateIssueStatusSchema in lib/validations/issue.ts).
 const statuses = {
-  bug: ['reported', 'in work', 'fixed', 'closed'],
-  feature: ['requested', 'in work', 'added', 'closed']
+  bug: ['reported', 'in_progress', 'fixed', 'closed'],
+  feature: ['requested', 'in_progress', 'added', 'closed']
+};
+
+// Friendly labels for the stored status values shown in the select dropdown.
+const statusLabels: Record<string, string> = {
+  reported: 'reported',
+  requested: 'requested',
+  in_progress: 'in work',
+  fixed: 'fixed',
+  added: 'added',
+  closed: 'closed',
 };
 
 interface BugReportingDropdownProps {
@@ -252,7 +263,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
         return 'bg-red-500/10 text-red-500 border-red-500/20';
       case 'requested':
         return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
-      case 'in work':
+      case 'in_progress':
         return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
       case 'fixed':
       case 'added':
@@ -508,7 +519,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                                   >
                                     {(issue.type === 'bug' ? statuses.bug : statuses.feature).map((st) => (
                                       <option key={st} value={st} className="bg-card text-foreground">
-                                        {st}
+                                        {statusLabels[st] ?? st}
                                       </option>
                                     ))}
                                   </select>

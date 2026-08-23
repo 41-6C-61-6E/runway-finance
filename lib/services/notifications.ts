@@ -704,8 +704,10 @@ export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Ui
       year: 'numeric',
     });
 
-    const actualToday = new Date().toISOString().split('T')[0];
-    const timePhrase = snapshotDateStr === actualToday ? 'in the last week' : `for week ending ${formattedDate}`;
+    // Always name the exact window ("for the week ending <date>") so the
+    // number can be matched against the linked chart's window label — and a
+    // stale chart window can't be misread as a bad calculation.
+    const timePhrase = `for the week ending ${formattedDate}`;
 
     await sendPushNotification(
       userId,

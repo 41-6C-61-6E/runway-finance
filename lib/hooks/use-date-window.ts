@@ -9,6 +9,8 @@ import { getCurrentMonth, getMonthRange, getPreciseDateRange, getPeriodLabel, sn
 const WINDOW_SPAN: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, 'ytd': 12, '5y': 60 };
 const MONTHS_BACK: Record<string, number> = { '1m': 0, '3m': 2, '6m': 5, '1y': 11, '5y': 59 };
 
+const VALID_TIMEFRAMES: TimeRange[] = ['1d', '7d', '30d', '1m', '3m', '6m', '1y', '365d', '5y', 'ytd', 'all', '1d_discrete', '7d_discrete'];
+
 export interface DateWindowState {
   timeframe: TimeRange;
   setTimeframe: (tf: TimeRange) => void;
@@ -33,12 +35,39 @@ export function useDateWindow(
   const currentMonth = getCurrentMonth();
   const searchParams = useSearchParams();
 
-  const [timeframeState, _setTimeframe] = usePersistentState<TimeRange>(timeframeKey || '', defaultTimeframe);
-  const [windowEnd, setWindowEnd] = usePersistentState<string>(windowEndKey, currentMonth);
+  // URL search params (e.g. notification deep links like
+  // /flows?timeframe=7d_discrete&date=2026-08-16) are authoritative for the
+  // initial window. They seed the state synchronously — so the very first
+  // data fetch already uses the linked window — and the persisted
+  // (DB/localStorage) chart selections are NOT restored over them. Without
+  // this, a previously saved window (often set by an *earlier* click of the
+  // same deep link) would clobber the linked window after mount.
+  const urlTimeframe = useMemo(() => {
+    const paramTf = searchParams?.get('timeframe');
+    return paramTf && (VALID_TIMEFRAMES as string[]).includes(paramTf) ? (paramTf as TimeRange) : null;
+  }, [searchParams]);
+
+  const urlWindowEnd = useMemo(() => {
+    const paramDate = searchParams?.get('date');
+    return paramDate && (/^\d{4}-\d{2}-\d{2}$/.test(paramDate) || /^\d{4}-\d{2}$/.test(paramDate)) ? paramDate : null;
+  }, [searchParams]);
+
+  const [timeframeState, _setTimeframe] = usePersistentState<TimeRange>(
+    timeframeKey || '',
+    urlTimeframe ?? defaultTimeframe,
+    { skipRestore: urlTimeframe !== null },
+  );
+  const [windowEnd, setWindowEnd] = usePersistentState<string>(
+    windowEndKey,
+    urlWindowEnd ?? currentMonth,
+    { skipRestore: urlWindowEnd !== null },
+  );
 
   const timeframe = controlledTimeframe !== undefined ? controlledTimeframe : timeframeState;
 
-  const lastSyncedParamRef = useRef<TimeRange | null>(null);
+  // Seed with the URL value so the sync effect below doesn't re-apply
+  // (and re-persist) the same value on mount.
+  const lastSyncedParamRef = useRef<TimeRange | null>(urlTimeframe);
 
   const setTimeframe = (tf: TimeRange) => {
     if (controlledTimeframe === undefined) {
@@ -51,33 +80,39 @@ export function useDateWindow(
     if (controlledTimeframe !== undefined) return;
     if (!searchParams) return;
 
-    const paramTf = searchParams.get('timeframe') as TimeRange | null;
-    const validTfs: TimeRange[] = ['1d', '7d', '30d', '1m', '3m', '6m', '1y', '365d', '5y', 'ytd', 'all', '1d_discrete', '7d_discrete'];
-    if (paramTf && validTfs.includes(paramTf)) {
-      if (lastSyncedParamRef.current !== paramTf) {
-        lastSyncedParamRef.current = paramTf;
-        _setTimeframe(paramTf);
+    // Re-sync on client-side navigation. On initial mount these already match
+    // the state initializers above, so no redundant (and re-persisting)
+    // state update happens.
+    if (urlTimeframe !== null) {
+      if (lastSyncedParamRef.current !== urlTimeframe) {
+        lastSyncedParamRef.current = urlTimeframe;
+        _setTimeframe(urlTimeframe);
       }
     }
 
-    const paramDate = searchParams.get('date');
-    if (paramDate) {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(paramDate) || /^\d{4}-\d{2}$/.test(paramDate)) {
-        setWindowEnd(paramDate);
-      }
+    // Compare against current state so re-applying the same value on mount
+    // is a no-op; only a genuine param change persists.
+    if (urlWindowEnd !== null && urlWindowEnd !== windowEnd) {
+      setWindowEnd(urlWindowEnd);
     }
-  }, [searchParams, controlledTimeframe, _setTimeframe, setWindowEnd]);
+  }, [searchParams, controlledTimeframe, _setTimeframe, setWindowEnd, urlTimeframe, urlWindowEnd, windowEnd]);
 
   useEffect(() => {
     lastSyncedParamRef.current = timeframe;
   }, [timeframe]);
 
   useEffect(() => {
+    // When the window end came straight from the URL (e.g. a notification
+    // deep link), it is already an exact date for discrete timeframes —
+    // force-snapping it would silently change the linked window. Only snap
+    // persisted monthly values (e.g. after the user switches to a discrete
+    // timeframe, which already snaps synchronously in setTimeframe).
+    if (urlWindowEnd !== null) return;
     const snapped = snapToPeriod(windowEnd, timeframe);
     if (snapped !== windowEnd) {
       setWindowEnd(snapped);
     }
-  }, [timeframe, windowEnd, setWindowEnd]);
+  }, [timeframe, windowEnd, setWindowEnd, urlWindowEnd]);
 
   const shift = WINDOW_SPAN[timeframe] ?? 1;
 

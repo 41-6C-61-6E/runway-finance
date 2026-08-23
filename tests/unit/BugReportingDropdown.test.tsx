@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import BugReportingDropdown from '@/components/bug-reporting-dropdown';
 
@@ -149,5 +149,82 @@ describe('BugReportingDropdown badge', () => {
     expect(container.innerHTML).toBe('');
     // The issues endpoint must never be called when disabled
     expect(mockFetch).not.toHaveBeenCalledWith('/api/bug-reporting');
+  });
+});
+
+describe('BugReportingDropdown status update', () => {
+  let originalFetch: typeof global.fetch;
+  let mockFetch: any;
+  let currentIssues: TestIssue[];
+
+  const renderDropdown = () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <BugReportingDropdown />
+      </QueryClientProvider>,
+    );
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    originalFetch = global.fetch;
+    currentIssues = [];
+
+    mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/bug-reporting/config') {
+        return Promise.resolve({ ok: true, json: async () => ({ enabled: true }) });
+      }
+      if (url === '/api/bug-reporting') {
+        return Promise.resolve({ ok: true, json: async () => currentIssues });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+    global.fetch = mockFetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  const openTrackTab = async () => {
+    // Open the dropdown panel first — the tabs only render when open
+    fireEvent.click(await screen.findByLabelText('Submit Feedback / Track issues'));
+    await screen.findByText('Open Issues (1)');
+    fireEvent.click(screen.getByText('Open Issues (1)'));
+  };
+
+  it('offers only the status options the API accepts (canonical values, friendly labels)', async () => {
+    currentIssues = [makeIssue({ id: 'bug-1' })];
+    renderDropdown();
+
+    await openTrackTab();
+
+    const select = screen.getByLabelText('Change issue status') as HTMLSelectElement;
+    const options = Array.from(select.querySelectorAll('option'));
+    expect(options.map((o) => o.value)).toEqual(['reported', 'in_progress', 'fixed', 'closed']);
+    expect(options.map((o) => o.textContent)).toEqual(['reported', 'in work', 'fixed', 'closed']);
+  });
+
+  it('PATCHes the canonical stored value when changing a bug status', async () => {
+    currentIssues = [makeIssue({ id: 'bug-1' })];
+    renderDropdown();
+
+    await openTrackTab();
+
+    const select = screen.getByLabelText('Change issue status') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'in_progress' } });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/bug-reporting/bug-1',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) }),
+      );
+    });
   });
 });

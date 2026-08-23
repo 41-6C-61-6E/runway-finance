@@ -9,6 +9,15 @@ export function usePersistentState<T>(
   options?: {
   serialize?: (val: T) => string;
   deserialize?: (raw: string) => T;
+  /**
+   * When true, the persisted (DB/localStorage) value is NOT applied on load —
+   * the state stays at `defaultValue` (or whatever the caller initialized it
+   * to, e.g. from URL search params) until the user explicitly changes it.
+   * Writes (DB + localStorage) still happen on every set. Used so URL
+   * deep-links (e.g. notification links) are authoritative over stale
+   * persisted chart selections.
+   */
+  skipRestore?: boolean;
 }
 ): [T, (val: T | ((prev: T) => T)) => void, boolean] {
   const context = useUserSettings();
@@ -32,6 +41,12 @@ export function usePersistentState<T>(
 
   useEffect(() => {
     if (!key) {
+      setIsLoaded(true);
+      return;
+    }
+    // When the caller has a more authoritative source for the initial value
+    // (e.g. URL search params), skip applying the persisted value entirely.
+    if (options?.skipRestore) {
       setIsLoaded(true);
       return;
     }

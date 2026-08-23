@@ -7,5 +7,5 @@ export const CreateIssueSchema = z.object({
 });
 
 export const UpdateIssueStatusSchema = z.object({
-  status: z.enum(['reported', 'requested', 'in_progress', 'resolved', 'closed', 'dismissed']),
+  status: z.enum(['reported', 'requested', 'in_progress', 'fixed', 'added', 'closed']),
 });

@@ -60,8 +60,10 @@ export interface AllocationResult {
  *    - Completed goals release their allocation back to the pool
  * 4. Return allocation map
  */
-export async function computeGoalAllocations(userId: string): Promise<AllocationResult> {
-  const dek = await getSessionDEK();
+export async function computeGoalAllocations(userId: string, dek?: Uint8Array): Promise<AllocationResult> {
+  // Accept an explicit DEK so non-request contexts (cron sync, background jobs)
+  // don't have to resolve it via auth(), which throws outside a request scope.
+  const resolvedDek = dek ?? (await getSessionDEK());
   
   // Fetch all goals with linked accounts (including completed for fund release logic)
   const goals = await getDb()
@@ -76,7 +78,7 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
       asc(financialGoals.id)
     );
 
-  const decryptedGoals = await decryptRows('financial_goals', goals, dek);
+  const decryptedGoals = await decryptRows('financial_goals', goals, resolvedDek);
 
   // Separate active and completed goals
   const activeGoals = decryptedGoals.filter(g => g.status === 'active');
@@ -123,8 +125,8 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
 
     if (!accountData[0]) continue;
 
-    const decryptedBalance = await decryptField(accountData[0].balance, dek);
-    const decryptedAccountName = await decryptField(accountData[0].name, dek);
+    const decryptedBalance = await decryptField(accountData[0].balance, resolvedDek);
+    const decryptedAccountName = await decryptField(accountData[0].name, resolvedDek);
     const accountBalance = parseFloat(decryptedBalance) || 0;
     
     // Sort goals by sortOrder (ascending) — determined by the reorder UI
@@ -198,9 +200,9 @@ export async function computeGoalAllocations(userId: string): Promise<Allocation
 /**
  * Update allocated amounts for all goals based on current allocation
  */
-export async function updateGoalAllocations(userId: string): Promise<void> {
-  const allocation = await computeGoalAllocations(userId);
-  const dek = await getSessionDEK();
+export async function updateGoalAllocations(userId: string, dek?: Uint8Array): Promise<void> {
+  const resolvedDek = dek ?? (await getSessionDEK());
+  const allocation = await computeGoalAllocations(userId, resolvedDek);
   const db = getDb();
 
   // Retrieve user settings
@@ -227,9 +229,9 @@ export async function updateGoalAllocations(userId: string): Promise<void> {
   const decryptedPersisted = await Promise.all(
     persistedGoals.map(async (g) => ({
       id: g.id,
-      name: await decryptField(g.name, dek),
-      targetAmount: parseFloat(await decryptField(g.targetAmount, dek)) || 0,
-      allocatedAmount: parseFloat(await decryptField(g.allocatedAmount, dek)) || 0,
+      name: await decryptField(g.name, resolvedDek),
+      targetAmount: parseFloat(await decryptField(g.targetAmount, resolvedDek)) || 0,
+      allocatedAmount: parseFloat(await decryptField(g.allocatedAmount, resolvedDek)) || 0,
       status: g.status,
     }))
   );
@@ -343,9 +345,9 @@ export async function findSharedAccounts(userId: string): Promise<Map<string, st
 /**
  * Snapshot current allocations to history
  */
-export async function snapshotAllocationsToHistory(userId: string): Promise<void> {
-  const allocation = await computeGoalAllocations(userId);
-  const dek = await getSessionDEK();
+export async function snapshotAllocationsToHistory(userId: string, dek?: Uint8Array): Promise<void> {
+  const resolvedDek = dek ?? (await getSessionDEK());
+  const allocation = await computeGoalAllocations(userId, resolvedDek);
   
   for (const account of allocation.accounts) {
     for (const goal of account.goals) {
@@ -361,7 +363,7 @@ export async function snapshotAllocationsToHistory(userId: string): Promise<void
         sortOrder: goal.sortOrder,
         isUnderfunded: goal.isUnderfunded,
         remainingOnAccount: formatToCents(goal.remainingOnAccount),
-      }, dek);
+      }, resolvedDek);
       await getDb().insert(goalAllocationHistory).values(encryptedRow);
     }
   }

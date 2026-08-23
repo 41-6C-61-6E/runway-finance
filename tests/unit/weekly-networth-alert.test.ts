@@ -182,6 +182,11 @@ describe('Weekly Net Worth Change Alert', () => {
     const payload = JSON.parse(callArgs[1]);
     expect(payload.title).toContain('Weekly Net Worth Alert');
     expect(payload.body).toContain('Your net worth increased by $100.00');
+    // The message must always name the exact window so it can be matched
+    // against the linked chart ("for the week ending Aug 2, 2026"), even
+    // when the snapshot happens to be from today.
+    expect(payload.body).toContain('for the week ending Aug 2, 2026');
+    expect(payload.body).not.toContain('in the last week');
     expect(payload.url).toContain('/flows?timeframe=7d_discrete&date=2026-08-02');
   });
 

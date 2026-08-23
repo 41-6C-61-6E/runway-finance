@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.08.1787368598150",
-  "buildTime": "2026-08-22T03:16:38.150Z",
-  "hash": "bc11fc8",
-  "fullHash": "bc11fc8201c6deccfd7380c79dac8098fc6c6b7f",
+  "buildNumber": "26.08.1787511263433",
+  "buildTime": "2026-08-23T18:54:23.433Z",
+  "hash": "594136e",
+  "fullHash": "594136e407f8be0ec57e8d9dd2746dc0fa20f51d",
   "commits": [
+    "delete: remove unit tests for escape velocity projection calculations",
+    "feat: implement escape velocity projection engine and associated tests",
     "feat: implement escape velocity tab in investments page and update version info metadata",
     "feat: upgrade mortgage payoff visualization and add equity progress bar to property cards",
     "feat: add row group identifiers to budget table and implement unit tests for transaction icon components",
@@ -201,19 +203,33 @@
     "feat: add hideFromTransactions setting to categories and optimize cash flow data fetching using month-aligned summary tables.",
     "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page",
     "chore: automate service worker generation during build and implement commit history preservation in versioning script",
-    "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
-    "feat: use earliest snapshot as starting balance for new accounts and fix sankey chart rendering logic",
-    "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections."
+    "refactor: replace FIRE trace with comprehensive investments calculation and summary integration"
   ],
   "history": [
+    {
+      "hash": "594136e",
+      "fullHash": "594136e407f8be0ec57e8d9dd2746dc0fa20f51d",
+      "author": "Alan Racek",
+      "date": "2026-08-22T18:51:27-07:00",
+      "message": "delete: remove unit tests for escape velocity projection calculations",
+      "type": "delete",
+      "buildNumber": "26.08.1787511263433"
+    },
+    {
+      "hash": "6768ce7",
+      "fullHash": "6768ce71675817327f2da3aab361ac55e0e9e963",
+      "author": "Alan Racek",
+      "date": "2026-08-22T11:52:41-07:00",
+      "message": "feat: implement escape velocity projection engine and associated tests",
+      "type": "feat"
+    },
     {
       "hash": "bc11fc8",
       "fullHash": "bc11fc8201c6deccfd7380c79dac8098fc6c6b7f",
       "author": "Alan Racek",
       "date": "2026-08-21T17:54:00-07:00",
       "message": "feat: implement escape velocity tab in investments page and update version info metadata",
-      "type": "feat",
-      "buildNumber": "26.08.1787368598150"
+      "type": "feat"
     },
     {
       "hash": "cfee09b",
@@ -1790,22 +1806,6 @@
       "date": "2026-07-06T09:54:00-07:00",
       "message": "refactor: replace FIRE trace with comprehensive investments calculation and summary integration",
       "type": "refactor"
-    },
-    {
-      "hash": "d6ce7fa",
-      "fullHash": "d6ce7fac26253d59020c9ee2d39044b36017c3d7",
-      "author": "Alan Racek",
-      "date": "2026-07-06T09:39:41-07:00",
-      "message": "feat: use earliest snapshot as starting balance for new accounts and fix sankey chart rendering logic",
-      "type": "feat"
-    },
-    {
-      "hash": "345261d",
-      "fullHash": "345261d0417ffa316689ecda0b0d4cf8ed5cdc69",
-      "author": "Alan Racek",
-      "date": "2026-07-06T09:19:30-07:00",
-      "message": "feat: add git-based version info generation, improve Sankey UI labels, and refactor net worth drivers into collapsible sections.",
-      "type": "feat"
     }
   ]
 }

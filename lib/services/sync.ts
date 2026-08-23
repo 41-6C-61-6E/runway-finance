@@ -1320,7 +1320,9 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
     // Refresh goal allocations and milestone alerts in the background (non-fatal)
     import('@/lib/services/goal-allocation').then(({ updateGoalAllocations }) => {
-      return updateGoalAllocations(dataUserId);
+      // Pass the DEK explicitly: this runs in the background and for cron
+      // syncs there is no request scope, so getSessionDEK() (auth()) would throw.
+      return updateGoalAllocations(dataUserId, dek);
     }).catch((err) => {
       logger.error(`${LOG_TAG} Failed to update goal allocations (non-fatal):`, err);
     });

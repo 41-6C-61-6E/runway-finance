@@ -113,7 +113,7 @@ describe('Error Resilience & Standardization Suite', () => {
 
   describe('lib/validations/issue.ts - UpdateIssueStatusSchema', () => {
     it('accepts valid issue statuses', () => {
-      const validStatuses = ['reported', 'requested', 'in_progress', 'resolved', 'closed', 'dismissed'];
+      const validStatuses = ['reported', 'requested', 'in_progress', 'fixed', 'added', 'closed'];
       for (const status of validStatuses) {
         const result = UpdateIssueStatusSchema.safeParse({ status });
         expect(result.success).toBe(true);

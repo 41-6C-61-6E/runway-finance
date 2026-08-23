@@ -5,7 +5,8 @@ const mockState = vi.hoisted(() => {
   let mockAccounts: any[] = [];
   let mockUserSettings: any[] = [];
   const mockAccountSnapshots: Array<{ accountId: string; snapshotDate: string; balance: string }> = [];
-  return { mockAccounts, mockUserSettings, mockAccountSnapshots };
+  const getBalancesOnDateCalls: Array<{ targetDate: string; accountIds: string[] }> = [];
+  return { mockAccounts, mockUserSettings, mockAccountSnapshots, getBalancesOnDateCalls };
 });
 
 vi.mock('@/lib/services/snapshot-balances', () => ({
@@ -16,6 +17,7 @@ vi.mock('@/lib/services/snapshot-balances', () => ({
     accountIds: string[],
     _dek: Uint8Array,
   ) => {
+    mockState.getBalancesOnDateCalls.push({ targetDate, accountIds: [...accountIds] });
     const result: Record<string, number> = {};
     if (accountIds.length === 0) return result;
     for (const accId of accountIds) {
@@ -81,6 +83,7 @@ describe('wealth-flow service (snapshot-only)', () => {
     mockState.mockAccounts = [];
     mockState.mockUserSettings = [{ currency: 'USD', showImportedData: { global: true, cashFlowProjections: true }, paystubEnabled: true }];
     mockState.mockAccountSnapshots.length = 0;
+    mockState.getBalancesOnDateCalls.length = 0;
   });
 
   async function runWealthFlow(
@@ -427,6 +430,67 @@ describe('wealth-flow service (snapshot-only)', () => {
     vi.useRealTimers();
   });
 
+  it('always uses snapshots (never live balances) for discrete timeframes even when the window ends on today', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00-04:00'));
+
+    const todayStr = '2026-07-15';
+
+    mockState.mockAccounts = [
+      // Live balance deliberately differs from the latest snapshot — it must
+      // NOT be used for discrete windows.
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false, balance: '99999.00' },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-07-08', balance: '2000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-07-15', balance: '3000.00' },
+    );
+
+    const result = await runWealthFlow(
+      // 8 days back from the window end, mirroring the weekly alert's window
+      // (start = end - 7 days, service compares snapshot dates <= start).
+      '2026-07-08',
+      todayStr,
+      undefined,
+      '7d_discrete',
+    );
+
+    // Snapshot-based: beginning 2000 (2026-07-08), ending 3000 (2026-07-15).
+    expect(result.summary.beginningNetWorth).toBe(2000);
+    expect(result.summary.endingNetWorth).toBe(3000);
+    expect(result.summary.netWorthChange).toBe(1000);
+
+    // Both ends resolved through snapshots — the live-balance shortcut was
+    // skipped even though the window ends on today.
+    expect(mockState.getBalancesOnDateCalls.some(c => c.targetDate === todayStr)).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it('always uses snapshots for 1d_discrete windows ending on today', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00-04:00'));
+
+    const todayStr = '2026-07-15';
+
+    mockState.mockAccounts = [
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false, balance: '777.00' },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-07-14', balance: '1000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-07-15', balance: '1500.00' },
+    );
+
+    const result = await runWealthFlow(todayStr, todayStr, undefined, '1d_discrete');
+
+    expect(result.summary.beginningNetWorth).toBe(1000);
+    expect(result.summary.endingNetWorth).toBe(1500);
+    expect(result.summary.netWorthChange).toBe(500);
+
+    expect(mockState.getBalancesOnDateCalls.every(c => c.targetDate === '2026-07-14' || c.targetDate === todayStr)).toBe(true);
+
+    vi.useRealTimers();
+  });
   it('correctly handles HELOC balance increase as debt accumulation (net worth decrease)', async () => {
     mockState.mockAccounts = [
       { id: 'heloc-1', userId: 'user_1', name: 'Home Equity Line', type: 'heloc', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },

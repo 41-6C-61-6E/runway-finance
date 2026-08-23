@@ -171,10 +171,17 @@ export async function calculateWealthFlow(
     return acc ? isAccountActiveOnDate(acc, endDateStr) : false;
   });
 
-  const todayStr = formatInTimezone(new Date(), userTz);
+  // Discrete windows (1d_discrete / 7d_discrete) represent a fixed "window
+  // ending on date X" — they must always be computed from snapshots so the
+  // result is stable and matches what alerts/reports computed the same way
+  // (e.g. the weekly net worth alert deep-links here). Rolling timeframes
+  // still use live account balances when the window ends on today, so they
+  // keep reflecting the latest un-synced state.
+  const isDiscreteTimeframe = timeframe === '1d_discrete' || timeframe === '7d_discrete';
+  const todayStr = isDiscreteTimeframe ? null : formatInTimezone(new Date(), userTz);
 
   const getBalances = async (targetDate: string, accountIds: string[]) => {
-    if (targetDate === todayStr) {
+    if (todayStr !== null && targetDate === todayStr) {
       const result: Record<string, number> = {};
       for (const id of accountIds) {
         const acc = accountsMap.get(id);
