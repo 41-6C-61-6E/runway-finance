@@ -11,7 +11,6 @@ const INVESTMENT_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'holdings', label: 'Holdings & Portfolio' },
   { id: 'income', label: 'Income & Activity' },
-  { id: 'escape-velocity', label: 'Escape Velocity' },
 ];
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { PerformanceChart } from '@/components/investments/performance-chart';
@@ -22,7 +21,6 @@ import { IncomeDividendsPanel } from '@/components/investments/income-dividends-
 import { RecentActivity } from '@/components/investments/recent-activity';
 import { HoldingsTable } from '@/components/investments/holdings-table';
 import { HoldingDetailSheet } from '@/components/investments/holding-detail-modal';
-import { EscapeVelocityTab } from '@/components/investments/escape-velocity-tab';
 import { CandlestickChart, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 import { useQuery } from '@tanstack/react-query';
@@ -42,7 +40,7 @@ interface InvestmentsData {
 
 export default function InvestmentsPage() {
   const { isVisible } = useChartVisibility();
-  const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'income' | 'escape-velocity'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'income'>('overview');
   const [selectedHolding, setSelectedHolding] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -71,18 +69,6 @@ export default function InvestmentsPage() {
     },
   });
 
-  // 3. Fetch 1m portfolio history
-  const { data: historyRes, isLoading: historyLoading } = useQuery<{ data: any[] }>({
-    queryKey: ['investments-history'],
-    queryFn: async () => {
-      const res = await fetch('/api/investments/history?timeframe=1y', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch history data');
-      return res.json();
-    },
-  });
-
-  const portfolioHistory = historyRes?.data || [];
-
   // Extract unique tickers from holdings
   const tickers = data?.holdings
     ?.map((h) => h.ticker)
@@ -107,7 +93,7 @@ export default function InvestmentsPage() {
   const quotes = quotesRes?.quotes || [];
 
   // Non-blocking loading check
-  const loading = dataLoading || incomeLoading || historyLoading;
+  const loading = dataLoading || incomeLoading;
   const error = dataError ? (dataError instanceof Error ? dataError.message : String(dataError)) : null;
 
   if (loading) {
@@ -151,13 +137,13 @@ export default function InvestmentsPage() {
             <MobileTabSwipeContainer
               tabs={INVESTMENT_TABS}
               activeTabId={activeTab}
-              onTabChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income' | 'escape-velocity')}
+                  onTabChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
             >
               <div className="hidden md:block mb-5 sm:mb-6">
                 <AppTabs
                   tabs={INVESTMENT_TABS}
                   activeTab={activeTab}
-                  onChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income' | 'escape-velocity')}
+                  onChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
                   variant="underline"
                 />
               </div>
@@ -240,14 +226,6 @@ export default function InvestmentsPage() {
                     </div>
                   )}
                 </div>
-              )}
-              {/* ── Escape Velocity Tab Content ── */}
-              {activeTab === 'escape-velocity' && (
-                <EscapeVelocityTab
-                  totalPortfolioValue={data.summary.totalBalance}
-                  totalAnnualIncome={incomeData?.totalAnnual}
-                  portfolioHistory={portfolioHistory}
-                />
               )}
             </MobileTabSwipeContainer>
 
