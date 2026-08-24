@@ -66,6 +66,10 @@ const getAssetClass = (ticker: string | null, name: string): string => {
 
 interface ChartItem {
   name: string;
+  /** Fund/security display name (used by "By Asset"). */
+  fundName?: string;
+  /** Ticker symbol (used by "By Asset"). */
+  ticker?: string;
   value: number;
   percentage: number;
   color: string;
@@ -201,11 +205,21 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
 
     const groupedValues: Record<string, number> = {};
 
+    // For "By Asset": remember the fund name + ticker for each security key.
+    const securityMeta: Record<string, { name: string; ticker: string | null }> = {};
+
     for (const h of holdings) {
       let key = 'Other';
 
       if (groupBy === 'security') {
         key = h.ticker || h.name || 'Other';
+        if (h.ticker) {
+          if (!securityMeta[key]) {
+            securityMeta[key] = { name: h.name, ticker: h.ticker };
+          }
+        } else {
+          securityMeta[key] = { name: h.name, ticker: null };
+        }
       } else if (groupBy === 'account') {
         key = `${h.institutionName} - ${h.accountName}`;
       } else if (groupBy === 'taxCategory') {
@@ -245,12 +259,17 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       groupedValues[key] = (groupedValues[key] || 0) + h.value;
     }
 
-    const items = Object.entries(groupedValues).map(([name, value]) => ({
-      name,
-      value,
-      percentage: (value / totalValue) * 100,
-      color: '',
-    }));
+    const items: ChartItem[] = Object.entries(groupedValues).map(([name, value]) => {
+      const meta = groupBy === 'security' ? securityMeta[name] : undefined;
+      return {
+        name,
+        fundName: meta?.name,
+        ticker: meta?.ticker ?? undefined,
+        value,
+        percentage: (value / totalValue) * 100,
+        color: '',
+      };
+    });
 
     // Sort descending
     items.sort((a, b) => b.value - a.value);
@@ -266,6 +285,8 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
         value: otherValue,
         percentage: otherPct,
         color: '',
+        fundName: undefined,
+        ticker: undefined,
       });
     } else {
       finalItems = items;
@@ -318,7 +339,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
         title={
           <div className="flex items-center gap-2">
             <PieIcon className="w-4 h-4 text-primary shrink-0" />
-            <span>Asset Allocation & Rebalancing</span>
+            <span>Asset Allocation</span>
           </div>
         }
       />
@@ -410,7 +431,16 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
                   <div key={idx} className="flex items-center justify-between text-xs py-0.5 border-b border-border/10">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: item.color }} />
-                      <span className="text-muted-foreground truncate" title={item.name}>{item.name}</span>
+                      {groupBy === 'security' && item.ticker ? (
+                        <span className="flex items-center gap-1.5 min-w-0" title={`${item.fundName ?? ''} (${item.ticker})`.trim()}>
+                          <span className="font-semibold font-mono text-foreground shrink-0">{item.ticker}</span>
+                          {item.fundName && item.fundName !== item.ticker ? (
+                            <span className="truncate text-foreground/80">{item.fundName}</span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground truncate" title={item.name}>{item.name}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 shrink-0 ml-2 font-medium">
                       <span className="text-foreground font-mono tabular-nums blur-number">{formatCurrency(item.value)}</span>

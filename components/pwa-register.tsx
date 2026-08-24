@@ -123,12 +123,6 @@ export function PWARegister() {
                   label: "Update",
                   onClick: applyUpdate,
                 },
-                cancel: {
-                  label: "Later",
-                  onClick: () => {
-                    toast.dismiss("pwa-update");
-                  },
-                },
                 duration: Infinity,
               });
             })
@@ -146,12 +140,6 @@ export function PWARegister() {
                     } else {
                       window.location.reload();
                     }
-                  },
-                },
-                cancel: {
-                  label: "Later",
-                  onClick: () => {
-                    toast.dismiss("pwa-update");
                   },
                 },
                 duration: Infinity,
