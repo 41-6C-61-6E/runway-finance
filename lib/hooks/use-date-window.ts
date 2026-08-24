@@ -65,10 +65,6 @@ export function useDateWindow(
 
   const timeframe = controlledTimeframe !== undefined ? controlledTimeframe : timeframeState;
 
-  // Seed with the URL value so the sync effect below doesn't re-apply
-  // (and re-persist) the same value on mount.
-  const lastSyncedParamRef = useRef<TimeRange | null>(urlTimeframe);
-
   const setTimeframe = (tf: TimeRange) => {
     if (controlledTimeframe === undefined) {
       _setTimeframe(tf);
@@ -76,18 +72,34 @@ export function useDateWindow(
     setWindowEnd(snapToPeriod(windowEnd, tf));
   };
 
+  // Identity of the URLSearchParams object for which the URL-params sync
+  // effect below has already run. Next.js gives a new object per distinct
+  // URL, so comparing by identity "applies once per URL" with no
+  // re-serialization or string-parsing work.
+  const appliedSearchParamsRef = useRef<URLSearchParams | null>(null);
+
+  // Serialized URL params for which the URL-params sync effect below has
+  // already run. String comparison (instead of object identity) is robust
+  // against Next.js re-instancing the URLSearchParams object for the same
+  // URL. "Apply once per URL" — never re-asserting afterward — is what lets
+  // the user freely navigate (back/next buttons, timeframe switches) after
+  // following an alert link without the window snapping back to the linked
+  // params.
+  const appliedUrlKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (controlledTimeframe !== undefined) return;
     if (!searchParams) return;
 
-    // Re-sync on client-side navigation. On initial mount these already match
-    // the state initializers above, so no redundant (and re-persisting)
-    // state update happens.
-    if (urlTimeframe !== null) {
-      if (lastSyncedParamRef.current !== urlTimeframe) {
-        lastSyncedParamRef.current = urlTimeframe;
-        _setTimeframe(urlTimeframe);
-      }
+    const urlKey = searchParams.toString();
+    if (appliedUrlKeyRef.current === urlKey) return;
+    appliedUrlKeyRef.current = urlKey;
+
+    // Compare against current state so applying on mount is a no-op; only a
+    // genuine param change (a new deep link after client-side navigation)
+    // persists.
+    if (urlTimeframe !== null && urlTimeframe !== timeframeState) {
+      _setTimeframe(urlTimeframe);
     }
 
     // Compare against current state so re-applying the same value on mount
@@ -95,11 +107,7 @@ export function useDateWindow(
     if (urlWindowEnd !== null && urlWindowEnd !== windowEnd) {
       setWindowEnd(urlWindowEnd);
     }
-  }, [searchParams, controlledTimeframe, _setTimeframe, setWindowEnd, urlTimeframe, urlWindowEnd, windowEnd]);
-
-  useEffect(() => {
-    lastSyncedParamRef.current = timeframe;
-  }, [timeframe]);
+  }, [searchParams, controlledTimeframe, _setTimeframe, setWindowEnd, timeframeState]);
 
   useEffect(() => {
     // When the window end came straight from the URL (e.g. a notification

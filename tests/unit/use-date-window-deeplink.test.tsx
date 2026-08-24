@@ -7,7 +7,7 @@
 // URL params as the authoritative initial window — even when a stale chart
 // selection (persisted DB value — often written by a PREVIOUS click of the
 // same link, or an old month) would otherwise override it after mount.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, act } from 'react';
 import { render } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
@@ -71,10 +71,32 @@ import { useDateWindow } from '@/lib/hooks/use-date-window';
 
 // ── Harness ───────────────────────────────────────────────────────────────────
 
+// Refs so tests can drive the hook's window navigation without rerendering.
+const prevWindowRef = { current: () => {} };
+const nextWindowRef = { current: () => {} };
+
 function TestHarness() {
   const dw = useDateWindow('finance:sankey:timeframe', 'finance:sankey:windowEnd', '1m');
+  prevWindowRef.current = dw.prevWindow;
+  nextWindowRef.current = dw.nextWindow;
   return (
-    <div data-testid="window" data-timeframe={dw.timeframe} data-window-end={dw.windowEnd}>
+    <div
+      data-testid="window"
+      data-timeframe={dw.timeframe}
+      data-window-end={dw.windowEnd}
+    >
+      <span
+        data-testid="back-btn"
+        onClick={() => prevWindowRef.current()}
+      >
+        back
+      </span>
+      <span
+        data-testid="next-btn"
+        onClick={() => nextWindowRef.current()}
+      >
+        next
+      </span>
       <span data-testid="range-start">{dw.dateRange.start}</span>
       <span data-testid="range-end">{dw.dateRange.end}</span>
     </div>
@@ -188,5 +210,67 @@ describe('useDateWindow — URL deep-link authority (weekly net worth alert)', (
       start: '2026-07-19',
       end: '2026-07-26',
     });
+  });
+
+  it('lets the user navigate freely after a URL seed (no re-snapping)', () => {
+    // Reproduces the alert deep-link bug: the URL seeds 7d_discrete +
+    // 2026-08-16, then the user hits Back / Next. The window must follow
+    // user intent — the URL must never re-assert its params over the
+    // user's navigated window (which is what caused the window to snap
+    // back to the linked week, and the chart to show the alert's period
+    // while the header said something else).
+    //
+    // Freeze the clock: nextWindow clamps to "today".
+    vi.useFakeTimers();
+    // Build in local time so "today" is deterministic regardless of TZ.
+    vi.setSystemTime(new Date(2026, 7, 23, 12, 0, 0));
+
+    setUrl('/flows', { timeframe: '7d_discrete', date: '2026-08-16' });
+
+    const { utils, read } = renderHarness();
+    expect(read()).toEqual({
+      timeframe: '7d_discrete',
+      windowEnd: '2026-08-16',
+      start: '2026-08-09',
+      end: '2026-08-16',
+    });
+
+    // Back → exactly 7 days earlier.
+    act(() => {
+      prevWindowRef.current();
+    });
+    expect(read().windowEnd).toBe('2026-08-09');
+
+    // And again — two weeks back from the seeded date.
+    act(() => {
+      prevWindowRef.current();
+    });
+    expect(read().windowEnd).toBe('2026-08-02');
+
+    // Forward navigation must be just as free: from the user-navigated
+    // window, not re-jumped to the seeded 2026-08-16.
+    act(() => {
+      nextWindowRef.current();
+    });
+    expect(read().windowEnd).toBe('2026-08-09');
+
+    act(() => {
+      nextWindowRef.current();
+    });
+    expect(read().windowEnd).toBe('2026-08-16');
+
+    // 2026-08-16 + 7d lands on "today" — the latest allowed window end.
+    act(() => {
+      nextWindowRef.current();
+    });
+    expect(read().windowEnd).toBe('2026-08-23');
+
+    // One more: stays clamped at today.
+    act(() => {
+      nextWindowRef.current();
+    });
+    expect(read().windowEnd).toBe('2026-08-23');
+
+    vi.useRealTimers();
   });
 });
