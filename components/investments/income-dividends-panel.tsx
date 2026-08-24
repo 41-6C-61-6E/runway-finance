@@ -89,8 +89,19 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
 
   const { data, isLoading, error } = useInvestmentIncomeData(timeframe);
 
-  // Chart is capped at the most recent 60 months.
-  const chartData: MonthlyFlowDatum[] = useMemo(() => (data?.months ?? []).slice(-60), [data]);
+  // Chart is capped at the most recent 60 months. Out-flows are negated so
+  // `stackOffset="sign"` stacks them below the zero line — the upward portion
+  // of each bar then equals the net change (growth + income + contributions
+  // minus withdrawals & losses).
+  const chartData: MonthlyFlowDatum[] = useMemo(
+    () =>
+      (data?.months ?? []).slice(-60).map((d) => ({
+        ...d,
+        withdrawals: -d.withdrawals,
+        losses: -d.losses,
+      })),
+    [data]
+  );
 
   const allZeros = chartData.every(
     (d) => d.income === 0 && d.contributions === 0 && d.withdrawals === 0 && d.growth === 0 && d.losses === 0
@@ -131,7 +142,8 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
       const d = payload[0]?.payload as MonthlyFlowDatum;
       const rows = CASHFLOW_SERIES.filter((s) => visibleSeries[s.key] && Math.abs(d[s.key]) > 0);
       const totalUp = rows.filter((s) => s.dir === 'in').reduce((sum, s) => sum + (d[s.key] as number), 0);
-      const totalDown = rows.filter((s) => s.dir === 'out').reduce((sum, s) => sum + (d[s.key] as number), 0);
+      // Out-flow series are stored as negative in chartData; use magnitude for the total.
+      const totalDown = rows.filter((s) => s.dir === 'out').reduce((sum, s) => sum + Math.abs(d[s.key] as number), 0);
       const net = totalUp - totalDown;
       return (
         <ChartTooltip>
@@ -142,7 +154,7 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
                 <TooltipRow
                   key={s.key}
                   label={s.label}
-                  value={`${s.dir === 'in' ? '+' : '-'}${formatCurrency(d[s.key] as number)}`}
+                  value={`${s.dir === 'in' ? '+' : '-'}${formatCurrency(Math.abs(d[s.key] as number))}`}
                   color={s.color}
                 />
               ))}
