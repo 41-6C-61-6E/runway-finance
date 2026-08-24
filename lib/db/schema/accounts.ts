@@ -77,6 +77,8 @@ export const holdings = pgTable(
     securityId: text('security_id').notNull(),
     ticker: text('ticker'),
     name: text('name'),
+    tickerOverride: text('ticker_override'),
+    publicEquivalent: text('public_equivalent'),
     quantity: text('quantity').notNull(),
     price: text('price').notNull(),
     costBasis: text('cost_basis'),

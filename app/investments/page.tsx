@@ -24,6 +24,8 @@ import { HoldingDetailSheet } from '@/components/investments/holding-detail-moda
 import { CandlestickChart, ShieldCheck, ArrowRight } from 'lucide-react';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { getDisplayTicker } from '@/lib/types/investments';
 import { useInvestmentIncomeData, type IncomeTimeframeValue, type IncomeResponse } from '@/lib/hooks/use-investment-income';
 
 interface InvestmentsData {
@@ -47,11 +49,73 @@ export default function InvestmentsPage() {
   const [incomeTimeframe, setIncomeTimeframe] = useState<IncomeTimeframeValue>('1y');
   const [activityFilter, setActivityFilter] = useState<string>('all');
 
+  const queryClient = useQueryClient();
+
   const handleSelectHolding = (h: any) => {
     setSelectedHolding(h);
     setIsDetailOpen(true);
   };
 
+  /**
+   * Persist a ticker override / public equivalent for this holding's
+   * security, then refresh quotes + investments data so the whole page
+   * reflects the new identifiers immediately.
+   */
+  const handleHoldingOverridesChange = async (
+    securityId: string,
+    patch: { tickerOverride?: string; publicEquivalent?: string },
+  ) => {
+    const res = await fetch('/api/investments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ securityId, ...patch }),
+    });
+    if (!res.ok) {
+      try {
+        const j = await res.json();
+        // The route returns { error, field?, message } for known field errors
+        // and { error, details: { field: string[] }, message } for zod-level
+        // rejections.
+        if (j?.field && j?.message) throw new Error(String(j.message));
+        const details = j?.details;
+        if (details && typeof details === 'object') {
+          const [field, msgs] = Object.entries(details).find(
+            ([, v]) => Array.isArray(v) && v.length > 0
+          );
+          if (field && Array.isArray(msgs) && msgs[0]) {
+            throw new Error(`${field}: ${msgs[0]}`);
+          }
+        }
+        throw new Error(j?.message || 'Failed to save');
+      } catch (e) {
+        if (e instanceof Error && /ticker|invalid/i.test(e.message)) throw e;
+        throw new Error('Failed to save');
+      }
+    }
+    // Optimistically patch the currently open holding so the drawer refreshes
+    // instantly (the query invalidation below re-syncs everything else).
+    setSelectedHolding((prev) =>
+      prev && prev.securityId === securityId
+        ? (() => {
+            const next = { ...prev, ...patch };
+            // Recompute the resolved display ticker locally (override →
+            // ticker → equivalent) so the drawer header updates instantly.
+            const ov = (next.tickerOverride ?? '').trim().toUpperCase();
+            const t = (next.ticker ?? '').trim().toUpperCase();
+            const eq = (next.publicEquivalent ?? '').trim().toUpperCase();
+            next.displayTicker = ov || t || eq || null;
+            return next;
+          })()
+        : prev
+    );
+    // Refresh the page's cached data so the edited ticker/equivalent flows
+    // through to all cards, tables, charts, and the quote mapping immediately.
+    await queryClient.invalidateQueries({ queryKey: ['investments'] });
+    // The quotes query key depends on holdings data, which is refetched above,
+    // so this also re-keys (and thus refetches with the new mapping).
+    queryClient.invalidateQueries({ queryKey: ['investments-quotes'] });
+  };
   /** Chart summary tiles / legend focus the activity list on a flow group. */
   const handleFocusActivity = (filter: string) => {
     setActivityFilter(filter);
@@ -71,19 +135,33 @@ export default function InvestmentsPage() {
   const { data: incomeActivity, isLoading: incomeLoading } = useInvestmentIncomeData(incomeTimeframe);
   const { data: incomeOneYear } = useInvestmentIncomeData('1y');
 
-  // Extract unique tickers from holdings
-  const tickers = data?.holdings
-    ?.map((h) => h.ticker)
-    .filter((t): t is string => !!t && typeof t === 'string' && t.trim().length > 0) || [];
-  const uniqueTickers = Array.from(new Set(tickers));
+  // Extract unique *display* tickers from holdings (user overrides take
+  // precedence over the Plaid-reported ticker), plus a mapping of any
+  // user-assigned public ETF equivalents so prices resolve to those sources.
+  const holdingsArr: any[] = data?.holdings || [];
+  const { uniqueTickers, quoteMappings } = (() => {
+    const set = new Set<string>();
+    const mapping = new Map<string, string>();
+    for (const h of holdingsArr) {
+      const dt = getDisplayTicker(h);
+      if (dt) set.add(dt);
+      const eq = (h.publicEquivalent ?? '').trim().toUpperCase();
+      if (dt && eq && eq !== dt && !mapping.has(dt)) {
+        mapping.set(dt, eq);
+      }
+    }
+    const mappings = [...mapping.entries()].map(([k, v]) => `${k}:${v}`).join(',');
+    return { uniqueTickers: Array.from(set), quoteMappings: mappings };
+  })();
 
   // 4. Fetch live stock quotes (progressive / non-blocking)
   const { data: quotesRes } = useQuery<{ quotes: QuoteData[] }>({
-    queryKey: ['investments-quotes', uniqueTickers.join(',')],
+    queryKey: ['investments-quotes', uniqueTickers.join(','), quoteMappings],
     queryFn: async () => {
-      const res = await fetch(`/api/investments/quotes?tickers=${uniqueTickers.join(',')}`, {
-        credentials: 'include',
-      });
+      const url = quoteMappings
+        ? `/api/investments/quotes?tickers=${uniqueTickers.join(',')}&mapping=${encodeURIComponent(quoteMappings)}`
+        : `/api/investments/quotes?tickers=${uniqueTickers.join(',')}`;
+      const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch live quotes');
       return res.json();
     },
@@ -125,8 +203,9 @@ export default function InvestmentsPage() {
 
   const hasAccounts = data && data.accounts && data.accounts.length > 0;
 
-  const selectedQuote = selectedHolding?.ticker
-    ? quotes.find((q) => q.ticker?.toUpperCase() === selectedHolding.ticker?.toUpperCase())
+  const selectedDisplayTicker = getDisplayTicker(selectedHolding ?? {});
+  const selectedQuote = selectedDisplayTicker
+    ? quotes.find((q) => q.ticker?.toUpperCase() === selectedDisplayTicker)
     : undefined;
 
   return (
@@ -246,6 +325,7 @@ export default function InvestmentsPage() {
               accounts={data.accounts}
               quote={selectedQuote}
               recentTransactions={incomeOneYear?.transactions || []}
+              onOverridesChange={handleHoldingOverridesChange}
             />
           </div>
         ) : (

@@ -7,6 +7,10 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
+import {
+  isConstantPriceTicker,
+  resolvePriceSourceTicker,
+} from '@/lib/utils/ticker-mappings';
 
 const LOG_TAG = '[api-investments-holding-history]';
 
@@ -14,18 +18,14 @@ const LOG_TAG = '[api-investments-holding-history]';
 const tickerPriceCache = new Map<string, { prices: Map<string, number>; expiresAt: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
-const TICKER_MAPPINGS: Record<string, string> = {
-  'LMCSTK': 'LMT',
-  'LMCMBI': 'AGG',
-  'LMSMPH': 'IWM',
-  'LMMEPH': 'IJH',
-};
-
-const CONSTANT_PRICE_TICKERS = new Set(['SCHMMF', 'LMCSVF', 'SCHSEC']);
-
-async function fetchTickerDailyPrices(ticker: string, days: number = 30): Promise<Map<string, number>> {
+async function fetchTickerDailyPrices(
+  ticker: string,
+  days: number = 30,
+  priceSource?: string | null,
+): Promise<Map<string, number>> {
   const cleanTicker = ticker.trim().toUpperCase();
-  const cacheKey = `${cleanTicker}:${days}`;
+  const source = (priceSource ?? cleanTicker).trim().toUpperCase() || cleanTicker;
+  const cacheKey = `${source}:${days}`;
   const cached = tickerPriceCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.prices;
@@ -33,7 +33,7 @@ async function fetchTickerDailyPrices(ticker: string, days: number = 30): Promis
 
   const priceMap = new Map<string, number>();
 
-  if (CONSTANT_PRICE_TICKERS.has(cleanTicker)) {
+  if (isConstantPriceTicker(cleanTicker)) {
     const today = new Date();
     for (let i = days; i >= 0; i--) {
       const d = new Date(today);
@@ -45,7 +45,7 @@ async function fetchTickerDailyPrices(ticker: string, days: number = 30): Promis
   }
 
   try {
-    const mappedTicker = TICKER_MAPPINGS[cleanTicker] ?? cleanTicker;
+    const mappedTicker = resolvePriceSourceTicker(cleanTicker, priceSource);
     const startTs = Math.floor((Date.now() - (days + 5) * 24 * 60 * 60 * 1000) / 1000);
     const endTs = Math.floor(Date.now() / 1000);
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mappedTicker)}?period1=${startTs}&period2=${endTs}&interval=1d`;
@@ -183,9 +183,14 @@ export async function GET(request: Request) {
 
     // 4. Collect unique tickers to fetch Yahoo market price history in parallel
     const uniqueTickers = new Set<string>();
+    // ticker → resolved Yahoo price source (public equivalent / proxy table)
+    const priceSourceByTicker = new Map<string, string>();
     for (const h of filteredHoldings) {
-      if (h.ticker && h.ticker.trim().length > 0) {
-        uniqueTickers.add(h.ticker.trim().toUpperCase());
+      const display = (h.tickerOverride ?? '').trim().toUpperCase()
+        || (h.ticker ?? '').trim().toUpperCase();
+      if (display && !priceSourceByTicker.has(display)) {
+        uniqueTickers.add(display);
+        priceSourceByTicker.set(display, resolvePriceSourceTicker(display, h.publicEquivalent));
       }
     }
 
@@ -193,7 +198,7 @@ export async function GET(request: Request) {
     if (uniqueTickers.size > 0) {
       await Promise.all(
         Array.from(uniqueTickers).map(async (t) => {
-          const prices = await fetchTickerDailyPrices(t, days);
+          const prices = await fetchTickerDailyPrices(t, days, priceSourceByTicker.get(t));
           if (prices.size > 0) {
             tickerPricesMap.set(t, prices);
           }
@@ -215,14 +220,18 @@ export async function GET(request: Request) {
     > = {};
 
     for (const h of filteredHoldings) {
-      const key = h.ticker || h.securityId || h.name || 'unknown';
+      const displayTicker =
+        (h.tickerOverride ?? '').trim().toUpperCase() ||
+        (h.ticker ?? '').trim().toUpperCase() ||
+        null;
+      const key = displayTicker || h.securityId || h.name || 'unknown';
       const qty = parseFloat(h.quantity) || 0;
       const price = parseFloat(h.price) || 0;
       const val = parseFloat(h.value) || qty * price;
 
       if (!groupedHoldings[key]) {
         groupedHoldings[key] = {
-          ticker: h.ticker ?? null,
+          ticker: displayTicker,
           name: h.name ?? null,
           totalQuantity: 0,
           currentPrice: price,

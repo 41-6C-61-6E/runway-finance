@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
+import { getDisplayTicker } from '@/lib/types/investments';
 
 interface Holding {
   accountId: string;
@@ -23,6 +24,9 @@ interface Holding {
   institutionName: string;
   securityId: string;
   ticker: string | null;
+  tickerOverride?: string | null;
+  publicEquivalent?: string | null;
+  displayTicker?: string | null;
   name: string;
   quantity: number;
   price: number;
@@ -135,7 +139,8 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
   // Total portfolio value recalculated with live quotes
   const totalLivePortfolioValue = useMemo(() => {
     return holdings.reduce((sum, h) => {
-      const q = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+      const dt = getDisplayTicker(h);
+      const q = dt ? quotesMap.get(dt) : null;
       const val = q?.price ? q.price * h.quantity : h.value;
       return sum + val;
     }, 0);
@@ -151,7 +156,8 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
   const accountHoldingStats = useMemo(() => {
     const map: Record<string, { count: number; value: number }> = {};
     for (const h of holdings) {
-      const q = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+      const dt = getDisplayTicker(h);
+      const q = dt ? quotesMap.get(dt) : null;
       const val = q?.price ? q.price * h.quantity : h.value;
       if (!map[h.accountId]) {
         map[h.accountId] = { count: 0, value: 0 };
@@ -218,14 +224,16 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
   // Apply search, account, and asset type filters
   const filteredHoldings = useMemo(() => {
     return holdings.filter((h) => {
+      const dt = getDisplayTicker(h) ?? '';
       const matchesSearch =
-        (h.ticker?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+        (dt.toLowerCase().includes(search.toLowerCase()) ||
+          (h.ticker ?? '').toLowerCase().includes(search.toLowerCase())) ||
         h.name.toLowerCase().includes(search.toLowerCase());
       
       const isAccountMatch =
         selectedAccountIds.size === 0 || selectedAccountIds.has(h.accountId);
 
-      const assetType = getAssetType(h.ticker, h.name);
+      const assetType = getAssetType(getDisplayTicker(h), h.name);
       const matchesAssetType =
         selectedAssetType === 'all' || assetType === selectedAssetType;
 
@@ -240,15 +248,17 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
       let valA: any = 0;
       let valB: any = 0;
 
-      const qA = a.ticker ? quotesMap.get(a.ticker.toUpperCase()) : null;
-      const qB = b.ticker ? quotesMap.get(b.ticker.toUpperCase()) : null;
+      const dtA = getDisplayTicker(a);
+      const dtB = getDisplayTicker(b);
+      const qA = dtA ? quotesMap.get(dtA) : null;
+      const qB = dtB ? quotesMap.get(dtB) : null;
       const liveValA = qA?.price ? qA.price * a.quantity : a.value;
       const liveValB = qB?.price ? qB.price * b.quantity : b.value;
 
       switch (sortField) {
         case 'security':
-          valA = a.ticker || a.name;
-          valB = b.ticker || b.name;
+          valA = getDisplayTicker(a) || a.name;
+          valB = getDisplayTicker(b) || b.name;
           return sortDirection === 'asc'
             ? valA.localeCompare(valB)
             : valB.localeCompare(valA);
@@ -312,7 +322,8 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
       'Portfolio Weight %',
     ];
     const rows = sortedHoldings.map((h) => {
-      const q = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+      const dt = getDisplayTicker(h);
+      const q = dt ? quotesMap.get(dt) : null;
       const price = q?.price ?? h.price;
       const val = q?.price ? q.price * h.quantity : h.value;
       const cost = h.costBasis;
@@ -323,9 +334,9 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
         : (h.portfolioWeight != null ? h.portfolioWeight.toFixed(2) : '0.00');
 
       return [
-        h.ticker || '',
+        getDisplayTicker(h) || '',
         `"${h.name.replace(/"/g, '""')}"`,
-        getAssetType(h.ticker, h.name),
+        getAssetType(getDisplayTicker(h), h.name),
         `"${h.institutionName} - ${h.accountName}"`,
         h.quantity,
         price,
@@ -586,10 +597,11 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
           <tbody className="divide-y divide-border/30">
             {sortedHoldings.length > 0 ? (
               sortedHoldings.map((h, idx) => {
-                const assetType = getAssetType(h.ticker, h.name);
+                const displayTicker = getDisplayTicker(h);
+                const assetType = getAssetType(displayTicker, h.name);
 
                 // Fetch live quote stats and calculate live value and live returns
-                const quote = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+                const quote = displayTicker ? quotesMap.get(displayTicker) : null;
                 const price = quote?.price ?? h.price;
                 const value = quote?.price && h.quantity ? quote.price * h.quantity : h.value;
                 const cost = h.costBasis;
@@ -629,9 +641,14 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                     <td className="p-3">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {h.ticker && (
+                            {displayTicker && (
                             <span className="px-1.5 py-0.5 font-mono text-[9px] font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
-                              {h.ticker}
+                                {displayTicker}
+                                {h.tickerOverride ? (
+                                  <span className="ml-1 text-[8px] font-sans opacity-70" title="Custom ticker">
+                                    ✦
+                                  </span>
+                                ) : null}
                             </span>
                           )}
                           <span className="font-semibold text-foreground group-hover:text-primary transition-colors truncate max-w-[130px] sm:max-w-[160px]" title={h.name}>
@@ -773,9 +790,10 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
           sortedHoldings.map((h, idx) => {
             const rowId = `${h.accountId}-${h.securityId}-${idx}`;
             const isExpanded = expandedRow === rowId;
-            const assetType = getAssetType(h.ticker, h.name);
+            const displayTicker = getDisplayTicker(h);
+            const assetType = getAssetType(displayTicker, h.name);
 
-            const quote = h.ticker ? quotesMap.get(h.ticker.toUpperCase()) : null;
+            const quote = displayTicker ? quotesMap.get(displayTicker) : null;
             const price = quote?.price ?? h.price;
             const value = quote?.price && h.quantity ? quote.price * h.quantity : h.value;
             const cost = h.costBasis;
@@ -819,9 +837,14 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {h.ticker && (
+                      {displayTicker && (
                         <span className="px-1.5 py-0.5 font-mono text-[9px] font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
-                          {h.ticker}
+                          {displayTicker}
+                          {h.tickerOverride ? (
+                            <span className="ml-1 text-[8px] font-sans opacity-70" title="Custom ticker">
+                              ✦
+                            </span>
+                          ) : null}
                         </span>
                       )}
                       <span className="font-semibold text-foreground truncate max-w-[170px]" title={h.name}>

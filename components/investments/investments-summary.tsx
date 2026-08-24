@@ -21,10 +21,14 @@ import {
   YAxis,
 } from 'recharts';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
+import { getDisplayTicker } from '@/lib/types/investments';
 
 interface Holding {
   accountId: string;
   ticker: string | null;
+  tickerOverride?: string | null;
+  publicEquivalent?: string | null;
+  displayTicker?: string | null;
   name: string;
   quantity?: number;
   price?: number;
@@ -184,8 +188,9 @@ export function InvestmentsSummary({
       let hasValidLiveChange = false;
 
       for (const h of holdings) {
-        if (h.ticker) {
-          const q = qMap.get(h.ticker.toUpperCase());
+        const dt = getDisplayTicker(h);
+        if (dt) {
+          const q = qMap.get(dt);
           if (q && q.change != null) {
             const qty = h.quantity != null ? h.quantity : (h.price > 0 ? h.value / h.price : 0);
             liveChangeSum += q.change * qty;

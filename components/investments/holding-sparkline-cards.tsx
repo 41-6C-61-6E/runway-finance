@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
+import { getDisplayTicker } from '@/lib/types/investments';
 
 interface Holding {
   accountId: string;
@@ -100,7 +101,8 @@ function HoldingCard({ holding, history, quote, index, onClick }: HoldingCardPro
     return [Math.max(0, min - pad), max + pad];
   }, [history, hasHistory]);
 
-  const gradId = `sparkGrad-${index}-${holding.accountId}-${holding.ticker || 'unlisted'}`;
+  const displayTicker = getDisplayTicker(holding);
+  const gradId = `sparkGrad-${index}-${holding.accountId}-${displayTicker || 'unlisted'}`;
 
   return (
     <div
@@ -110,9 +112,9 @@ function HoldingCard({ holding, history, quote, index, onClick }: HoldingCardPro
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          {holding.ticker && (
+          {displayTicker && (
             <span className="inline-block px-1.5 py-0.5 font-mono text-[10px] font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none mb-1">
-              {holding.ticker}
+              {displayTicker}
             </span>
           )}
           <div className="text-xs font-semibold text-foreground truncate max-w-[140px]" title={holding.name}>
@@ -288,9 +290,10 @@ export function HoldingSparklineCards({ holdings, quotes, onSelectHolding }: Hol
           ) : (
             <div className="flex sm:grid overflow-x-auto sm:overflow-visible gap-3 sm:grid-cols-3 lg:grid-cols-4 -mx-4 px-4 pb-3 sm:pb-0 sm:mx-0 sm:px-0 scrollbar-none snap-x snap-mandatory">
               {topHoldings.map((holding, idx) => {
-                const key = holding.ticker ? holding.ticker.toUpperCase() : (holding.securityId ?? holding.name);
-                const history = historyMap.get(key) ?? (holding.ticker ? historyMap.get(holding.ticker.toUpperCase()) : []) ?? [];
-                const quote = holding.ticker ? quoteMap.get(holding.ticker.toUpperCase()) : undefined;
+                const dt = getDisplayTicker(holding);
+                const key = dt ?? (holding.securityId ?? holding.name);
+                const history = historyMap.get(key) ?? (dt ? historyMap.get(dt) : []) ?? [];
+                const quote = dt ? quoteMap.get(dt) : undefined;
                 return (
                   <div key={`${holding.accountId}-${key}-${idx}`} className="w-[245px] sm:w-auto shrink-0 snap-start">
                     <HoldingCard

@@ -405,6 +405,33 @@ export async function syncPlaidConnection(
       });
 
       if (holdingsForAccount !== undefined) {
+        // Preserve user-set ticker overrides (display ticker / public ETF
+        // equivalent) across the delete-and-reinsert, since Plaid does not
+        // know about them. Read once per account before wiping rows.
+        const existingOverridesRows = await getDb()
+          .select({
+            securityId: holdings.securityId,
+            tickerOverride: holdings.tickerOverride,
+            publicEquivalent: holdings.publicEquivalent,
+          })
+          .from(holdings)
+          .where(eq(holdings.accountId, upserted.id));
+        const existingOverridesDecrypted = existingOverridesRows.length > 0
+          ? await decryptRows('holdings', existingOverridesRows, dek)
+          : [];
+        const overridesBySecurityId = new Map<string, { tickerOverride: string | null; publicEquivalent: string | null }>();
+        for (const er of existingOverridesDecrypted) {
+          if (!er.securityId) continue;
+          const hasOverride = er.tickerOverride != null && er.tickerOverride !== '';
+          const hasEquivalent = er.publicEquivalent != null && er.publicEquivalent !== '';
+          if (!overridesBySecurityId.has(er.securityId) || hasOverride || hasEquivalent) {
+            overridesBySecurityId.set(er.securityId, {
+              tickerOverride: er.tickerOverride ?? null,
+              publicEquivalent: er.publicEquivalent ?? null,
+            });
+          }
+        }
+
         await getDb()
           .delete(holdings)
           .where(eq(holdings.accountId, upserted.id));
@@ -453,6 +480,18 @@ export async function syncPlaidConnection(
             const encryptedCost = cost != null ? await encryptField(cost, dek) : null;
             const encryptedValue = await encryptField(val, dek);
 
+            // Carry user-set overrides across the sync (re-encrypt the
+            // plaintext we read back from the DB above).
+            const preserved = overridesBySecurityId.get(h.securityId);
+            const preservedOverride = preserved?.tickerOverride ?? null;
+            const preservedEquivalent = preserved?.publicEquivalent ?? null;
+            const encryptedOverride = preservedOverride
+              ? await encryptField(preservedOverride, dek)
+              : null;
+            const encryptedEquivalent = preservedEquivalent
+              ? await encryptField(preservedEquivalent, dek)
+              : null;
+
             await getDb()
               .insert(holdings)
               .values({
@@ -466,6 +505,8 @@ export async function syncPlaidConnection(
                 costBasis: encryptedCost,
                 value: encryptedValue,
                 currency: h.currency,
+                tickerOverride: encryptedOverride,
+                publicEquivalent: encryptedEquivalent,
               })
               .onConflictDoUpdate({
                 target: [holdings.accountId, holdings.securityId],
@@ -477,6 +518,8 @@ export async function syncPlaidConnection(
                   costBasis: encryptedCost,
                   value: encryptedValue,
                   currency: h.currency,
+                    tickerOverride: encryptedOverride,
+                    publicEquivalent: encryptedEquivalent,
                   updatedAt: new Date(),
                 },
               });

@@ -9,6 +9,7 @@ import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { PieChart as PieIcon } from 'lucide-react';
+import { getDisplayTicker } from '@/lib/types/investments';
 
 interface Holding {
   accountId: string;
@@ -194,7 +195,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       'Commodities': 0,
     };
     for (const h of holdings) {
-      const cls = getAssetClass(h.ticker, h.name);
+      const cls = getAssetClass(getDisplayTicker(h), h.name);
       map[cls] = (map[cls] || 0) + h.value;
     }
     return map;
@@ -212,10 +213,10 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       let key = 'Other';
 
       if (groupBy === 'security') {
-        key = h.ticker || h.name || 'Other';
-        if (h.ticker) {
+        key = getDisplayTicker(h) || h.name || 'Other';
+        if (getDisplayTicker(h)) {
           if (!securityMeta[key]) {
-            securityMeta[key] = { name: h.name, ticker: h.ticker };
+            securityMeta[key] = { name: h.name, ticker: getDisplayTicker(h) };
           }
         } else {
           securityMeta[key] = { name: h.name, ticker: null };
@@ -253,7 +254,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
         groupedValues[wrapper] = (groupedValues[wrapper] ?? 0) + h.value;
         continue;
       } else if (groupBy === 'assetClass') {
-        key = getAssetClass(h.ticker, h.name);
+        key = getAssetClass(getDisplayTicker(h), h.name);
       }
 
       groupedValues[key] = (groupedValues[key] || 0) + h.value;
@@ -431,13 +432,17 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
                   <div key={idx} className="flex items-center justify-between text-xs py-0.5 border-b border-border/10">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: item.color }} />
-                      {groupBy === 'security' && item.ticker ? (
-                        <span className="flex items-center gap-1.5 min-w-0" title={`${item.fundName ?? ''} (${item.ticker})`.trim()}>
-                          <span className="font-semibold font-mono text-foreground shrink-0">{item.ticker}</span>
-                          {item.fundName && item.fundName !== item.ticker ? (
-                            <span className="truncate text-foreground/80">{item.fundName}</span>
-                          ) : null}
-                        </span>
+                      {groupBy === 'security' ? (
+                        item.ticker ? (
+                          <span className="flex items-center gap-1.5 min-w-0" title={`${item.fundName ?? ''} (${item.ticker})`.trim()}>
+                            <span className="font-semibold font-mono text-foreground shrink-0">{item.ticker}</span>
+                            {item.fundName && item.fundName !== item.ticker ? (
+                              <span className="truncate text-foreground/80">{item.fundName}</span>
+                            ) : null}
+                          </span>
+                        ) : (
+                          <span className="truncate text-foreground/80" title={item.fundName ?? item.name}>{item.fundName ?? item.name}</span>
+                        )
                       ) : (
                         <span className="text-muted-foreground truncate" title={item.name}>{item.name}</span>
                       )}

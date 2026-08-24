@@ -5,6 +5,7 @@ import { decryptField, encryptField, encryptRow, decryptRows } from '@/lib/crypt
 import { isAssetAccount, isLiabilityAccount, isInvestmentAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
 import { logger } from '@/lib/logger';
 import { getAccountCurrentBalance } from './asset-estimator';
+import { isConstantPriceTicker, resolvePriceSourceTicker } from '@/lib/utils/ticker-mappings';
 
 const LOG_TAG = '[account-history]';
 
@@ -1076,15 +1077,6 @@ function toDateString(d: any): string {
   return String(d);
 }
 
-const TICKER_MAPPINGS: Record<string, string> = {
-  'LMCSTK': 'LMT',
-  'LMCMBI': 'AGG',
-  'LMSMPH': 'IWM',
-  'LMMEPH': 'IJH',
-};
-
-const CONSTANT_PRICE_TICKERS = new Set(['SCHMMF', 'LMCSVF', 'SCHSEC']);
-
 export async function generateInvestmentMarketSnapshots(
   accountId: string,
   userId: string,
@@ -1157,7 +1149,7 @@ export async function generateInvestmentMarketSnapshots(
   
   // Pre-populate constant-price tickers with 1.00
   for (const ticker of uniqueTickers) {
-    if (CONSTANT_PRICE_TICKERS.has(ticker)) {
+    if (isConstantPriceTicker(ticker)) {
       const priceMap = new Map<string, number>();
       for (const d of dailyDates) {
         priceMap.set(d, 1.00);
@@ -1166,7 +1158,7 @@ export async function generateInvestmentMarketSnapshots(
     }
   }
 
-  const fetchableTickers = Array.from(uniqueTickers).filter(t => !CONSTANT_PRICE_TICKERS.has(t));
+  const fetchableTickers = Array.from(uniqueTickers).filter(t => !isConstantPriceTicker(t));
 
   if (fetchableTickers.length > 0) {
     const startTs = Math.floor(new Date(fromDate + 'T00:00:00Z').getTime() / 1000);
@@ -1175,7 +1167,7 @@ export async function generateInvestmentMarketSnapshots(
     await Promise.all(
       fetchableTickers.map(async (ticker) => {
         try {
-          const mappedTicker = TICKER_MAPPINGS[ticker] ?? ticker;
+          const mappedTicker = resolvePriceSourceTicker(ticker);
           const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mappedTicker)}?period1=${startTs}&period2=${endTs}&interval=1d`;
           const res = await fetch(url, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -1242,7 +1234,7 @@ export async function generateInvestmentMarketSnapshots(
           const yahooPrice = priceMap.get(dateStr);
           if (yahooPrice !== undefined) {
             price = yahooPrice;
-            if (!CONSTANT_PRICE_TICKERS.has(tickerUpper)) {
+              if (!isConstantPriceTicker(tickerUpper)) {
               hasDailyPrice = true;
             }
           } else {

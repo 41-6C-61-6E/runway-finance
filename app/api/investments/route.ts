@@ -3,12 +3,30 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, transactions, holdings } from '@/lib/db/schema';
 import { eq, and, asc, desc, inArray } from 'drizzle-orm';
+import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
+import {
+  isValidIdentifier,
+  resolveDisplayTicker,
+  updateHoldingOverrides,
+} from './helpers/holding-overrides';
 
 const LOG_TAG = '[api-investments]';
+
+/**
+ * Body for POST /api/investments — updates user-set ticker identifiers for
+ * a security. Both fields are optional; at least one must be provided.
+ * Empty string clears the value.
+ */
+const UpdateHoldingOverridesSchema = z.object({
+  securityId: z.string().min(1).max(128),
+  // Empty string clears the value; otherwise must be a valid ticker format.
+  tickerOverride: z.string().max(12).optional(),
+  publicEquivalent: z.string().max(12).optional(),
+});
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -97,6 +115,9 @@ export async function GET(request: Request) {
         institutionName: acc.institution || 'Unknown Brokerage',
         securityId,
         ticker: h.ticker,
+        tickerOverride: h.tickerOverride ?? null,
+        publicEquivalent: h.publicEquivalent ?? null,
+        displayTicker: resolveDisplayTicker(h.ticker, h.tickerOverride, h.publicEquivalent),
         name: h.name || 'Unknown Security',
         quantity: qty,
         price,
@@ -194,6 +215,90 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(
       { error: 'internal_error', message: 'Failed to fetch investments data' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST — Update user-set ticker identifiers (display ticker / public ETF
+ * equivalent) for a security. Applies to all account positions of that
+ * security. Values are stored encrypted at rest.
+ */
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: 'unauthenticated', message: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+
+  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: 'invalid_body', message: 'Request body must be valid JSON' },
+      { status: 400 }
+    );
+  }
+
+  const parsed = UpdateHoldingOverridesSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: 'validation_error',
+        details: parsed.error.flatten().fieldErrors,
+        message: 'tickerOverride / publicEquivalent must each be an empty string or a valid ticker (1–12 chars, A–Z 0–9 . - =)',
+      },
+      { status: 400 }
+    );
+  }
+
+  // Three-state per field: absent → keep DB value, '' → clear (NULL),
+  // ticker → set. `undefined` must be passed through untouched so the
+  // helper can distinguish "not sent" from "clear".
+  const rawOverride = parsed.data.tickerOverride;
+  const rawEquivalent = parsed.data.publicEquivalent;
+  const cleanedOverride = rawOverride === undefined ? undefined : rawOverride.trim().toUpperCase();
+  const cleanedEquivalent = rawEquivalent === undefined ? undefined : rawEquivalent.trim().toUpperCase();
+  if (cleanedOverride !== undefined && cleanedOverride !== '' && !isValidIdentifier(cleanedOverride)) {
+    return NextResponse.json(
+      { error: 'validation_error', field: 'tickerOverride', message: 'Invalid ticker format (1–12 chars, A–Z 0–9 . - =)' },
+      { status: 400 }
+    );
+  }
+  if (cleanedEquivalent !== undefined && cleanedEquivalent !== '' && !isValidIdentifier(cleanedEquivalent)) {
+    return NextResponse.json(
+      { error: 'validation_error', field: 'publicEquivalent', message: 'Invalid ticker format (1–12 chars, A–Z 0–9 . - =)' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const { securityId } = parsed.data;
+    await updateHoldingOverrides(
+      securityId,
+      dataUserId,
+      cleanedOverride,
+      cleanedEquivalent,
+    );
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'holding_not_found') {
+      return NextResponse.json(
+        { error: 'not_found', message: 'Holding no longer exists' },
+        { status: 404 }
+      );
+    }
+    logger.error(`${LOG_TAG} Error updating holding overrides`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json(
+      { error: 'internal_error', message: 'Failed to update holding' },
       { status: 500 }
     );
   }

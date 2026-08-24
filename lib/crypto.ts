@@ -305,7 +305,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   category_spending_summary: ['amount', 'transactionCount'],
   category_income_summary: ['amount', 'transactionCount'],
   account_snapshots: ['balance'],
-  holdings: ['name', 'quantity', 'price', 'costBasis', 'value'],
+  holdings: ['name', 'quantity', 'price', 'costBasis', 'value', 'tickerOverride', 'publicEquivalent'],
   holding_snapshots: ['name', 'quantity', 'price', 'value', 'costBasis'],
   import_log: ['fileContent'],
 

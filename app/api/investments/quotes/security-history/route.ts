@@ -1,21 +1,16 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import {
+  isConstantPriceTicker,
+  resolvePriceSourceTicker,
+} from '@/lib/utils/ticker-mappings';
 
 const LOG_TAG = '[api-security-history]';
 
 // In-memory cache for security historical charts
 const cache = new Map<string, { data: any; expiresAt: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
-
-const TICKER_MAPPINGS: Record<string, string> = {
-  'LMCSTK': 'LMT',
-  'LMCMBI': 'AGG',
-  'LMSMPH': 'IWM',
-  'LMMEPH': 'IJH',
-};
-
-const CONSTANT_PRICE_TICKERS = new Set(['SCHMMF', 'LMCSVF', 'SCHSEC']);
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -26,18 +21,23 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawTicker = (searchParams.get('ticker') ?? '').trim().toUpperCase();
   const range = (searchParams.get('range') ?? '1m').toLowerCase(); // '1w' | '1m' | '3m' | '1y' | '5y' | 'all'
+  // Optional client-side override of the price source (e.g. a user-assigned
+  // public ETF equivalent for an internally-named fund).
+  const sourceOverride = (searchParams.get('source') ?? '').trim().toUpperCase();
 
   if (!rawTicker) {
     return NextResponse.json({ error: 'Ticker is required' }, { status: 400 });
   }
 
-  const cacheKey = `${rawTicker}:${range}`;
+  // Constant-price short-circuit happens below; resolve source for caching.
+  const resolvedSource = resolvePriceSourceTicker(rawTicker, sourceOverride) || rawTicker;
+  const cacheKey = `${resolvedSource}:${range}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.data);
   }
 
-  if (CONSTANT_PRICE_TICKERS.has(rawTicker)) {
+  if (isConstantPriceTicker(rawTicker)) {
     const today = new Date();
     const points = [];
     const count = range === '1w' ? 7 : range === '1m' ? 30 : range === '3m' ? 90 : 365;
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
   const { yahooRange, interval } = rangeConfigMap[range] || rangeConfigMap['1m'];
 
   try {
-    const mappedTicker = TICKER_MAPPINGS[rawTicker] ?? rawTicker;
+    const mappedTicker = resolvedSource;
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mappedTicker)}?interval=${interval}&range=${yahooRange}`;
 
     const res = await fetch(url, {
