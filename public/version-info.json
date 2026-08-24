@@ -1,9 +1,14 @@
 {
-  "buildNumber": "26.08.1787518947744",
-  "buildTime": "2026-08-23T21:02:27.744Z",
-  "hash": "f3d4a40",
-  "fullHash": "f3d4a403e566112a810b098c56348e96f2bc32a8",
+  "buildNumber": "26.08.1787594862548",
+  "buildTime": "2026-08-24T18:07:42.548Z",
+  "hash": "0f938c0",
+  "fullHash": "0f938c076e921151012625b8057e626f4adab80c",
   "commits": [
+    "feat(investments): add InvestmentHolding type and ticker resolution utilities",
+    "refactor: remove redundant cancel option from PWA update toast notifications",
+    "feat: enhance useDateWindow hook to improve URL parameter handling and user navigation",
+    "feat: adjust chart data processing to negate out-flows for accurate net change representation",
+    "feat: enhance investment income tracking with new data structures and utility functions",
     "feat: enhance usePersistentState to support skipRestore option for authoritative state management feat: allow computeGoalAllocations to accept explicit DEK for non-request contexts fix: ensure notifications use exact window labels for clarity in alerts refactor: update syncConnection to pass DEK explicitly for background operations refactor: ensure wealth-flow calculations use snapshots for discrete timeframes fix: update issue status schema to reflect new status options chore: update service worker and version info for new build test: add unit tests for BugReportingDropdown status updates and error resilience test: implement tests for useDateWindow to ensure correct handling of deep links feat: introduce useInvestmentIncomeData hook for investment income queries feat: add utility functions for investment transaction classification and monthly flow calculations",
     "delete: remove unit tests for escape velocity projection calculations",
     "feat: implement escape velocity projection engine and associated tests",
@@ -198,22 +203,57 @@
     "refactor: replace vashon color scheme with bainbridge, update chart color logic, and improve net worth visualization rendering",
     "feat: implement privacy mode for sensitive financial data and chart accessibility labels",
     "feat: implement transaction splitting with database support, API endpoints, and UI integration",
-    "feat: add user-configurable timezone settings with dynamic IANA selection and registration support",
-    "feat: add configurable retention period for automatic deletion of pending transactions",
-    "feat: include paystub accounts in cash flow calculations regardless of virtual status",
-    "feat: add hideFromTransactions setting to categories and optimize cash flow data fetching using month-aligned summary tables.",
-    "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page",
-    "chore: automate service worker generation during build and implement commit history preservation in versioning script"
+    "feat: add user-configurable timezone settings with dynamic IANA selection and registration support"
   ],
   "history": [
+    {
+      "hash": "0f938c0",
+      "fullHash": "0f938c076e921151012625b8057e626f4adab80c",
+      "author": "Alan Racek",
+      "date": "2026-08-24T08:32:09-07:00",
+      "message": "feat(investments): add InvestmentHolding type and ticker resolution utilities",
+      "type": "feat",
+      "buildNumber": "26.08.1787594862548"
+    },
+    {
+      "hash": "169185f",
+      "fullHash": "169185f2534c84d84b0374e97bc4cd7f7da3c43a",
+      "author": "Alan Racek",
+      "date": "2026-08-23T19:43:00-07:00",
+      "message": "refactor: remove redundant cancel option from PWA update toast notifications",
+      "type": "refactor"
+    },
+    {
+      "hash": "753015c",
+      "fullHash": "753015c2b40ee2ceda0a3f7ff0ac5f56ad134b6a",
+      "author": "Alan Racek",
+      "date": "2026-08-23T18:46:35-07:00",
+      "message": "feat: enhance useDateWindow hook to improve URL parameter handling and user navigation",
+      "type": "feat"
+    },
+    {
+      "hash": "4c98f10",
+      "fullHash": "4c98f10d2cb962d5d7afe236365ce19b56d83e0e",
+      "author": "Alan Racek",
+      "date": "2026-08-23T17:09:22-07:00",
+      "message": "feat: adjust chart data processing to negate out-flows for accurate net change representation",
+      "type": "feat"
+    },
+    {
+      "hash": "6dd0312",
+      "fullHash": "6dd031259ebb685fb791df2096dc05540a35b548",
+      "author": "Alan Racek",
+      "date": "2026-08-23T16:18:51-07:00",
+      "message": "feat: enhance investment income tracking with new data structures and utility functions",
+      "type": "feat"
+    },
     {
       "hash": "f3d4a40",
       "fullHash": "f3d4a403e566112a810b098c56348e96f2bc32a8",
       "author": "Alan Racek",
       "date": "2026-08-23T13:31:24-07:00",
       "message": "feat: enhance usePersistentState to support skipRestore option for authoritative state management feat: allow computeGoalAllocations to accept explicit DEK for non-request contexts fix: ensure notifications use exact window labels for clarity in alerts refactor: update syncConnection to pass DEK explicitly for background operations refactor: ensure wealth-flow calculations use snapshots for discrete timeframes fix: update issue status schema to reflect new status options chore: update service worker and version info for new build test: add unit tests for BugReportingDropdown status updates and error resilience test: implement tests for useDateWindow to ensure correct handling of deep links feat: introduce useInvestmentIncomeData hook for investment income queries feat: add utility functions for investment transaction classification and monthly flow calculations",
-      "type": "feat",
-      "buildNumber": "26.08.1787518947744"
+      "type": "feat"
     },
     {
       "hash": "594136e",
@@ -1766,46 +1806,6 @@
       "date": "2026-07-08T08:40:42-07:00",
       "message": "feat: add user-configurable timezone settings with dynamic IANA selection and registration support",
       "type": "feat"
-    },
-    {
-      "hash": "5a7403b",
-      "fullHash": "5a7403b6258f9e93f7a1d7214f241820b736b1fd",
-      "author": "Alan Racek",
-      "date": "2026-07-07T19:25:04-07:00",
-      "message": "feat: add configurable retention period for automatic deletion of pending transactions",
-      "type": "feat"
-    },
-    {
-      "hash": "0fb7f33",
-      "fullHash": "0fb7f334e4e88ea7cfb846925ccd372f44a02c1a",
-      "author": "Alan Racek",
-      "date": "2026-07-07T18:53:12-07:00",
-      "message": "feat: include paystub accounts in cash flow calculations regardless of virtual status",
-      "type": "feat"
-    },
-    {
-      "hash": "ebae50a",
-      "fullHash": "ebae50a1facdf71602477a879e8a3b379902e8aa",
-      "author": "Alan Racek",
-      "date": "2026-07-07T16:12:12-07:00",
-      "message": "feat: add hideFromTransactions setting to categories and optimize cash flow data fetching using month-aligned summary tables.",
-      "type": "feat"
-    },
-    {
-      "hash": "189f1a6",
-      "fullHash": "189f1a6bd8dfcfca09c04de192b3b3f025f5459b",
-      "author": "Alan Racek",
-      "date": "2026-07-06T15:57:07-07:00",
-      "message": "feat: add hideFromTransactions setting to categories and implement auto-filtering on transactions page",
-      "type": "feat"
-    },
-    {
-      "hash": "9f81954",
-      "fullHash": "9f81954de65846cfd0e068737eaa3fbc680eae2c",
-      "author": "Alan Racek",
-      "date": "2026-07-06T10:12:03-07:00",
-      "message": "chore: automate service worker generation during build and implement commit history preservation in versioning script",
-      "type": "chore"
     }
   ]
 }

@@ -99,7 +99,7 @@ export default function ResizableSidebar() {
     <Link
       href={href}
       onMouseEnter={() => handlePrefetch(href)}
-      className={`flex items-center rounded-lg transition-all duration-150 ${
+      className={`flex touch-manipulation items-center rounded-lg transition-all duration-150 ${
         !showLabel
           ? 'justify-center py-2'
           : 'px-3 py-2 gap-3'
@@ -117,8 +117,12 @@ export default function ResizableSidebar() {
   return (
     <>
       <aside
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onPointerEnter={(event) => {
+          if (event.pointerType === 'mouse') handleMouseEnter()
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType === 'mouse') handleMouseLeave()
+        }}
         className="fixed left-0 top-0 z-45 h-screen flex flex-col justify-between transition-all duration-300 hidden md:flex"
         style={{ width: `${sidebarWidth}px` }}
       >
