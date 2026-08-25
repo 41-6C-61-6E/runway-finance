@@ -1,4 +1,4 @@
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, filterReportableAccounts } from '@/lib/utils/account-scope';
 import { ASSET_ACCOUNT_TYPES, LIABILITY_ACCOUNT_TYPES } from '@/lib/utils/account-scope';
 import type { AccountData, CalculationTrace } from '@/lib/types/financial';
 
@@ -21,9 +21,7 @@ function devValidateAccountTypes(accounts: AccountData[]): void {
 export function buildNetWorthTraces(accounts: AccountData[]): CalculationTrace[] {
   devValidateAccountTypes(accounts);
   // Filter reportable accounts to ensure strict parity with /overview and /net-worth
-  const reportableAccounts = accounts.filter(
-    (a) => !a.isHidden && !a.isExcludedFromNetWorth
-  );
+  const reportableAccounts = filterReportableAccounts(accounts);
   const assetsTrace = buildTotalAssetsTrace(reportableAccounts);
   const liabilitiesTrace = buildTotalLiabilitiesTrace(reportableAccounts);
   const debtTrace = buildDebtToAssetTraceFrom(assetsTrace, liabilitiesTrace);
@@ -139,9 +137,7 @@ function buildDebtToAssetTraceFrom(assetsTrace: CalculationTrace, liabilitiesTra
 
 /** Convenience wrapper: builds debt-to-asset ratio trace directly from accounts. */
 export function buildDebtToAssetTrace(accounts: AccountData[]): CalculationTrace {
-  const reportableAccounts = accounts.filter(
-    (a) => !a.isHidden && !a.isExcludedFromNetWorth
-  );
+  const reportableAccounts = filterReportableAccounts(accounts);
   const assets = buildTotalAssetsTrace(reportableAccounts);
   const liabilities = buildTotalLiabilitiesTrace(reportableAccounts);
   return buildDebtToAssetTraceFrom(assets, liabilities);

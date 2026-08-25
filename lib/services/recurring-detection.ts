@@ -1163,6 +1163,12 @@ export async function getUpcomingBills(
 
     // Advance and collect occurrences up to horizon
     while (projDate <= horizonStr && safety < maxIterations) {
+      // Guard against degenerate frequency math (e.g. a weekly step that fails
+      // to advance): re-emitting the same date would create duplicate bill
+      // entries (same `${id}-${date}` key) that break React reconciliation.
+      const nextProjDate = addFrequencyPeriod(projDate, item.frequency, initialAnchorDay);
+      if (nextProjDate <= projDate) break;
+
       const t1 = todayDate.getTime();
       const t2 = new Date(projDate + 'T00:00:00Z').getTime();
       const daysDiff = Math.round((t2 - t1) / (1000 * 60 * 60 * 24));
@@ -1184,7 +1190,7 @@ export async function getUpcomingBills(
         isOverdue: false,
       });
 
-      projDate = addFrequencyPeriod(projDate, item.frequency, initialAnchorDay);
+      projDate = nextProjDate;
       safety++;
     }
   }

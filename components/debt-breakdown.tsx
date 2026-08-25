@@ -5,8 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate, isReportableAccount, computeNetWorthTotals } from '@/lib/utils/account-scope';
+import { convertCurrency } from '@/lib/constants/currency-rates';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { formatInTimezone } from '@/lib/utils/timeframe';
+import { useUserSettings } from '@/components/user-settings-provider';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { AppTabs } from '@/components/ui/app-tabs';
@@ -78,6 +81,10 @@ interface AccountData {
   type: string;
   balance: string | number;
   name: string;
+  isHidden?: boolean | null;
+  isExcludedFromNetWorth?: boolean | null;
+  currency?: string | null;
+  metadata?: string | any | null;
 }
 
 interface CategoryEntry {
@@ -90,6 +97,8 @@ interface CategoryEntry {
 export function DebtBreakdown() {
   const router = useRouter();
   const { privacyMode } = usePrivacyMode();
+  const { settings } = useUserSettings() ?? {};
+  const baseCurrency = settings?.currency || 'USD';
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('debtBreakdown');
   const [unit, setUnit] = useState<'$' | '%'>('$');
   const [activeTab, setActiveTab] = useState<'assets' | 'debt'>('assets');
@@ -106,33 +115,25 @@ export function DebtBreakdown() {
   });
 
   const { totalAssets, totalLiabilities, assetCategories, debtCategories } = useMemo(() => {
-    let assets = 0;
-    let liabilities = 0;
-    const assetMap: Record<string, number> = {};
-    const debtMap: Record<string, number> = {};
+    // Timezone-aware "today" — must match the server-side canonical calc.
+    const todayStr = formatInTimezone(new Date(), settings?.timezone || 'America/New_York');
 
-    for (const acc of accounts) {
-      const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+    // Canonical scoped totals (reportable + active + currency-converted),
+    // consistent with the Overview and History chart.
+    const totals = computeNetWorthTotals(accounts, baseCurrency, todayStr);
 
-      if (isAssetAccount(acc.type)) {
-        assets += balance;
-        const cat = ASSET_DISPLAY_CATEGORIES[acc.type] || { label: 'Other' };
-        assetMap[cat.label] = (assetMap[cat.label] || 0) + balance;
-      } else if (isLiabilityAccount(acc.type)) {
-        const absBalance = Math.abs(balance);
-        liabilities += absBalance;
-        const cat = DEBT_DISPLAY_CATEGORIES[acc.type] || { label: 'Other Debt' };
-        debtMap[cat.label] = (debtMap[cat.label] || 0) + absBalance;
-      }
-    }
+    const reportableAccounts = accounts.filter(
+      (acc) => isReportableAccount(acc) && isAccountActiveOnDate(acc, todayStr)
+    );
 
-    const makeCategories = (map: Record<string, number>, colorMap: Record<string, { label: string }>, typeKey: string): CategoryEntry[] => {
+    const makeCategories = (colorMap: Record<string, { label: string }>, isDebt: boolean): CategoryEntry[] => {
       const merged: Record<string, { key: string; label: string; amount: number }> = {};
-      for (const acc of accounts) {
-        const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+      for (const acc of reportableAccounts) {
+        const rawBalance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
         const catInfo = colorMap[acc.type];
         if (!catInfo) continue;
-        const val = typeKey === 'debt' ? Math.abs(balance) : balance;
+        const converted = convertCurrency(rawBalance, acc.currency || 'USD', baseCurrency);
+        const val = isDebt ? Math.abs(converted) : converted;
         if (val <= 0) continue;
         merged[catInfo.label] = {
           key: acc.type,
@@ -149,12 +150,12 @@ export function DebtBreakdown() {
     };
 
     return {
-      totalAssets: assets,
-      totalLiabilities: liabilities,
-      assetCategories: makeCategories(assetMap, ASSET_DISPLAY_CATEGORIES, 'asset'),
-      debtCategories: makeCategories(debtMap, DEBT_DISPLAY_CATEGORIES, 'debt'),
+      totalAssets: totals.totalAssets,
+      totalLiabilities: totals.totalLiabilities,
+      assetCategories: makeCategories(ASSET_DISPLAY_CATEGORIES, false),
+      debtCategories: makeCategories(DEBT_DISPLAY_CATEGORIES, true),
     };
-  }, [accounts]);
+  }, [accounts, baseCurrency]);
 
   const activeCategories = activeTab === 'assets' ? assetCategories : debtCategories;
   const activeTotal = activeTab === 'assets' ? totalAssets : totalLiabilities;

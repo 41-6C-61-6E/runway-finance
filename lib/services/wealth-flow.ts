@@ -5,6 +5,8 @@ import { decryptRows } from '@/lib/crypto';
 import { convertCurrency, roundToCents } from '@/lib/services/account-history';
 import { getBalancesOnDate } from '@/lib/services/snapshot-balances';
 import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
+import { getSignedNetWorthBalance, filterReportableAccounts } from '@/lib/utils/account-scope';
+import { formatInTimezone } from '@/lib/utils/timeframe';
 import { isRealEstateType } from '@/lib/constants/account-types';
 import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
 
@@ -79,24 +81,6 @@ function getAccountGroup(type: string): string {
   return isLiabilityAccount(t) ? 'credit_loans' : 'other_assets';
 }
 
-function getSignedNetWorthBalance(balance: number, accountType: string): number {
-  return isLiabilityAccount(accountType) ? -Math.abs(balance) : balance;
-}
-
-function formatInTimezone(date: Date, tz: string): string {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = formatter.formatToParts(date);
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-  return `${year}-${month}-${day}`;
-}
-
 export async function calculateWealthFlow(
   userId: string,
   startDateStr: string,
@@ -123,9 +107,7 @@ export async function calculateWealthFlow(
 
   const decryptedAccounts = await decryptRows('accounts', allAccounts, dek);
 
-  const reportableAccounts = decryptedAccounts.filter(
-    (a: any) => !a.isHidden && !a.isExcludedFromNetWorth
-  );
+  const reportableAccounts = filterReportableAccounts(decryptedAccounts);
 
   const accountIdsToUse = filterAccountIds && filterAccountIds.length > 0
     ? reportableAccounts.map((a: any) => a.id).filter((id: string) => filterAccountIds.includes(id))

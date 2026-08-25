@@ -9,6 +9,7 @@ import {
 import { eq, and, desc, gte, lt } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
+import { isReportableAccount, filterReportableAccounts } from '@/lib/utils/account-scope';
 import {
   evaluateConditionTree,
 } from '@/lib/services/notifications';
@@ -139,11 +140,11 @@ export async function POST(request: Request, { params }: RouteParams) {
 
       // Build account name map (exclude hidden/excluded accounts)
       const accountRows = await db
-        .select({ id: accounts.id, name: accounts.name, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
+        .select({ id: accounts.id, name: accounts.name, type: accounts.type, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
         .from(accounts)
         .where(eq(accounts.userId, dataUserId));
       const visibleAccountIds = new Set(
-        accountRows.filter(a => !a.isHidden && !a.isExcludedFromNetWorth).map(a => a.id)
+        filterReportableAccounts(accountRows).map(a => a.id)
       );
       const accountNameMap = new Map<string, string>();
       for (const acc of accountRows) {
@@ -210,7 +211,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     // ── Account Balance preview ──────────────────────────────────────────
     if (rule.triggerType === 'account_balance') {
       const accountRows = await db
-        .select({ id: accounts.id, name: accounts.name, balance: accounts.balance, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
+        .select({ id: accounts.id, name: accounts.name, type: accounts.type, balance: accounts.balance, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
         .from(accounts)
         .where(eq(accounts.userId, dataUserId));
 
@@ -218,6 +219,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         accountRows.map(async (acc) => ({
           id: acc.id,
           name: await decryptField(acc.name, dek),
+          type: acc.type,
           balance: parseFloat(await decryptField(acc.balance, dek)) || 0,
           isHidden: acc.isHidden,
           isExcludedFromNetWorth: acc.isExcludedFromNetWorth,
@@ -229,7 +231,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       // Exclude hidden/excluded accounts
       const targetAccountId = rule.criteria?.accountId;
       const candidateAccounts = decryptedAccounts.filter(a =>
-        !a.isHidden && !a.isExcludedFromNetWorth && (targetAccountId ? a.id === targetAccountId : true)
+        isReportableAccount(a) && (targetAccountId ? a.id === targetAccountId : true)
       );
 
       const matches: BalanceMatch[] = [];

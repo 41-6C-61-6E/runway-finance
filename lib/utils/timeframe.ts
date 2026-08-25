@@ -22,6 +22,27 @@ function subtractMonthsClamped(date: Date, months: number): void {
   date.setDate(Math.min(originalDay, maxDays));
 }
 
+/**
+ * Formats a Date as a YYYY-MM-DD string in the given IANA timezone.
+ *
+ * Single source of truth for "what date is it over there" — used by every
+ * snapshot / chart date-boundary computation so client and server agree on
+ * the "today" string regardless of process timezone.
+ */
+export function formatInTimezone(date: Date, tz: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
 function subtractYearsClamped(date: Date, years: number): void {
   const originalDay = date.getDate();
   const originalMonth = date.getMonth();

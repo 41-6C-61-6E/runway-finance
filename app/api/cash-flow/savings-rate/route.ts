@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { getUserTransactionsFromCache } from '@/lib/services/search-cache';
-import { toCashFlowAmount } from '@/lib/utils/account-scope';
+import { toCashFlowAmount, isCashFlowRelevantAccount, isReportableAccount } from '@/lib/utils/account-scope';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
     // Filter active (reportable or paystub) accounts, applying user exclusions
     const activeAccounts = decryptedAccounts.filter(
-      (a: any) => ((!a.isHidden && !a.isExcludedFromNetWorth) || a.type === 'paystub') && !excludedAccounts.has(a.id)
+      (a: any) => isCashFlowRelevantAccount(a) && !excludedAccounts.has(a.id)
     );
     const activeAccountIds = new Set(activeAccounts.map(a => a.id));
 
@@ -332,21 +332,19 @@ export async function GET(request: Request) {
 
     // Helper functions to check connected account types (requiring at least one synced transaction)
     function hasConnectedSavingsAccountsWithTx(accountsList: any[]) {
-      return accountsList.some(a => a.type === 'savings' && !a.isHidden && !a.isExcludedFromNetWorth && accountsWithTransactions.has(a.id));
+      return accountsList.some(a => a.type === 'savings' && isReportableAccount(a) && accountsWithTransactions.has(a.id));
     }
     function hasConnectedInvestmentAccountsWithTx(accountsList: any[]) {
       return accountsList.some(a =>
         ['investment', 'brokerage', 'crypto', 'metals', '529', 'otherinvestment', 'otherInvestment'].includes(a.type) &&
-        !a.isHidden &&
-        !a.isExcludedFromNetWorth &&
+        isReportableAccount(a) &&
         accountsWithTransactions.has(a.id)
       );
     }
     function hasConnectedRetirementAccountsWithTx(accountsList: any[]) {
       return accountsList.some(a =>
         ['retirement', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira'].includes(a.type) &&
-        !a.isHidden &&
-        !a.isExcludedFromNetWorth &&
+        isReportableAccount(a) &&
         accountsWithTransactions.has(a.id)
       );
     }

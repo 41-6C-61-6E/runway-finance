@@ -1,6 +1,6 @@
 import { getDb, getPool } from '@/lib/db';
 import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories, transactionTags } from '@/lib/db/schema';
-import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, convertCurrency, formatToCents } from '@/lib/services/account-history';
+import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, formatToCents } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
@@ -11,7 +11,7 @@ import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from 
 import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 import { logger } from '@/lib/logger';
-import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate, toCashFlowAmount } from '@/lib/utils/account-scope';
+import { toCashFlowAmount, computeNetWorthTotals, computeCategoryBreakdown } from '@/lib/utils/account-scope';
 
 import { isSimilarDescription } from '@/lib/utils/description-matching';
 import { resolveDataUserId } from '@/lib/sharing';
@@ -50,44 +50,15 @@ export async function createNetWorthSnapshot(
 
   const decrypted = await decryptRows('accounts', userAccounts, dek);
 
-  let totalAssets = 0;
-  let totalLiabilities = 0;
-  const breakdown: Record<string, { count: number; value: number }> = {};
-
-  for (const acc of decrypted) {
-    if (acc.isExcludedFromNetWorth || acc.isHidden) {
-      continue;
-    }
-
-    if (!isAccountActiveOnDate(acc, snapshotDate)) {
-      continue;
-    }
-
-    const balance = acc.balance ? parseFloat(acc.balance) : 0;
-    const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
-    const accountType = acc.type.toLowerCase();
-
-    if (isAssetAccount(accountType)) {
-      totalAssets += convertedBal;
-    } else if (isLiabilityAccount(accountType)) {
-      totalLiabilities += Math.abs(convertedBal);
-    }
-
-    if (!breakdown[accountType]) {
-      breakdown[accountType] = { count: 0, value: 0 };
-    }
-    breakdown[accountType].count++;
-    breakdown[accountType].value += convertedBal;
-  }
-
-  const roundToCents = (val: number) => Math.round(val * 100) / 100;
-  totalAssets = roundToCents(totalAssets);
-  totalLiabilities = roundToCents(totalLiabilities);
-  const netWorth = roundToCents(totalAssets - totalLiabilities);
-
-  for (const key of Object.keys(breakdown)) {
-    breakdown[key].value = roundToCents(breakdown[key].value);
-  }
+  // Canonical scoped calculation (reportable + active on the snapshot date,
+  // currency-converted) — identical to the live dashboard and the full net
+  // worth recalculation pipeline, so both writers produce the same rows.
+  const { totalAssets, totalLiabilities, netWorth } = computeNetWorthTotals(
+    decrypted,
+    baseCurrency,
+    snapshotDate
+  );
+  const breakdown = computeCategoryBreakdown(decrypted, baseCurrency, snapshotDate);
 
   const nwValues = {
     userId,

@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.08.1787594862548",
-  "buildTime": "2026-08-24T18:07:42.548Z",
-  "hash": "0f938c0",
-  "fullHash": "0f938c076e921151012625b8057e626f4adab80c",
+  "buildNumber": "26.08.1787623710788",
+  "buildTime": "2026-08-25T02:08:30.788Z",
+  "hash": "1fcd1a1",
+  "fullHash": "1fcd1a147e209aad7e3c8a3d271be8ed86b812cf",
   "commits": [
+    "chore: update service worker and version info for new build",
     "feat(investments): add InvestmentHolding type and ticker resolution utilities",
     "refactor: remove redundant cancel option from PWA update toast notifications",
     "feat: enhance useDateWindow hook to improve URL parameter handling and user navigation",
@@ -202,18 +203,25 @@
     "fix: prevent notifications and alerts for hidden or excluded accounts across sync and preview services",
     "refactor: replace vashon color scheme with bainbridge, update chart color logic, and improve net worth visualization rendering",
     "feat: implement privacy mode for sensitive financial data and chart accessibility labels",
-    "feat: implement transaction splitting with database support, API endpoints, and UI integration",
-    "feat: add user-configurable timezone settings with dynamic IANA selection and registration support"
+    "feat: implement transaction splitting with database support, API endpoints, and UI integration"
   ],
   "history": [
+    {
+      "hash": "1fcd1a1",
+      "fullHash": "1fcd1a147e209aad7e3c8a3d271be8ed86b812cf",
+      "author": "Alan Racek",
+      "date": "2026-08-24T13:11:36-07:00",
+      "message": "chore: update service worker and version info for new build",
+      "type": "chore",
+      "buildNumber": "26.08.1787623710788"
+    },
     {
       "hash": "0f938c0",
       "fullHash": "0f938c076e921151012625b8057e626f4adab80c",
       "author": "Alan Racek",
       "date": "2026-08-24T08:32:09-07:00",
       "message": "feat(investments): add InvestmentHolding type and ticker resolution utilities",
-      "type": "feat",
-      "buildNumber": "26.08.1787594862548"
+      "type": "feat"
     },
     {
       "hash": "169185f",
@@ -1797,14 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-07-08T11:56:46-07:00",
       "message": "feat: implement transaction splitting with database support, API endpoints, and UI integration",
-      "type": "feat"
-    },
-    {
-      "hash": "beb6a7c",
-      "fullHash": "beb6a7c14bd32fd69212b2ab82a8039532e5b993",
-      "author": "Alan Racek",
-      "date": "2026-07-08T08:40:42-07:00",
-      "message": "feat: add user-configurable timezone settings with dynamic IANA selection and registration support",
       "type": "feat"
     }
   ]

@@ -18,6 +18,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
+import { isCashFlowRelevantAccount } from '@/lib/utils/account-scope';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
@@ -160,7 +161,7 @@ export function IncomeExpenseChart() {
 
   // Active accounts and categorized helper data structures
   const activeDbAccounts = useMemo(() => {
-    return accountsData.filter((a: any) => (!a.isHidden && !a.isExcludedFromNetWorth) || a.type === 'paystub');
+    return accountsData.filter((a: any) => isCashFlowRelevantAccount(a));
   }, [accountsData]);
 
   const parentCategories = useMemo(() => {

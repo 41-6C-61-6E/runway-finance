@@ -8,23 +8,8 @@ import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
-import { filterReportableAccounts, isAssetAccount, isLiabilityAccount, isAccountActiveOnDate, ASSET_CATEGORY_MAP, LIABILITY_CATEGORY_MAP } from '@/lib/utils/account-scope';
-import { convertCurrency } from '@/lib/services/account-history';
-import { getDateRange, type TimeFrame } from '@/lib/utils/timeframe';
-
-function formatInTimezone(date: Date, tz: string): string {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = formatter.formatToParts(date);
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-  return `${year}-${month}-${day}`;
-}
+import { filterReportableAccounts, computeNetWorthTotals, computeCategoryBreakdown } from '@/lib/utils/account-scope';
+import { getDateRange, type TimeFrame, formatInTimezone } from '@/lib/utils/timeframe';
 
 
 export async function GET(request: Request) {
@@ -125,38 +110,12 @@ export async function GET(request: Request) {
       const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
       const reportableAccounts = filterReportableAccounts(decryptedAccounts);
 
-      const roundToCents = (val: number) => Math.round(val * 100) / 100;
+      const { totalAssets, totalLiabilities, netWorth } = computeNetWorthTotals(reportableAccounts, baseCurrency, todayStr);
 
-      let totalAssets = 0;
-      let totalLiabilities = 0;
-      const breakdown: Record<string, number> = {};
-      const allBreakdownCategories = new Set<string>();
+      // Canonical per-type breakdown (same scope as the totals above)
+      const breakdown = computeCategoryBreakdown(reportableAccounts, baseCurrency, todayStr);
+      const allBreakdownCategories = new Set(Object.keys(breakdown));
 
-      for (const acc of reportableAccounts) {
-        if (!isAccountActiveOnDate(acc, todayStr)) {
-          continue;
-        }
-        const balance = parseFloat(acc.balance) || 0;
-        const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
-        const accountType = acc.type.toLowerCase();
-        let categoryName = 'Other';
-
-        if (isAssetAccount(accountType)) {
-          categoryName = ASSET_CATEGORY_MAP[accountType] || 'Other Investments';
-          breakdown[categoryName] = (breakdown[categoryName] || 0) + convertedBal;
-          totalAssets += convertedBal;
-          allBreakdownCategories.add(categoryName);
-        } else if (isLiabilityAccount(accountType)) {
-          categoryName = LIABILITY_CATEGORY_MAP[accountType] || 'Other Debt';
-          breakdown[categoryName] = (breakdown[categoryName] || 0) + Math.abs(convertedBal);
-          totalLiabilities += Math.abs(convertedBal);
-          allBreakdownCategories.add(categoryName);
-        }
-      }
-
-      totalAssets = roundToCents(totalAssets);
-      totalLiabilities = roundToCents(totalLiabilities);
-      const netWorth = roundToCents(totalAssets - totalLiabilities);
       const currentSnapshot: Record<string, any> = {
         date: todayStr,
         netWorth,
@@ -165,7 +124,7 @@ export async function GET(request: Request) {
         isSynthetic: false,
       };
       for (const cat of allBreakdownCategories) {
-        currentSnapshot[cat] = roundToCents(breakdown[cat] || 0);
+        currentSnapshot[cat] = breakdown[cat]?.value ?? 0;
       }
 
       return NextResponse.json({
@@ -208,25 +167,8 @@ export async function GET(request: Request) {
       const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
       const reportableAccounts = filterReportableAccounts(decryptedAccounts);
 
-      let liveAssets = 0;
-      let liveLiabilities = 0;
-      for (const acc of reportableAccounts) {
-        if (!isAccountActiveOnDate(acc, todayStr)) {
-          continue;
-        }
-        const balance = parseFloat(acc.balance) || 0;
-        const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
-        const accountType = acc.type.toLowerCase();
-        if (isAssetAccount(accountType)) {
-          liveAssets += convertedBal;
-        } else if (isLiabilityAccount(accountType)) {
-          liveLiabilities += Math.abs(convertedBal);
-        }
-      }
-      const roundToCents = (val: number) => Math.round(val * 100) / 100;
-      const liveNetWorth = roundToCents(liveAssets - liveLiabilities);
-      liveAssets = roundToCents(liveAssets);
-      liveLiabilities = roundToCents(liveLiabilities);
+      const { totalAssets: liveAssets, totalLiabilities: liveLiabilities, netWorth: liveNetWorth } =
+        computeNetWorthTotals(reportableAccounts, baseCurrency, todayStr);
 
       const lastPoint = formattedData[formattedData.length - 1];
       if (lastPoint && lastPoint.date === todayStr) {

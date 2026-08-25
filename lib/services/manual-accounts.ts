@@ -10,7 +10,7 @@ import { decryptField, encryptField, encryptRow } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
 import type { ApiConfig } from '@/lib/services/asset-estimator';
 import { API_KEY_DEFAULTS } from '@/config/defaults';
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { computeNetWorthTotals, computeCategoryBreakdown, type NetWorthAccountInput } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
 import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, convertCurrency, roundToCents, getAccountEarliestCalculationDate, formatToCents } from '@/lib/services/account-history';
 import { validateEndpointUrl } from '@/lib/utils/ssrf';
@@ -1201,39 +1201,27 @@ async function updateNetWorthSnapshot(userId: string, dek?: Uint8Array) {
       eq(accounts.isExcludedFromNetWorth, false)
     ));
 
-  let totalAssets = 0;
-  let totalLiabilities = 0;
-  const breakdown: Record<string, { count: number; value: number }> = {};
-
+  const decryptedAccountInputs: NetWorthAccountInput[] = [];
   for (const acc of userAccounts) {
-    const balance = parseFloat(dek ? await decryptField(acc.balance, dek) : acc.balance.toString());
-    const accountType = acc.type.toLowerCase();
-
-    const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
-
-    if (isAssetAccount(accountType)) {
-      totalAssets += convertedBal;
-    } else if (isLiabilityAccount(accountType)) {
-      totalLiabilities += Math.abs(convertedBal);
-    }
-
-    if (!breakdown[accountType]) {
-      breakdown[accountType] = { count: 0, value: 0 };
-    }
-    breakdown[accountType].count++;
-    breakdown[accountType].value += convertedBal;
-  }
-
-  totalAssets = roundToCents(totalAssets);
-  totalLiabilities = roundToCents(totalLiabilities);
-  const netWorth = roundToCents(totalAssets - totalLiabilities);
-
-  for (const key of Object.keys(breakdown)) {
-    breakdown[key].value = roundToCents(breakdown[key].value);
+    decryptedAccountInputs.push({
+      type: acc.type,
+      balance: parseFloat(dek ? await decryptField(acc.balance, dek) : acc.balance.toString()),
+      isHidden: acc.isHidden,
+      isExcludedFromNetWorth: acc.isExcludedFromNetWorth,
+      currency: acc.currency,
+      metadata: acc.metadata,
+    });
   }
 
   const today = nowISO();
 
+  // Canonical scoped calculation (reportable + active-on-date, currency-converted)
+  // — identical to the net worth snapshot pipeline and the live dashboard.
+  const totals = computeNetWorthTotals(decryptedAccountInputs, baseCurrency, today);
+  const breakdown = computeCategoryBreakdown(decryptedAccountInputs, baseCurrency, today);
+  const totalAssets = totals.totalAssets;
+  const totalLiabilities = totals.totalLiabilities;
+  const netWorth = totals.netWorth;
   const nwValues: any = {
     userId,
     snapshotDate: today,

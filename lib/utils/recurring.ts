@@ -86,6 +86,15 @@ export function addFrequencyPeriod(dateStr: string, frequency: FrequencyType, an
   const day = d.getUTCDate();
   const effectiveDay = anchorDay ?? day;
 
+  // Weekly/biweekly must step relative to the given date. Deriving the next
+  // occurrence from (anchor day-of-month + 7/14 days) of the same month can
+  // project a past date — or the very same date repeatedly — which produces
+  // duplicate upcoming-bill entries (duplicate React keys).
+  if (frequency === 'weekly' || frequency === 'biweekly') {
+    const delta = frequency === 'weekly' ? 7 : 14;
+    return new Date(Date.UTC(year, month, day + delta)).toISOString().split('T')[0];
+  }
+
   if (frequency === 'semi_monthly') {
     const target = new Date(Date.UTC(year, month, 1));
     if (day < 15) {
@@ -105,12 +114,11 @@ export function addFrequencyPeriod(dateStr: string, frequency: FrequencyType, an
     : frequency === 'quarterly' ? 3
     : frequency === 'semi_annual' ? 6
     : frequency === 'annual' ? 12
-    : 0;
-  const dayDelta = frequency === 'weekly' ? 7 : frequency === 'biweekly' ? 14 : 0;
+    : 1;
 
   const target = new Date(Date.UTC(year, month + monthDelta, 1));
   const daysInTargetMonth = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
-  target.setUTCDate(Math.min(effectiveDay, daysInTargetMonth) + dayDelta);
+  target.setUTCDate(Math.min(effectiveDay, daysInTargetMonth));
 
   return target.toISOString().split('T')[0];
 }

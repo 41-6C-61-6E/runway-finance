@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Calculator } from 'lucide-react';
-import { isAssetAccount, isLiabilityAccount, isFireEligibleAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount, isFireEligibleAccount, isReportableAccount } from '@/lib/utils/account-scope';
 import { ASSET_ACCOUNT_TYPES, LIABILITY_ACCOUNT_TYPES } from '@/lib/utils/account-scope';
 import {
   buildNetWorthTraces,
@@ -301,7 +301,7 @@ export default function FinancialLogicPage() {
 
         // Compute FIRE metrics
         const reportableFireAccounts = accounts.filter(
-          (a) => !a.isHidden && !a.isExcludedFromNetWorth && isFireEligibleAccount(a)
+          (a) => isReportableAccount(a) && isFireEligibleAccount(a)
         );
         const currentInvestableAssets = reportableFireAccounts.reduce((sum, a) => {
           const b = typeof a.balance === 'string' ? parseFloat(a.balance) : a.balance;

@@ -36,6 +36,8 @@ export const ASSET_ACCOUNT_TYPES = [
 ];
 
 import { REAL_ESTATE_SUBTYPES } from '@/lib/constants/account-types';
+import { convertCurrency } from '@/lib/constants/currency-rates';
+import { roundToCents } from '@/lib/utils/format';
 
 export const REAL_ESTATE_TYPES = REAL_ESTATE_SUBTYPES;
 
@@ -245,4 +247,144 @@ export function isFireEligibleAccount(acc: any): boolean {
       rawSubtype.includes(kw) ||
       rawCategory.includes(kw)
   );
+}
+
+export interface NetWorthAccountInput {
+  type: string;
+  balance?: string | number;
+  isHidden?: boolean | null;
+  isExcludedFromNetWorth?: boolean | null;
+  currency?: string | null;
+  metadata?: string | any | null;
+}
+
+function getAccountBalance(acc: NetWorthAccountInput): number {
+  const raw = acc.balance;
+  if (raw == null || raw === '') return 0;
+  const num = typeof raw === 'string' ? parseFloat(raw) : raw;
+  return Number.isFinite(num) ? num : 0;
+}
+
+export interface NetWorthTotals {
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+}
+
+/**
+ * Single source of truth for "current net worth" from a set of accounts.
+ *
+ * Rules (mirrored by the net worth snapshot pipeline):
+ * - hidden (`isHidden`) and net-worth-excluded (`isExcludedFromNetWorth`)
+ *   accounts are NOT included
+ * - accounts inactive for the given date (e.g. paid-off/refinanced
+ *   mortgages) are NOT included
+ * - balances are converted from the account currency to `baseCurrency`
+ * - liability balances are always counted as absolute value
+ *
+ * Used by the live net worth calculation, the dashboard Overview, and the
+ * debt breakdown so every surface reports the same figures.
+ */
+export function computeNetWorthTotals(
+  accounts: NetWorthAccountInput[],
+  baseCurrency: string = 'USD',
+  dateStr: string = new Date().toISOString().split('T')[0]
+): NetWorthTotals {
+  let totalAssets = 0;
+  let totalLiabilities = 0;
+
+  for (const acc of accounts) {
+    if (!isReportableAccount(acc)) continue;
+    if (!isAccountActiveOnDate(acc, dateStr)) continue;
+
+    const balance = getAccountBalance(acc);
+    if (balance === 0) continue;
+
+    const convertedBal = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
+    const accountType = acc.type.toLowerCase();
+
+    if (isAssetAccount(accountType)) {
+      totalAssets += convertedBal;
+    } else if (isLiabilityAccount(accountType)) {
+      totalLiabilities += Math.abs(convertedBal);
+    }
+  }
+
+  totalAssets = roundToCents(totalAssets);
+  totalLiabilities = roundToCents(totalLiabilities);
+
+  return {
+    totalAssets,
+    totalLiabilities,
+    netWorth: roundToCents(totalAssets - totalLiabilities),
+  };
+}
+
+/**
+ * Net-worth contribution of a single account balance, with the canonical
+ * sign convention: assets count positive, liabilities always count as their
+ * absolute value (entering net worth negative).
+ *
+ * Single source of truth for the asset/liability sign rule — used by the
+ * wealth flow and anywhere the "signed" view of a balance is needed.
+ */
+export function getSignedNetWorthBalance(balance: number, accountType: string): number {
+  return isLiabilityAccount(accountType) ? -Math.abs(balance) : balance;
+}
+
+/**
+ * Per-account-type breakdown over the canonical net-worth scope
+ * (reportable + active-on-date), currency-converted to `baseCurrency`,
+ * values rounded to cents.
+ *
+ * Used by every net-worth snapshot writer (sync, manual accounts, full
+ * recalculation) and the chart fallback so the stored `breakdown` jsonb
+ * always matches the totals exactly.
+ */
+export function computeCategoryBreakdown(
+  accounts: NetWorthAccountInput[],
+  baseCurrency: string = 'USD',
+  dateStr: string = new Date().toISOString().split('T')[0]
+): Record<string, { count: number; value: number }> {
+  const breakdown: Record<string, { count: number; value: number }> = {};
+
+  for (const acc of accounts) {
+    if (!isReportableAccount(acc)) continue;
+    if (!isAccountActiveOnDate(acc, dateStr)) continue;
+
+    const accountType = acc.type.toLowerCase();
+    if (!isAssetAccount(accountType) && !isLiabilityAccount(accountType)) continue;
+
+    // Zero-balance accounts still get a breakdown entry (count + value 0)
+    // so stored breakdown shape matches the legacy snapshot format.
+    const convertedBal = convertCurrency(
+      getAccountBalance(acc),
+      acc.currency || 'USD',
+      baseCurrency
+    );
+
+    if (!breakdown[accountType]) {
+      breakdown[accountType] = { count: 0, value: 0 };
+    }
+    breakdown[accountType].count++;
+    breakdown[accountType].value += convertedBal;
+  }
+
+  for (const key of Object.keys(breakdown)) {
+    breakdown[key].value = roundToCents(breakdown[key].value);
+  }
+  return breakdown;
+}
+
+/**
+ * An account is relevant to cash-flow (income/expense) analytics when it is
+ * reportable for net worth, OR it is a paystub account (paystubs are normally
+ * excluded from net worth but must still count toward income).
+ */
+export function isCashFlowRelevantAccount(account: {
+  type: string;
+  isHidden?: boolean | null;
+  isExcludedFromNetWorth?: boolean | null;
+}): boolean {
+  return isReportableAccount(account) || account.type === 'paystub';
 }

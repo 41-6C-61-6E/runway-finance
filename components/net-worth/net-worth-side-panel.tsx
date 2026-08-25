@@ -3,8 +3,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatCurrency } from '@/lib/utils/format';
-import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isReportableAccount } from '@/lib/utils/account-scope';
+import { convertCurrency } from '@/lib/constants/currency-rates';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { computeNetWorthTotals } from '@/lib/utils/account-scope';
+import { formatInTimezone } from '@/lib/utils/timeframe';
+import { useUserSettings } from '@/components/user-settings-provider';
 import { EstimatePill } from '@/components/ui/estimate-pill';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import type { AccountData, ChartPoint } from '@/lib/types/financial';
@@ -110,6 +114,8 @@ function getDebtRatioRating(rawRatio: number) {
 
 export function NetWorthSidePanel() {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthSidePanel');
+  const { settings } = useUserSettings() ?? {};
+  const baseCurrency = settings?.currency || 'USD';
 
 
   const { data: accounts = [], isLoading: accountsLoading, error: accountsError } = useQuery<AccountData[]>({
@@ -151,24 +157,11 @@ export function NetWorthSidePanel() {
   const error = (accountsError || chartError) ? 'Failed to fetch net worth data' : null;
 
   const totals = useMemo(() => {
-    let totalAssets = 0;
-    let totalLiabilities = 0;
-
-    for (const acc of accounts) {
-      const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
-      if (isAssetAccount(acc.type)) {
-        totalAssets += balance;
-      } else if (isLiabilityAccount(acc.type)) {
-        totalLiabilities += Math.abs(balance);
-      }
-    }
-
-    return {
-      totalAssets,
-      totalLiabilities,
-      netWorth: totalAssets - totalLiabilities,
-    };
-  }, [accounts]);
+    // Canonical scoped calculation — includes only reportable (visible, not
+    // net-worth-excluded) accounts, currency-converted, matching the chart.
+    const todayStr = formatInTimezone(new Date(), settings?.timezone || 'America/New_York');
+    return computeNetWorthTotals(accounts, baseCurrency, todayStr);
+  }, [accounts, baseCurrency, settings?.timezone]);
 
   const processedData = useMemo(() => {
     if (chartData.length === 0) return [];
@@ -238,12 +231,17 @@ export function NetWorthSidePanel() {
     let liquid = 0;
     let illiquid = 0;
     for (const acc of accounts) {
+      // Same canonical scope as the totals above so the split can never
+      // include hidden / net-worth-excluded accounts (this list is fetched
+      // with includeHidden=true for the account tree) or mix currencies.
+      if (!isReportableAccount(acc)) continue;
       if (!isAssetAccount(acc.type)) continue;
       const balance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
+      const converted = convertCurrency(balance, acc.currency || 'USD', baseCurrency);
       if (LIQUID_TYPES.has(acc.type)) {
-        liquid += balance;
+        liquid += converted;
       } else {
-        illiquid += balance;
+        illiquid += converted;
       }
     }
     const total = liquid + illiquid;
@@ -254,7 +252,7 @@ export function NetWorthSidePanel() {
       liquidPct: total > 0 ? (liquid / total) * 100 : 0,
       illiquidPct: total > 0 ? (illiquid / total) * 100 : 0,
     };
-  }, [accounts]);
+  }, [accounts, baseCurrency]);
 
 
   // Net Worth Milestone

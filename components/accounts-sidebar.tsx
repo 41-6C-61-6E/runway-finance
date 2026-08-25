@@ -8,7 +8,9 @@ import { useSidebar, ACCOUNTS_MIN_WIDTH, ACCOUNTS_MAX_WIDTH, COLLAPSED_WIDTH } f
 import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
 import AccountRow, { type Account, formatCurrency } from '@/components/features/accounts/AccountRow';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
-import { filterReportableAccounts, isLiabilityAccount } from '@/lib/utils/account-scope';
+import { filterReportableAccounts, computeNetWorthTotals } from '@/lib/utils/account-scope';
+import { useUserSettings } from '@/components/user-settings-provider';
+import { formatInTimezone } from '@/lib/utils/timeframe';
 import { TYPE_HIERARCHY, GROUP_ORDER } from '@/lib/constants/account-types';
 
 const SUB_GROUP_TO_TYPES: Record<string, string[]> = {};
@@ -51,6 +53,8 @@ export default function AccountsSidebar() {
   const [expandedSubGroups, setExpandedSubGroups] = useState<Record<string, boolean>>({});
 
   const visibleAccounts: Account[] = filterReportableAccounts(accounts as Account[]);
+  const settingsContext = useUserSettings();
+  const baseCurrency = settingsContext?.settings?.currency || 'USD';
 
   const hierarchy = useMemo(() => {
     const map = new Map<string, Map<string, Account[]>>();
@@ -74,12 +78,14 @@ export default function AccountsSidebar() {
     return map;
   }, [visibleAccounts]);
 
+  // Canonical net worth (hidden excluded via visibleAccounts, inactive accounts
+  // skipped, currency-converted) — must match the dashboard total.
   const totalNetWorth = useMemo(() => {
-    return visibleAccounts.reduce((sum, a) => {
-      const val = parseFloat(a.balance) || 0;
-      return isLiabilityAccount(a.type) ? sum - Math.abs(val) : sum + val;
-    }, 0);
-  }, [visibleAccounts]);
+    // Timezone-aware "today" — must match the server-side canonical calc.
+    const todayStr = formatInTimezone(new Date(), settingsContext?.settings?.timezone || 'America/New_York');
+    const { netWorth } = computeNetWorthTotals(visibleAccounts as any[], baseCurrency, todayStr);
+    return netWorth;
+  }, [visibleAccounts, baseCurrency, settingsContext?.settings?.timezone]);
 
   const getGroupTotal = useCallback(
     (group: string) => {

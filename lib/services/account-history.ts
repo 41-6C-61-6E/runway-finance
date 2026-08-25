@@ -2,18 +2,24 @@ import { getDb, getPool } from '@/lib/db';
 import { accountSnapshots, transactions, accounts, netWorthSnapshots, userSettings, holdingSnapshots } from '@/lib/db/schema';
 import { eq, and, lt, lte, gte, asc, desc, isNull, sql, inArray } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRows } from '@/lib/crypto';
-import { isAssetAccount, isLiabilityAccount, isInvestmentAccount, isAccountActiveOnDate } from '@/lib/utils/account-scope';
+import { isLiabilityAccount, isInvestmentAccount, computeNetWorthTotals, computeCategoryBreakdown } from '@/lib/utils/account-scope';
 import { logger } from '@/lib/logger';
 import { getAccountCurrentBalance } from './asset-estimator';
 import { isConstantPriceTicker, resolvePriceSourceTicker } from '@/lib/utils/ticker-mappings';
+import { roundToCents as formatRoundToCents } from '@/lib/utils/format';
 
 const LOG_TAG = '[account-history]';
 
 import { EXCHANGE_RATES, convertCurrency } from '@/lib/constants/currency-rates';
 export { EXCHANGE_RATES, convertCurrency };
 
+/**
+ * Re-export of the canonical `roundToCents` from @/lib/utils/format.
+ * Kept as a delegation so existing importers keep working; new code
+ * should import from @/lib/utils/format directly.
+ */
 export function roundToCents(value: number): number {
-  return Math.round(value * 100) / 100;
+  return formatRoundToCents(value);
 }
 
 export function formatToCents(value: number): string {
@@ -1012,42 +1018,33 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
       latestByAccount.set(snap.accountId, snap.balance);
     }
 
-    let totalAssets = 0;
-    let totalLiabilities = 0;
-    const breakdown: Record<string, { count: number; value: number }> = {};
+    // Canonical totals (hidden/excluded + inactive accounts skipped, currency-converted)
+    const { totalAssets, totalLiabilities, netWorth } = computeNetWorthTotals(
+      decryptedAccounts.map((acc) => ({
+        type: acc.type,
+        balance: latestByAccount.get(acc.id) ?? 0,
+        isHidden: acc.isHidden,
+        isExcludedFromNetWorth: acc.isExcludedFromNetWorth,
+        currency: acc.currency,
+        metadata: acc.metadata,
+      })),
+      baseCurrency,
+      dateStr
+    );
 
-    for (const acc of decryptedAccounts) {
-      if (acc.isExcludedFromNetWorth || acc.isHidden) continue;
-
-      if (!isAccountActiveOnDate(acc, dateStr)) {
-        continue;
-      }
-
-      const accountType = acc.type.toLowerCase();
-
-      const bal = latestByAccount.get(acc.id) ?? 0;
-      const convertedBal = convertCurrency(bal, acc.currency || 'USD', baseCurrency);
-
-      if (isAssetAccount(accountType)) {
-        totalAssets += convertedBal;
-      } else if (isLiabilityAccount(accountType)) {
-        totalLiabilities += Math.abs(convertedBal);
-      }
-
-      if (!breakdown[accountType]) {
-        breakdown[accountType] = { count: 0, value: 0 };
-      }
-      breakdown[accountType].count++;
-      breakdown[accountType].value += convertedBal;
-    }
-
-    totalAssets = roundToCents(totalAssets);
-    totalLiabilities = roundToCents(totalLiabilities);
-    const netWorth = roundToCents(totalAssets - totalLiabilities);
-
-    for (const key of Object.keys(breakdown)) {
-      breakdown[key].value = roundToCents(breakdown[key].value);
-    }
+    // Canonical per-type breakdown (identical scope to the totals above)
+    const breakdown = computeCategoryBreakdown(
+      decryptedAccounts.map((acc) => ({
+        type: acc.type,
+        balance: latestByAccount.get(acc.id) ?? 0,
+        isHidden: acc.isHidden,
+        isExcludedFromNetWorth: acc.isExcludedFromNetWorth,
+        currency: acc.currency,
+        metadata: acc.metadata,
+      })),
+      baseCurrency,
+      dateStr
+    );
 
     const nwValues = {
       userId,

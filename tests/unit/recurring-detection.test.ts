@@ -13,6 +13,7 @@ import {
   previewMatchingTransactions,
 } from '@/lib/services/recurring-detection';
 import { detectRecurringTransactions } from '@/lib/services/recurring-detection';
+import type { FrequencyType } from '@/lib/utils/recurring';
 import { encryptRow, decryptRow } from '@/lib/crypto';
 import {
   transactions,
@@ -238,6 +239,40 @@ describe('Recurring Detection Engine', () => {
       expect(addFrequencyPeriod('2026-08-31', 'quarterly')).toBe('2026-11-30');
       expect(addFrequencyPeriod('2026-01-31', 'annual')).toBe('2027-01-31');
       expect(addFrequencyPeriod('2026-08-15', 'monthly')).toBe('2026-09-15');
+    });
+  });
+
+  describe('addFrequencyPeriod weekly anchor-day regression', () => {
+    it('always steps weekly forward by 7 days, ignoring the anchor day-of-month', () => {
+      // Regression: lastDate=2026-08-08 (anchorDay 8) with nextExpected 2026-08-22
+      // used to project (Aug 1 + 8 + 7) = 2026-08-15 — a PAST date, and re-stepping
+      // from 2026-08-15 pinned on it forever, emitting duplicate bill entries.
+      expect(addFrequencyPeriod('2026-08-22', 'weekly', 8)).toBe('2026-08-29');
+      expect(addFrequencyPeriod('2026-08-29', 'weekly', 8)).toBe('2026-09-05');
+    });
+
+    it('steps biweekly forward by 14 days, ignoring the anchor day-of-month', () => {
+      expect(addFrequencyPeriod('2026-08-22', 'biweekly', 8)).toBe('2026-09-05');
+      expect(addFrequencyPeriod('2026-08-21', 'biweekly', 21)).toBe('2026-09-04');
+    });
+
+    it('never produces a date at or before the input for any frequency', () => {
+      const cases: Array<[string, FrequencyType, number]> = [
+        ['2026-08-01', 'weekly', 1],
+        ['2026-08-15', 'weekly', 8],
+        ['2026-08-01', 'biweekly', 1],
+        ['2026-08-15', 'biweekly', 20],
+        ['2026-08-15', 'semi_monthly', 15],
+        ['2026-02-28', 'monthly', 28],
+        ['2026-01-31', 'monthly', 31],
+        ['2026-08-15', 'quarterly', 15],
+        ['2026-08-15', 'semi_annual', 15],
+        ['2026-08-15', 'annual', 15],
+      ];
+      for (const [date, frequency, anchor] of cases) {
+        const next = addFrequencyPeriod(date, frequency, anchor);
+        expect(new Date(next + 'T00:00:00Z').getTime()).toBeGreaterThan(new Date(date + 'T00:00:00Z').getTime());
+      }
     });
   });
 

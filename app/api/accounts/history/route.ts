@@ -8,22 +8,8 @@ import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggrega
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
 import { filterReportableAccounts, isAssetAccount, isLiabilityAccount, isInvestmentAccount } from '@/lib/utils/account-scope';
-import { getDateRange, type TimeFrame } from '@/lib/utils/timeframe';
+import { getDateRange, type TimeFrame, formatInTimezone } from '@/lib/utils/timeframe';
 
-
-function formatInTimezone(date: Date, tz: string): string {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = formatter.formatToParts(date);
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-  return `${year}-${month}-${day}`;
-}
 
 export async function GET(request: Request) {
   const session = await auth();
