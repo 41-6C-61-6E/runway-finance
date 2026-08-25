@@ -225,7 +225,7 @@ function SettingsPageBody() {
 
                 {accountSubTab === 'manual' && <ManualAccountsSection />}
 
-                {(accountSubTab === 'connections' || accountSubTab === 'automatic') && (
+                  {accountSubTab === 'connections' && (
                   <div className="space-y-5 sm:space-y-6">
                     <OrphanedAccountsSection
                       accounts={accounts}
@@ -238,6 +238,7 @@ function SettingsPageBody() {
 
                     <AutomaticAccountsSection
                       accounts={accounts}
+                        accountView="transactions"
                       accountsLoading={accountsLoading}
                       connections={connections}
                       connectionsLoading={connectionsLoading}
@@ -249,6 +250,21 @@ function SettingsPageBody() {
                     />
                   </div>
                 )}
+
+                  {accountSubTab === 'automatic' && (
+                    <AutomaticAccountsSection
+                      accounts={accounts}
+                      accountView="management"
+                      accountsLoading={accountsLoading}
+                      connections={connections}
+                      connectionsLoading={connectionsLoading}
+                      currentUserId={currentUserId}
+                      sharingGroup={sharingGroup}
+                      fetchAccounts={fetchAccounts}
+                      fetchConnections={fetchConnections}
+                      onOpenAccountDrawer={handleOpenAccountDrawer}
+                    />
+                  )}
               </>
             )}
 

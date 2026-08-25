@@ -25,6 +25,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { getBadgeClasses } from '@/lib/utils/account-badge';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import { useUserSettings } from '@/components/user-settings-provider';
+import { useRouter } from 'next/navigation';
 import type { SettingsAccount, SettingsConnection } from './OrphanedAccountsSection';
 
 const SYNC_INTERVALS: Record<string, number> = {
@@ -74,6 +75,9 @@ interface AutomaticAccountsSectionProps {
   accountsLoading: boolean;
   connections: SettingsConnection[];
   connectionsLoading: boolean;
+  /** 'transactions' = transaction settings + bank connections (Settings > Accounts > Connections
+   *  tab); 'management' = account management table (Settings > Accounts > Automatic Accounts tab). */
+  accountView?: 'transactions' | 'management';
   currentUserId?: string;
   sharingGroup: any;
   fetchAccounts: () => Promise<void>;
@@ -86,6 +90,7 @@ export default function AutomaticAccountsSection({
   accountsLoading,
   connections,
   connectionsLoading,
+  accountView = 'management',
   currentUserId,
   sharingGroup,
   fetchAccounts,
@@ -93,6 +98,7 @@ export default function AutomaticAccountsSection({
   onOpenAccountDrawer,
 }: AutomaticAccountsSectionProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const settingsContext = useUserSettings();
   const settings = settingsContext?.settings || {};
   const updateSetting = settingsContext?.updateSetting;
@@ -709,6 +715,7 @@ export default function AutomaticAccountsSection({
     return { baseFee, refreshCost, total };
   };
 
+  const view: 'transactions' | 'management' = accountView === 'transactions' ? 'transactions' : 'management';
   const hasConnection = connections.length > 0;
   const hasMySimpleFin = connections.some((conn) => conn.userId === currentUserId && conn.provider === 'simplefin');
 
@@ -730,7 +737,7 @@ export default function AutomaticAccountsSection({
         />
       )}
 
-      {staleAccounts.length > 0 && (
+      {view === 'transactions' && staleAccounts.length > 0 && (
         <div className="mb-6 bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/25 rounded-xl p-4 flex gap-3 text-sm">
           <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div className="flex-1 space-y-1">
@@ -769,8 +776,9 @@ export default function AutomaticAccountsSection({
       )}
 
       {/* Transaction Settings Section */}
-      <div className="mb-6 pb-6 border-b border-border/60">
-        <h2 className="text-base font-semibold text-foreground mb-1">Transaction Settings</h2>
+      {view === 'transactions' && (
+        <div className="mb-6 pb-6 border-b border-border/60">
+          <h2 className="text-base font-semibold text-foreground mb-1">Transaction Settings</h2>
         <p className="text-xs text-muted-foreground mb-4 font-normal">
           Configure cleanup policies and rules for your bank-synced transactions.
         </p>
@@ -825,8 +833,10 @@ export default function AutomaticAccountsSection({
           )}
         </div>
       </div>
+      )}
 
       {/* Add Connection Options */}
+      {view === 'transactions' && (
       <div className="p-0 mb-6">
         <button
           type="button"
@@ -972,15 +982,16 @@ export default function AutomaticAccountsSection({
                   >
                     {loading ? 'Adding...' : 'Add Connection'}
                   </button>
-                </form>
-              </div>
-            )}
-          </div>
-        )}
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
       </div>
+      )}
 
       {/* Existing Connections */}
-      {hasConnection && (
+      {view === 'transactions' && hasConnection && (
         <div className="p-0 mb-6">
           <h2 className="text-base font-semibold text-foreground mb-4">Automatic Bank Connections</h2>
           {connectionsLoading ? (
@@ -1135,13 +1146,29 @@ export default function AutomaticAccountsSection({
       )}
 
       {/* Account Management Table */}
-      {hasConnection && (
-        <div className="p-0">
+      {view === 'management' && (
+      <div className="p-0">
           <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
           <p className="text-xs text-muted-foreground mb-4">
             Manage your connected bank and brokerage accounts.
           </p>
 
+          {!hasConnection ? (
+            <div className="p-4 sm:p-5 bg-muted/30 border border-border rounded-xl text-center">
+              <p className="text-sm font-medium text-foreground">No bank connections yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Connect a bank via Plaid or SimpleFIN in the Connections tab to manage your synchronized accounts here.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.replace('/settings?tab=accounts&sub=connections')}
+                className="mt-3 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-colors"
+              >
+                Go to Connections
+              </button>
+            </div>
+          ) : (
+            <>
           <div className="flex flex-wrap gap-2 mb-4">
             {(['all', 'visible', 'included', 'hidden', 'excluded', 'plaid', 'simplefin'] as const).map((filter) => (
               <button
@@ -1180,10 +1207,14 @@ export default function AutomaticAccountsSection({
               return true;
             });
 
-            if (filteredAccounts.length === 0 && accountFilter !== 'all') {
+            if (filteredAccounts.length === 0) {
               return (
                 <div className="p-4 bg-muted/30 border border-border rounded-lg text-center">
-                  <p className="text-muted-foreground text-sm">No accounts match the filter.</p>
+                  <p className="text-muted-foreground text-sm">
+                    {accountFilter === 'all'
+                      ? 'No connected accounts found. Enable accounts via Manage Sync, or run a Sync from the Connections tab.'
+                      : 'No accounts match the filter.'}
+                  </p>
                 </div>
               );
             }
@@ -1274,8 +1305,10 @@ export default function AutomaticAccountsSection({
               </div>
             );
           })()}
-        </div>
-      )}
+          </>
+          )}
+          </div>
+          )}
 
       {/* Plaid Credentials Dialog */}
       <Dialog open={isPlaidCredentialsDialogOpen} onOpenChange={setIsPlaidCredentialsDialogOpen}>
