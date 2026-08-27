@@ -150,6 +150,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...account, tags: attachedTags }, { status: 201 });
   } catch (err) {
     logger.error('POST /api/manual-accounts - error', { userId, name: body.name, error: err instanceof Error ? err.message : 'Failed to create account' });
-    return NextResponse.json({ error: 'internal_error', message: err instanceof Error ? err.message : 'Failed to create account' }, { status: 500 });
+    // M-7: do not echo the raw DB/stack error back to the client.
+    return NextResponse.json({ error: 'internal_error', message: 'Failed to create account' }, { status: 500 });
   }
 }

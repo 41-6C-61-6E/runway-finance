@@ -1,5 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
-import { checkRateLimit, getClientIp } from "./rate-limit";
+import { checkRateLimit, checkGlobalRateLimit, getClientIp } from "./rate-limit";
 
 export const authConfig = {
   pages: {
@@ -50,7 +50,12 @@ export const authConfig = {
         pathname.startsWith("/api/register")
       ) {
         const ip = getClientIp(request);
-        if (!(await checkRateLimit(`rl:${pathname}:${ip}`, 10, 60_000))) {
+        if (
+          !(await checkRateLimit(`rl:${pathname}:${ip}`, 10, 60_000)) ||
+          // Non-identity backstop (H-1): even if the per-IP identity is
+          // spoofed, total load on auth/register stays bounded.
+          !(await checkGlobalRateLimit(`auth:${pathname.startsWith('/api/register') ? 'register' : 'auth'}`, 60, 60_000))
+        ) {
           return Response.json({ error: "Too many requests" }, { status: 429 });
         }
       }

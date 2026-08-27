@@ -13,7 +13,7 @@ import { API_KEY_DEFAULTS } from '@/config/defaults';
 import { computeNetWorthTotals, computeCategoryBreakdown, type NetWorthAccountInput } from '@/lib/utils/account-scope';
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
 import { generateHistoricalAccountSnapshots, recalculateNetWorthSnapshots, convertCurrency, roundToCents, getAccountEarliestCalculationDate, formatToCents } from '@/lib/services/account-history';
-import { validateEndpointUrl } from '@/lib/utils/ssrf';
+import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[manual-accounts]';
 
@@ -363,32 +363,35 @@ const TREZOR_HOSTS = ['btc2.trezor.io', 'btc1.trezor.io', 'btc3.trezor.io'];
 
 async function fetchBtcPrice(apiConfig?: ApiConfig): Promise<number> {
   const url = apiConfig?.btcApiUrl || DEFAULT_API_CONFIG.btcApiUrl!;
-  const validated = await validateEndpointUrl(url);
-  if (!validated.ok) {
-    throw new Error(`BTC price URL blocked by SSRF validation: ${validated.error}`);
-  }
   const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
   logger.info(`${LOG_TAG} BTC price API call`, { url });
-  logger.debug(`${LOG_TAG} BTC price curl: ${curlCmd}`);
   let res: Response;
   try {
-    res = await fetch(url, {
+    // H-5: user-configured endpoint → fetchSecure validates the initial URL
+    // AND every redirect hop (plain fetch would follow a 302 privately).
+    res = await fetchSecure(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       signal: AbortSignal.timeout(10000),
     });
   } catch (err) {
-    throw new Error(`BTC price network error\n  URL: ${url}\n  curl: ${curlCmd}\n  error: ${err instanceof Error ? err.message : String(err)}`);
+    // L-4 (2026-08-27 security review): keep the full URL/curl/response in the
+    // server log only; the client-facing message must not expose the endpoint
+    // (which can carry API-key query params) or the upstream body.
+    logger.error(`${LOG_TAG} BTC price network error`, { url, curl: curlCmd, error: err instanceof Error ? err.message : String(err) });
+    throw new Error('Failed to fetch BTC price: network error');
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '(unreadable)');
-    throw new Error(`BTC price HTTP ${res.status}\n  URL: ${url}\n  curl: ${curlCmd}\n  response: ${body.slice(0, 300)}`);
+    logger.error(`${LOG_TAG} BTC price HTTP error`, { url, status: res.status, response: body.slice(0, 300) });
+    throw new Error(`Failed to fetch BTC price: upstream returned HTTP ${res.status}`);
   }
   const data = await res.json() as {
     chart?: { result?: Array<{ meta?: { regularMarketPrice?: number } }> };
   };
   const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
   if (price === undefined || price === null) {
-    throw new Error(`BTC price parse error\n  URL: ${url}\n  curl: ${curlCmd}\n  raw: ${JSON.stringify(data).slice(0, 500)}`);
+    logger.error(`${LOG_TAG} BTC price parse error`, { url, raw: JSON.stringify(data).slice(0, 500) });
+    throw new Error('Failed to fetch BTC price: malformed upstream response');
   }
   logger.info(`${LOG_TAG} BTC price: $${price}/BTC`);
   return price;
@@ -425,33 +428,28 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
   for (const fmt of xpubFormats) {
     for (const host of hostList) {
       const url = baseUrlTemplate.replace('{host}', host).replace('{xpub}', encodeURIComponent(fmt));
-      const validated = await validateEndpointUrl(url);
-      if (!validated.ok) {
-        lastError = `SSRF validation blocked: ${validated.error}`;
-        logger.warn(`${LOG_TAG} Bitcoin host ${host} blocked by SSRF validation`, { error: lastError });
-        continue;
-      }
-
       const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
       logger.info(`${LOG_TAG} Bitcoin API call`, { host, xpub: fmt, url });
       logger.debug(`${LOG_TAG} Bitcoin curl: ${curlCmd}`);
 
       let res: Response;
       try {
-        res = await fetch(url, {
+        // H-5: user-configured endpoint → fetchSecure validates URL + hops.
+        res = await fetchSecure(url, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
           signal: AbortSignal.timeout(15000),
         });
       } catch (err) {
-        lastError = `network error\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}\n  error: ${err instanceof Error ? err.message : String(err)}`;
-        logger.warn(`${LOG_TAG} Bitcoin host ${host} failed for ${fmt}`, { error: lastError });
+        lastError = 'network error on one host';
+        // L-4: host/URL/curl/response stay server-side only.
+        logger.warn(`${LOG_TAG} Bitcoin host ${host} failed for ${fmt}`, { url, curl: curlCmd, error: err instanceof Error ? err.message : String(err) });
         continue;
       }
 
       if (!res.ok) {
         const body = await res.text().catch(() => '(unreadable)');
-        lastError = `HTTP ${res.status}\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}\n  response: ${body.slice(0, 300)}`;
-        logger.warn(`${LOG_TAG} Bitcoin host ${host} returned ${res.status} for ${fmt}, trying next host`);
+        lastError = `upstream HTTP ${res.status}`;
+        logger.warn(`${LOG_TAG} Bitcoin host ${host} returned ${res.status} for ${fmt}, trying next host`, { url, response: body.slice(0, 300) });
         continue;
       }
 
@@ -462,7 +460,8 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
       try {
         data = JSON.parse(rawJson);
       } catch {
-        lastError = `parse error (invalid JSON)\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}\n  raw: ${rawJson.slice(0, 300)}`;
+        lastError = 'upstream returned invalid JSON';
+        logger.warn(`${LOG_TAG} Bitcoin parse error`, { url, raw: rawJson.slice(0, 300) });
         continue;
       }
 
@@ -473,7 +472,8 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
       logger.debug(`${LOG_TAG} Bitcoin parsed [${host}/${fmt}]`);
 
       if (isNaN(totalSats)) {
-        lastError = `parse error (NaN)\n  host: ${host}\n  URL: ${url}\n  curl: ${curlCmd}`;
+        lastError = 'upstream returned an invalid balance';
+        logger.warn(`${LOG_TAG} Bitcoin parse error (NaN)`, { url });
         continue;
       }
 
@@ -481,7 +481,7 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
 
       if (btc === 0 && fmt !== xpubFormats[xpubFormats.length - 1]) {
         logger.debug(`${LOG_TAG} BTC returned 0 for ${fmt} on ${host}, will retry with next format`);
-        lastError = `got 0 BTC for ${fmt} on ${host}`;
+        lastError = 'upstream reported 0 BTC';
         break;
       }
 
@@ -492,6 +492,7 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
   }
 
   if (btcAmount === null) {
+    logger.error(`${LOG_TAG} Bitcoin fetch failed after all hosts/formats`, { lastError });
     throw new Error(`Bitcoin fetch failed (${xpubFormats.length} formats x ${hostList.length} hosts)\n  last: ${lastError}`);
   }
 
@@ -507,10 +508,6 @@ async function fetchBitcoinBalance(xpub: string, apiConfig?: ApiConfig): Promise
 
 async function fetchSpotPrice(type: 'gold' | 'silver', apiConfig?: ApiConfig): Promise<number> {
   const baseUrl = apiConfig?.metalsApiUrl || DEFAULT_API_CONFIG.metalsApiUrl!;
-  const validated = await validateEndpointUrl(baseUrl);
-  if (!validated.ok) {
-    throw new Error(`Spot price URL blocked by SSRF validation: ${validated.error}`);
-  }
   const ticker = type === 'gold' ? 'GC=F' : 'SI=F';
   const url = `${baseUrl}/${ticker}`;
   const curlCmd = `curl -s -A 'Mozilla/5.0' '${url}'`;
@@ -518,22 +515,27 @@ async function fetchSpotPrice(type: 'gold' | 'silver', apiConfig?: ApiConfig): P
   logger.debug(`${LOG_TAG} Spot price curl: ${curlCmd}`);
   let res: Response;
   try {
-    res = await fetch(url, {
+    // H-5: user-configured endpoint → fetchSecure validates URL + redirect hops.
+    res = await fetchSecure(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
     });
   } catch (err) {
-    throw new Error(`Spot price network error\n  URL: ${url}\n  curl: ${curlCmd}\n  error: ${err instanceof Error ? err.message : String(err)}`);
+    // L-4: keep URL/curl in server log only; client-facing message stays generic.
+    logger.error(`${LOG_TAG} Spot price network error`, { url, curl: curlCmd, error: err instanceof Error ? err.message : String(err) });
+    throw new Error('Failed to fetch spot price: network error');
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '(unreadable)');
-    throw new Error(`Spot price HTTP ${res.status}\n  URL: ${url}\n  curl: ${curlCmd}\n  response: ${body.slice(0, 300)}`);
+    logger.error(`${LOG_TAG} Spot price HTTP error`, { url, status: res.status, response: body.slice(0, 300) });
+    throw new Error(`Failed to fetch spot price: upstream returned HTTP ${res.status}`);
   }
   const data = await res.json() as {
     chart?: { result?: Array<{ meta?: { regularMarketPrice?: number } }> };
   };
   const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
   if (price === undefined || price === null) {
-    throw new Error(`Spot price parse error\n  URL: ${url}\n  curl: ${curlCmd}\n  raw: ${JSON.stringify(data).slice(0, 500)}`);
+    logger.error(`${LOG_TAG} Spot price parse error`, { url, raw: JSON.stringify(data).slice(0, 500) });
+    throw new Error('Failed to fetch spot price: malformed upstream response');
   }
   return price;
 }

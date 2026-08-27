@@ -29,6 +29,7 @@ import { toCsv } from '@/lib/utils/export-formatter';
 import { ZipArchive } from 'archiver';
 import { apiUnauthorized, apiTooManyRequests, handleApiError } from '@/lib/api/response';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { requireMinRole } from '@/lib/utils/require-auth';
 
 const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: accounts, dbName: 'accounts', label: 'accounts' },
@@ -60,6 +61,12 @@ export async function GET(request: Request) {
     const userId = session.user.id;
     if (!(await checkRateLimit(`backup-export-csv:${userId}`, 10, 60_000))) {
       return apiTooManyRequests('Too many export requests. Please wait a moment.');
+    }
+
+    // M-1: full CSV dumps include sensitive accounts — admin/primary only.
+    const forbidden = await requireMinRole('admin', userId);
+    if (forbidden) {
+      return forbidden;
     }
 
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;

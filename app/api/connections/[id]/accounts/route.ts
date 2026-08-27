@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 import { fetchAccounts } from '@/lib/simplefin';
+import { logger } from '@/lib/logger';
 
 export async function GET(
   request: Request,
@@ -60,8 +61,10 @@ export async function GET(
       disabledAccounts: connection.disabledAccounts || [],
     });
   } catch (error) {
+    logger.error('Failed to fetch accounts from SimpleFIN', { error: error instanceof Error ? error.message : String(error) });
+    // M-7: log detail server-side, return a generic message to the client.
     return NextResponse.json(
-      { error: 'fetch_failed', message: error instanceof Error ? error.message : 'Failed to fetch accounts from SimpleFIN' },
+      { error: 'fetch_failed', message: 'Failed to fetch accounts from SimpleFIN' },
       { status: 500 }
     );
   }

@@ -315,13 +315,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               };
             }
           } catch (err) {
+            // L-9 (2026-08-27 security review): be strict in ALL envs. A DB
+            // error resolving the share group must not leave a stale
+            // dataUserId in the session (previously dev-only leniency).
             logger.error('Error verifying share group membership in session callback', { error: err });
-            if (process.env.NODE_ENV === 'production') {
-              return {
-                ...session,
-                user: undefined as any,
-              };
-            }
+            return {
+              ...session,
+              user: undefined as any,
+            };
           }
         }
 

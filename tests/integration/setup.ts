@@ -2,7 +2,22 @@ import { beforeAll, afterAll, beforeEach } from 'vitest';
 import { getPool } from '@/lib/db';
 import { initDb } from '@/lib/db/migrate';
 
-const testDbUrl = process.env.DATABASE_URL || 'postgresql://postgres:***REMOVED-POSTGRES_PASSWORD***@localhost:5432/runway_finance_test';
+// L-13 (2026-08-27 security review): no hardcoded local test-DB password.
+// Point DATABASE_URL at a dedicated test database before running
+// `pnpm test:integration` (see README "Integration tests").
+const testDbUrl = process.env.DATABASE_URL;
+
+function requireTestDbUrl(): string {
+  if (!testDbUrl) {
+    throw new Error(
+      'DATABASE_URL is not set for integration tests. Export a dedicated ' +
+        'test database URL, e.g. ' +
+        'DATABASE_URL=postgresql://postgres:<strong-password>@localhost:5432/runway_finance_test ' +
+        '(see README "Integration tests"). Refusing to run without it.'
+    );
+  }
+  return testDbUrl;
+}
 
 export async function truncateAllTestTables() {
   const pool = getPool();
@@ -28,7 +43,7 @@ export async function truncateAllTestTables() {
 }
 
 beforeAll(async () => {
-  await initDb(testDbUrl);
+  await initDb(requireTestDbUrl());
   await truncateAllTestTables();
 });
 

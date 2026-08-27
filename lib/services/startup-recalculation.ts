@@ -41,6 +41,13 @@ export interface RecalculationStatus {
   startedAt: string | null;
   completedAt: string | null;
   type: string;
+  /**
+   * L-3 (2026-08-27 security review): the user who owns this run (manual
+   * per-user runs). `system-startup` runs have owner null (visible to all).
+   * Callers only report status for runs they own/triggered, to prevent
+   * cross-user bleed of other households' progress/errors.
+   */
+  owner: string | null;
 }
 
 export let recalculationStatus: RecalculationStatus = {
@@ -52,6 +59,7 @@ export let recalculationStatus: RecalculationStatus = {
   startedAt: null,
   completedAt: null,
   type: 'system-startup',
+  owner: null,
 };
 
 export async function runBackgroundRecalculation(
@@ -85,7 +93,8 @@ export async function runBackgroundRecalculation(
     errors: [],
     startedAt: new Date().toISOString(),
     completedAt: null,
-    type: specificUserId ? `manual-${specificType}` : 'system-startup',
+    type: specificUserId ? specificType : 'system-startup',
+    owner: specificUserId ?? null,
   };
 
   if (userIds.length === 0) {

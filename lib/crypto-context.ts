@@ -46,7 +46,17 @@ export function invalidateUserDEKCache(userId?: string): void {
 
 // Get the DEK for the current authenticated user
 export async function getSessionDEK(): Promise<Uint8Array> {
+  // SECURITY (H-2, 2026-08-27 security review): TEST_DEK_HEX lets tests
+  // substitute a fixed DEK, but if it ever reached a deployed environment it
+  // would make EVERY user read/write with the same key (cross-user exposure).
+  // It is therefore honored ONLY in test processes; in any other environment
+  // its mere presence is a misconfiguration and fails closed.
+  const inTestProcess = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
   if (process.env.TEST_DEK_HEX) {
+    if (!inTestProcess) {
+      logger.error('[crypto-context] FATAL: TEST_DEK_HEX is set outside a test process. Refusing to start key resolution.');
+      throw new Error('TEST_DEK_HEX may only be set in a test environment (VITEST=true or NODE_ENV=test)');
+    }
     return hexToBytes(process.env.TEST_DEK_HEX);
   }
   const session = await auth();

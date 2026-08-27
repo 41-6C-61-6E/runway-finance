@@ -172,6 +172,7 @@ export async function POST(
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     logger.error('Failed to approve proposal', { userId, proposalId: id, error: message });
-    return NextResponse.json({ error: message }, { status: 500 });
+    // M-7: log detail server-side, return a generic message to the client.
+    return NextResponse.json({ error: 'Failed to approve proposal' }, { status: 500 });
   }
 }

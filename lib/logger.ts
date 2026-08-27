@@ -123,12 +123,20 @@ function serializeError(err: unknown): Record<string, unknown> {
       errorDetails.cause = err.cause instanceof Error ? serializeError(err.cause) : String(err.cause);
     }
     for (const key of Object.keys(err)) {
-      errorDetails[key] = (err as any)[key];
+      errorDetails[key] = SENSITIVE_KEY_RE.test(key) ? '[REDACTED]' : (err as any)[key];
     }
     return errorDetails;
   }
   return { message: String(err) };
 }
+
+/**
+ * M-11 (2026-08-27 security review): redact secret-looking keys from log
+ * metadata before they reach the console or the (rolling) log file. One
+ * careless `logger.error('x', { password, headers })` would otherwise dump
+ * credentials into the log permanently.
+ */
+const SENSITIVE_KEY_RE = /(password|passphrase|pin|token|secret|api_?key|dek|kek|authorization|cookie|credential)/i;
 
 function cleanMetadata(obj: unknown, seen = new WeakSet()): any {
   if (obj === null || obj === undefined) return obj;
@@ -152,7 +160,13 @@ function cleanMetadata(obj: unknown, seen = new WeakSet()): any {
 
   const clean: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(obj)) {
-    clean[key] = cleanMetadata(val, seen);
+    const isSecretish =
+      SENSITIVE_KEY_RE.test(key) &&
+      key !== 'token_count' && // non-secret counters
+      typeof val !== 'boolean' &&
+      typeof val !== 'number' &&
+      typeof val !== 'object'; // redact scalars; recurse into containers
+    clean[key] = isSecretish ? '[REDACTED]' : cleanMetadata(val, seen);
   }
   return clean;
 }

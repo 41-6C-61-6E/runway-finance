@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptRow } from '@/lib/crypto';
+import { isSafeUserRegex } from '@/lib/services/rules-engine';
 
 const OPERATOR_ENUM = z.enum([
   'contains',
@@ -46,6 +47,17 @@ const UpdateRuleSchema = z.object({
   setPayee: z.string().max(200).nullable().optional(),
   setReviewed: z.boolean().nullable().optional(),
   overrideExisting: z.boolean().optional(),
+}).superRefine((val, ctx) => {
+  // M-4 (2026-08-27 security review): reject catastrophic-backtracking
+  // patterns before they can be evaluated against the whole transaction set.
+  if (val.conditionOperator === 'regex' && val.conditionValue !== undefined && !isSafeUserRegex(val.conditionValue)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['conditionValue'], message: 'Regex may not use nested quantifiers (e.g. (a+)+) and is limited to 120 characters.' });
+  }
+  val.conditions?.forEach((c, i) => {
+    if (c.operator === 'regex' && !isSafeUserRegex(c.value)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['conditions', i, 'value'], message: 'Regex may not use nested quantifiers (e.g. (a+)+) and is limited to 120 characters.' });
+    }
+  });
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

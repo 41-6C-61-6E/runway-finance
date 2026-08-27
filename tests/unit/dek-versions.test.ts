@@ -205,7 +205,10 @@ describe('DEK fallback chain (decrypt retry + getServerDEK wiring)', () => {
     })();
   });
 
-  it('decryptField uses fallback DEKs, or returns "" without them', async () => {
+  // M-10: when the primary key and all fallbacks fail, decryptField throws
+  // (logs server-side) instead of returning "", so callers surface a
+  // visible generic error via handleApiError rather than empty data.
+  it('decryptField uses fallback DEKs, or throws without them (M-10)', async () => {
     const field = await encryptField('field-value', DEK_A);
 
     await (async () => {
@@ -215,7 +218,7 @@ describe('DEK fallback chain (decrypt retry + getServerDEK wiring)', () => {
 
     await (async () => {
       setDekFallbacks([]);
-      await expect(decryptField(field, DEK_B)).resolves.toBe('');
+      await expect(decryptField(field, DEK_B)).rejects.toThrow('could not be decrypted');
     })();
   });
 

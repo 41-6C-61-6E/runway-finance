@@ -297,7 +297,8 @@ export default function ImportExportTab() {
     setExportError(null);
     setExportSuccess(null);
     try {
-      const res = await fetch('/api/backup/export', { credentials: 'include' });
+      // M-6: the server refuses plaintext unless explicitly opted in.
+      const res = await fetch('/api/backup/export?plaintext=true', { credentials: 'include' });
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
       triggerDownload(blob, `personal-finance-backup-${new Date().toISOString().split('T')[0]}.json`);
@@ -505,23 +506,22 @@ export default function ImportExportTab() {
 
             <div className="flex flex-wrap items-center gap-3">
               <Button
+                onClick={() => { setEncExportPassphrase(''); setEncExportOpen(true); }}
+                disabled={backupBusy !== null}
+                className="flex items-center gap-2"
+              >
+                {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                Backup (Encrypted — recommended)
+              </Button>
+
+              <Button
                 onClick={handleBackupExport}
                 disabled={backupBusy !== null}
                 variant="outline"
                 className="flex items-center gap-2"
               >
                 {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <DownloadCloud className="h-4 w-4" />}
-                Download Backup (JSON)
-              </Button>
-
-              <Button
-                onClick={() => { setEncExportPassphrase(''); setEncExportOpen(true); }}
-                disabled={backupBusy !== null}
-                variant="outline"
-                className="flex items-center gap-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-              >
-                {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                Encrypted Backup
+                Backup (JSON — unencrypted)
               </Button>
 
               <Button

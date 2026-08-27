@@ -16,8 +16,16 @@ export default defineConfig({
     hookTimeout: 30000,
     env: {
       TZ: 'America/New_York',
-      DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:***REMOVED-POSTGRES_PASSWORD***@localhost:5432/runway_finance_test',
-      ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || '***REMOVED-ENCRYPTION_KEY***',
+      // L-13 (2026-08-27 security review): the local test-DB password is no
+      // longer a hardcoded fallback. Integration tests REQUIRE DATABASE_URL in
+      // the environment (see README "Integration tests" for the expected shape
+      // and a way to stand up a throwaway test DB).
+      DATABASE_URL: process.env.DATABASE_URL || '',
+      // Synthetic test-only key. NEVER a live value — the real ENCRYPTION_KEY
+      // must come from the environment (see .env / scripts/test-integration.sh).
+      // A real key was previously committed here and leaked to git history;
+      // do not reintroduce a live key as a fallback.
+      ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
       NEXTAUTH_SECRET: 'test-secret-test-secret-test-secret',
     },
   },

@@ -32,7 +32,7 @@ export const RecurringPatchSchema = z.object({
 });
 
 export const RecurringBulkPatchSchema = z.object({
-  items: z.array(RecurringPatchSchema.required({ id: true })),
+  items: z.array(RecurringPatchSchema.required({ id: true })).max(1000), // M-5: bound bulk work
 });
 
 export const RecurringCreateSchema = z.object({
@@ -61,11 +61,11 @@ export const RecurringDetectSchema = z.object({
 
 export const RecurringMergeSchema = z.object({
   targetId: z.string().uuid(),
-  sourceIds: z.array(z.string().uuid()).min(1),
+  sourceIds: z.array(z.string().uuid()).min(1).max(500), // M-5: bound bulk work
   customName: z.string().max(200).optional(),
 });
 
 export const RecurringBulkActionSchema = z.object({
   action: z.enum(['confirm', 'dismiss', 'undismiss', 'pause', 'resume', 'delete', 'dismiss_all_pending', 'reset_unconfirmed']),
-  ids: z.array(z.string().uuid()).optional(),
+  ids: z.array(z.string().uuid()).max(1000).optional(), // M-5: bound bulk work
 });

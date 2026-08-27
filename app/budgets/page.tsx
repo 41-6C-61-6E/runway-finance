@@ -6,11 +6,59 @@ import { BudgetPeriodProvider, BudgetPeriodSelector } from '@/components/budgets
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 import { BudgetTable } from '@/components/budgets/budget-table';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
-import { Wallet } from 'lucide-react';
+import { Wallet, Info, X } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
+
+const ENVELOPE_BANNER_KEY = 'finance:budgets:envelope-info-dismissed';
+
+/**
+ * Dismissible one-time explainer for "envelope" (longer-timeframe) budgets:
+ * a yearly/quarterly budget is judged over its FULL native period — a
+ * lumpy month (a $6,000 vacation under a $12,000/yr budget) is not an
+ * overrun. Shown until the user dismisses it (persisted in localStorage).
+ */
+function EnvelopeInfoBanner() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem(ENVELOPE_BANNER_KEY)) setVisible(true);
+    } catch {
+      setVisible(true);
+    }
+  }, []);
+  if (!visible) return null;
+  const dismiss = () => {
+    setVisible(false);
+    try {
+      window.localStorage.setItem(ENVELOPE_BANNER_KEY, 'true');
+    } catch {
+      // ignore storage errors
+    }
+  };
+  return (
+    <div className="flex items-start gap-2.5 p-3 bg-primary/5 border border-primary/20 rounded-xl text-xs">
+      <Info className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+      <div className="flex-1 space-y-1 min-w-0">
+        <p className="font-semibold text-foreground">Longer-timeframe budgets are tracked over their full period</p>
+        <p className="text-muted-foreground leading-relaxed">
+          Yearly and quarterly budgets aren&rsquo;t monthly limits. A {`$12,000/yr`} vacation budget shows an
+          average of {`≈ $1,000/mo`} in the table, but it won&rsquo;t be marked over after a {`$6,000`} vacation
+          month. It only goes over when the full-year total passes {`$12,000`}.
+        </p>
+      </div>
+      <button
+        onClick={dismiss}
+        aria-label="Dismiss"
+        className="p-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer shrink-0"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
 
 function BudgetsContent() {
   const { isVisible } = useChartVisibility();
@@ -41,6 +89,7 @@ function BudgetsContent() {
       <div className="lg:hidden">
         <BudgetPeriodSelector />
       </div>
+      <EnvelopeInfoBanner />
       {showTable && (
         <Suspense fallback={<LoadingSpinner category="summary" />}>
           <BudgetTable targetCategoryId={targetCategoryId} />
@@ -54,6 +103,7 @@ function BudgetsContent() {
       <div className="lg:hidden">
         <BudgetPeriodSelector />
       </div>
+      <EnvelopeInfoBanner />
       <Suspense fallback={<LoadingSpinner category="summary" />}>
         <BudgetSummary />
       </Suspense>

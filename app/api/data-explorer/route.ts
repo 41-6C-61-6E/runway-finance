@@ -11,6 +11,24 @@ import { handleApiError } from '@/lib/api/response';
 import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 type PgTable = any;
+
+/**
+ * M-8 (2026-08-27 security review): the Data Explorer is a debugging
+ * surface (it can round-trip decrypted data of the owner's household).
+ * It is disabled by default and only available in non-production
+ * environments, or when explicitly opt-in via DATA_EXPLORER=on.
+ */
+function requireDataExplorerAccess(): NextResponse | null {
+  const enabled = process.env.NODE_ENV !== 'production' || process.env.DATA_EXPLORER === 'on';
+  if (!enabled) {
+    return NextResponse.json(
+      { error: 'disabled', message: 'Data Explorer is disabled on this deployment.' },
+      { status: 404 }
+    );
+  }
+  return null;
+}
+
 type ColumnMeta = {
   field: string;
   label: string;
@@ -209,6 +227,8 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     searchColumns: [],
     columnOverrides: {
       userId: { hidden: true },
+      // M-8: third-party API keys must not round-trip over the debug explorer.
+      apiKeys: { hidden: true },
     },
   },
 };
@@ -347,6 +367,8 @@ function coercePushdownValue(col: any, field: string, value: unknown): any {
 
 export async function GET(request: Request) {
   const session = await auth();
+  const disabled = requireDataExplorerAccess();
+  if (disabled) return disabled;
   if (!session?.user) {
     return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
   }
@@ -676,6 +698,8 @@ export async function GET(request: Request) {
 
 export async function DELETE(request: Request) {
   const session = await auth();
+  const disabled = requireDataExplorerAccess();
+  if (disabled) return disabled;
   if (!session?.user) {
     return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
   }
@@ -691,9 +715,18 @@ export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const tableKey = searchParams.get('table');
   const id = searchParams.get('id');
+  // M-8: destructive delete requires an explicit confirmation that echoes
+  // the target id, so an accidental/misfired DELETE cannot drop a record.
+  const confirm = searchParams.get('confirm');
 
   if (!tableKey || !id) {
     return NextResponse.json({ error: 'missing_parameters', message: 'Table name and ID are required' }, { status: 400 });
+  }
+  if (confirm !== id) {
+    return NextResponse.json(
+      { error: 'confirmation_required', message: 'Destructive delete requires confirm=<id> to acknowledge the exact record.' },
+      { status: 400 }
+    );
   }
 
   const config = TABLE_REGISTRY[tableKey];

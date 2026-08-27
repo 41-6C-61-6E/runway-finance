@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { parseCsv } from '@/lib/utils/csv-parser';
+import { handleApiError } from '@/lib/api/response';
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -13,6 +14,16 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File | null;
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    // M-5 (2026-08-27 security review): reject oversized CSVs before spending
+    // CPU parsing them. Mirrors the 50 MB cap in import/execute.
+    const MAX_CSV_BYTES = 50 * 1024 * 1024; // 50 MB
+    if (file.size > MAX_CSV_BYTES) {
+      return NextResponse.json(
+        { error: 'CSV file is too large. The maximum size is 50 MB.' },
+        { status: 413 }
+      );
     }
 
     const text = await file.text();
@@ -30,9 +41,6 @@ export async function POST(request: Request) {
       delimiter: result.delimiter,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to parse CSV', message: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Failed to parse CSV');
   }
 }

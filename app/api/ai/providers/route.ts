@@ -95,7 +95,8 @@ export async function POST(request: Request) {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Database error';
       logger.error('[ai/providers] Failed to deactivate providers', { userId: session.user.id, error: message });
-      return NextResponse.json({ error: 'Failed to save provider', detail: message }, { status: 500 });
+      // M-7: log detail server-side, return a generic message to the client.
+      return NextResponse.json({ error: 'Failed to save provider' }, { status: 500 });
     }
   }
 
@@ -143,6 +144,7 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Database error';
     logger.error('[ai/providers] Failed to create provider', { userId: session.user.id, error: message });
-    return NextResponse.json({ error: 'Failed to save provider', detail: message }, { status: 500 });
+    // M-7: log detail server-side, return a generic message to the client.
+    return NextResponse.json({ error: 'Failed to save provider' }, { status: 500 });
   }
 }

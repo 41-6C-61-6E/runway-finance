@@ -8,7 +8,13 @@ function bytesToHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('hex');
 }
 
+// L-8 (2026-08-27 security review): validate hex shape explicitly instead of
+// relying on Buffer's silent odd-length truncation — a corrupted row's IV
+// should fail loudly (at the decrypt boundary) rather than silently garble.
 function hexToBytes(hex: string): Uint8Array {
+  if (!/^[0-9a-f]*$/i.test(hex) || hex.length % 2 !== 0) {
+    throw new Error(`hexToBytes: invalid hex input (length ${hex?.length ?? 'n/a'})`);
+  }
   return new Uint8Array(Buffer.from(hex, 'hex'));
 }
 
@@ -17,7 +23,6 @@ function base64FromBytes(bytes: Uint8Array): string {
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
-  if (!b64) return new Uint8Array(0);
   try {
     return new Uint8Array(Buffer.from(b64.trim(), 'base64'));
   } catch {
@@ -258,34 +263,36 @@ export async function encryptField(plaintext: string, key: Uint8Array): Promise<
 export async function decryptField(payload: string | number, key: Uint8Array): Promise<string> {
   // Convert numbers to strings (plaintext numeric values from database)
   const payloadStr = typeof payload === 'number' ? String(payload) : String(payload ?? '');
-  
+
   if (!payloadStr) {
     return '';
   }
-  
+
   let parsed: any;
   try {
     parsed = JSON.parse(payloadStr);
   } catch {
-    // Not JSON - return as-is (plaintext value)
+    // Not JSON — pre-encryption legacy plaintext value; return as-is.
     return payloadStr;
   }
-  
-  // Check if it's encrypted JSON format with ct and iv fields
-  if (typeof parsed !== 'object' || !parsed?.ct || !parsed?.iv) {
-    // Valid JSON but not encrypted format - return stringified
-    return typeof payload === 'string' ? payloadStr : String(payload);
+
+  // Only the encrypted JSON envelope ({ ct, iv }) is treated as ciphertext.
+  // Anything else (valid JSON that isn't our envelope) is legacy plaintext.
+  if (typeof parsed !== 'object' || parsed === null || !parsed.ct || !parsed.iv) {
+    return payloadStr;
   }
-  
+
   try {
     return await decrypt({ ciphertext: parsed.ct, iv: parsed.iv, tag: '' }, key);
   } catch (err) {
-    logger.error('[crypto] Field decryption failed', {
+    // M-10 (2026-08-27 security review): an ENCRYPTED value that fails to
+    // decrypt (wrong key, corruption, tamper) is a hard, visible failure —
+    // log it and throw so bugs don't surface as silent blank fields.
+    // L-7: do NOT log the IV or any ciphertext material.
+    logger.error('[crypto] Field decryption FAILED for encrypted value (wrong key or corrupted data)', {
       error: err instanceof Error ? err.message : String(err),
-      iv: parsed.iv,
     });
-    // Return empty string if decryption fails (corrupted data or wrong key)
-    return '';
+    throw new Error('Encrypted field could not be decrypted (wrong key or corrupted data)');
   }
 }
 

@@ -2,6 +2,7 @@
 
 import { signIn, signOut } from 'auth'
 import { updatePassword } from '@/lib/users'
+import { checkPasswordPolicy, MIN_PASSWORD_LENGTH } from '@/lib/password-policy'
 
 export async function handleSignIn(formData: FormData) {
   const provider = formData.get('provider')?.toString()
@@ -21,8 +22,11 @@ export async function handleChangePassword(formData: FormData): Promise<{ succes
     return { success: false, error: 'All fields are required' }
   }
 
-  if (newPassword.length < 4) {
-    return { success: false, error: 'New password must be at least 4 characters' }
+  // M-2: server-side password policy (the action runs server-side, so this
+  // is authoritative, not just a client hint).
+  const policy = checkPasswordPolicy(newPassword)
+  if (!policy.ok) {
+    return { success: false, error: policy.message ?? `New password must be at least ${MIN_PASSWORD_LENGTH} characters` }
   }
 
   if (newPassword !== confirmPassword) {

@@ -4,6 +4,12 @@ import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 
+// M-7 (2026-08-27 security review): error.message can carry raw internal
+// details (DB errors, stack fragments). In production we render ONLY the
+// opaque digest (a stable id you can share with support); the raw message is
+// logged server-side / to the console and never shown to end users.
+const isProduction = process.env.NODE_ENV === 'production';
+
 export default function Error({
   error,
   reset,
@@ -25,10 +31,18 @@ export default function Error({
       <p className="text-muted-foreground text-sm max-w-md mb-6 leading-relaxed">
         An unexpected error occurred while rendering this page. You can try to reset the component or reload the application.
       </p>
-      {error.message && (
-        <div className="mb-6 p-3 bg-muted/50 border border-border/60 rounded text-left font-mono text-xs max-w-lg overflow-auto select-text text-destructive">
-          <strong>{error.name || 'Error'}:</strong> {error.message}
-        </div>
+      {isProduction ? (
+        error.digest && (
+          <div className="mb-6 p-3 bg-muted/50 border border-border/60 rounded text-left font-mono text-xs max-w-lg overflow-auto select-text text-muted-foreground">
+            <strong>Error reference:</strong> {error.digest}
+          </div>
+        )
+      ) : (
+        error.message && (
+          <div className="mb-6 p-3 bg-muted/50 border border-border/60 rounded text-left font-mono text-xs max-w-lg overflow-auto select-text text-destructive">
+            <strong>{error.name || 'Error'}:</strong> {error.message}
+          </div>
+        )
       )}
       <div className="flex gap-3 justify-center">
         <Button onClick={() => reset()} variant="default" size="sm">

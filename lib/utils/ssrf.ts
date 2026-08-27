@@ -235,10 +235,14 @@ export async function fetchSecure(
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      // Combine the SSRF timeout with any caller-provided abort signal.
+      const signals: AbortSignal[] = [controller.signal];
+      if (options.signal) signals.push(options.signal);
+      const signal = signals.length > 1 ? AbortSignal.any(signals) : controller.signal;
       const response = await fetch(validated.url.toString(), {
         ...options,
         redirect: 'manual',
-        signal: controller.signal,
+        signal,
       });
 
       // Handle redirects securely by re-validating the redirect target

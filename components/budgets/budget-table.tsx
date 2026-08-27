@@ -10,6 +10,7 @@ import { BudgetExclusionsDialog } from './budget-exclusions-dialog';
 import { FeatureSettingsMenu } from '@/components/ui/feature-settings-menu';
 import { BudgetItemTransactionsIcon, getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
+import { isEnvelopeRow, envelopeExplainText, ENVELOPE_STATUS_META, nativePeriodLabel, type EnvelopeBudgetRow } from '@/lib/utils/budget-envelope';
 import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, History, Layers, Filter, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -29,6 +30,17 @@ interface BudgetData {
   periodType: string;
   nativePeriodType?: 'monthly' | 'quarterly' | 'yearly';
   nativeAmount?: number;
+  /** The native period the budget is defined over (e.g. "2026", "2026-Q3"). */
+  nativePeriodKey?: string | null;
+  /** True when this budget is defined in a longer timeframe than the viewed period (envelope budget). `budgeted` is only an average. */
+  prorated?: boolean;
+  /** Cumulative spend against the full native-period envelope up to end of viewed period. */
+  envelopeSpent?: number | null;
+  envelopeRemaining?: number | null;
+  envelopePercentUsed?: number | null;
+  envelopeStatus?: 'within' | 'nearlyUsed' | 'exceeded' | null;
+  envelopeStart?: string | null;
+  envelopeEnd?: string | null;
   periodKey?: string | null;
   yearMonth?: string | null;
   isRecurring: boolean;
@@ -342,6 +354,78 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     [budgets]
   );
 
+  // ── Envelope (longer-period) budget rendering ─────────────────────────────
+  // A yearly budget shown in a monthly view is a full-year "envelope": the
+  // per-month figure is just an AVERAGE. Status always reflects the full
+  // native-period total — lumpy budgets (vacations, annual insurance) may
+  // spend their entire envelope early in the period and still be within
+  // budget, so no pace is applied.
+  const isEnvelope = (b: BudgetData) => isEnvelopeRow(b as EnvelopeBudgetRow);
+
+  const renderEnvelopeBadge = (b: BudgetData) => {
+    if (!isEnvelope(b)) return null;
+    const meta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
+    const per = b.nativePeriodType === 'quarterly' ? 'qt' : 'yr';
+    return (
+      <span
+        title={envelopeExplainText(b as EnvelopeBudgetRow, { formatCurrency })}
+        className={cn(
+          'inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold border rounded shrink-0',
+          meta ? meta.badgeClass : 'bg-muted/60 text-muted-foreground border-border/60'
+        )}
+      >
+        <Layers className="w-3 h-3 shrink-0" />
+        {formatCurrency(b.nativeAmount ?? 0)}/{per}
+        {meta && b.envelopeStatus !== 'within' && <span>{meta.label}</span>}
+      </span>
+    );
+  };
+
+  const renderBudgetCell = (b: BudgetData) => {
+    if (!isEnvelope(b)) return <>{formatCurrency(b.budgeted)}</>;
+    return (
+      <span
+        className="text-muted-foreground"
+        title={`Averaged from ${formatCurrency(b.nativeAmount ?? 0)} per ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} — not a ${periodType === 'quarterly' ? 'quarterly' : 'monthly'} limit`}
+      >
+        {formatCurrency(b.budgeted)}
+        <span className="text-[9px] font-sans text-muted-foreground/70 ml-0.5">avg</span>
+      </span>
+    );
+  };
+
+  const envelopeVarianceText = (b: BudgetData) => {
+    if (!isEnvelope(b) || b.envelopeRemaining == null || b.nativeAmount == null) return null;
+    const per = b.nativePeriodType === 'quarterly' ? 'qt' : 'yr';
+    if (b.envelopeRemaining <= 0) {
+      return { text: `−${formatCurrency(Math.abs(b.envelopeRemaining))} over ${formatCurrency(b.nativeAmount)}/${per}`, cls: 'text-destructive' };
+    }
+    if (b.envelopeStatus === 'nearlyUsed') {
+      return { text: `${formatCurrency(b.envelopeRemaining)} left of ${formatCurrency(b.nativeAmount)}/${per}`, cls: 'text-amber-500 font-medium' };
+    }
+    return { text: `+${formatCurrency(b.envelopeRemaining)} of ${formatCurrency(b.nativeAmount)}/${per}`, cls: 'text-constructive' };
+  };
+
+  const renderEnvelopeProgress = (b: BudgetData) => {
+    if (!isEnvelope(b)) return null;
+    const pct = b.envelopePercentUsed ?? 0;
+    const meta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
+    const noun = b.nativePeriodType === 'quarterly' ? 'quarter' : 'year';
+    return (
+      <div
+        className="flex items-center gap-1 sm:gap-1.5 min-w-0"
+        title={`${Math.max(0, Math.round(pct))}% of the full ${noun} envelope used (${formatCurrency(b.envelopeSpent ?? 0)} of ${formatCurrency(b.nativeAmount ?? 0)}). Lumpy budget — tracked over the whole ${noun}, no pace applied.`}
+      >
+        <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
+          <div className={`h-full ${meta?.barClass ?? 'bg-primary'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
+        </div>
+        <span className={`text-[10px] font-mono shrink-0 ${meta?.textClass ?? 'text-muted-foreground'}`}>
+          {Math.round(pct)}%/{b.nativePeriodType === 'quarterly' ? 'Q' : 'yr'}
+        </span>
+      </div>
+    );
+  };
+
   const renderSortHeader = (field: SortField, label: string, align: 'left' | 'right' = 'left') => {
     const isActive = sortField === field;
     return (
@@ -577,6 +661,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               const isOver = b.remaining < 0;
               const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
               const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
+              const envVariance = envelopeVarianceText(b);
               return (
                 <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
@@ -600,7 +685,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                         periodType={periodType}
                         periodKey={periodKey}
                       />
-                      {!isEE && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                      {isEnvelope(b) && renderEnvelopeBadge(b)}
+                      {!isEE && !isEnvelope(b) && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
                         <span
                           title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
                           className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
@@ -638,9 +724,19 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                   </div>
 
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-muted-foreground">Budget: <span className="text-foreground blur-number">{formatCurrency(b.budgeted)}</span></span>
+                    <span className="text-muted-foreground">Budget: <span className="text-foreground blur-number">{renderBudgetCell(b)}</span></span>
                     <span className="text-muted-foreground">Actual: <span className="text-foreground blur-number">{formatCurrency(b.actual)}</span></span>
                   </div>
+                  {isEnvelope(b) && (
+                    <div className="space-y-1">
+                      {renderEnvelopeProgress(b)}
+                    </div>
+                  )}
+                  {envVariance && !isEE && (
+                    <div className="text-[11px] font-mono">
+                      <span className={envVariance.cls}>{envVariance.text}</span>
+                    </div>
+                  )}
 
                   {/* Everything Else Mobile Breakout sub-card */}
                   {isEE && expandedCatchAll && b.groupedBreakout && (
@@ -838,6 +934,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       const isOver = b.remaining < 0;
                       const isEE = b.isEverythingElse || b.isCatchAll || (b.categoryName || '').toLowerCase() === 'everything else';
                       const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
+                      const envVariance = isEnvelope(b) ? envelopeVarianceText(b) : null;
                       return (
                         <Fragment key={b.id}>
                           <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
@@ -862,7 +959,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                   periodType={periodType}
                                   periodKey={periodKey}
                                 />
-                                {!isEE && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                                {isEnvelope(b) && renderEnvelopeBadge(b)}
+                                {!isEE && !isEnvelope(b) && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
                                   <span
                                     title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
                                     className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
@@ -894,11 +992,11 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               </div>
                               {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
                             </td>
-                            <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
+                            <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
                             <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
                             {showVarianceCol && (
-                              <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
-                                {formatCurrency(b.remaining)}
+                              <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? (envVariance?.cls ?? '') : (isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground')}`}>
+                                {envVariance ? envVariance.text : formatCurrency(b.remaining)}
                               </td>
                             )}
                             {showProgressCol && (
@@ -911,6 +1009,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                     {(b.percentUsed || 0).toFixed(0)}%
                                   </span>
                                 </div>
+                                {isEnvelope(b) && <div className="mt-1">{renderEnvelopeProgress(b)}</div>}
                               </td>
                             )}
                             {showAccountCol && (

@@ -94,20 +94,37 @@ const authHandler = NextAuth(authConfig).auth(async (request) => {
   // before they reach the route handler and consume memory/CPU.
   if (
     request.method === 'POST' &&
-    (pathname.startsWith('/api/import/execute') || pathname.startsWith('/api/backup/import'))
+    (pathname.startsWith('/api/import/execute') ||
+     pathname.startsWith('/api/import/upload') ||
+     pathname.startsWith('/api/backup/import'))
   ) {
+    // M-5 (2026-08-27 security review): the cap is now LENGTH-INDEPENDENT.
+    // A request without a Content-Length header (chunked transfer
+    // encoding) was previously skipped entirely. If we cannot determine
+    // the declared size we reject: legitimate clients always know the
+    // size of their upload buffer, so chunked bodies here are a DoS
+    // vector rather than a normal flow.
+    const MAX_BODY_BYTES = 100 * 1024 * 1024; // 100 MB hard cap
     const contentLength = request.headers.get('content-length');
     if (contentLength) {
       const size = parseInt(contentLength, 10);
-      // 100 MB cap (backup restore allows up to 100 MB on the client; CSV import
-      // is capped at 50 MB in its own handler).
-      const MAX_BODY_BYTES = 100 * 1024 * 1024;
-      if (!isNaN(size) && size > MAX_BODY_BYTES) {
+      if (isNaN(size)) {
+        return new NextResponse(
+          JSON.stringify({ error: 'BAD_REQUEST', message: 'Invalid Content-Length header.' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      if (size > MAX_BODY_BYTES) {
         return new NextResponse(
           JSON.stringify({ error: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large.' }),
           { status: 413, headers: { 'Content-Type': 'application/json' } }
         );
       }
+    } else if (request.headers.get('transfer-encoding') !== 'identity') {
+      return new NextResponse(
+        JSON.stringify({ error: 'PAYLOAD_TOO_LARGE', message: 'This endpoint requires a Content-Length header; chunked uploads are not supported.' }),
+        { status: 413, headers: { 'Content-Type': 'application/json' } }
+      );
     }
   }
 

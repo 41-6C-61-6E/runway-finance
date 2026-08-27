@@ -8,7 +8,7 @@ import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypt
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { findDuplicateRule } from '@/lib/services/rules-engine';
-import { validateEndpointUrl } from '@/lib/utils/ssrf';
+import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[ai-categorizer]';
 const BATCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per batch
@@ -496,11 +496,6 @@ async function callAiApi(
   signal?: AbortSignal,
 ): Promise<AiResponse> {
   const url = `${endpoint.replace(/\/$/, '')}/chat/completions`;
-  const validated = await validateEndpointUrl(url);
-  if (!validated.ok) {
-    throw new Error(`SSRF blocked request to ${url}: ${validated.error}`);
-  }
-
   const body: Record<string, any> = {
     model,
     messages: [
@@ -530,7 +525,8 @@ async function callAiApi(
       throw new DOMException('Aborted', 'AbortError');
     }
     try {
-      const response = await fetch(url, {
+      // H-5: user-configured endpoint → fetchSecure validates URL + hops.
+      const response = await fetchSecure(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),

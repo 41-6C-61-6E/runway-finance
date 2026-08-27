@@ -15,6 +15,11 @@ vi.mock('@/lib/auth', () => ({
   auth: vi.fn().mockResolvedValue({ user: { id: 'test-user-id' } }),
 }));
 
+// Mock the M-1 role gate (full CSV dumps are admin/primary only).
+vi.mock('@/lib/utils/require-auth', () => ({
+  requireMinRole: vi.fn().mockResolvedValue(null),
+}));
+
 // Mock crypto context
 vi.mock('@/lib/crypto-context', () => ({
   getSessionDEK: vi.fn().mockResolvedValue(new Uint8Array(32)),

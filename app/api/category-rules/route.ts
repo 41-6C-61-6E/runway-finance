@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, encryptRow } from '@/lib/crypto';
-import { findDuplicateRule } from '@/lib/services/rules-engine';
+import { findDuplicateRule, isSafeUserRegex } from '@/lib/services/rules-engine';
 
 const OPERATOR_ENUM = z.enum([
   'contains',
@@ -26,6 +26,17 @@ const OPERATOR_ENUM = z.enum([
   'less_than_or_equal',
   'equals_numeric',
 ]);
+
+const assertSafeRegex = (val: any, ctx: z.ZodRefineCtx) => {
+  if (val.conditionOperator === 'regex' && !isSafeUserRegex(val.conditionValue)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['conditionValue'], message: 'Regex may not use nested quantifiers (e.g. (a+)+) and is limited to 120 characters.' });
+  }
+  val.conditions?.forEach((c: any, i: number) => {
+    if (c.operator === 'regex' && !isSafeUserRegex(c.value)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['conditions', i, 'value'], message: 'Regex may not use nested quantifiers (e.g. (a+)+) and is limited to 120 characters.' });
+    }
+  });
+};
 
 const CreateRuleSchema = z.object({
   name: z.string().min(1).max(200),
@@ -47,7 +58,7 @@ const CreateRuleSchema = z.object({
   setPayee: z.string().max(200).nullable().optional(),
   setReviewed: z.boolean().nullable().optional(),
   overrideExisting: z.boolean().default(false),
-});
+}).superRefine(assertSafeRegex);
 
 export async function GET() {
   const session = await auth();

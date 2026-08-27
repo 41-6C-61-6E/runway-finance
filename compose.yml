@@ -35,9 +35,17 @@ services:
 
   finance-app:
     container_name: finance-app
-    image: alanracek/personal-finance:latest
+    # M-14 (2026-08-27 security review): pin a concrete tag, never ':latest'
+    # (mutable). For fully immutable deploys, pin by digest:
+    #   image: alanracek/personal-finance@sha256:<digest>
+    # (docker buildx imagetools inspect alanracek/personal-finance).
+    # This app is now built locally (see Dockerfile); build & tag locally
+    #   docker build -t alanracek/personal-finance:2026.08.27 .
+    # or remove this image line entirely to rely on `build: .`.
+    image: alanracek/personal-finance:2026.08.27
     ports:
       - "3001:3000"
+    restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     logging:
@@ -58,7 +66,10 @@ services:
 
       # User defined
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}      # Admin set KEY used for passowrd resets and data recovery
-      - REGISTRATION_PIN=${REGISTRATION_PIN}  # PIN needed to register a new account, set to empty string to disable new registration
+      # M-3: registration is CLOSED BY DEFAULT — set ALLOW_REGISTRATION=true to
+      # open it, and a strong (>=8 char) REGISTRATION_PIN to further gate it.
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
+      - REGISTRATION_PIN=${REGISTRATION_PIN}
       - FRED_API_KEY=${FRED_API_KEY}
       - BUG_REPORTING=${BUG_REPORTING:-false}
 

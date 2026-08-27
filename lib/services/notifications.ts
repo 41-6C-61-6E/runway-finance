@@ -253,13 +253,15 @@ export async function sendPushNotification(
       if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
         logger.info('[notifications-service] Deleting expired/invalid push subscription', {
           id: sub.id,
-          endpoint: sub.endpoint,
+            // L-6 (2026-08-27 security review): don't log the full push
+            // endpoint (it can carry push credentials / is long + personal).
+            endpoint: sub.endpoint ? `${sub.endpoint.slice(0, 40)}…(redacted)` : undefined,
           statusCode: err.statusCode,
         });
         await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
       } else {
         logger.error('[notifications-service] Error sending push notification', {
-          endpoint: sub.endpoint,
+            endpoint: sub.endpoint ? `${sub.endpoint.slice(0, 40)}…(redacted)` : undefined,
           error: String(err),
         });
       }
@@ -505,6 +507,19 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
         }
         actualSpent = Math.abs(actualSpent);
 
+        // Timeframe-aware wording: a yearly budget is a full-year "envelope" —
+        // make that explicit so the user knows which number they're compared to.
+        const timeframeWord = pType === 'yearly'
+          ? ' annual'
+          : pType === 'quarterly'
+            ? ' quarterly'
+            : '';
+        // Lumpy (longer-timeframe) budgets are tracked over their FULL native
+        // period, not by pace: spending 80% of a yearly budget in January (a
+        // planned vacation) is fine. So the 80% warning tier is suppressed for
+        // quarterly/yearly budgets — users are only alerted when the envelope
+        // is actually crossed.
+        const isLumpyBudget = pType === 'quarterly' || pType === 'yearly';
         const threshold = settings.budgetAlertThreshold ?? 80;
         const warningThresholdAmount = budget.amount * (threshold / 100);
         const escalationThresholdAmount = budget.amount * 1.25;
@@ -517,7 +532,7 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
           await sendPushNotification(
             userId,
             `Budget Significantly Over: ${budget.categoryName}`,
-            `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
+            `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget}${timeframeWord} budget for ${budget.categoryName}.`,
             `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
             'budget_alert',
             escalationKey
@@ -529,12 +544,12 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
           await sendPushNotification(
             userId,
             `Budget Exceeded: ${budget.categoryName}`,
-            `You've spent $${roundedActual} of your $${roundedBudget} budget for ${budget.categoryName}.`,
+            `You've spent $${roundedActual} of your $${roundedBudget}${timeframeWord} budget for ${budget.categoryName}.`,
             `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
             'budget_alert',
             exceededKey
           );
-        } else if (actualSpent >= warningThresholdAmount) {
+        } else if (!isLumpyBudget && actualSpent >= warningThresholdAmount) {
           const warningKey = `budget:${bounds.periodKey}:${budgetCatId}:threshold`;
           const roundedActual = Math.round(actualSpent);
           const roundedBudget = Math.round(budget.amount);

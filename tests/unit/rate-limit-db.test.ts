@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 
 const state = vi.hoisted(() => ({
   now: new Date('2026-01-01T00:00:00Z'),
@@ -42,7 +42,7 @@ vi.mock('@/lib/db', () => ({
   }),
 }));
 
-import { checkRateLimit, clearRateLimitMap, getClientIp } from '@/lib/rate-limit';
+import { checkGlobalRateLimit, checkRateLimit, clearRateLimitMap, getClientIp } from '@/lib/rate-limit';
 
 const advance = (ms: number) => {
   state.now = new Date(state.now.getTime() + ms);
@@ -117,18 +117,68 @@ describe('DB-backed rate limiting', () => {
 
 describe('getClientIp', () => {
   const req = (headers: Record<string, string>) => new Request('http://localhost/api', { headers });
+  const orig = process.env.RATE_LIMIT_TRUST_PROXY;
 
-  it('prefers x-real-ip', () => {
+  afterAll(() => {
+    if (orig === undefined) delete process.env.RATE_LIMIT_TRUST_PROXY;
+    else process.env.RATE_LIMIT_TRUST_PROXY = orig;
+  });
+
+  it('ignores client headers when no trusted proxy is configured (H-1)', () => {
+    delete process.env.RATE_LIMIT_TRUST_PROXY;
+    const request = req({ 'x-real-ip': '1.2.3.4', 'x-forwarded-for': '9.9.9.9, 8.8.8.8' });
+    expect(getClientIp(request)).toBe('direct');
+  });
+
+  it('prefers a sanitized x-real-ip when a trusted proxy is configured', () => {
+    process.env.RATE_LIMIT_TRUST_PROXY = 'true';
     const request = req({ 'x-real-ip': '1.2.3.4', 'x-forwarded-for': '9.9.9.9, 8.8.8.8' });
     expect(getClientIp(request)).toBe('1.2.3.4');
   });
 
-  it('falls back to the first x-forwarded-for entry', () => {
+  it('falls back to the first x-forwarded-for entry (trusted proxy)', () => {
+    process.env.RATE_LIMIT_TRUST_PROXY = 'true';
     const request = req({ 'x-forwarded-for': ' 5.6.7.8 , 8.8.8.8' });
     expect(getClientIp(request)).toBe('5.6.7.8');
   });
 
-  it('defaults to unknown when no proxy headers are present', () => {
+  it('rejects malformed proxy header values (trusted proxy)', () => {
+    process.env.RATE_LIMIT_TRUST_PROXY = 'true';
+    expect(getClientIp(req({ 'x-real-ip': '1.2.3.4, evil' }))).toBe('unknown');
+    // A raw CRLF cannot be constructed via the Request/Headers API (undici
+    // rejects it) — this simulates an upstream proxy that forwards it, which
+    // is exactly the case sanitizeIp's bare-literal check must cover.
+    const rawHeaders = {
+      get: (name: string) =>
+        name.toLowerCase() === 'x-real-ip' ? 'evil\r\nX-Injected: 1' : null,
+    };
+    expect(getClientIp({ headers: rawHeaders } as unknown as Request)).toBe('unknown');
+  });
+
+  it('defaults to unknown when no (trusted) proxy headers are present', () => {
+    process.env.RATE_LIMIT_TRUST_PROXY = 'true';
     expect(getClientIp(req({}))).toBe('unknown');
+  });
+});
+
+describe('checkGlobalRateLimit (H-1 non-identity backstop)', () => {
+  beforeEach(() => {
+    state.now = new Date('2026-01-01T00:00:00Z');
+    state.entries.clear();
+    state.shouldFail = false;
+    clearRateLimitMap();
+  });
+
+  it('shares one bucket across all callers regardless of identity', async () => {
+    for (let i = 0; i < 2; i++) {
+      expect(await checkGlobalRateLimit('login', 2, 60_000)).toBe(true);
+    }
+    expect(await checkGlobalRateLimit('login', 2, 60_000)).toBe(false);
+  });
+
+  it('keeps buckets independent', async () => {
+    expect(await checkGlobalRateLimit('login', 1, 60_000)).toBe(true);
+    expect(await checkGlobalRateLimit('login', 1, 60_000)).toBe(false);
+    expect(await checkGlobalRateLimit('register', 1, 60_000)).toBe(true);
   });
 });

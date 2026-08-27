@@ -95,8 +95,9 @@ const USER_TABLES: { table: any; dbName: string }[] = [
   { table: syncLogs, dbName: 'sync_logs' },
 ];
 
-import { apiUnauthorized, apiTooManyRequests, handleApiError } from '@/lib/api/response';
+import { apiError, apiUnauthorized, apiTooManyRequests, handleApiError } from '@/lib/api/response';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { requireMinRole } from '@/lib/utils/require-auth';
 
 export async function GET(request: Request) {
   try {
@@ -108,6 +109,30 @@ export async function GET(request: Request) {
     const userId = session.user.id;
     if (!(await checkRateLimit(`backup-export:${userId}`, 10, 60_000))) {
       return apiTooManyRequests('Too many export requests. Please wait a moment.');
+    }
+
+    // M-1: a full backup is a household-restore artifact and includes
+    // sensitive accounts. Plain members cannot produce it (admins/primary
+    // are unaffected); use the filtered CSV export for their needs.
+    const forbidden = await requireMinRole('admin', userId);
+    if (forbidden) {
+      return forbidden;
+    }
+
+    // M-6: the full backup is decrypted financial history. It is now
+    // ENCRYPTED BY DEFAULT: without a passphrase the route refuses the
+    // export, and the legacy plaintext v1 format only comes out when the
+    // caller EXPLICITLY opts in with ?plaintext=true. (Evaluated up front
+    // so rejected requests never touch the data tables.)
+    const url = new URL(request.url);
+    const passphrase = url.searchParams.get('passphrase');
+    const plaintextFlag = url.searchParams.get('plaintext');
+    if (!passphrase && plaintextFlag !== 'true') {
+      return apiError(
+        'passphrase_required',
+        'Backup export requires a passphrase. Use the encrypted export, or pass plaintext=true to knowingly download unencrypted data.',
+        400
+      );
     }
 
     const dataUserId = (session.user as any).dataUserId ?? session.user.id;
@@ -186,13 +211,6 @@ export async function GET(request: Request) {
 
     const json = JSON.stringify(backup, null, 2);
     const dateStr = new Date().toISOString().split('T')[0];
-
-    // Optional file-level encryption. When a passphrase is supplied, the entire
-    // backup JSON is encrypted with AES-GCM (key derived via PBKDF2) and returned
-    // as a self-contained encrypted container. The default (no passphrase) keeps
-    // the existing plaintext version-1 format for backward compatibility.
-    const url = new URL(request.url);
-    const passphrase = url.searchParams.get('passphrase');
 
     if (passphrase) {
       const { encryptBackupJson } = await import('@/lib/crypto');

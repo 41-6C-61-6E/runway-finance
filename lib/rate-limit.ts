@@ -49,15 +49,57 @@ function evictOldestEntries(targetCount: number): void {
 }
 
 /**
- * Resolves the client IP for rate limiting.
- * Prefers x-real-ip, then the first x-forwarded-for entry, then 'unknown'.
+ * Whether client-controllable IP headers may be trusted as rate-limit
+ * identity.
+ *
+ * SECURITY (fix for H-1, 2026-08-27 security review): X-Real-IP /
+ * X-Forwarded-For set by a client let an attacker rotate their identity
+ * per request and bypass every limit. Headers are therefore only trusted
+ * when the operator sets RATE_LIMIT_TRUST_PROXY=true, which declares that
+ * the request passes through a reverse proxy that rewrites X-Real-IP to
+ * the real peer address and strips any client-supplied X-Forwarded-For
+ * before forwarding. Without that flag all requests are bucketed under
+ * the shared `direct` id so header rotation cannot bypass limits.
+ */
+export function isTrustedProxyEnabled(): boolean {
+  return process.env.RATE_LIMIT_TRUST_PROXY === 'true';
+}
+
+const IP_V4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
+const IP_V6_RE = /^[0-9a-fA-F:]{2,45}$/;
+
+function sanitizeIp(value: string | null): string | null {
+  if (!value) return null;
+  const v = value.trim();
+  // Reject anything that is not a bare IPv4/IPv6 literal (blocks garbage
+  // like "1.2.3.4, evil" or CRLF injection into the limit key).
+  if (!IP_V4_RE.test(v) && !IP_V6_RE.test(v)) return null;
+  return v;
+}
+
+/**
+ * Resolves the identity used as a rate-limit key for the request:
+ * - trusted proxy configured: sanitized X-Real-IP, else first
+ *   X-Forwarded-For entry, else `unknown`;
+ * - otherwise: the shared `direct` id (headers are attacker-controlled).
  */
 export function getClientIp(request: Request): string {
+  if (!isTrustedProxyEnabled()) return 'direct';
   return (
-    request.headers.get('x-real-ip')
-    ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    sanitizeIp(request.headers.get('x-real-ip'))
+    ?? sanitizeIp(request.headers.get('x-forwarded-for')?.split(',')[0])
     ?? 'unknown'
   );
+}
+
+/**
+ * Non-identity backstop limit, shared across ALL clients. Prevents a
+ * compromised/misconfigured proxy (or a client that ignores limits) from
+ * brute-forcing an endpoint via identity rotation. Use for high-value
+ * endpoints (login, register, invite).
+ */
+export async function checkGlobalRateLimit(bucket: string, maxRequests: number, windowMs: number): Promise<boolean> {
+  return checkRateLimit(`rl:global:${bucket}`, maxRequests, windowMs);
 }
 
 // Single atomic upsert: increments within the window, resets otherwise.

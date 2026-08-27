@@ -7,6 +7,7 @@ import { fuzzyMatchCategory } from '@/lib/utils/fuzzy-match';
 import { getDb } from '@/lib/db';
 import { accounts, categories } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { handleApiError } from '@/lib/api/response';
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -24,6 +25,16 @@ export async function POST(request: Request) {
 
     if (!csvText || !importType || !columnMapping) {
       return NextResponse.json({ error: 'Missing required fields: csvText, importType, columnMapping' }, { status: 400 });
+    }
+
+    // M-5 (2026-08-27 security review): reject oversized CSVs before parsing.
+    // Mirrors the 50 MB cap in import/execute.
+    const MAX_CSV_BYTES = 50 * 1024 * 1024; // 50 MB
+    if (typeof csvText === 'string' && csvText.length > MAX_CSV_BYTES) {
+      return NextResponse.json(
+        { error: 'CSV file is too large. The maximum size is 50 MB.' },
+        { status: 413 }
+      );
     }
 
     const parsed = parseCsv(csvText);
@@ -162,9 +173,6 @@ export async function POST(request: Request) {
       })),
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Preview failed', message: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Preview failed');
   }
 }

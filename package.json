@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:docker": "bash ./scripts/test-docker.sh",
-    "test:integration": "DATABASE_URL=postgresql://postgres:***REMOVED-POSTGRES_PASSWORD***@localhost:5432/runway_finance_test vitest run --config vitest.integration.config.ts",
+    "test:integration": "bash ./scripts/test-integration.sh",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

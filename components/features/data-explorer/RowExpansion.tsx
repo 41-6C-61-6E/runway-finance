@@ -40,7 +40,7 @@ export default function RowExpansion({ row, columns, onNavigate, tableKey, onRow
     setIsDeleting(true);
     setDeleteError(null);
     try {
-      const res = await fetch(`/api/data-explorer?table=${tableKey}&id=${row.id}`, {
+      const res = await fetch(`/api/data-explorer?table=${tableKey}&id=${row.id}&confirm=${encodeURIComponent(row.id)}`, {
         method: 'DELETE',
         credentials: 'include',
       });

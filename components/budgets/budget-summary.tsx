@@ -16,6 +16,7 @@ import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { useMemo } from 'react';
+import { isEnvelopeRow, ENVELOPE_STATUS_META, type EnvelopeBudgetRow } from '@/lib/utils/budget-envelope';
 
 interface BudgetData {
   id: string;
@@ -27,6 +28,12 @@ interface BudgetData {
   percentUsed: number;
   type: 'income' | 'expense';
   isDiscretionary?: boolean;
+  nativePeriodType?: 'monthly' | 'quarterly' | 'yearly' | null;
+  nativeAmount?: number | null;
+  prorated?: boolean;
+  envelopeSpent?: number | null;
+  envelopeRemaining?: number | null;
+  envelopeStatus?: 'within' | 'nearlyUsed' | 'exceeded' | null;
 }
 
 function getPeriodConfig(periodType: string) {
@@ -168,13 +175,22 @@ export function BudgetSummary() {
   const incomeBudgets = budgets.filter((b) => b.type === 'income');
   const expenseBudgets = budgets.filter((b) => b.type === 'expense');
 
-  const totalIncomeBudgeted = incomeBudgets.reduce((s, b) => s + b.budgeted, 0);
-  const totalIncomeActual = incomeBudgets.reduce((s, b) => s + b.actual, 0);
+  // Envelope budgets (quarterly/yearly budgets shown in a shorter period) have
+  // an AVERAGE per-period figure, not a spendable limit. They are excluded
+  // from period totals, pace math, and the donut so lumpy spending (e.g. a
+  // $6,000 vacation month under a $12,000/yr budget) doesn't look like an
+  // overrun. They are tracked separately over their full native period.
+  const isEnvelope = (b: BudgetData) => isEnvelopeRow(b as EnvelopeBudgetRow);
+  const envelopeExpenseBudgets = expenseBudgets.filter(isEnvelope);
+  const coreExpenseBudgets = expenseBudgets.filter((b) => !isEnvelope(b));
+
+  const totalIncomeBudgeted = incomeBudgets.filter((b) => !isEnvelope(b)).reduce((s, b) => s + b.budgeted, 0);
+  const totalIncomeActual = incomeBudgets.filter((b) => !isEnvelope(b)).reduce((s, b) => s + b.actual, 0);
   const incomePercent = totalIncomeBudgeted > 0 ? (totalIncomeActual / totalIncomeBudgeted) * 100 : 0;
 
-  const totalExpenseBudgeted = expenseBudgets.reduce((s, b) => s + b.budgeted, 0);
-  const totalExpenseActual = expenseBudgets.reduce((s, b) => s + b.actual, 0);
-  const expenseRemaining = expenseBudgets.reduce((s, b) => s + b.remaining, 0);
+  const totalExpenseBudgeted = coreExpenseBudgets.reduce((s, b) => s + b.budgeted, 0);
+  const totalExpenseActual = coreExpenseBudgets.reduce((s, b) => s + b.actual, 0);
+  const expenseRemaining = coreExpenseBudgets.reduce((s, b) => s + b.remaining, 0);
   const expensePercent = totalExpenseBudgeted > 0 ? (totalExpenseActual / totalExpenseBudgeted) * 100 : 0;
 
   const hasIncome = incomeBudgets.length > 0;
@@ -199,8 +215,8 @@ export function BudgetSummary() {
   const { daysElapsed, totalDays, timePercent, isPast, isFuture } = pacingInfo;
 
   // Fixed vs Variable expense splitting for smart pacing
-  const fixedExpenseBudgets = expenseBudgets.filter((b) => b.isDiscretionary === false);
-  const variableExpenseBudgets = expenseBudgets.filter((b) => b.isDiscretionary !== false);
+  const fixedExpenseBudgets = coreExpenseBudgets.filter((b) => b.isDiscretionary === false);
+  const variableExpenseBudgets = coreExpenseBudgets.filter((b) => b.isDiscretionary !== false);
 
   const fixedBudgeted = fixedExpenseBudgets.reduce((s, b) => s + b.budgeted, 0);
   const fixedActual = fixedExpenseBudgets.reduce((s, b) => s + b.actual, 0);
@@ -242,13 +258,18 @@ export function BudgetSummary() {
   const toleranceBuffer = 25 * periodConfig.multiplier;
 
   // Categories over budget
-  const allOverBudgets = expenseBudgets.filter((b) => b.remaining < -0.01);
-  const significantOverBudgets = expenseBudgets.filter(
+  const allOverBudgets = coreExpenseBudgets.filter((b) => b.remaining < -0.01);
+  const significantOverBudgets = coreExpenseBudgets.filter(
     (b) => b.remaining < -0.01 && (b.percentUsed > 200 || Math.abs(b.remaining) > overBudgetThreshold)
   );
-  const minorOverBudgets = expenseBudgets.filter(
+  const minorOverBudgets = coreExpenseBudgets.filter(
     (b) => b.remaining < -0.01 && !significantOverBudgets.includes(b)
   );
+
+  // Envelope budgets over their FULL native-period amount — the real
+  // overrun condition for lumpy budgets (tracked over the whole year/quarter,
+  // no pace).
+  const envelopeExceeded = envelopeExpenseBudgets.filter((b) => b.envelopeStatus === 'exceeded');
 
   const finishLabel = isPast ? 'Final finish' : `Projected ${periodConfig.endNoun} finish`;
   const finishTotal = isPast ? totalExpenseActual : projectedExpenseTotal;
@@ -268,14 +289,16 @@ export function BudgetSummary() {
   };
 
   // Rule 1: Critical Overrun (Red)
-  if (totalExpenseActual > totalExpenseBudgeted || significantOverBudgets.length > 0) {
+  if (totalExpenseActual > totalExpenseBudgeted || significantOverBudgets.length > 0 || envelopeExceeded.length > 0) {
     healthStatus = {
       label: 'Critical Overrun',
       badgeClass: 'bg-destructive/10 text-destructive border-destructive/20',
       icon: AlertTriangle,
       description: totalExpenseActual > totalExpenseBudgeted
         ? `Total actual spending (${formatCurrency(totalExpenseActual)}) has exceeded total expense budget (${formatCurrency(totalExpenseBudgeted)}).`
-        : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >200% of budget or >${formatCurrency(overBudgetThreshold)} over budget.`,
+        : significantOverBudgets.length > 0
+          ? `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >200% of budget or >${formatCurrency(overBudgetThreshold)} over budget.`
+          : `${envelopeExceeded.length} ${envelopeExceeded.length === 1 ? 'envelope budget is' : 'envelope budgets are'} over their full ${envelopeExceeded[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} amount (${envelopeExceeded.map((b) => b.categoryName).join(', ')}).`,
     };
   }
   // Rule 2: Over Target (Orange)
@@ -320,7 +343,15 @@ export function BudgetSummary() {
   let alertText: string | null = null;
   let alertClass = '';
 
-  if (significantOverBudgets.length === 1) {
+  if (envelopeExceeded.length === 1) {
+    alertText = `Envelope budget over its ${envelopeExceeded[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} (${envelopeExceeded[0].categoryName})`;
+    alertHref = getTxUrl(undefined, envelopeExceeded[0].categoryId);
+    alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
+  } else if (envelopeExceeded.length > 1) {
+    alertText = `${envelopeExceeded.length} envelope budgets over their ${envelopeExceeded[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} amount`;
+    alertHref = getTxUrl(envelopeExceeded.map((b) => b.categoryId));
+    alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
+  } else if (significantOverBudgets.length === 1) {
     alertText = `1 category over budget (${significantOverBudgets[0].categoryName})`;
     alertHref = getTxUrl(undefined, significantOverBudgets[0].categoryId);
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
@@ -340,6 +371,12 @@ export function BudgetSummary() {
 
   const spentAmount = Math.max(0, totalExpenseActual);
   const remainingAmount = Math.max(0, totalExpenseBudgeted - totalExpenseActual);
+  // Envelope rollup for the summary strip: cumulative native-period spend vs native amounts.
+  const envelopeSpentTotal = envelopeExpenseBudgets.reduce((s, b) => s + (b.envelopeSpent ?? 0), 0);
+  const envelopeCapTotal = envelopeExpenseBudgets.reduce((s, b) => s + (b.nativeAmount || 0), 0);
+  const envelopeOverAmount = envelopeExpenseBudgets.reduce((s, b) => s + (b.envelopeRemaining != null && b.envelopeRemaining < 0 ? Math.abs(b.envelopeRemaining) : 0), 0);
+  const envelopeNearlyUsed = envelopeExpenseBudgets.filter((b) => b.envelopeStatus === 'nearlyUsed').length;
+  const envelopeWithin = envelopeExpenseBudgets.length - envelopeExceeded.length - envelopeNearlyUsed;
   const chartData = (spentAmount === 0 && remainingAmount === 0)
     ? [{ name: 'Empty', value: 1, color: 'var(--muted)' }]
     : [
@@ -355,10 +392,10 @@ export function BudgetSummary() {
   const discretionaryPct = totalExpBud > 0 ? (discretionaryBudgeted / totalExpBud) * 100 : 0;
 
   // Category Risk / Variance Distribution (Metric 1.3)
-  const totalCatCount = expenseBudgets.length;
-  const underBudgetCount = expenseBudgets.filter((b) => b.percentUsed <= 85).length;
-  const nearLimitCount = expenseBudgets.filter((b) => b.percentUsed > 85 && b.percentUsed <= 100).length;
-  const overBudgetCount = expenseBudgets.filter((b) => b.percentUsed > 100).length;
+  const totalCatCount = coreExpenseBudgets.length;
+  const underBudgetCount = coreExpenseBudgets.filter((b) => b.percentUsed <= 85).length;
+  const nearLimitCount = coreExpenseBudgets.filter((b) => b.percentUsed > 85 && b.percentUsed <= 100).length;
+  const overBudgetCount = coreExpenseBudgets.filter((b) => b.percentUsed > 100).length;
 
   const underPct = totalCatCount > 0 ? (underBudgetCount / totalCatCount) * 100 : 0;
   const nearPct = totalCatCount > 0 ? (nearLimitCount / totalCatCount) * 100 : 0;
@@ -546,6 +583,7 @@ export function BudgetSummary() {
           {/* Section 2: Donut Chart & Progress Section */}
           <div className="py-4 first:pt-0 last:pb-0 space-y-4">
             {hasExpenses && (
+              <>
               <div className="flex items-center justify-center relative py-1">
                 <div className="w-36 h-36 relative flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
@@ -575,6 +613,12 @@ export function BudgetSummary() {
                   </div>
                 </div>
               </div>
+                {envelopeExpenseBudgets.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground/70 text-center mt-1">
+                    Excludes <span className="font-semibold text-muted-foreground">{envelopeExpenseBudgets.length} envelope budget{envelopeExpenseBudgets.length === 1 ? '' : 's'}</span> (tracked over full year/quarter below)
+                  </p>
+                )}
+              </>
             )}
 
             {/* Expense & Income Progress Bars */}
@@ -629,7 +673,70 @@ export function BudgetSummary() {
             </div>
           </div>
 
-          {/* Section 3: Fixed vs Discretionary Allocation */}
+          {/* Section 3: Envelope budgets (quarterly/yearly budgets rolled into this period) */}
+          {hasExpenses && envelopeExpenseBudgets.length > 0 && (
+            <div className="py-4 first:pt-0 last:pb-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-foreground flex items-center gap-1 text-xs font-bold">
+                  <Layers className="w-3.5 h-3.5 text-primary shrink-0" />
+                  Envelope Budgets
+                </span>
+                <span
+                  className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border font-mono ${
+                    envelopeExceeded.length > 0
+                      ? 'bg-destructive/10 text-destructive border-destructive/20'
+                      : envelopeNearlyUsed > 0
+                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                        : 'bg-constructive/10 text-constructive border-constructive/20'
+                  }`}
+                >
+                  {envelopeExceeded.length > 0
+                    ? `${envelopeExceeded.length} over ${envelopeExpenseBudgets[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'}`
+                    : `${envelopeWithin}/${envelopeExpenseBudgets.length} in budget`}
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mb-2 leading-relaxed">
+                Tracked over their full {envelopeExpenseBudgets[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} — a month can exceed the average without going over.
+              </p>
+              <div className="h-2 w-full bg-muted/50 rounded-full overflow-hidden flex">
+                <div
+                  className="h-full bg-constructive transition-all duration-500"
+                  style={{ width: `${envelopeCapTotal > 0 ? (Math.min(envelopeSpentTotal, envelopeCapTotal) / envelopeCapTotal) * 100 : 0}%` }}
+                />
+                {envelopeOverAmount > 0 && envelopeCapTotal > 0 && (
+                  <div
+                    className="h-full bg-destructive transition-all duration-500"
+                    style={{ width: `${Math.min((envelopeOverAmount / envelopeCapTotal) * 100, 30)}%` }}
+                  />
+                )}
+              </div>
+              <div className="flex justify-between text-[11px] font-mono font-medium text-muted-foreground mt-1">
+                <span className="font-semibold">{formatCurrency(envelopeSpentTotal)} spent</span>
+                <span>
+                  of {formatCurrency(envelopeCapTotal)}
+                  {envelopeOverAmount > 0 && <span className="text-destructive font-semibold"> · {formatCurrency(envelopeOverAmount)} over</span>}
+                </span>
+              </div>
+              <div className="mt-2 max-h-28 overflow-y-auto space-y-1 pl-2 border-l-2 border-border/40">
+                {envelopeExpenseBudgets.map((b) => {
+                  const meta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
+                  return (
+                    <div key={b.id} className="flex justify-between items-center text-[10px]">
+                      <span className="truncate max-w-[150px] text-foreground font-medium">{b.categoryName}</span>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        <span className="font-mono text-muted-foreground">{formatCurrency(b.envelopeSpent ?? 0)} / {formatCurrency(b.nativeAmount ?? 0)}</span>
+                        {meta && b.envelopeStatus !== 'within' && (
+                          <span className={`text-[9px] font-semibold px-1 py-px rounded border ${meta.badgeClass}`}>{meta.label}</span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Section 4: Fixed vs Discretionary Allocation */}
           {hasExpenses && totalExpBud > 0 && (
             <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip
@@ -671,7 +778,7 @@ export function BudgetSummary() {
             </div>
           )}
 
-          {/* Section 4: Category Risk / Variance Distribution */}
+          {/* Section 5: Category Risk / Variance Distribution */}
           {hasExpenses && totalCatCount > 0 && (
             <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip
@@ -725,7 +832,7 @@ export function BudgetSummary() {
             </div>
           )}
 
-          {/* Section 5: Target vs. Actual Savings Rate */}
+          {/* Section 6: Target vs. Actual Savings Rate */}
           {hasIncome && totalIncomeBudgeted > 0 && (
             <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip

@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { calculateAmortizationSchedule } from '@/lib/utils/amortization';
 import type { AmortizationParams } from '@/lib/utils/amortization';
 import { API_KEY_DEFAULTS } from '@/config/defaults';
-import { validateEndpointUrl } from '@/lib/utils/ssrf';
+import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[asset-estimator]';
 
@@ -57,7 +57,9 @@ async function fetchFredSeries(
 
   const url = `${baseUrl}?series_id=${seriesId}&api_key=${apiKey}&file_type=json&observation_start=${startDate}&observation_end=${endDate}&sort_order=asc`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    // H-5: user-configured endpoint → route through fetchSecure so redirect
+    // hops are re-validated (plain fetch would follow a 302 to a private IP).
+    const res = await fetchSecure(url, { signal: AbortSignal.timeout(10000) });
     if (!res.ok) {
       logger.warn(`${LOG_TAG} FRED API HTTP ${res.status} for ${seriesId}`);
       return [];
@@ -266,7 +268,8 @@ async function estimateMetalsHistory(
     }
     const url = `${baseUrl}/${ticker}?period1=${startTs}&period2=${endTs}&interval=1mo`;
 
-    const res = await fetch(url, {
+    // H-5: user-configured endpoint → fetchSecure re-validates redirect hops.
+    const res = await fetchSecure(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       signal: AbortSignal.timeout(10000),
     });

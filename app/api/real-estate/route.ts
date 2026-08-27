@@ -38,7 +38,14 @@ export async function GET(request: Request) {
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
-  const months = parseInt(searchParams.get('months') || '24', 10);
+  const monthsRaw = parseInt(searchParams.get('months') || '24', 10);
+  const months = Number.isFinite(monthsRaw) ? Math.max(1, Math.min(monthsRaw, 240)) : 24;
+  // L-1 (2026-08-27 security review): compute the snapshot cutoff in JS and
+  // bind it as a parameter, instead of interpolating user input into a SQL
+  // INTERVAL via sql.raw.
+  const cutoff = new Date();
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - months);
+  const cutoffDate = cutoff.toISOString().slice(0, 10);
 
   const db = getDb();
 
@@ -114,7 +121,7 @@ export async function GET(request: Request) {
         const snapshotsConditions = [
           eq(accountSnapshots.userId, dataUserId),
           eq(accountSnapshots.accountId, property.id),
-          sql`${accountSnapshots.snapshotDate} >= CURRENT_DATE - INTERVAL '${sql.raw(String(months))} months'`
+          sql`${accountSnapshots.snapshotDate} >= ${cutoffDate}::date`
         ];
         if (!isImportRealEstateEnabled) {
           snapshotsConditions.push(eq(accountSnapshots.isImported, false));
@@ -144,7 +151,7 @@ export async function GET(request: Request) {
         const mortgageSnapshotsConditions = [
           eq(accountSnapshots.userId, dataUserId),
           inArray(accountSnapshots.accountId, allLinkedIds),
-          sql`${accountSnapshots.snapshotDate} >= CURRENT_DATE - INTERVAL '${sql.raw(String(months))} months'`
+          sql`${accountSnapshots.snapshotDate} >= ${cutoffDate}::date`
         ];
         if (!isImportRealEstateEnabled) {
           mortgageSnapshotsConditions.push(eq(accountSnapshots.isImported, false));

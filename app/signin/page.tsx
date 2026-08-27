@@ -40,6 +40,21 @@ export default function SignInPage() {
       if (pinVal) setSharingPin(pinVal);
       if (tokenVal) setJoinToken(tokenVal);
     }
+
+    // M-13 (2026-08-27 security review): the join token / invite PIN arrive in
+    // the URL query string (shareable link). Scrub them from location
+    // immediately after capturing so they don't linger in the address bar or
+    // leak into anything that logs window.location on refresh/navigation.
+    if (tokenVal || pinVal || email || join === 'true') {
+      try {
+        const url = new URL(window.location.href);
+        url.search = '';
+        url.hash = '';
+        window.history.replaceState(window.history.state, '', url.pathname);
+      } catch {
+        // best-effort cleanup
+      }
+    }
   }, []);
 
   const hasJoinToken = joinToken.length > 0;

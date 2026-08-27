@@ -107,6 +107,7 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch models';
     logger.error('Failed to fetch AI models', { endpoint, error: message });
-    return NextResponse.json({ error: message }, { status: 500 });
+    // M-7: log detail server-side, return a generic message to the client.
+    return NextResponse.json({ error: 'Failed to fetch AI models' }, { status: 500 });
   }
 }

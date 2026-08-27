@@ -19,8 +19,20 @@ const TABLE_METADATA = [
   { key: 'user_settings', label: 'User Settings', group: 'System' },
 ];
 
+// M-8 (2026-08-27 security review): Data Explorer is disabled by default and
+// only available in non-production, or with DATA_EXPLORER=on.
+function dataExplorerEnabled(): boolean {
+  return process.env.NODE_ENV !== 'production' || process.env.DATA_EXPLORER === 'on';
+}
+
 export async function GET() {
   const session = await auth();
+  if (!dataExplorerEnabled()) {
+    return NextResponse.json(
+      { error: 'disabled', message: 'Data Explorer is disabled on this deployment.' },
+      { status: 404 }
+    );
+  }
   if (!session?.user) {
     return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
   }

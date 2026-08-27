@@ -21,12 +21,16 @@ vi.mock('@/lib/db', async () => {
   return {
   getPool: () => ({
     connect: async () => ({
-      query: async (sql: string, params: any[]) => {
-        if (sql.includes('SELECT password_hash FROM users WHERE username')) {
+      query: async (sql: any, params: any[]) => {
+        // drizzle's node-postgres driver passes a pg QueryConfig object
+        // ({ text, ... }) for ORM queries and a plain string for raw
+        // BEGIN/COMMIT/ROLLBACK calls.
+        const text: string = typeof sql === 'string' ? sql : sql?.text ?? '';
+        if (text.includes('SELECT password_hash FROM users WHERE username')) {
           const user = mockUsers.find((u) => u.username === params[0]);
           return { rows: user ? [user] : [] };
         }
-        if (sql.includes('UPDATE users SET password_hash')) {
+        if (text.includes('UPDATE users SET password_hash')) {
           const user = mockUsers.find((u) => u.username === params[1]);
           if (user) user.password_hash = params[0];
           return { rows: [] };

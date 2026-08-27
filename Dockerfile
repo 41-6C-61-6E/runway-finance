@@ -8,6 +8,12 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json pnpm-lock.yaml* .npmrc ./
+# L-11 (2026-08-27 security review): dev deps are installed here so the
+# build has esbuild/sharp/etc. The runner stage reuses this node_modules, so
+# the prod image currently carries dev deps too. A cleaner split would do a
+# separate `pnpm deploy --prod` (prod-only node_modules) into the runner.
+# Left as-is to avoid disturbing an already-working build; revisit on the
+# next Dockerfile change. .dockerignore already excludes .env/keys (verified).
 RUN corepack enable pnpm && corepack prepare pnpm@10.23.0 --activate && pnpm i --frozen-lockfile
 
 # Rebuild the source code only when needed

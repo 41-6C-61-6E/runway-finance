@@ -11,6 +11,7 @@ import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import ChangePasswordDrawer from '@/components/change-password-drawer';
 import { toast } from 'sonner';
 import { isRealEstateType } from '@/lib/constants/account-types';
+import { clearAllClientCaches } from '@/lib/query-client';
 
 interface UserDropdownProps {
   onOpenChange?: (open: boolean) => void;
@@ -192,7 +193,7 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
             {initial}
           </button>
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="hidden md:block">User menu</TooltipContent>
+            onClick={() => { void clearAllClientCaches(); signOut({ redirectTo: '/signin' }); }}
       </Tooltip>
       {open && (
         <div className="absolute right-[-12px] sm:right-0 top-full mt-1 w-56 py-1 bg-card border border-border rounded-lg shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">

@@ -77,7 +77,7 @@ export const TransactionFilterSchema = z.object({
 
 export const PatchTransactionSchema = z.object({
   categoryId: z.string().uuid().nullable().optional(),
-  tagIds: z.array(z.string().uuid()).optional(),
+  tagIds: z.array(z.string().uuid()).max(100).optional(), // M-5: cap to bound per-row work
   payee: z.string().max(200).optional(),
   notes: z.string().max(2000).optional(),
   memo: z.string().max(500).optional(),
@@ -99,7 +99,7 @@ export const CreateTransactionSchema = z.object({
   memo: z.string().max(500).optional(),
   notes: z.string().max(2000).optional(),
   categoryId: z.string().uuid().nullable().optional(),
-  tagIds: z.array(z.string().uuid()).optional(),
+  tagIds: z.array(z.string().uuid()).max(100).optional(), // M-5: cap to bound per-row work
   pending: z.boolean().optional(),
 });
 
@@ -110,16 +110,16 @@ export const SplitTransactionSchema = z.object({
       categoryId: z.string().uuid().nullable().optional(),
       description: z.string().max(500).optional(),
       notes: z.string().max(2000).optional(),
-      tagIds: z.array(z.string().uuid()).optional(),
+      tagIds: z.array(z.string().uuid()).max(100).optional(), // M-5: cap to bound per-row work
     })
-  ).min(2),
+  ).min(2).max(50), // M-5: cap split count
 });
 
 export const BulkPatchTransactionSchema = z.object({
-  ids: z.array(z.string()).min(1).optional(),
+  ids: z.array(z.string()).min(1).max(5000).optional(), // M-5: bound IN-lists + decrypt loops
   patch: z.object({
     categoryId: z.string().nullable().optional(),
-    tagIds: z.array(z.string().uuid()).optional(),
+    tagIds: z.array(z.string().uuid()).max(100).optional(), // M-5: cap to bound per-row work
     reviewed: z.boolean().optional(),
     ignored: z.boolean().optional(),
   }),
@@ -145,7 +145,7 @@ export const BulkPatchTransactionSchema = z.object({
 });
 
 export const BulkDeleteTransactionSchema = z.object({
-  ids: z.array(z.string()).min(1).optional(),
+  ids: z.array(z.string()).min(1).max(50000).optional(), // M-5: bound IN-lists
   selectAllMatching: z.boolean().optional(),
   search: z.string().max(200).optional(),
   type: z.string().optional(),

@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow } from '@/lib/crypto';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, notInArray } from 'drizzle-orm';
 import {
   accounts,
   categories,
@@ -23,6 +23,7 @@ import {
 } from '@/lib/db/schema';
 import { ZipArchive } from 'archiver';
 import { toCsv, formatFirePlanTxt } from '@/lib/utils/export-formatter';
+import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -34,6 +35,9 @@ export async function POST(req: NextRequest) {
   const dataUserId = (session.user as any).dataUserId ?? userId;
   const db = getDb();
   const dek = await getSessionDEK();
+
+  // M-1: sensitive accounts hidden from plain members stay out of exports.
+  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
 
   try {
     const body = await req.json();
@@ -53,7 +57,12 @@ export async function POST(req: NextRequest) {
       archive.on('error', reject);
     });
 
-    const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
+    // M-1: hidden accounts are not exported (and never enter the name map).
+    const accountConditions = [eq(accounts.userId, dataUserId)];
+    if (hiddenAccountIds.length > 0) {
+      accountConditions.push(notInArray(accounts.id, hiddenAccountIds));
+    }
+    const accountsRaw = await db.select().from(accounts).where(and(...accountConditions));
     const decryptedAccounts = await Promise.all(
       accountsRaw.map((r) => decryptRow('accounts', r as Record<string, unknown>, dek))
     );
@@ -72,6 +81,9 @@ export async function POST(req: NextRequest) {
     // 1. Transactions
     if (datasets.includes('transactions')) {
       const conds = [eq(transactions.userId, dataUserId), eq(transactions.deleted, false)];
+      if (hiddenAccountIds.length > 0) {
+        conds.push(notInArray(transactions.accountId, hiddenAccountIds));
+      }
       if (startDate) conds.push(gte(transactions.date, startDate));
       if (endDate) conds.push(lte(transactions.date, endDate));
 
@@ -134,7 +146,11 @@ export async function POST(req: NextRequest) {
       }));
       archive.append(toCsv(mappedNw), { name: 'net_worth_snapshots.csv' });
 
-      const accSnapRaw = await db.select().from(accountSnapshots).where(eq(accountSnapshots.userId, dataUserId));
+      const accSnapConds = [eq(accountSnapshots.userId, dataUserId)];
+      if (hiddenAccountIds.length > 0) {
+        accSnapConds.push(notInArray(accountSnapshots.accountId, hiddenAccountIds));
+      }
+      const accSnapRaw = await db.select().from(accountSnapshots).where(and(...accSnapConds));
       const decAccSnap = await Promise.all(accSnapRaw.map((r) => decryptRow('account_snapshots', r as Record<string, unknown>, dek)));
       const mappedAccSnap = decAccSnap.map((s) => ({
         Date: s.snapshotDate || '',

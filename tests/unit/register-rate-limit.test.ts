@@ -36,10 +36,34 @@ vi.mock('@/lib/db/seed-categories', () => ({ seedUserCategories: vi.fn().mockRes
 vi.mock('@/lib/db/seed-default-rules', () => ({ seedUserDefaultRules: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/lib/db/seed-ai-providers', () => ({ seedUserAiProviders: vi.fn().mockResolvedValue(undefined) }));
 
+// H-1: the register route consults BOTH a per-identity limit and a global
+// backstop. Mock both with simple counters so each test is hermetic; the
+// real limiter logic is covered in rate-limit-db.test.ts.
+const rlState = vi.hoisted(() => ({
+  perKey: new Map<string, number>(),
+  global: new Map<string, number>(),
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn(async (key: string, max: number) => {
+    const n = (rlState.perKey.get(key) ?? 0) + 1;
+    rlState.perKey.set(key, n);
+    return n <= max;
+  }),
+  checkGlobalRateLimit: vi.fn(async (bucket: string, max: number) => {
+    const n = (rlState.global.get(bucket) ?? 0) + 1;
+    rlState.global.set(bucket, n);
+    return n <= max;
+  }),
+  getClientIp: vi.fn((req: Request) => req.headers.get('x-forwarded-for') ?? 'unknown'),
+}));
+
 describe('registration API rate limiting', () => {
   beforeEach(() => {
     // Reset rate limiter state between tests if needed, but since it's in-memory, we can use different IPs or keys
     vi.clearAllMocks();
+    rlState.perKey.clear();
+    rlState.global.clear();
   });
 
   it('rate limits registration attempts per IP', async () => {

@@ -61,6 +61,7 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     logger.error('Batch action failed', { userId, action, error: message });
-    return NextResponse.json({ error: message }, { status: 500 });
+    // M-7: log detail server-side, return a generic message to the client.
+    return NextResponse.json({ error: 'Batch action failed' }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { importLog } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { handleApiError } from '@/lib/api/response';
 
 export async function GET() {
   const session = await auth();
@@ -22,9 +23,6 @@ export async function GET() {
 
     return NextResponse.json(logs);
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch import logs', message: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Failed to fetch import logs');
   }
 }

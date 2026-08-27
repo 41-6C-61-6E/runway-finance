@@ -444,11 +444,11 @@ describe('DEK rotation / join / login key-version chain', () => {
         wrappingTag: staleVersionWrap.tag,
       });
 
-      const res = await updatePassword(user, 'old-pw', 'new-pw');
+      const res = await updatePassword(user, 'old-pw', 'NewPasswordXyz');
       expect(res.success).toBe(true);
 
       const keyRow = mockState.user_encryption_keys.find((r) => r.userId === user)!;
-      const newKek = await deriveKeyFromPassword('new-pw', hexToBytes(keyRow.salt));
+      const newKek = await deriveKeyFromPassword('NewPasswordXyz', hexToBytes(keyRow.salt));
 
       const pwdDek = await unwrapKey(
         { ciphertext: keyRow.wrappedDek, iv: keyRow.wrappingIv, tag: keyRow.wrappingTag },
@@ -477,7 +477,7 @@ describe('DEK rotation / join / login key-version chain', () => {
       );
       expect(bytesToHex(vDek)).toBe(bytesToHex(dekNEW));
 
-      expect(await bcrypt.compare('new-pw', mockState.users[0].password_hash)).toBe(true);
+      expect(await bcrypt.compare('NewPasswordXyz', mockState.users[0].password_hash)).toBe(true);
     });
   });
 });

@@ -170,6 +170,8 @@ export default function AdvancedTab() {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || errData.error || `HTTP ${res.status}`);
       }
+      // H-7: wipe client-side decrypted caches before leaving the app.
+      void (await import('@/lib/query-client')).clearAllClientCaches().catch(() => {});
       await signOut({ redirectTo: '/signin' });
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Failed to delete account');

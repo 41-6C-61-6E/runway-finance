@@ -17,6 +17,7 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(() => true),
+  checkGlobalRateLimit: vi.fn(() => true),
   getClientIp: vi.fn((req: Request) => req.headers.get('x-forwarded-for') ?? 'unknown'),
 }));
 
@@ -98,7 +99,7 @@ describe('register API shared-account join (atomic transaction)', () => {
       makeRequest(
         {
           username: 'new_member',
-          password: 'password123',
+          password: "Password123x",
           sharingEmail: ' Primary@Example.COM ',
           sharingPin: '12345678',
         },
@@ -119,7 +120,7 @@ describe('register API shared-account join (atomic transaction)', () => {
     expect(state.order).not.toContain('ROLLBACK');
 
     // The DEK rewrap and membership accept received a transactional db handle
-    expect(rewrapDekForUser).toHaveBeenCalledWith('new_member', 'password123', 'primary_user', expect.anything());
+    expect(rewrapDekForUser).toHaveBeenCalledWith('new_member', 'Password123x', 'primary_user', expect.anything());
     expect(acceptInvitation).toHaveBeenCalledWith('inv_1', 'primary_user', 'new_member', expect.anything());
     expect(validateInvitation).toHaveBeenCalledWith('primary@example.com', '12345678');
 
@@ -135,7 +136,7 @@ describe('register API shared-account join (atomic transaction)', () => {
       makeRequest(
         {
           username: 'new_member2',
-          password: 'password123',
+          password: "Password123x",
           sharingEmail: 'primary@example.com',
           sharingPin: '12345678',
         },
@@ -159,7 +160,7 @@ describe('register API shared-account join (atomic transaction)', () => {
       makeRequest(
         {
           username: 'new_member3',
-          password: 'password123',
+          password: "Password123x",
           sharingEmail: 'primary@example.com',
           sharingPin: '12345678',
         },

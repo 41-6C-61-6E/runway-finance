@@ -91,6 +91,32 @@ function parsePeriodRange(keyOrDate: string | null | undefined): { start: string
   return { start: '1970-01-01', end: '9999-12-31' };
 }
 
+/**
+ * For a budget whose native timeframe spans the viewed period (e.g. a yearly
+ * budget viewed in a monthly view), compute how much has been used of the FULL
+ * native-period envelope up to the end of the viewed period.
+ *
+ * These "lumpy" budgets are NOT prorated: a $12,000/yr vacation budget is
+ * considered within budget for the entire year as long as cumulative spending
+ * at any point does not exceed $12,000. Pace is deliberately not considered —
+ * spending it all in January is valid for these budget types.
+ */
+function resolveEnvelopeForRollDown(budget: { nativeAmount: number; nativePeriodType: string; nativePeriodKey: string | null }) {
+  if (budget.nativePeriodType === 'monthly' || !budget.nativePeriodKey) return undefined;
+
+  const range = parsePeriodRange(budget.nativePeriodKey);
+
+  // Clamp the envelope window to the budget's effective range (mid-year start, etc.)
+  const windowStart = range.start > '1970-01-01' ? range.start : null;
+  const windowEnd = range.end < '9999-12-31' ? range.end : null;
+
+  return {
+    envelopeStart: windowStart,
+    envelopeEnd: windowEnd,
+    envelopeAmount: budget.nativeAmount,
+  };
+}
+
 function getPreviousPeriodKey(periodType: string, periodKey: string): string {
   if (periodType === 'monthly') {
     const [y, m] = periodKey.split('-').map(Number);
@@ -207,6 +233,23 @@ export async function GET(request: Request) {
       isIncome: boolean | null;
       categoryType: string | null;
       isDiscretionary: boolean | null;
+      /**
+       * true when the budget is expressed in a LONGER timeframe than the
+       * viewed period (a yearly budget shown in a monthly view). `budgeted`
+       * is then an informational monthly/quarterly average, NOT a limit —
+       * the real limit is the full native amount (the "envelope").
+       */
+      prorated: boolean;
+      /** The native period key this budget is defined over (e.g. "2026" for a yearly budget), derived from the viewed period for recurring budgets. */
+      nativePeriodKey: string | null;
+      /** Cumulative spending against the full native-period envelope, up to the end of the viewed period. Null when not prorated or not computable. */
+      envelopeSpent: number | null;
+      envelopeRemaining: number | null;
+      envelopePercentUsed: number | null;
+      /** 'within' | 'nearlyUsed' | 'exceeded' — status of the native-period envelope. */
+      envelopeStatus: 'within' | 'nearlyUsed' | 'exceeded' | null;
+      envelopeStart: string | null;
+      envelopeEnd: string | null;
     }
 
     const activeBudgetRows: ResolvedBudgetItem[] = [];
@@ -293,26 +336,44 @@ export async function GET(request: Request) {
 
       if (chosen) {
         const nativeAmount = parseFloat(chosen.amount) || 0;
+          // Native period key this budget is defined over. One-off budgets carry
+          // it explicitly; recurring budgets are derived from the viewed period.
+          const nativePeriodKey = chosen.periodKey || chosen.yearMonth || (() => {
+            const pStart = parsePeriodRange(targetPeriodKey).start; // YYYY-MM-DD
+            const py = parseInt(pStart.substring(0, 4), 10);
+            const pm = parseInt(pStart.substring(5, 7), 10); // 1-12
+            if (nativePeriodType === 'yearly') return String(py);
+            if (nativePeriodType === 'quarterly') return `${py}-Q${Math.floor((pm - 1) / 3) + 1}`;
+            return targetPeriodKey;
+          })();
         activeBudgetRows.push({
-          id: chosen.id,
-          categoryId: chosen.categoryId,
-          categoryName: chosen.categoryName,
-          categoryColor: chosen.categoryColor || '#6366f1',
-          periodType: periodType,
-          nativePeriodType,
-          nativeAmount,
-          budgeted: nativeAmount * budgetedMultiplier,
-          periodKey: chosen.periodKey || chosen.yearMonth || null,
-          yearMonth: chosen.yearMonth || null,
-          effectiveFrom: chosen.effectiveFrom || null,
-          effectiveTo: chosen.effectiveTo || null,
-          isRecurring: chosen.isRecurring,
-          fundingAccountId: chosen.fundingAccountId,
-          rollover: chosen.rollover,
-          notes: chosen.notes,
-          isIncome: chosen.isIncome,
-          categoryType: chosen.categoryType,
-          isDiscretionary: chosen.isDiscretionary,
+            id: chosen.id,
+            categoryId: chosen.categoryId,
+            categoryName: chosen.categoryName,
+            categoryColor: chosen.categoryColor || '#6366f1',
+            periodType: periodType,
+            nativePeriodType,
+            nativeAmount,
+            budgeted: nativeAmount * budgetedMultiplier,
+            periodKey: chosen.periodKey || chosen.yearMonth || null,
+            yearMonth: chosen.yearMonth || null,
+            effectiveFrom: chosen.effectiveFrom || null,
+            effectiveTo: chosen.effectiveTo || null,
+            isRecurring: chosen.isRecurring,
+            fundingAccountId: chosen.fundingAccountId,
+            rollover: chosen.rollover,
+            notes: chosen.notes,
+            isIncome: chosen.isIncome,
+            categoryType: chosen.categoryType,
+            isDiscretionary: chosen.isDiscretionary,
+            prorated: (nativePeriodType === 'quarterly' && periodType === 'monthly') || (nativePeriodType === 'yearly' && (periodType === 'monthly' || periodType === 'quarterly')),
+            nativePeriodKey,
+            envelopeSpent: null,
+            envelopeRemaining: null,
+            envelopePercentUsed: null,
+            envelopeStatus: null,
+            envelopeStart: null,
+            envelopeEnd: null,
         });
       }
     }
@@ -506,9 +567,111 @@ export async function GET(request: Request) {
 
     // Calculate rollover carryover for active monthly expense budgets with rollover: true
     const rolloverCarryoverMap = new Map<string, number>();
+
+    // ── Envelope spending for rolled-down (prorated) budgets ─────────────
+    // ── Envelope spending for rolled-down (prorated) budgets ─────────────
+    // A yearly/quarterly budget viewed in a shorter period is judged against
+    // its ENTIRE native period, not the prorated slice. Compute cumulative
+    // spending from the envelope start up to the end of the viewed period.
+    // Pace is intentionally NOT applied — lumpy budgets (vacations, annual
+    // insurance) can spend their full amount early in the period and still
+    // be within budget.
+    {
+      const envelopeRows = activeBudgetRows.filter((r) => r.prorated);
+      if (envelopeRows.length > 0) {
+        for (const row of envelopeRows) {
+          const envInfo = resolveEnvelopeForRollDown({
+            nativeAmount: row.nativeAmount,
+            nativePeriodType: row.nativePeriodType,
+            nativePeriodKey: row.nativePeriodKey,
+          });
+          if (!envInfo) continue;
+
+          // Window start: native-period start, clamped forward by the budget's
+          // effectiveFrom (e.g. a budget that starts mid-year). ISO date
+          // strings compare lexicographically, so max() is safe.
+          const effFromStart = row.effectiveFrom ? parsePeriodRange(row.effectiveFrom).start : null;
+          const envInfoStart = envInfo.envelopeStart || '1970-01-01';
+          const effFrom = effFromStart || '1970-01-01';
+          // ISO dates compare correctly lexicographically (Math.max would coerce to numbers).
+          const envStart = effFrom > envInfoStart ? effFrom : envInfoStart;
+          // Stop at the end of the viewed period: for current/future views this
+          // is today's period-end (later actuals in the envelope period haven't
+          // happened yet); for past views it freezes the number as of that period.
+          const stopDate = bounds.endDate;
+
+          row.envelopeStart = envStart;
+          row.envelopeEnd = envInfo.envelopeEnd;
+
+          if (envStart >= stopDate) {
+            // Envelope has not opened before the end of the viewed period
+            row.envelopeSpent = 0;
+            row.envelopeRemaining = envInfo.envelopeAmount;
+            row.envelopePercentUsed = 0;
+            row.envelopeStatus = 'within';
+            continue;
+          }
+
+          const envTxConditions = [
+            eq(transactions.userId, dataUserId),
+            gte(transactions.date, envStart),
+            lt(transactions.date, stopDate),
+            eq(transactions.deleted, false),
+            eq(transactions.ignored, false),
+            inArray(transactions.categoryId, coveredCategoriesMap.get(row.categoryId) || [row.categoryId]),
+          ];
+          if (!isImportTransactionsEnabled) {
+            envTxConditions.push(eq(transactions.isImported, false));
+          }
+
+          const envTxRows = await db
+            .select({
+              id: transactions.id,
+              date: transactions.date,
+              amount: transactions.amount,
+              accountId: transactions.accountId,
+              categoryId: transactions.categoryId,
+            })
+            .from(transactions)
+            .where(and(...envTxConditions));
+
+          let spent = 0;
+          for (const tx of envTxRows) {
+            if (tx.accountId && excludedAccountIds.has(tx.accountId)) continue;
+            if (excludedTransactionIds.has(tx.id)) continue;
+            if (tx.categoryId && excludedCategoryIds.has(tx.categoryId)) continue;
+            const txDateStr = typeof tx.date === 'string' ? tx.date : ((tx.date as unknown) instanceof Date ? (tx.date as Date).toISOString().split('T')[0] : String(tx.date));
+            if (txDateStr < envStart || txDateStr >= stopDate) continue;
+            const decrypted = await decryptField(String(tx.amount), dek);
+            const amt = parseFloat(decrypted);
+            if (isNaN(amt)) continue;
+            const catInfo = categoryByIdMap.get(tx.categoryId);
+            // Income categories: deposits are positive in DB, and they
+            // INCREASE the remaining envelope (income envelope = target).
+            spent += catInfo?.isIncome ? amt : -amt;
+          }
+
+          const remaining = envInfo.envelopeAmount - spent;
+          const percentUsed = envInfo.envelopeAmount > 0 ? (spent / envInfo.envelopeAmount) * 100 : 0;
+          row.envelopeSpent = Math.round(spent * 100) / 100;
+          row.envelopeRemaining = Math.round(remaining * 100) / 100;
+          row.envelopePercentUsed = Math.round(percentUsed * 10) / 10;
+          row.envelopeStatus = remaining <= 0
+            ? 'exceeded'
+            : remaining <= envInfo.envelopeAmount * 0.10
+              ? 'nearlyUsed'
+              : 'within';
+        }
+      }
+    }
+
     if (periodType === 'monthly') {
       const rolloverRows = activeBudgetRows.filter(
-        (r) => r.rollover && !r.isIncome && r.categoryType !== 'compound'
+        // Only budgets Natively defined monthly participate in month-to-month
+        // rollover. A rolled-down yearly/quarterly budget uses its whole-period
+        // envelope instead — carrying the monthly proration forward overstates
+        // the available amount for lumpy categories.
+        (r) => r.rollover && !r.isIncome && r.categoryType !== 'compound' && r.nativePeriodType === 'monthly'
       );
 
       if (rolloverRows.length > 0) {
@@ -649,6 +812,14 @@ export async function GET(request: Request) {
         periodType: row.periodType,
         nativePeriodType: row.nativePeriodType,
         nativeAmount: nativeAmount,
+        nativePeriodKey: row.nativePeriodKey,
+        prorated: row.prorated,
+        envelopeSpent: row.envelopeSpent,
+        envelopeRemaining: row.envelopeRemaining,
+        envelopePercentUsed: row.envelopePercentUsed,
+        envelopeStatus: row.envelopeStatus,
+        envelopeStart: row.envelopeStart,
+        envelopeEnd: row.envelopeEnd,
         periodKey: row.periodKey || row.yearMonth || null,
         yearMonth: row.yearMonth || null,
         effectiveFrom: row.effectiveFrom || null,
@@ -697,6 +868,14 @@ export async function GET(request: Request) {
         availableBudget: 0,
         notes: null,
         monthlyAmount: 0,
+        prorated: false,
+        nativePeriodKey: null,
+        envelopeSpent: null,
+        envelopeRemaining: null,
+        envelopePercentUsed: null,
+        envelopeStatus: null,
+        envelopeStart: null,
+        envelopeEnd: null,
         budgeted: 0,
         actual: totalUnbudgetedActual,
         remaining: -totalUnbudgetedActual,

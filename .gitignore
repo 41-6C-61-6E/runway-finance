@@ -55,3 +55,6 @@ chat.json
 /public/sw.js
 
 
+
+# L-2 (2026-08-27): generated at dev/build time by scripts/generate-sw.mjs (sw.js); version-info.json exposes commit history/author names publicly — untrack both.
+/public/version-info.json

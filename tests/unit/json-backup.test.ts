@@ -73,7 +73,13 @@ vi.mock('@/lib/db', () => ({
       query: vi.fn(),
       release: vi.fn(),
     }),
+    query: vi.fn().mockResolvedValue({ rows: [{ count: 1 }] }),
   }),
+}));
+
+// M-1: backup export is admin/primary only.
+vi.mock('@/lib/utils/require-auth', () => ({
+  requireMinRole: vi.fn().mockResolvedValue(null),
 }));
 
 describe('JSON Backup Export / Import API', () => {
@@ -82,7 +88,8 @@ describe('JSON Backup Export / Import API', () => {
   });
 
   it('should export all tables including importLog fileContent and join tables', async () => {
-    const response = await exportGET(new Request('http://localhost/api/backup/export'));
+    // M-6: plaintext v1 is only served with an explicit opt-in flag.
+    const response = await exportGET(new Request('http://localhost/api/backup/export?plaintext=true'));
     expect(response.status).toBe(200);
 
     const backup = await response.json();
@@ -91,6 +98,13 @@ describe('JSON Backup Export / Import API', () => {
     expect(backup.data.import_log[0].fileContent).toBe('mocked-csv-content');
     expect(backup.data.transaction_tags).toBeDefined();
     expect(backup.data.transaction_tags[0].transactionId).toBe('tx-1');
+  });
+
+  it('M-6: refuses a plaintext backup export without explicit opt-in', async () => {
+    const response = await exportGET(new Request('http://localhost/api/backup/export'));
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe('passphrase_required');
   });
 
   it('should successfully restore JSON backup', async () => {

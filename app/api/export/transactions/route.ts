@@ -3,9 +3,10 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow } from '@/lib/crypto';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, notInArray } from 'drizzle-orm';
 import { accounts, categories, transactions } from '@/lib/db/schema';
 import { toCsv } from '@/lib/utils/export-formatter';
+import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -24,9 +25,17 @@ export async function GET(req: NextRequest) {
   const db = getDb();
   const dek = await getSessionDEK();
 
+  // M-1: sensitive accounts hidden from plain members stay out of exports.
+  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
+
   try {
     // 1. Fetch Accounts and Categories lookup maps
-    const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
+    // M-1: hidden accounts are not exported (and never enter the name map).
+    const accountConditions = [eq(accounts.userId, dataUserId)];
+    if (hiddenAccountIds.length > 0) {
+      accountConditions.push(notInArray(accounts.id, hiddenAccountIds));
+    }
+    const accountsRaw = await db.select().from(accounts).where(and(...accountConditions));
     const decryptedAccounts = await Promise.all(
       accountsRaw.map((r) => decryptRow('accounts', r as Record<string, unknown>, dek))
     );
@@ -44,6 +53,9 @@ export async function GET(req: NextRequest) {
 
     // 2. Build transactions query
     const conditions = [eq(transactions.userId, dataUserId), eq(transactions.deleted, false)];
+    if (hiddenAccountIds.length > 0) {
+      conditions.push(notInArray(transactions.accountId, hiddenAccountIds));
+    }
 
     if (startDate) {
       conditions.push(gte(transactions.date, startDate));

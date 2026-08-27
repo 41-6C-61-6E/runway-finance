@@ -73,8 +73,13 @@ describe('Crypto', () => {
     await expect(decryptField('not-json', testKey)).resolves.toBe('not-json');
   });
 
-  it('field decrypt returns empty string on decryption failure', async () => {
-    await expect(decryptField('{"ct":"invalid","iv":"0123456789abcdef01234567"}', testKey)).resolves.toBe('');
+  // M-10 (2026-08-27 security review): decryption failures are no longer
+  // swallowed into "". decryptField logs server-side and throws; callers
+  // surface a generic message via handleApiError so a wrong DEK is visible
+  // to the user instead of silently rendering empty data.
+  it('field decrypt throws on decryption failure (M-10)', async () => {
+    await expect(decryptField('{"ct":"invalid","iv":"0123456789abcdef01234567"}', testKey))
+      .rejects.toThrow('could not be decrypted');
   });
 
   it('row-level encrypt/decrypt roundtrips for JSONB objects (conditions)', async () => {

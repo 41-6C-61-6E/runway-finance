@@ -1,6 +1,5 @@
 const CACHE_NAME = "personal-finance-{{BUILD_NUMBER}}";
 const STATIC_ASSETS = [
-  "/",
   "/offline",
   "/favicon.svg",
   "/manifest.json",
@@ -45,11 +44,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Offline support for session: Network-first with cache fallback for NextAuth session
-  if (url.pathname === "/api/auth/session") {
-    event.respondWith(networkFirstWithFallback(request));
-    return;
-  }
+  // H-7 (2026-08-27 security review): the session endpoint is NEVER cached.
+  // A cache fallback would tell offline/stale clients they are still logged
+  // in — including after a server-side revoke. Failing closed (no session
+  // when the network is down) is the safe direction. (All /api/* passes
+  // through unhandled to the network below.)
 
   // Bypass other API requests (data queries are persisted in IndexedDB)
   if (url.pathname.startsWith("/api/")) {
@@ -68,25 +67,38 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Handle Next.js RSC Flight requests (network-first so fresh data is served when online)
+  // H-7: RSC Flight requests embed decrypted payloads — network only, never
+  // cached. (Static assets above remain cache-first; the offline page is the
+  // fallback for navigation.)
   const isRSC =
     url.searchParams.has("_rsc") ||
     request.headers.get("RSC") === "1" ||
     request.headers.get("Accept")?.includes("text/x-component");
 
   if (isRSC) {
-    event.respondWith(networkFirstWithFallback(request));
+    event.respondWith(offlineFailingNetworkOnly(request));
     return;
   }
 
-  // Handle HTML document requests with network-first and fallback
+  // H-7: HTML documents embed RSC payloads with decrypted data — network
+  // only, falling back to the static offline page when there is no network.
   if (request.headers.get("Accept")?.includes("text/html")) {
-    event.respondWith(networkFirstWithFallback(request));
+    event.respondWith(offlineFailingNetworkOnly(request));
     return;
   }
 
   event.respondWith(cacheFirst(request));
 });
+
+async function offlineFailingNetworkOnly(request) {
+  try {
+    return await fetch(request);
+  } catch {
+    const offlinePage = await caches.match("/offline");
+    if (offlinePage) return offlinePage;
+    return new Response("Offline", { status: 503 });
+  }
+}
 
 async function cacheFirst(request) {
   const cached = await caches.match(request);

@@ -6,6 +6,80 @@ import { decryptRows } from '@/lib/crypto';
 
 const LOG_TAG = '[rules-engine]';
 
+/**
+ * M-4 (2026-08-27 security review): user-supplied regex conditions are
+ * evaluated for EVERY transaction in the household. A pathological pattern
+ * (nested quantifiers, deep alternation) can hang the shared worker with a
+ * multi-second backtracking — cross-tenant DoS. We therefore:
+ *   - reject known catastrophic-backtracking shapes at validation time
+ *     (exported so write paths can use it too), and
+ *   - enforce a hard length cap at evaluation time (defense in depth for
+ *     rules created before the validator existed).
+ */
+const MAX_RULE_REGEX_LENGTH = 120;
+
+function hasCatastrophicShape(pattern: string): boolean {
+  // Per-depth flags for group bodies: has an inner quantifier or a nested
+  // group. A group is "repeated" when closed by +, * or { — if its body
+  // then contains any quantifier or nested group, backtracking can be
+  // super-linear (classic ReDoS shapes: (a+)+, (a*)*, (a{1,})+, ((a+))+,
+  // (a+b+)*, ...). This scan is linear and never backtracks itself.
+  const stack: { hasQuant: boolean; hasGroup: boolean }[] = [
+    { hasQuant: false, hasGroup: false },
+  ];
+  let inClass = false;
+  let escaped = false;
+  const isQuant = (c: string) => c === '+' || c === '*' || c === '{';
+
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (inClass) { if (ch === ']') inClass = false; continue; }
+    if (ch === '[') { inClass = true; continue; }
+
+    if (ch === '(') {
+      stack.push({ hasQuant: false, hasGroup: false });
+    } else if (ch === ')') {
+      if (stack.length <= 1) return false; // malformed; RegExp ctor catches it
+      const closed = stack.pop()!;
+      const next = pattern[i + 1];
+      const repeated = next === '+' || next === '*' || next === '{';
+      if (repeated && (closed.hasQuant || closed.hasGroup)) return true;
+      const parent = stack[stack.length - 1];
+      parent.hasGroup = true; // any nested group flags the enclosing body
+      if (repeated || closed.hasQuant) parent.hasQuant = true;
+    } else if (isQuant(ch) && stack.length > 1) {
+      stack[stack.length - 1].hasQuant = true;
+    }
+  }
+  return false;
+}
+
+/**
+ * True when the pattern contains a quantified (repeated) group whose body
+ * itself contains a quantifier or a nested group — the classic
+ * catastrophic-backtracking shape.
+ */
+export function hasNestedQuantifier(pattern: string): boolean {
+  return hasCatastrophicShape(pattern);
+}
+
+export function isSafeUserRegex(pattern: string): boolean {
+  if (typeof pattern !== 'string' || pattern.length === 0 || pattern.length > MAX_RULE_REGEX_LENGTH) {
+    return false;
+  }
+  // Must at least be a constructible regex.
+  try {
+    new RegExp(pattern);
+  } catch {
+    return false;
+  }
+  // Reject nested quantifiers such as (a+)+ or ((a+))+.
+  if (hasCatastrophicShape(pattern)) return false;
+  return true;
+}
+
 type TransactionData = {
   id: string;
   description: string;
@@ -142,6 +216,7 @@ function evaluateSingleCondition(
       return targetStr.endsWith(searchStr);
     case 'regex':
       try {
+        if (!isSafeUserRegex(searchValue)) return false;
         const flags = condition.caseSensitive ? '' : 'i';
         return new RegExp(searchValue, flags).test(fieldStr);
       } catch {

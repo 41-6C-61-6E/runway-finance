@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, recalculateNetWorthSnapshots } from '@/lib/services/account-history';
 import { updateMonthlyCashFlowSummaries, updateCategorySpendingSummaries, updateCategoryIncomeSummaries } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+import { handleApiError } from '@/lib/api/response';
 
 export async function GET(
   _request: Request,
@@ -46,10 +47,7 @@ export async function GET(
       fileContent,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch import log', message: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Failed to fetch import log');
   }
 }
 
@@ -186,9 +184,6 @@ export async function DELETE(
     invalidateUserSearchCache(dataUserId);
     return NextResponse.json({ success: true, warnings: postWarnings.length > 0 ? postWarnings : undefined });
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to delete import', message: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Failed to delete import');
   }
 }

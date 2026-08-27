@@ -12,13 +12,18 @@ import { seedUserDefaultRules } from '@/lib/db/seed-default-rules';
 import { seedUserAiProviders } from '@/lib/db/seed-ai-providers';
 import { validateInvitation, validateJoinToken, acceptInvitation } from '@/lib/sharing';
 import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
-import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { checkGlobalRateLimit, checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { checkPasswordPolicy } from '@/lib/password-policy';
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
 
-    if (!(await checkRateLimit(`register:${ip}`, 5, 60_000))) {
+    if (
+      !(await checkRateLimit(`register:${ip}`, 5, 60_000)) ||
+      // Non-identity backstop (H-1): caps total registrations even under IP rotation.
+      !(await checkGlobalRateLimit('register', 30, 60_000))
+    ) {
       logger.warn('Register API: rate limit exceeded', { ip });
       return NextResponse.json(
         { message: 'Too many registration attempts. Please try again in a minute.' },
@@ -44,6 +49,13 @@ export async function POST(request: Request) {
     if (!username || !password) {
       logger.warn('Register API: missing username or password');
       return NextResponse.json({ message: 'Username and password are required' }, { status: 400 });
+    }
+
+    // M-2: server-side password policy (authoritative, both paths).
+    const policy = checkPasswordPolicy(password);
+    if (!policy.ok) {
+      logger.warn('Register API: password failed policy');
+      return NextResponse.json({ message: policy.message ?? 'Weak password' }, { status: 400 });
     }
 
     // ── Shared account join path ────────────────────────────────────────────
@@ -95,7 +107,10 @@ export async function POST(request: Request) {
 
     // ── Standard registration path ──────────────────────────────────────────
 
-    if (process.env.ALLOW_REGISTRATION === 'false') {
+    // M-3: registration is CLOSED BY DEFAULT — it only opens when
+    // ALLOW_REGISTRATION is explicitly set to "true". (Was: open unless
+    // explicitly "false". Unset env ⇒ open.)
+    if (process.env.ALLOW_REGISTRATION !== 'true') {
       logger.warn('Register API: registration is disabled');
       return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
     }
@@ -110,6 +125,15 @@ export async function POST(request: Request) {
       const requiredPinBuffer = Buffer.from(requiredPin);
       if (pinBuffer.length !== requiredPinBuffer.length || !timingSafeEqual(pinBuffer, requiredPinBuffer)) {
         logger.warn('Register API: invalid registration PIN');
+        return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
+      }
+    }
+
+    // M-3: the configured PIN itself must meet a minimum bar — weak,
+    // guessable PINs (dates, repeated digits) defeat the gate.
+    if (requiredPin && requiredPin.length > 0) {
+      if (requiredPin.length < 8 || /^(.)\1+$/.test(requiredPin)) {
+        logger.error('Register API: REGISTRATION_PIN is too weak (need >=8 chars, not a repeated character). Change it and restart.');
         return NextResponse.json({ message: 'Registration failed' }, { status: 400 });
       }
     }

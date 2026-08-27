@@ -1,10 +1,17 @@
 import bcrypt from 'bcryptjs';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import type { PoolClient } from 'pg';
+import * as schema from './db/schema';
+
+function drizzleOnClient(client: PoolClient) {
+  return drizzle(client, { schema });
+}
 import { getPool } from './db';
 import { deriveKeyFromPassword, unwrapKey, wrapKey, generateDEK, getServerKey } from './crypto';
 import { getDb } from './db';
 import { userEncryptionKeys, dekVersions, dekVersionWraps } from './db/schema';
 import { and, eq } from 'drizzle-orm';
+import { checkPasswordPolicy } from './password-policy';
 
 // Drizzle instance type (without the concrete $client brand, so a db bound to
 // a transactional PoolClient is also assignable).
@@ -105,101 +112,119 @@ export async function updatePassword(username: string, currentPassword: string, 
     const valid = await bcrypt.compare(currentPassword, user.password_hash);
     if (!valid) return { success: false, error: 'Current password is incorrect' };
 
+    // M-2: enforce the shared server-side password policy.
+    const policy = checkPasswordPolicy(newPassword);
+    if (!policy.ok) return { success: false, error: policy.message ?? 'Weak password' };
+
     const password_hash = await bcrypt.hash(newPassword, 12);
-    await client.query(
-      'UPDATE users SET password_hash = $1 WHERE username = $2',
-      [password_hash, username]
-    );
-
-    // Re-wrap DEK with new password
+    // M-9: hash update + DEK re-wrap are ONE transaction — all-or-nothing.
+    // A partial state (new hash, old wraps) previously left the user logged
+    // in with a mismatched key until the next self-heal.
+    // H-3: the in-memory DEK cache is invalidated UNCONDITIONALLY after the
+    // commit so no instance keeps serving the old key. Failures here are non-
+    // fatal: the cache also expires by TTL and the next login re-derives.
+    const invalidateCache = () => {
+      void import('./crypto-context').then((m) => m.invalidateUserDEKCache(username)).catch(() => {});
+    };
     try {
-      const db = getDb();
-      const [keyRow] = await db
-        .select()
-        .from(userEncryptionKeys)
-        .where(eq(userEncryptionKeys.userId, username))
-        .limit(1);
+      await client.query('BEGIN');
 
-      if (keyRow) {
-        const salt = hexToBytes(keyRow.salt);
-        const oldKek = await deriveKeyFromPassword(currentPassword, salt);
-        let dek: Uint8Array;
-        if (keyRow.serverWrappedDek && keyRow.serverWrappingIv) {
-          // The server wrap is authoritative — the password wrap may predate a
-          // household DEK rotation that only refreshed the server-side copies.
-          dek = await unwrapKey({
-            ciphertext: keyRow.serverWrappedDek,
-            iv: keyRow.serverWrappingIv,
-            tag: keyRow.serverWrappingTag ?? '',
-          }, getServerKey());
-        } else {
-          dek = await unwrapKey({
-            ciphertext: keyRow.wrappedDek,
-            iv: keyRow.wrappingIv,
-            tag: keyRow.wrappingTag,
-          }, oldKek);
-        }
+      await client.query(
+        'UPDATE users SET password_hash = $1 WHERE username = $2',
+        [password_hash, username]
+      );
 
-        const newSalt = crypto.getRandomValues(new Uint8Array(32));
-        const newKek = await deriveKeyFromPassword(newPassword, newSalt);
-        const pwdWrapped = await wrapKey(dek, newKek);
+      // Re-wrap DEK with the new password within the same transaction.
+      const tx: Db = drizzleOnClient(client);
+      {
+        const [keyRow] = await tx
+          .select()
+          .from(userEncryptionKeys)
+          .where(eq(userEncryptionKeys.userId, username))
+          .limit(1);
 
-        // Also re-wrap with server key
-        const serverKey = getServerKey();
-        const serverWrapped = await wrapKey(dek, serverKey);
+        if (keyRow) {
+          const salt = hexToBytes(keyRow.salt);
+          const oldKek = await deriveKeyFromPassword(currentPassword, salt);
+          let dek: Uint8Array;
+          if (keyRow.serverWrappedDek && keyRow.serverWrappingIv) {
+            // The server wrap is authoritative — the password wrap may predate a
+            // household DEK rotation that only refreshed the server-side copies.
+            dek = await unwrapKey({
+              ciphertext: keyRow.serverWrappedDek,
+              iv: keyRow.serverWrappingIv,
+              tag: keyRow.serverWrappingTag ?? '',
+            }, getServerKey());
+          } else {
+            dek = await unwrapKey({
+              ciphertext: keyRow.wrappedDek,
+              iv: keyRow.wrappingIv,
+              tag: keyRow.wrappingTag,
+            }, oldKek);
+          }
 
-        await db.update(userEncryptionKeys).set({
-          wrappedDek: pwdWrapped.ciphertext,
-          wrappingIv: pwdWrapped.iv,
-          wrappingTag: pwdWrapped.tag,
-          serverWrappedDek: serverWrapped.ciphertext,
-          serverWrappingIv: serverWrapped.iv,
-          serverWrappingTag: serverWrapped.tag,
-          salt: bytesToHex(newSalt),
-          updatedAt: new Date(),
-        }).where(eq(userEncryptionKeys.userId, username));
+          const newSalt = crypto.getRandomValues(new Uint8Array(32));
+          const newKek = await deriveKeyFromPassword(newPassword, newSalt);
+          const pwdWrapped = await wrapKey(dek, newKek);
 
-        // Refresh this user's wrap of the household's current DEK version under
-        // the new KEK so the version chain stays readable after the change.
-        const householdId = keyRow.primaryUserId ?? username;
-        const versionRows = await db
-          .select({
-            id: dekVersions.id,
-            version: dekVersions.version,
-            dekWrappedServer: dekVersions.dekWrappedServer,
-            wrappingIv: dekVersions.wrappingIv,
-            wrappingTag: dekVersions.wrappingTag,
-          })
-          .from(dekVersions)
-          .where(eq(dekVersions.primaryUserId, householdId));
+          // Also re-wrap with server key
+          const serverKey = getServerKey();
+          const serverWrapped = await wrapKey(dek, serverKey);
 
-        if (versionRows.length > 0) {
-          const latest = versionRows.reduce((a, b) => ((b.version ?? 0) > (a.version ?? 0) ? b : a));
-          const versionDek = await unwrapKey({
-            ciphertext: latest.dekWrappedServer,
-            iv: latest.wrappingIv,
-            tag: latest.wrappingTag,
-          }, serverKey);
-          const versionWrap = await wrapKey(versionDek, newKek);
-          await db
-            .delete(dekVersionWraps)
-            .where(and(eq(dekVersionWraps.versionId, latest.id), eq(dekVersionWraps.memberUserId, username)));
-          await db.insert(dekVersionWraps).values({
-            versionId: latest.id,
-            memberUserId: username,
-            wrappedDek: versionWrap.ciphertext,
-            wrappingIv: versionWrap.iv,
-            wrappingTag: versionWrap.tag,
-          });
+          await tx.update(userEncryptionKeys).set({
+            wrappedDek: pwdWrapped.ciphertext,
+            wrappingIv: pwdWrapped.iv,
+            wrappingTag: pwdWrapped.tag,
+            serverWrappedDek: serverWrapped.ciphertext,
+            serverWrappingIv: serverWrapped.iv,
+            serverWrappingTag: serverWrapped.tag,
+            salt: bytesToHex(newSalt),
+            updatedAt: new Date(),
+          }).where(eq(userEncryptionKeys.userId, username));
+
+          // Refresh this user's wrap of the household's current DEK version under
+          // the new KEK so the version chain stays readable after the change.
+          const householdId = keyRow.primaryUserId ?? username;
+          const versionRows = await tx
+            .select({
+              id: dekVersions.id,
+              version: dekVersions.version,
+              dekWrappedServer: dekVersions.dekWrappedServer,
+              wrappingIv: dekVersions.wrappingIv,
+              wrappingTag: dekVersions.wrappingTag,
+            })
+            .from(dekVersions)
+            .where(eq(dekVersions.primaryUserId, householdId));
+
+          if (versionRows.length > 0) {
+            const latest = versionRows.reduce((a, b) => ((b.version ?? 0) > (a.version ?? 0) ? b : a));
+            const versionDek = await unwrapKey({
+              ciphertext: latest.dekWrappedServer,
+              iv: latest.wrappingIv,
+              tag: latest.wrappingTag,
+            }, serverKey);
+            const versionWrap = await wrapKey(versionDek, newKek);
+            await tx
+              .delete(dekVersionWraps)
+              .where(and(eq(dekVersionWraps.versionId, latest.id), eq(dekVersionWraps.memberUserId, username)));
+            await tx.insert(dekVersionWraps).values({
+              versionId: latest.id,
+              memberUserId: username,
+              wrappedDek: versionWrap.ciphertext,
+              wrappingIv: versionWrap.iv,
+              wrappingTag: versionWrap.tag,
+            });
+          }
         }
       }
-    } catch (err: any) {
-      return { success: false, error: `Password updated but key re-wrap failed: ${err.message}` };
-    }
 
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Failed to update password' };
+      await client.query('COMMIT');
+      invalidateCache();
+      return { success: true };
+    } catch (err: any) {
+      try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+      return { success: false, error: err.message || 'Failed to update password' };
+    }
   } finally {
     client.release();
   }
