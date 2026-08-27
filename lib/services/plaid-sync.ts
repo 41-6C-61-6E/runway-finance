@@ -941,8 +941,22 @@ export async function syncPlaidConnection(
       durationMs: Date.now() - startedAt,
     };
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    logger.error(`${LOG_TAG} Plaid Sync failed`, { connectionId, error: errorMessage });
+    const plaidPayload =
+      (err as any)?.response?.data ?? (err as any)?.error_body ?? (err as any);
+    const plaidCode = plaidPayload?.error_code;
+    const plaidMsg = plaidPayload?.error_message;
+    const plaidDetail = plaidCode
+      ? ` [Plaid: ${plaidCode}${plaidMsg ? ` — ${plaidMsg}` : ''}]`
+      : '';
+    const errorMessage = `${err instanceof Error ? err.message : String(err)}${plaidDetail}`;
+    logger.error(`${LOG_TAG} Plaid Sync failed`, {
+      connectionId,
+      error: errorMessage,
+      plaidCode,
+      plaidMessage: plaidMsg ?? null,
+      plaidStatus: (err as any)?.response?.status ?? (err as any)?.status ?? null,
+      plaidPayload: plaidPayload ?? null,
+    });
 
     await getDb()
       .update(syncLogs)

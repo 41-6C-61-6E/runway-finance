@@ -44,9 +44,12 @@ describe('classifyTransaction', () => {
       expect(classifyTransaction('Investment Sale', 'Vanguard', 310)).toBe('sell');
     });
 
-    it('treats reversals as withdrawal-type (signed amount decides bucket)', () => {
-      expect(classifyTransaction('Contribution Reversal', 'Schwab', -1500)).toBe('withdrawal');
-      expect(classifyTransaction('FEE REVERSAL', 'Schwab', 0.5)).toBe('fee');
+    it('classifies reversals as their own types (CF-11)', () => {
+    // CF-11: reversals get their own types now. `fee_reversal` is neutral
+    // (offsets the fee it corrects); `withdrawal_reversal` is a genuine cash
+    // correction bucketed by sign (see bucketCashFlow).
+    expect(classifyTransaction('Contribution Reversal', 'Schwab', -1500)).toBe('withdrawal_reversal');
+    expect(classifyTransaction('FEE REVERSAL', 'Schwab', 0.5)).toBe('fee_reversal');
     });
 
     it('does not mistake "capital gains distribution" for a withdrawal', () => {
@@ -86,6 +89,13 @@ describe('bucketCashFlow', () => {
     // Corrections arrive as separate "reversal" rows, so a mis-signed row
     // still lands in the outflow bucket as its magnitude.
     expect(bucketCashFlow('withdrawal', 100)).toEqual({ bucket: 'withdrawals', mag: 100 });
+  });
+
+  it('routes reversal rows (CF-11): fee_reversal neutral, withdrawal_reversal by sign', () => {
+    expect(bucketCashFlow('fee_reversal', -0.5)).toBeNull();
+    expect(bucketCashFlow('fee_reversal', 0.5)).toBeNull();
+    expect(bucketCashFlow('withdrawal_reversal', 250)).toEqual({ bucket: 'contributions', mag: 250 });
+    expect(bucketCashFlow('withdrawal_reversal', -250)).toEqual({ bucket: 'withdrawals', mag: 250 });
   });
 
   it('uses whole-word keyword matching (no partial-word false hits)', () => {
@@ -136,7 +146,6 @@ describe('buildMonthlyFlows', () => {
       contributions: { '2026-06': 500 },
       withdrawals: {},
       income: { '2026-06': 100 },
-      cashFlows: { '2026-06': 600 },
       deltas: { '2026-06': 1000 },
     });
     expect(flows[0]).toMatchObject({
@@ -157,7 +166,6 @@ describe('buildMonthlyFlows', () => {
       contributions: {},
       withdrawals: {},
       income: {},
-      cashFlows: {},
       deltas: { '2026-06': -600 },
     });
     expect(flows[0].growth).toBe(0);
@@ -171,7 +179,6 @@ describe('buildMonthlyFlows', () => {
       contributions: { '2026-06': 1000 },
       withdrawals: {},
       income: { '2026-06': 50 },
-      cashFlows: { '2026-06': 1050 },
       deltas: { '2026-06': -300 },
     });
     expect(flows[0].losses).toBe(1350);
@@ -184,7 +191,6 @@ describe('buildMonthlyFlows', () => {
       contributions: {},
       withdrawals: { '2026-06': 400 }, // withdrawal 350 + fee 50
       income: { '2026-06': 200 },
-      cashFlows: { '2026-06': -150 },
       deltas: { '2026-06': -250 },
     });
     expect(flows[0].withdrawals).toBe(400);
@@ -196,7 +202,6 @@ describe('buildMonthlyFlows', () => {
       contributions: { '2026-06': 500 },
       withdrawals: { '2026-06': 100 },
       income: { '2026-06': 80 },
-      cashFlows: { '2026-06': 480 },
       deltas: {},
     });
     expect(flows[0]).toMatchObject({ growth: 0, losses: 0, delta: null, net: 480 });
@@ -208,7 +213,6 @@ describe('buildMonthlyFlows', () => {
       contributions: { '2025-03': 1000, '2026-02': 250 },
       withdrawals: { '2025-07': 300 },
       income: { '2025-04': 120, '2025-10': 95, '2026-01': 140 },
-      cashFlows: {},
       deltas: { '2025-03': 2000, '2025-07': -4200, '2026-02': 610 },
     });
     for (const f of flows) {
@@ -230,6 +234,10 @@ describe('type predicates', () => {
     expect(isNeutralType('reinvestment')).toBe(true);
     expect(isNeutralType('transfer')).toBe(true);
     expect(isNeutralType('buy')).toBe(false);
+    // CF-11: fee reversals are neutral too (offset the fee they correct,
+    // are not net cash movement); withdrawal reversals are NOT.
+    expect(isNeutralType('fee_reversal')).toBe(true);
+    expect(isNeutralType('withdrawal_reversal')).toBe(false);
   });
 
   it('income types are dividend/interest', () => {

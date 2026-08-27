@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, transactions, accountSnapshots } from '@/lib/db/schema';
+import { accounts, transactions, accountSnapshots, userSettings } from '@/lib/db/schema';
 import { eq, and, desc, inArray, gte, lt, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
 import { isInvestmentAccount, filterReportableAccounts } from '@/lib/utils/account-scope';
+import { convertCurrency } from '@/lib/constants/currency-rates';
 import {
   classifyTransaction,
   bucketCashFlow,
@@ -50,10 +51,22 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const timeframe = searchParams.get('timeframe') || '1y';
 
+  // Base currency for cross-currency conversion (mirrors the net-worth routes).
+  // All amounts returned by this endpoint are in the user's base currency.
+  const userSettingsRows = await getDb()
+    .select({ currency: userSettings.currency })
+    .from(userSettings)
+    .where(eq(userSettings.userId, session.user.id))
+    .limit(1);
+  const baseCurrency = userSettingsRows[0]?.currency || 'USD';
+
   const now = new Date();
   const { startMonth, endMonth } = timeframeMonthBounds(timeframe, now);
   const startStr = `${startMonth}-01`;
   const endStr = addMonthsClamped(endMonth, 1) + '-01'; // exclusive bound
+  // `all` is capped at 60 months of history; surface that fact so the UI can
+  // label the range honestly.
+  const allCapped = timeframe === 'all' && monthsBetween(startMonth, endMonth).length >= 60;
 
   try {
     // 1. Reportable (non-hidden, non-excluded) investment accounts
@@ -69,7 +82,7 @@ export async function GET(request: Request) {
 
     if (investmentAccounts.length === 0) {
       return NextResponse.json({
-        months: monthsBetween(startMonth, endMonth).map((m) => ({ month: m, contributions: 0, withdrawals: 0, income: 0, growth: 0, losses: 0, net: 0, delta: null })),
+        months: monthsBetween(startMonth, endMonth).map((m) => ({ month: m, contributions: 0, withdrawals: 0, income: 0, growth: 0, losses: 0, net: 0, delta: null, lastSnapshotDate: null })),
         start: startStr,
         end: endStr, // exclusive (1st of the month after the range)
         summary: {
@@ -82,10 +95,13 @@ export async function GET(request: Request) {
         },
         transactions: [],
         hasSnapshots: false,
+        baseCurrency,
+        allCapped,
       });
     }
 
     const accountIds = investmentAccounts.map((acc) => acc.id);
+    const accById = new Map(investmentAccounts.map((a) => [a.id, a]));
 
     // 2. Classified transactions in range
     const rawTxns = await getDb()
@@ -146,7 +162,10 @@ export async function GET(request: Request) {
         } catch {
           bal = 0;
         }
-        running[s.accountId] = bal;
+        // Convert to the base currency PER ACCOUNT before summing — each account's
+        // balance carries its own FX rate, so converting the total would be wrong.
+        const acc = accById.get(s.accountId);
+        running[s.accountId] = convertCurrency(bal, acc?.currency || 'USD', baseCurrency);
         let total = 0;
         for (const v of Object.values(running)) total += v;
         balanceByDate.set(s.snapshotDate, total);
@@ -181,13 +200,18 @@ export async function GET(request: Request) {
     const monthHasSnapshot: Record<string, boolean> = {};
     for (const d of sortedDates) {
       const ym = d.slice(0, 7);
-      monthHasSnapshot[ym] = true;
+      // A snapshot dated exactly the 1st (00:00) reflects the START of the
+      // month, not the end — only a snapshot strictly after the 1st makes the
+      // month's delta a meaningful in-month measurement.
+      if (d > `${ym}-01`) monthHasSnapshot[ym] = true;
     }
 
     const deltas: Record<string, number | null> = {};
+    const lastSnapshotDates: Record<string, string | null> = {};
     for (const m of months) {
       if (!monthHasSnapshot[m]) {
         deltas[m] = null;
+        lastSnapshotDates[m] = null;
         continue;
       }
       const startBal = balanceAtOrBefore(`${m}-01`);
@@ -208,8 +232,12 @@ export async function GET(request: Request) {
       const endBal = found ? balanceByDate.get(found) ?? null : null;
       if (startBal === null || endBal === null || found === null) {
         deltas[m] = null;
+        lastSnapshotDates[m] = null;
       } else {
         deltas[m] = endBal - startBal;
+        // The month's "end" balance is only known as of this snapshot date —
+        // for the in-progress month, surface it so the UI can say "MTD as of…".
+        lastSnapshotDates[m] = found;
       }
     }
 
@@ -217,19 +245,20 @@ export async function GET(request: Request) {
     const contributions: Record<string, number> = {};
     const withdrawals: Record<string, number> = {};
     const income: Record<string, number> = {};
-    const cashFlows: Record<string, number> = {};
-
-    const accById = new Map(investmentAccounts.map((a) => [a.id, a]));
     const classified = decryptedTxns
       .map((tx) => {
         const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : Number(tx.amount);
         const amt = Number.isFinite(amount) ? amount : 0;
         const type = classifyTransaction(tx.description, tx.payee, amt);
         const acc = accById.get(tx.accountId);
+        // Convert to the base currency so buckets and the returned list are
+        // all in one currency (sign is preserved by conversion).
+        const baseAmt = round2(convertCurrency(amt, acc?.currency || 'USD', baseCurrency));
         const rec = {
           id: tx.id,
           date: String(tx.date),
-          amount: amt,
+          amount: baseAmt,
+          currency: acc?.currency || 'USD',
           description: tx.description,
           payee: tx.payee,
           pending: !!tx.pending,
@@ -240,19 +269,18 @@ export async function GET(request: Request) {
           type,
         };
 
-        const bucket = bucketCashFlow(type, amt);
+        const bucket = bucketCashFlow(type, baseAmt);
         const ym = yearMonthOf(rec.date);
         if (bucket) {
-          if (bucket.bucket === 'income') income[ym] = round2((income[ym] ?? 0) + amt);
+          if (bucket.bucket === 'income') income[ym] = round2((income[ym] ?? 0) + baseAmt);
           else if (bucket.bucket === 'contributions') contributions[ym] = round2((contributions[ym] ?? 0) + bucket.mag);
           else withdrawals[ym] = round2((withdrawals[ym] ?? 0) + bucket.mag);
-          cashFlows[ym] = round2((cashFlows[ym] ?? 0) + amt);
         }
         return rec;
       });
 
     // 5. Assemble monthly series + summary
-    const monthly = buildMonthlyFlows(months, { contributions, withdrawals, income, cashFlows, deltas });
+    const monthly = buildMonthlyFlows(months, { contributions, withdrawals, income, deltas, lastSnapshotDates });
     const withDeltas = monthly.filter((m) => m.delta !== null);
 
     const sum = (fn: (m: (typeof monthly)[number]) => number) => round2(monthly.reduce((s, m) => s + fn(m), 0));
@@ -264,9 +292,12 @@ export async function GET(request: Request) {
     const netTotal = round2(contributionsTotal - withdrawalsTotal + incomeTotal + growthTotal - lossesTotal);
 
     // Annualized income yield: mean monthly income × 12 / mean starting balance.
+    // Both numerator and denominator are measured over the SAME cohort —
+    // months that actually have a snapshot balance — so the ratio isn't
+    // distorted by months with flows but no balance data. Fewer than 3 such
+    // months means the annualization is too noisy to report.
     let annualizedIncomePct: number | null = null;
-    if (withDeltas.length > 0) {
-      const meanIncome = incomeTotal / months.length;
+    if (withDeltas.length >= 3) {
       let startSum = 0;
       let startCount = 0;
       for (const m of withDeltas) {
@@ -276,8 +307,10 @@ export async function GET(request: Request) {
           startCount++;
         }
       }
+      const incomeWithDeltas = round2(withDeltas.reduce((s, m) => s + m.income, 0));
       const meanStart = startCount > 0 ? startSum / startCount : 0;
-      if (meanStart > 0) {
+      const meanIncome = incomeWithDeltas / withDeltas.length;
+      if (meanStart > 0 && startCount === withDeltas.length) {
         annualizedIncomePct = round2((meanIncome * 12 / meanStart) * 100);
       }
     }
@@ -320,6 +353,8 @@ export async function GET(request: Request) {
       end: endStr, // exclusive (1st of the month after the range)
       transactions: classified,
       hasSnapshots,
+      baseCurrency,
+      allCapped,
     });
   } catch (error) {
     logger.error(`${LOG_TAG} Error fetching investment income`, {

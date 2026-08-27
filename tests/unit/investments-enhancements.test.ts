@@ -40,7 +40,11 @@ describe('Investment Income Classification', () => {
   it('classifies trades and capital flows', () => {
     expect(classifyTransaction('YOU BOUGHT 10 SHARES SPY', null, -5200)).toBe('buy');
     expect(classifyTransaction('YOU SOLD 5 SHARES TSLA', null, 1250)).toBe('sell');
-    expect(classifyTransaction('AUTOMATIC REINVESTMENT', null, 45.0)).toBe('reinvestment');
+    // CF-14: a *positive* line hitting reinvestment keywords is the DRIP cash
+    // credit itself (income that crossed the boundary) — count it as income;
+    // the *negative* DRIP purchase is the internal rotation.
+    expect(classifyTransaction('AUTOMATIC REINVESTMENT', null, 45.0)).toBe('dividend');
+    expect(classifyTransaction('AUTOMATIC REINVESTMENT - BOUGHT 0.4 SH VOO', 'Vanguard', -45.0)).toBe('reinvestment');
     expect(classifyTransaction('MANAGEMENT FEE Q3', null, -25.0)).toBe('fee');
     expect(classifyTransaction('DIRECT DEPOSIT BROKERAGE', null, 1000)).toBe('deposit');
   });

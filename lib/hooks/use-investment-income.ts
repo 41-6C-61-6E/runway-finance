@@ -11,6 +11,29 @@ export const INCOME_TIMEFRAMES: { label: string; value: IncomeTimeframeValue }[]
   { label: 'All', value: 'all' },
 ];
 
+/**
+ * Human-readable phrase describing a timeframe's window, used wherever the
+ * old UI hard-coded "monthly"/"this month" and stopped matching the selected
+ * range. Kept in the hook file so every surface (chart, tiles, modal) shares
+ * one source of truth.
+ *
+ * `all` honestly names the server-side 5-year cap rather than "full history".
+ */
+export function timeframeLabel(tf: IncomeTimeframeValue): string {
+  switch (tf) {
+    case '6m':
+      return 'the last 6 months';
+    case '1y':
+      return 'the last 12 months';
+    case 'ytd':
+      return 'this year to date';
+    case '3y':
+      return 'the last 3 years';
+    case 'all':
+      return 'the last 5 years';
+  }
+}
+
 /* ── Response shapes for GET /api/investments/income?timeframe=… ────────── */
 
 export interface MonthlyFlowDatum {
@@ -24,6 +47,12 @@ export interface MonthlyFlowDatum {
   net: number;
   /** Balance delta (end − start) or null when snapshots are insufficient. */
   delta: number | null;
+  /**
+   * Date of the last snapshot inside this month (the month's balance is only
+   * known as of this date). Null when the delta is null. Lets the UI label
+   * the in-progress month "MTD as of …" instead of implying a full month.
+   */
+  lastSnapshotDate: string | null;
 }
 
 export interface IncomeSource {
@@ -51,12 +80,15 @@ export interface ClassifiedTransaction {
   id: string;
   date: string;
   amount: number;
+  /** Base-currency amount (the route converts to the user's base currency). */
+  amountInBase?: number;
   description: string;
   payee: string | null;
   pending: boolean;
   /** Database account id (for deep links into the full transactions view). */
   accountId: string;
   /** Plaid external id (for "view original in Plaid" style links). */
+  /** Already converted to the user's base currency by the API. */
   externalId?: string | null;
   accountName: string;
   institutionName: string;
@@ -72,6 +104,10 @@ export interface IncomeResponse {
   end: string;
   transactions: ClassifiedTransaction[];
   hasSnapshots: boolean;
+  /** User's base currency; every amount in this response is denominated in it. */
+  baseCurrency: string;
+  /** True when the `all` timeframe hit the server's 60-month cap. */
+  allCapped: boolean;
 }
 
 /**
@@ -87,6 +123,9 @@ export function useInvestmentIncomeData(timeframe: IncomeTimeframeValue) {
       if (!res.ok) throw new Error('Failed to fetch investment income');
       return res.json();
     },
-    staleTime: 60_000,
+    // The `all` range re-fetches, re-decrypts and re-classifies ~5 years of
+    // transactions and snapshots on every refresh — the most expensive query
+    // on the page. Cache it aggressively; shorter ranges stay responsive.
+    staleTime: timeframe === 'all' ? 10 * 60_000 : 60_000,
   });
 }

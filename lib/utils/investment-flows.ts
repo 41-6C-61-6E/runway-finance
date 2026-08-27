@@ -21,6 +21,8 @@ export type TransactionType =
   | 'fee'
   | 'deposit'
   | 'withdrawal'
+  | 'fee_reversal'
+  | 'withdrawal_reversal'
   | 'reinvestment'
   | 'transfer'
   | 'other';
@@ -82,11 +84,13 @@ const KEYWORD_MAP: { keywords: string[]; type: TransactionType }[] = [
       'fee refunds',
       'fee refund',
     ],
-    type: 'fee',
+    type: 'fee_reversal',
   },
-  // Reversals of contributions/withdrawals — money back out (or back in);
-  // the signed amount decides the bucket.
-  { keywords: ['reversals', 'reversal'], type: 'withdrawal' },
+  // Reversals of external flows — corrections of earlier contribution or
+  // withdrawal lines. The signed amount decides the direction (see
+  // bucketCashFlow); they are surfaced in the UI but do not double-count
+  // as capital flows in the residual math (see isNeutralType).
+  { keywords: ['reversals', 'reversal', 'reversed'], type: 'withdrawal_reversal' },
   // External withdrawals / distributions
   {
     keywords: [
@@ -203,6 +207,18 @@ export function classifyTransaction(description: string, payee: string | null, a
   const text = `${description ?? ''} ${payee ?? ''}`.toLowerCase();
   for (const { keywords, type } of KEYWORD_MAP) {
     if (matchesAny(text, keywords)) {
+      if (type === 'reinvestment') {
+        // Single-line DRIP credit: some brokers post the dividend itself as one
+        // positive line ("DIVIDEND REINVESTED", "AUTO DRIP PAYMENT") with no
+        // paired buy — that money crossed the boundary as income, so it must
+        // not be swallowed by the rotation rule. DRIP *purchases* post as
+        // negative lines, so any line hitting these keywords with a positive
+        // amount is the cash credit itself.
+        if (amount > 0) {
+          const isInterest = /interest|yield/.test(text) && !/div/.test(text);
+          return isInterest ? 'interest' : 'dividend';
+        }
+      }
       return type;
     }
   }
@@ -228,13 +244,21 @@ export function isWithdrawalType(t: TransactionType): boolean {
 /** Reinvestments + internal transfers net to zero capital impact; they are shown for
  *  transparency but excluded from every bucket (and never mislabeled as income). */
 export function isNeutralType(t: TransactionType): boolean {
-  return t === 'reinvestment' || t === 'transfer';
+  return t === 'reinvestment' || t === 'transfer' || t === 'fee_reversal';
 }
 
 /**
  * Bucket a signed cash-flow amount (positive in / negative out) into the
  * non-negative magnitude buckets used by the signed stacked-bar chart.
  * Returns `null` for internal/neutral flows.
+ *
+ * Correction rows are special-cased:
+ *  - `fee_reversal` is neutral — it offsets a fee *outflow* (same period in
+ *    the common case), so counting it as an outflow double-counts the pair
+ *    and feeds a phantom residual.
+ *  - `withdrawal_reversal` is a genuine cash correction: a voided
+ *    contribution (negative) is cash back out, an unwound withdrawal
+ *    (positive) is cash back in — bucketed by sign.
  */
 export function bucketCashFlow(
   type: TransactionType,
@@ -256,6 +280,11 @@ export function bucketCashFlow(
     // Magnitude-based: corrections arrive separately as "reversal" transactions,
     // so a mis-signed row simply counts as its magnitude in the outflow bucket.
     return { bucket: 'withdrawals', mag: Math.abs(amount) };
+  }
+  if (type === 'withdrawal_reversal') {
+    return amount > 0
+      ? { bucket: 'contributions', mag: amount }
+      : { bucket: 'withdrawals', mag: -amount };
   }
   return null;
 }
@@ -299,6 +328,13 @@ export interface MonthlyFlow {
   net: number;
   /** Change in snapshot balance for the month (null when no snapshots exist). */
   delta: number | null;
+  /**
+   * Date of the last snapshot that contributed to this month's delta
+   * (strictly inside the month). Null when the delta is null. Lets the UI
+   * label the in-progress (current) month honestly — its balance is only
+   * known as of this date, not through today.
+   */
+  lastSnapshotDate: string | null;
 }
 
 export interface MonthlyFlowInput {
@@ -308,10 +344,10 @@ export interface MonthlyFlowInput {
   withdrawals: Record<string, number>;
   /** month → income magnitude (dividends + interest) */
   income: Record<string, number>;
-  /** month → net signed cash flow of ALL classified txns (excl. reinvest/transfer) */
-  cashFlows: Record<string, number>;
   /** month → (month-end balance − month-start balance), null if uncomputable */
   deltas: Record<string, number | null>;
+  /** month → date of the last in-month snapshot backing the delta (optional) */
+  lastSnapshotDates?: Record<string, string | null>;
 }
 
 /**
@@ -345,7 +381,17 @@ export function buildMonthlyFlows(months: string[], input: MonthlyFlowInput): Mo
     }
 
     const net = round2(contributions - withdrawals + income + growth - losses);
-    return { month, contributions, withdrawals, income, growth, losses, net, delta: delta !== null && delta !== undefined ? round2(delta) : null };
+    return {
+      month,
+      contributions,
+      withdrawals,
+      income,
+      growth,
+      losses,
+      net,
+      delta: delta !== null && delta !== undefined ? round2(delta) : null,
+      lastSnapshotDate: delta !== null && delta !== undefined ? input.lastSnapshotDates?.[month] ?? null : null,
+    };
   });
 }
 

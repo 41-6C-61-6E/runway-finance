@@ -19,15 +19,31 @@ import {
 import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { CircleDollarSign, TrendingUp, TrendingDown, Landmark, ArrowDownCircle, Info } from 'lucide-react';
+import {
+  CircleDollarSign,
+  TrendingUp,
+  TrendingDown,
+  Landmark,
+  ArrowDownCircle,
+  Info,
+  X,
+  ChevronDown,
+  ExternalLink,
+  ArrowRightLeft,
+  SlidersHorizontal,
+} from 'lucide-react';
+import { yearMonthOf, addMonthsClamped } from '@/lib/utils/investment-flows';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   INCOME_TIMEFRAMES,
   useInvestmentIncomeData,
+  timeframeLabel,
   type IncomeTimeframeValue,
   type MonthlyFlowDatum,
   type ClassifiedTransaction,
 } from '@/lib/hooks/use-investment-income';
+import { buildTransactionsDeepLink } from '@/components/investments/recent-activity';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 /* ── Series definitions ─────────────────────────────────────────────────── */
 /* Colors (CSS-var based, theme-safe):
@@ -78,6 +94,21 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
     losses: true,
   });
   const [showReinvested, setShowReinvested] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<MonthlyFlowDatum | null>(null);
+  // CF-5 (a11y/UX parity): close the detail modal on Escape.
+  useEffect(() => {
+    if (!selectedMonth) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedMonth(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedMonth]);
+  // The month's data is tied to the range; switching timeframe can drop the
+  // picked month from the response — reset on change.
+  useEffect(() => {
+    setSelectedMonth(null);
+  }, [timeframe]);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -107,6 +138,14 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
     (d) => d.income === 0 && d.contributions === 0 && d.withdrawals === 0 && d.growth === 0 && d.losses === 0
   );
 
+    // The chart data negates out-flow series for stacking; the detail modal
+    // needs the original (positive-magnitude) buckets, so re-resolve the
+    // selected month from the raw response.
+    const selectedMonthDatum = useMemo(() => {
+      if (!selectedMonth) return null;
+      return (data?.months ?? []).find((m) => m.month === selectedMonth.month) ?? null;
+    }, [selectedMonth, data]);
+
   const yDomain = useMemo((): [number, number] => {
     let max = 0;
     let min = 0;
@@ -127,6 +166,11 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
   }, [chartData, visibleSeries]);
 
   const formatYTick = useCallback((v: number) => formatChartYAxisCurrency(v, yDomain[0], yDomain[1]), [yDomain]);
+
+  // The in-progress month is always the last bar in the data (server builds
+  // the range through the current month), so no client clock is needed to
+  // decide which month is still "open".
+  const lastMonth = chartData.length > 0 ? chartData[chartData.length - 1].month : null;
 
   const toggleSeries = (key: CashflowSeriesKey) => {
     setVisibleSeries((prev) => {
@@ -164,6 +208,17 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
                 value={`${net >= 0 ? '+' : '-'}${formatCurrency(Math.abs(net))}`}
                 className={`blur-number ${net >= 0 ? 'text-chart-1' : 'text-destructive'}`}
               />
+              {d.delta === null ? (
+                <div className="text-[10px] text-muted-foreground/70 mt-1 leading-snug">
+                  No balance snapshot this month — net is recorded flows only
+                </div>
+              ) : (
+                d.lastSnapshotDate && lastMonth === d.month && (
+                  <div className="text-[10px] text-muted-foreground/70 mt-1 leading-snug">
+                    Month to date · balance as of {formatSafeUTCDate(d.lastSnapshotDate, { month: 'short', day: 'numeric' })}
+                  </div>
+                )
+              )}
             </>
           ) : (
             <div className="text-muted-foreground/70 py-1">No recorded activity this month</div>
@@ -171,7 +226,7 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
         </ChartTooltip>
       );
     },
-    [visibleSeries]
+    [visibleSeries, lastMonth]
   );
 
   const rangeLabel = useMemo(() => {
@@ -185,7 +240,12 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
   }, [chartData]);
 
   const summary = data?.summary;
-  const hasActivity = data !== undefined && !allZeros;
+  const noCashFlow = data !== undefined && allZeros;
+  // CF-8: a month with only trades/reinvests/transfers has no *bucket* activity,
+  // but it is not "no activity" — the txns are in the feed and the Activity
+  // tab shows them, so hide the card only when the feed is actually empty.
+  const hasOnlyNeutralActivity = noCashFlow && (data?.transactions.length ?? 0) > 0;
+  const hasActivity = data !== undefined && (noCashFlow ? hasOnlyNeutralActivity : true);
   const noSnapshotsYet = data !== undefined && !data.hasSnapshots;
 
   const headerEl = (
@@ -204,13 +264,18 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" align="start" className="max-w-xs p-3 space-y-2 text-xs text-left leading-relaxed">
-            <div className="font-semibold text-foreground">Monthly capital breakdown</div>
+            <div className="font-semibold text-foreground">
+              Calendar-month capital breakdown · {timeframeLabel(timeframe)}
+            </div>
             <p className="text-muted-foreground">
               Each bar shows why your investment balances changed that month. <span className="text-foreground font-medium">Up</span>: income,
               contributions, and market growth. <span className="text-foreground font-medium">Down</span>: withdrawals/fees and market losses.
             </p>
             <p className="text-muted-foreground">
               Growth &amp; losses are derived from balance snapshots: balance change − (contributions − withdrawals + income).
+            </p>
+            <p className="text-muted-foreground">
+              Click any bar for a month-by-month detail. Hover for a quick breakdown.
             </p>
           </TooltipContent>
         </Tooltip>
@@ -258,35 +323,57 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
                   ))}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {CASHFLOW_SERIES.map((s) => {
-                    const active = visibleSeries[s.key];
-                    return (
-                      <button
-                        key={s.key}
-                        onClick={() => toggleSeries(s.key)}
-                        aria-pressed={active}
-                        title={active ? `Hide ${s.label}` : `Show ${s.label}`}
-                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-semibold transition-all ${
-                          active ? 'bg-card border-border text-foreground' : 'bg-transparent border-border/40 text-muted-foreground/50 line-through'
-                        }`}
-                      >
-                        <span
-                          className="inline-block w-2 h-2 rounded-full shrink-0"
-                          style={{ background: active ? s.color : 'var(--color-muted-foreground)', opacity: active ? 1 : 0.4 }}
-                        />
-                        {s.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* CF-16: series toggles used to sit as five always-visible chips
+                    that wrapped onto 2–3 rows next to the range picker. They now
+                    live in a "Customize" popover, freeing the row (and chart
+                    height). At least one series is always kept visible. */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Customize which series are shown"
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold leading-none text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors border border-border/50 bg-card"
+                    >
+                      <SlidersHorizontal className="w-3 h-3" />
+                      Customize
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-52 p-1.5 space-y-0.5">
+                    <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                      Show on chart
+                    </div>
+                    {CASHFLOW_SERIES.map((s) => {
+                      const active = visibleSeries[s.key];
+                      return (
+                        <button
+                          key={s.key}
+                          type="button"
+                          role="checkbox"
+                          aria-checked={active}
+                          onClick={() => toggleSeries(s.key)}
+                          title={active ? `Hide ${s.label}` : `Show ${s.label}`}
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[11px] font-semibold transition-colors hover:bg-muted/60 ${
+                            active ? 'text-foreground' : 'text-muted-foreground/50 line-through'
+                          }`}
+                        >
+                          <span
+                            className="inline-block w-2 h-2 rounded-full shrink-0"
+                            style={{ background: active ? s.color : 'var(--color-muted-foreground)', opacity: active ? 1 : 0.4 }}
+                          />
+                          {s.label}
+                        </button>
+                      );
+                    })}
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Chart */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    Monthly Breakdown · {rangeLabel}
+                    Period breakdown (monthly bars) · {rangeLabel}
+                    {data?.allCapped && <span className="ml-1 normal-case tracking-normal font-medium text-muted-foreground/70">— all time shows the last 60 months</span>}
                   </div>
                   {noSnapshotsYet && (
                     <div className="text-[10px] text-amber-500/90 font-medium">
@@ -300,7 +387,11 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
                       data={chartData}
                       stackOffset="sign"
                       margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
-                      barSize={isMobile ? 10 : 16}
+                      // No fixed barSize: Recharts sizes bars from the plot width ÷
+                      // category count, so 6 bars are chunky and 60 bars stay
+                      // readable instead of all being 16px slabs. BarCategoryGap
+                      // keeps the gap proportional as the count grows.
+                      barCategoryGap={chartData.length > 24 ? '15%' : '20%'}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.3} />
                       <XAxis
@@ -335,12 +426,31 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
                           fill={s.color}
                           maxBarSize={34}
                           radius={s.dir === 'in' ? [2, 2, 0, 0] : [0, 0, 2, 2]}
+                          /* CF-5: click opens the month detail report (same
+                             `data?.payload` pattern as the flows charts). */
+                          onClick={(d: any) => {
+                            const p = d?.payload;
+                            if (p?.month) setSelectedMonth(p as MonthlyFlowDatum);
+                          }}
+                          style={{ cursor: 'pointer' }}
                         />
                       ))}
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              {/* CF-8: explain the flatline instead of hiding the chart */}
+              {hasOnlyNeutralActivity && (
+                <div className="text-xs text-muted-foreground bg-muted/30 border border-border/20 rounded-xl p-3 leading-relaxed">
+                  No capital entered or left this period — only internal activity (trades, reinvestments, or transfers), which the chart doesn't plot.
+                  The{' '}
+                  <button onClick={() => onFocusActivity?.('all')} className="text-primary hover:text-primary/80 font-semibold transition-colors">
+                    activity list
+                  </button>{' '}
+                  shows those entries.
+                </div>
+              )}
 
               {/* Period summary tiles */}
               {summary && (
@@ -402,10 +512,8 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
                     Investment income ≈{' '}
                     <span className="font-semibold text-foreground">{summary.annualizedIncomePct.toFixed(2)}% annualized</span> of your average
                     investment balance
-                    {` (from ${timeframe === 'ytd' ? 'YTD' : timeframe === 'all' ? 'full' : timeframe.toUpperCase()} history`}
-                    {summary.monthsWithSnapshots < summary.monthCount
-                      ? `, measured over ${summary.monthsWithSnapshots} months with balance data)`
-                      : ')'}
+                    {` (from ${timeframeLabel(timeframe)}`}
+                    {`, measured over ${summary.monthsWithSnapshots} months with balance data)`}
                     .
                   </div>
                 )}
@@ -429,6 +537,17 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
           )}
         </div>
       )}
+        {/* CF-5: per-month detail report (client-only; every field is already
+            in the shared response). Rendered above the card so it stays
+            visible even when the card is collapsed. */}
+        {selectedMonthDatum && data && (
+          <MonthDetailModal
+            monthDatum={selectedMonthDatum}
+            transactions={data.transactions}
+            hasSnapshots={data.hasSnapshots}
+            onClose={() => setSelectedMonth(null)}
+          />
+        )}
     </div>
   );
 }
@@ -459,14 +578,22 @@ function SummaryTile({
       type="button"
       disabled={!onFocusActivity}
       onClick={() => onFocusActivity?.(focusFilter ?? 'all')}
-      title={onFocusActivity ? `Show ${label.toLowerCase()} in activity` : undefined}
-      className="p-2.5 rounded-lg bg-muted/30 border border-border/60 min-w-0 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-muted/30"
+      title={onFocusActivity ? `Filter the activity list to ${label.toLowerCase()}` : undefined}
+      // CF-19: make the click affordance explicit — browsers default buttons to
+      // `cursor: default`, so the previous "only a title tooltip" hint barely
+      // registered. Hover now also tints the border toward the series color.
+      className="group p-2.5 rounded-lg bg-muted/30 border border-border/60 min-w-0 text-left transition-colors hover:bg-muted/60 hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer disabled:cursor-default disabled:hover:bg-muted/30"
     >
       <div className="flex items-center gap-1.5 mb-1 min-w-0">
         <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
-        <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide truncate" title={label}>
+        <span className="text-[9px] font-semibold text-muted-foreground group-hover:text-foreground uppercase tracking-wide truncate" title={label}>
           {label}
         </span>
+        {onFocusActivity && (
+          <span className="ml-auto text-[9px] font-semibold text-muted-foreground/0 group-hover:text-primary transition-colors">
+            Filter
+          </span>
+        )}
       </div>
       <div
         className={`text-sm font-bold truncate tabular-nums blur-number ${
@@ -500,6 +627,321 @@ function ReinvestedList({ transactions }: { transactions: ClassifiedTransaction[
       ) : (
         <div className="text-[10px] text-muted-foreground/60">No reinvestment entries in this range.</div>
       )}
+    </div>
+  );
+}
+
+/* ── CF-5: month detail modal ───────────────────────────────────────────── */
+
+
+interface MonthBucketSection {
+  key: string;
+  label: string;
+  amount: number;
+  color: string;
+  icon: React.ComponentType<{ className?: string }>;
+  /** Transactions that make up this bucket's magnitude (cash buckets). */
+  transactions: ClassifiedTransaction[];
+  /** Derived buckets (growth/losses) have no underlying rows — explain why. */
+  derived?: string;
+}
+
+/**
+ * Mirror the server's `bucketCashFlow` for display purposes: group the month's
+ * transactions into the same cash buckets the chart uses, so the per-row
+ * sums always reconcile with the bucket totals (modulo rounding).
+ */
+function groupMonthTransactions(
+  month: string,
+  transactions: ClassifiedTransaction[]
+): Record<'income' | 'contributions' | 'withdrawals' | 'reinvested' | 'trades' | 'transfers', ClassifiedTransaction[]> {
+  const out = { income: [], contributions: [], withdrawals: [], reinvested: [], trades: [], transfers: [] };
+  for (const tx of transactions) {
+    if (yearMonthOf(tx.date) !== month) continue;
+    const t = tx.type;
+    if (t === 'dividend' || t === 'interest') out.income.push(tx);
+    else if (t === 'deposit') (tx.amount >= 0 ? out.contributions : out.withdrawals).push(tx);
+    else if (t === 'withdrawal' || t === 'fee') out.withdrawals.push(tx);
+    else if (t === 'withdrawal_reversal') (tx.amount >= 0 ? out.contributions : out.withdrawals).push(tx);
+    else if (t === 'reinvestment') out.reinvested.push(tx);
+    else if (t === 'buy' || t === 'sell') out.trades.push(tx);
+    else if (t === 'transfer' || t === 'fee_reversal') out.transfers.push(tx);
+  }
+  return out;
+}
+
+export function MonthDetailModal({
+  monthDatum,
+  transactions,
+  hasSnapshots,
+  onClose,
+}: {
+  monthDatum: MonthlyFlowDatum;
+  transactions: ClassifiedTransaction[];
+  hasSnapshots: boolean;
+  onClose: () => void;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const month = monthDatum.month;
+  const groups = useMemo(() => groupMonthTransactions(month, transactions), [month, transactions]);
+
+  // Cash buckets shown with their underlying rows.
+  const cashSections: MonthBucketSection[] = [
+    { key: 'income', label: 'Investment Income', amount: monthDatum.income, color: 'var(--color-chart-1)', icon: CircleDollarSign, transactions: groups.income },
+    { key: 'contributions', label: 'Contributions', amount: monthDatum.contributions, color: 'var(--color-chart-4)', icon: Landmark, transactions: groups.contributions },
+    { key: 'withdrawals', label: 'Withdrawals & Fees', amount: monthDatum.withdrawals, color: 'var(--color-chart-5)', icon: ArrowDownCircle, transactions: groups.withdrawals },
+  ];
+
+  // Derived market buckets — no transactions exist, so explain the derivation.
+  const growthSection: MonthBucketSection = {
+    key: 'growth',
+    label: 'Market Growth',
+    amount: monthDatum.growth,
+    color: 'var(--color-primary)',
+    icon: TrendingUp,
+    transactions: [],
+  };
+  const lossSection: MonthBucketSection = {
+    key: 'losses',
+    label: 'Market Losses',
+    amount: monthDatum.losses,
+    color: 'var(--color-destructive)',
+    icon: TrendingDown,
+    transactions: [],
+  };
+
+  const hasAny =
+    cashSections.some((s) => Math.abs(s.amount) > 0) ||
+    Math.abs(monthDatum.growth) > 0 ||
+    Math.abs(monthDatum.losses) > 0;
+
+  const totalIn = monthDatum.income + monthDatum.contributions;
+  const totalOut = monthDatum.withdrawals + monthDatum.losses;
+
+  const [startDay, endExclusive] = [`${month}-01`, `${addMonthsClamped(month, 1)}-01`];
+
+  const toggle = (key: string) => setExpanded((c) => (c === key ? null : key));
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Capital flow for ${formatMonthLong(month)}`}
+    >
+      <div
+        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 flex items-center justify-between p-5 border-b border-border bg-background/95 backdrop-blur">
+          <div className="flex items-center gap-2">
+            <CircleDollarSign className="w-4 h-4 text-primary" />
+            <h3 className="text-base font-semibold text-foreground">
+              Capital Flow — {formatMonthLong(month)}
+              {monthDatum.lastSnapshotDate && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  · balance as of {formatSafeUTCDate(monthDatum.lastSnapshotDate, { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg p-1.5 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5 bg-background text-sm">
+          {/* Hero: net change for the month */}
+          <div className={`rounded-xl p-4 text-center space-y-1 border ${monthDatum.net >= 0 ? 'bg-chart-1/5 border-chart-1/20' : 'bg-destructive/5 border-destructive/20'}`}>
+            <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Net change this month</div>
+            <div className={`text-3xl font-extrabold font-mono blur-number ${monthDatum.net >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+              {monthDatum.net >= 0 ? '+' : '−'}
+              {formatCurrency(Math.abs(monthDatum.net))}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              In: <span className="font-semibold text-foreground blur-number">{formatCurrency(totalIn)}</span>
+              {' · '}
+              Out: <span className="font-semibold text-foreground blur-number">{formatCurrency(totalOut)}</span>
+            </div>
+          </div>
+
+          {/* Reconciliation: recorded net vs actual balance delta (CF-4/CF-7) */}
+          {monthDatum.delta !== null && (
+            <div className="text-xs text-muted-foreground bg-muted/30 border border-border/20 rounded-xl p-3 leading-relaxed">
+              Balance moved <span className={`font-semibold blur-number ${monthDatum.delta >= 0 ? 'text-chart-1' : 'text-destructive'}`}>{monthDatum.delta >= 0 ? '+' : '−'}{formatCurrency(Math.abs(monthDatum.delta))}</span>.
+              {Math.abs(monthDatum.delta - monthDatum.net) > 0.01 ? (
+                <span>
+{' '}The ±{formatCurrency(Math.abs(monthDatum.delta - monthDatum.net))} gap between measured and recorded change is absorbed by growth/losses (the snapshot residual).
+                </span>
+              ) : (
+                <span> Recorded flows fully explain the measured change.</span>
+              )}
+            </div>
+          )}
+
+          {!hasAny ? (
+            <div className="text-muted-foreground text-center py-6 italic">No recorded capital activity this month.</div>
+          ) : (
+            <>
+              {/* Cash buckets with drill-down */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Details breakdown</h4>
+                  <span className="text-[10px] text-muted-foreground italic">Click a bucket to inspect transactions</span>
+                </div>
+                <div className="border border-border rounded-xl divide-y divide-border overflow-hidden bg-background">
+                  {cashSections.map((s) => {
+                    const Icon = s.icon;
+                    const listed = s.transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+                    const unmatched = Math.abs(s.amount - listed) > 0.01;
+                    return (
+                      <div key={s.key} onClick={() => toggle(s.key)} className="cursor-pointer hover:bg-muted/5 transition-colors">
+                        <div className="flex justify-between p-3">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground font-medium">{s.label}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
+                            <span className="blur-number">{formatCurrency(s.amount)}</span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expanded === s.key ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+                        {expanded === s.key && (
+                          <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
+                            {s.transactions.length > 0 ? (
+                              s.transactions.map((t, i) => (
+                                <div key={t.id ?? i} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-medium text-foreground truncate">{t.description || t.payee || 'Transaction'}</span>
+                                    <span className="text-[10px] text-muted-foreground truncate">
+                                      {t.accountName} · {formatSafeUTCDate(t.date, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                  </div>
+                                  <span
+                                    className={`font-mono font-medium blur-number shrink-0 ${
+                                      s.key === 'income' || s.key === 'contributions' ? 'text-chart-1' : 'text-chart-5'
+                                    }`}
+                                  >
+                                    {t.amount >= 0 ? '+' : '−'}
+                                    {formatCurrency(Math.abs(t.amount))}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-muted-foreground text-center py-3 italic">Nothing in this bucket for the month.</div>
+                            )}
+                            {unmatched && (
+                              <div className="text-[10px] text-amber-500/90 pt-1">
+                                {formatCurrency(Math.abs(s.amount - listed))} of this bucket has no matching line item (mis-signed or unclassified rows).
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Derived market buckets */}
+                  {[growthSection, lossSection]
+                    .filter((s) => Math.abs(s.amount) > 0)
+                    .map((s) => {
+                      const Icon = s.icon;
+                      return (
+                        <div key={s.key} onClick={() => toggle(s.key)} className="cursor-pointer hover:bg-muted/5 transition-colors">
+                          <div className="flex justify-between p-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+                              <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-muted-foreground font-medium">{s.label}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
+                              <span className={`blur-number ${s.key === 'growth' ? 'text-primary' : 'text-destructive'}`}>
+                                {s.key === 'growth' ? '+' : '−'}
+                                {formatCurrency(Math.abs(s.amount))}
+                              </span>
+                              <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expanded === s.key ? 'rotate-180' : ''}`} />
+                            </div>
+                          </div>
+                          {expanded === s.key && (
+                            <div className="bg-muted/10 border-t border-border px-4 py-2 text-xs text-muted-foreground leading-relaxed">
+                              {monthDatum.delta === null
+                                ? 'This month has no balance snapshots, so market movement cannot be separated from flows — nothing is shown here.'
+                                : `Derived, not recorded: the month's measured balance change (${monthDatum.delta >= 0 ? '+' : '−'}${formatCurrency(Math.abs(monthDatum.delta))}) minus the recorded capital flows (${monthDatum.net - monthDatum.growth + monthDatum.losses >= 0 ? '+' : '−'}${formatCurrency(Math.abs(monthDatum.net - monthDatum.growth + monthDatum.losses))}) — the residual is this bucket.`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                  {/* Net total row */}
+                  <div className="flex justify-between p-3 bg-primary/[0.03] font-semibold text-foreground border-t border-border">
+                    <span>Net change</span>
+                    <span className={`font-mono blur-number ${monthDatum.net >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                      {monthDatum.net >= 0 ? '+' : '−'}
+                      {formatCurrency(Math.abs(monthDatum.net))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Non-cash activity (trades, reinvests, transfers) for context */}
+              {(groups.trades.length > 0 || groups.reinvested.length > 0 || groups.transfers.length > 0) && (
+                <div className="space-y-1.5 text-xs">
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Internal activity (not counted in the buckets)
+                  </div>
+                  {groups.trades.length > 0 && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ArrowRightLeft className="w-3 h-3 shrink-0" />
+                      <span>
+                        {groups.trades.length} trade{groups.trades.length > 1 ? 's' : ''} — internal reallocations, no net cash impact
+                      </span>
+                    </div>
+                  )}
+                  {groups.reinvested.length > 0 && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <CircleDollarSign className="w-3 h-3 shrink-0" />
+                      <span>
+                        <span className="font-semibold text-foreground blur-number">{formatCurrency(groups.reinvested.reduce((s, t) => s + Math.abs(t.amount), 0))}</span> reinvested (excluded from income to avoid double counting)
+                      </span>
+                    </div>
+                  )}
+                  {groups.transfers.length > 0 && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ArrowDownCircle className="w-3 h-3 shrink-0" />
+                      <span>{groups.transfers.length} transfer{groups.transfers.length > 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Formula + deep link into the raw feed */}
+          <div className="text-xs text-muted-foreground bg-muted/30 border border-border/20 rounded-xl p-3 flex items-start gap-2 leading-relaxed">
+            <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground/60" />
+            <span>
+              <strong>How this is computed:</strong> Net change = contributions − withdrawals + income + growth − losses. Growth &amp; losses are derived from balance{' '}
+              {hasSnapshots ? 'snapshots' : 'changes'} (measured balance change minus recorded flows), so anything the classifier missed lands here
+              {monthDatum.delta === null && ', though this month has no snapshots so it defaults to zero'}.
+            </span>
+          </div>
+
+          <a
+            href={buildTransactionsDeepLink(startDay, endExclusive)}
+            className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg py-2 transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" /> View every transaction in {formatMonthLong(month)}
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 'use client';
-
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate, shiftDaysUTC } from '@/lib/utils/date';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -17,6 +16,8 @@ import {
   Minus,
   RefreshCw,
   ArrowDownLeft,
+  Undo2,
+  X,
 } from 'lucide-react';
 
 import type { ClassifiedTransaction } from '@/lib/hooks/use-investment-income';
@@ -65,6 +66,12 @@ const TYPE_CONFIG: Record<TransactionType, TypeConfig> = {
   deposit: { label: 'Deposit', icon: ArrowDownLeft, color: 'text-chart-4', bg: 'bg-chart-4/10 border-chart-4/20', amountClass: 'text-chart-4' },
   withdrawal: { label: 'Withdrawal', icon: ArrowUpRight, color: 'text-chart-5', bg: 'bg-chart-5/10 border-chart-5/20', amountClass: null },
   transfer: { label: 'Transfer', icon: ArrowLeftRight, color: 'text-muted-foreground', bg: 'bg-muted/20 border-border', amountClass: null },
+  // Correction rows — corrections of earlier fee/withdrawal lines. Shown so
+  // users can audit them, but excluded from the capital-flow buckets (fee
+  // reversals net against the fee; contribution/withdrawal reversals are
+  // bucketed by sign).
+  fee_reversal: { label: 'Fee Reversal', icon: Undo2, color: 'text-chart-5', bg: 'bg-chart-5/10 border-chart-5/20', amountClass: 'text-chart-5' },
+  withdrawal_reversal: { label: 'Reversal', icon: Undo2, color: 'text-chart-4', bg: 'bg-chart-4/10 border-chart-4/20', amountClass: null },
   other: { label: 'Activity', icon: ArrowLeftRight, color: 'text-muted-foreground', bg: 'bg-muted/20 border-border', amountClass: null },
 };
 
@@ -83,8 +90,8 @@ const FILTER_OPTIONS: { label: string; value: string }[] = [
 const FILTER_TYPES: Record<string, TransactionType[]> = {
   income: ['dividend', 'interest'],
   contributions: ['deposit'],
-  withdrawals: ['withdrawal'],
-  fees: ['fee'],
+  withdrawals: ['withdrawal', 'withdrawal_reversal'],
+  fees: ['fee', 'fee_reversal'],
   trades: ['buy', 'sell'],
   reinvests: ['reinvestment'],
   transfers: ['transfer'],
@@ -99,36 +106,56 @@ function amountLabel(tx: ClassifiedTransaction): string {
   if (tx.type === 'deposit' && tx.amount > 0) return `Deposited ${formatCurrency(Math.abs(tx.amount))}`;
   if (tx.type === 'withdrawal' && tx.amount < 0) return `Withdrew ${formatCurrency(Math.abs(tx.amount))}`;
   if (tx.type === 'fee' && tx.amount < 0) return `Fee ${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'fee_reversal') return `Fee reversal ${tx.amount < 0 ? '' : '+'}${formatCurrency(Math.abs(tx.amount))}`;
+  if (tx.type === 'withdrawal_reversal') return `Reversal ${tx.amount < 0 ? '−' : '+'}${formatCurrency(Math.abs(tx.amount))}`;
   if (tx.type === 'transfer') return `${tx.amount < 0 ? 'Out' : 'In'} ${formatCurrency(Math.abs(tx.amount))}`;
   return `${tx.amount < 0 ? '−' : '+'}${formatCurrency(Math.abs(tx.amount))}`;
 }
 
+/**
+ * Deep link to the full transactions view for a date range.
+ *
+ * `start` is inclusive; `endExclusive` is exclusive (1st of the month after
+ * the range) — matching the API's `start`/`end` fields — and is converted to
+ * the transactions view's inclusive convention here.
+ */
+export function buildTransactionsDeepLink(start?: string, endExclusive?: string, extra?: { search?: string; accountId?: string }): string {
+  const params = new URLSearchParams();
+  if (start) params.set('startDate', start);
+  const inclusiveEnd = endExclusive ? shiftDaysUTC(endExclusive, -1) : undefined;
+  if (inclusiveEnd) params.set('endDate', inclusiveEnd);
+  if (extra?.search) params.set('search', extra.search);
+  if (extra?.accountId) params.set('accountId', extra.accountId);
+  return `/transactions?${params.toString()}`;
+}
+
 export function RecentActivity({ transactions, startDate, endDate, value, onValueChange }: RecentActivityProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('recentActivity');
+  const cardRef = useRef<HTMLDivElement>(null);
   const [internalFilter, setInternalFilter] = useState<string>('all');
   // Controlled (shared with the Capital Flow chart) or internal filter.
   const filter = value ?? internalFilter;
   const setFilter = onValueChange ?? setInternalFilter;
   const [showAll, setShowAll] = useState(false);
+  // CF-19: when a Capital Flow summary tile drives a filter from off-screen
+  // (mobile stacks the card below the chart), bring it into view. Pill
+  // clicks inside the card are no-ops for `scrollIntoView` (already visible).
+  useEffect(() => {
+    if (filter !== 'all' && window.innerWidth < 1024) {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [filter]);
 
   const filtered =
     filter === 'all' ? transactions : transactions.filter((tx) => (FILTER_TYPES[filter] ?? []).includes(tx.type));
   const displayed = showAll ? filtered : filtered.slice(0, 12);
 
   const filterLabel = FILTER_OPTIONS.find((f) => f.value === filter)?.label ?? 'All';
-
-  // The API's range end is exclusive; the transactions view's endDate is inclusive.
+  // The API's range end is exclusive; the transactions view's endDate is inclusive
+  // (buildTransactionsDeepLink handles the conversion).
   const inclusiveEnd = endDate ? shiftDaysUTC(endDate, -1) : undefined;
-
-  /** Deep link to the full transactions view, scoped to this range. */
-  const buildDeepLink = (extra?: Partial<Record<string, string>>): string => {
-    const params = new URLSearchParams();
-    if (startDate) params.set('startDate', startDate);
-    if (inclusiveEnd) params.set('endDate', inclusiveEnd);
-    if (extra?.search) params.set('search', extra.search);
-    if (extra?.accountId) params.set('accountId', extra.accountId);
-    return `/transactions?${params.toString()}`;
-  };
+  const buildDeepLink = (extra?: { search?: string; accountId?: string }): string =>
+    buildTransactionsDeepLink(startDate, endDate, extra);
 
   const rangeLabel =
     startDate && inclusiveEnd
@@ -136,7 +163,7 @@ export function RecentActivity({ transactions, startDate, endDate, value, onValu
       : null;
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm h-full flex flex-col">
+    <div ref={cardRef} className="bg-card border border-border rounded-xl shadow-sm h-full flex flex-col">
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -145,8 +172,26 @@ export function RecentActivity({ transactions, startDate, endDate, value, onValu
             <ArrowLeftRight className="w-4 h-4 text-primary shrink-0" />
             <span>Activity</span>
             {rangeLabel && (
-              <span className="text-[10px] font-medium text-muted-foreground/80 hidden sm:inline truncate max-w-[160px]" title={rangeLabel}>
+              // CF-18: show the shared range on mobile too, so it's obvious the
+              // list and the Capital Flow chart cover the same window.
+              <span key="range" className="text-[10px] font-medium text-muted-foreground/80 truncate max-w-[90px] sm:max-w-[160px]" title={rangeLabel}>
                 {rangeLabel}
+              </span>
+            )}
+            {/* CF-19: persistent, visible indicator that a tile-driven (or pill)
+                filter is active, with a one-click clear — previously the only
+                signal was the pill bar color change on a different card. */}
+            {filter !== 'all' && (
+              <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+                {filterLabel}
+                <button
+                  type="button"
+                  onClick={() => setFilter('all')}
+                  aria-label="Clear activity filter"
+                  className="hover:text-foreground transition-colors"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
               </span>
             )}
           </div>

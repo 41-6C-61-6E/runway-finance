@@ -1,9 +1,12 @@
 {
-  "buildNumber": "26.08.1787623710788",
-  "buildTime": "2026-08-25T02:08:30.788Z",
-  "hash": "1fcd1a1",
-  "fullHash": "1fcd1a147e209aad7e3c8a3d271be8ed86b812cf",
+  "buildNumber": "26.08.1787802118379",
+  "buildTime": "2026-08-27T03:41:58.379Z",
+  "hash": "6077df9",
+  "fullHash": "6077df9d0b5e03ac98d96f101ff938735db1277b",
   "commits": [
+    "feat(settings): enhance AutomaticAccountsSection with account view handling for transactions and management",
+    "feat: enhance net worth calculations and account handling",
+    "refactor: remove DebtToAssetRatio, AssetAllocation, and NetWorthSummary components",
     "chore: update service worker and version info for new build",
     "feat(investments): add InvestmentHolding type and ticker resolution utilities",
     "refactor: remove redundant cancel option from PWA update toast notifications",
@@ -200,20 +203,41 @@
     "feat: implement 24-hour date window and update account data handling and privacy features",
     "refactor: standardize account balance storage to two-decimal string format and add precision cleanup scripts",
     "refactor: restrict real estate accounts to weekly or manual sync frequency with automatic coercion",
-    "fix: prevent notifications and alerts for hidden or excluded accounts across sync and preview services",
-    "refactor: replace vashon color scheme with bainbridge, update chart color logic, and improve net worth visualization rendering",
-    "feat: implement privacy mode for sensitive financial data and chart accessibility labels",
-    "feat: implement transaction splitting with database support, API endpoints, and UI integration"
+    "fix: prevent notifications and alerts for hidden or excluded accounts across sync and preview services"
   ],
   "history": [
+    {
+      "hash": "6077df9",
+      "fullHash": "6077df9d0b5e03ac98d96f101ff938735db1277b",
+      "author": "Alan Racek",
+      "date": "2026-08-24T21:18:36-07:00",
+      "message": "feat(settings): enhance AutomaticAccountsSection with account view handling for transactions and management",
+      "type": "feat",
+      "buildNumber": "26.08.1787802118379"
+    },
+    {
+      "hash": "3bb7007",
+      "fullHash": "3bb7007511e0bdc7b70d91d621d3c8c0f9a80ce5",
+      "author": "Alan Racek",
+      "date": "2026-08-24T19:52:37-07:00",
+      "message": "feat: enhance net worth calculations and account handling",
+      "type": "feat"
+    },
+    {
+      "hash": "686df49",
+      "fullHash": "686df493475f77b874e8a1c28d24707ddd1eda0c",
+      "author": "Alan Racek",
+      "date": "2026-08-24T19:52:08-07:00",
+      "message": "refactor: remove DebtToAssetRatio, AssetAllocation, and NetWorthSummary components",
+      "type": "refactor"
+    },
     {
       "hash": "1fcd1a1",
       "fullHash": "1fcd1a147e209aad7e3c8a3d271be8ed86b812cf",
       "author": "Alan Racek",
       "date": "2026-08-24T13:11:36-07:00",
       "message": "chore: update service worker and version info for new build",
-      "type": "chore",
-      "buildNumber": "26.08.1787623710788"
+      "type": "chore"
     },
     {
       "hash": "0f938c0",
@@ -1782,30 +1806,6 @@
       "date": "2026-07-08T18:02:50-07:00",
       "message": "fix: prevent notifications and alerts for hidden or excluded accounts across sync and preview services",
       "type": "fix"
-    },
-    {
-      "hash": "f8b9f9c",
-      "fullHash": "f8b9f9cda433198212cc8d2f67b7eb485e66aa82",
-      "author": "Alan Racek",
-      "date": "2026-07-08T16:07:55-07:00",
-      "message": "refactor: replace vashon color scheme with bainbridge, update chart color logic, and improve net worth visualization rendering",
-      "type": "refactor"
-    },
-    {
-      "hash": "59b70d7",
-      "fullHash": "59b70d753a13a52cbbe2e0f35387656d1c3d094a",
-      "author": "Alan Racek",
-      "date": "2026-07-08T13:45:16-07:00",
-      "message": "feat: implement privacy mode for sensitive financial data and chart accessibility labels",
-      "type": "feat"
-    },
-    {
-      "hash": "e9d00f7",
-      "fullHash": "e9d00f7ce747b27217ac487d5392152ec1057d5b",
-      "author": "Alan Racek",
-      "date": "2026-07-08T11:56:46-07:00",
-      "message": "feat: implement transaction splitting with database support, API endpoints, and UI integration",
-      "type": "feat"
     }
   ]
 }

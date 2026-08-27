@@ -66,6 +66,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
 
   const { periodType, periodKey } = useBudgetPeriod();
   const { startDate, endDate } = useMemo(() => getPeriodDateRange(periodType, periodKey), [periodType, periodKey]);
+  const periodSuffix = periodType === 'yearly' ? '/yr' : periodType === 'quarterly' ? '/quarter' : '/mo';
 
   const getTxUrl = useCallback((catIds?: string[], catId?: string) => {
     const params = new URLSearchParams();
@@ -250,7 +251,6 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
         throw new Error(data.message || 'Failed to create budget');
       }
 
-      const periodSuffix = periodType === 'yearly' ? '/yr' : periodType === 'quarterly' ? '/quarter' : '/mo';
       toast.success(`Converted "${item.categoryName}" to standalone budget (${formatCurrency(amountToBudget)}${periodSuffix})`);
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
     } catch (err) {
@@ -701,7 +701,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                       </button>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" className="text-xs">
-                                      Convert &ldquo;{item.categoryName}&rdquo; to standalone budget ({formatCurrency(Math.max(1, Math.round(item.actual)))}/mo)
+                                      Convert &ldquo;{item.categoryName}&rdquo; to standalone budget ({formatCurrency(Math.max(1, Math.round(item.actual)))}{periodSuffix})
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
@@ -999,7 +999,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                                   </button>
                                                 </TooltipTrigger>
                                                 <TooltipContent side="top" className="text-xs">
-                                                  Convert &ldquo;{item.categoryName}&rdquo; to standalone budget ({formatCurrency(Math.max(1, Math.round(item.actual)))}/mo)
+                                                  Convert &ldquo;{item.categoryName}&rdquo; to standalone budget ({formatCurrency(Math.max(1, Math.round(item.actual)))}{periodSuffix})
                                                 </TooltipContent>
                                               </Tooltip>
                                             </TooltipProvider>

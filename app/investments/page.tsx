@@ -27,6 +27,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { getDisplayTicker } from '@/lib/types/investments';
 import { useInvestmentIncomeData, type IncomeTimeframeValue, type IncomeResponse } from '@/lib/hooks/use-investment-income';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 interface InvestmentsData {
   accounts: any[];
@@ -46,7 +47,14 @@ export default function InvestmentsPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'income'>('overview');
   const [selectedHolding, setSelectedHolding] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [incomeTimeframe, setIncomeTimeframe] = useState<IncomeTimeframeValue>('1y');
+  // CF-17: persist the Activity timeframe like every other chart selection —
+  // previously it silently reset to 1Y on each visit.
+  const [persistedTimeframe, setPersistedTimeframe] = usePersistentState<IncomeTimeframeValue>('incomeTimeframe', '1y');
+  const incomeTimeframe: IncomeTimeframeValue = (
+    ['6m', '1y', 'ytd', '3y', 'all'] as const
+  ).includes(persistedTimeframe)
+    ? persistedTimeframe
+    : '1y';
   const [activityFilter, setActivityFilter] = useState<string>('all');
 
   const queryClient = useQueryClient();
@@ -133,7 +141,6 @@ export default function InvestmentsPage() {
 
   // 2. Fetch classified income
   const { data: incomeActivity, isLoading: incomeLoading } = useInvestmentIncomeData(incomeTimeframe);
-  const { data: incomeOneYear } = useInvestmentIncomeData('1y');
 
   // Extract unique *display* tickers from holdings (user overrides take
   // precedence over the Plaid-reported ticker), plus a mapping of any
@@ -296,7 +303,7 @@ export default function InvestmentsPage() {
                     <div>
                       <IncomeDividendsPanel
                         value={incomeTimeframe}
-                        onValueChange={setIncomeTimeframe}
+                        onValueChange={setPersistedTimeframe}
                         onFocusActivity={handleFocusActivity}
                       />
                     </div>
@@ -324,7 +331,10 @@ export default function InvestmentsPage() {
               allHoldings={data.holdings}
               accounts={data.accounts}
               quote={selectedQuote}
-              recentTransactions={incomeOneYear?.transactions || []}
+                            // CF-12: the drawer shows the *same* timeframe-scoped feed as the
+                            // Activity tab — one shared query instead of a silent second,
+                            // hardcoded 1Y request.
+              recentTransactions={incomeActivity?.transactions || []}
               onOverridesChange={handleHoldingOverridesChange}
             />
           </div>
