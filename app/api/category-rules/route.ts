@@ -27,7 +27,7 @@ const OPERATOR_ENUM = z.enum([
   'equals_numeric',
 ]);
 
-const assertSafeRegex = (val: any, ctx: z.ZodRefineCtx) => {
+const assertSafeRegex = (val: any, ctx: z.core.$RefinementCtx) => {
   if (val.conditionOperator === 'regex' && !isSafeUserRegex(val.conditionValue)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['conditionValue'], message: 'Regex may not use nested quantifiers (e.g. (a+)+) and is limited to 120 characters.' });
   }
