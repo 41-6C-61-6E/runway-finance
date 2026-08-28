@@ -8,7 +8,6 @@ import { PropertyEquityProgressBar } from './property-equity-progress-bar';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import { AppTabs } from '@/components/ui/app-tabs';
 import { cn } from '@/lib/utils';
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
@@ -20,6 +19,39 @@ const PROPERTY_TYPE_LABELS: Record<string, string> = {
   commercial: 'Commercial',
   other: 'Other',
 };
+
+function TogglePill<T extends string>({ options, value, onChange }: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="relative inline-flex items-center rounded-full bg-muted p-1 border border-border">
+      <span
+        className="absolute top-1 bottom-1 rounded-full bg-card shadow-sm border border-border transition-all duration-300 ease-out"
+        style={{
+          left: value === options[0].id ? '4px' : '50%',
+          width: 'calc(50% - 4px)',
+        }}
+        aria-hidden="true"
+      />
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => onChange(option.id)}
+          aria-pressed={value === option.id}
+          className={cn(
+            'relative z-10 px-5 sm:px-7 py-1.5 text-sm font-semibold rounded-full transition-colors duration-300',
+            value === option.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 interface MortgageInfo {
   id: string;
@@ -69,6 +101,7 @@ export function PropertyCard({
   const [newValue, setNewValue] = useState(String(property.value));
   const [activeTab, setActiveTab] = useState<'overview' | 'payoff'>('overview');
   const [selectedMortgageId, setSelectedMortgageId] = useState<string | null>(null);
+  const [showSupportingDetails, setShowSupportingDetails] = useState(false);
 
   const { isVisible } = useChartVisibility();
 
@@ -234,17 +267,16 @@ export function PropertyCard({
           <div>
             {/* Tabs Header */}
             {isPayoffVisible && (
-              <AppTabs
-                tabs={[
-                  { id: 'overview', label: 'Overview' },
-                  { id: 'payoff', label: 'Payoff Projections' },
-                ]}
-                activeTab={currentTab}
-                onChange={(tab) => setActiveTab(tab as any)}
-                fullWidth
-                size="sm"
-                className="mb-4"
-              />
+              <div className="flex justify-center mb-4" role="tablist" aria-label={`${property.name} view`}>
+                <TogglePill
+                  options={[
+                    { id: 'overview', label: 'Overview' },
+                    { id: 'payoff', label: 'Payoff Projections' },
+                  ]}
+                  value={currentTab}
+                  onChange={(tab) => setActiveTab(tab)}
+                />
+              </div>
             )}
 
             {currentTab === 'overview' ? (
@@ -349,6 +381,20 @@ export function PropertyCard({
                   />
                 </div>
 
+                {/* Supporting details stay tucked away until they are needed. */}
+                <div className="border-t border-border/40 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowSupportingDetails(!showSupportingDetails)}
+                    aria-expanded={showSupportingDetails}
+                    className="w-full flex items-center justify-between gap-3 text-left rounded-lg px-2.5 py-2 -mx-2.5 hover:bg-muted/40 transition-colors cursor-pointer"
+                  >
+                    <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider">Supporting details</span>
+                    <span className="text-[10px] text-muted-foreground">{showSupportingDetails ? 'Hide' : 'Show'} mortgages &amp; property info</span>
+                  </button>
+                </div>
+
+                {showSupportingDetails && <div className="space-y-4 animate-in fade-in-50 slide-in-from-top-1 duration-200">
                 {/* Mortgages Section */}
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between">
@@ -600,6 +646,7 @@ export function PropertyCard({
                     </div>
                   </div>
                 )}
+                </div>}
               </div>
             ) : (
               <div className="space-y-4">
@@ -641,4 +688,3 @@ export function PropertyCard({
     </div>
   );
 }
-

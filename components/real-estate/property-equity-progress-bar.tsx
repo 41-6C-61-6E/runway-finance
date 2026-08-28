@@ -1,25 +1,21 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState, useMemo } from 'react';
+
 import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
+import {
+  type EquityBreakdownMortgage,
+  type EquityBreakdownResult,
+  computeEquityBreakdown,
+} from '@/lib/services/real-estate-equity-breakdown';
 import { ShieldCheck, TrendingUp, Wallet, Landmark } from 'lucide-react';
-
-interface MortgageInfo {
-  id: string;
-  name: string;
-  balance: number;
-  originalLoanAmount: number;
-  interestRate?: number;
-  monthlyPayment?: number;
-  metadata?: Record<string, unknown>;
-}
 
 interface PropertyEquityProgressBarProps {
   propertyValue: number;
   purchasePrice?: number;
   initialValue?: number;
-  linkedMortgages: MortgageInfo[];
+  linkedMortgages: EquityBreakdownMortgage[];
   className?: string;
 }
 
@@ -32,139 +28,29 @@ export function PropertyEquityProgressBar({
 }: PropertyEquityProgressBarProps) {
   const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
 
-  const activeMortgages = useMemo(() => {
-    return linkedMortgages.filter(
-      (m) => !m.metadata || !['paid_off', 'refinanced'].includes((m.metadata as any)?.mortgageStatus)
-    );
-  }, [linkedMortgages]);
-
   const {
     totalValue,
     downPayment,
     principalPaid,
     appreciation,
     mortgageOwed,
-    totalEquity,
     downPaymentPct,
     principalPaidPct,
     appreciationPct,
     mortgageOwedPct,
     totalEquityPct,
-    effectivePurchasePrice,
     isWhollyOwned,
     isUnderwater,
-  } = useMemo(() => {
-    const val = Math.max(0, propertyValue);
-    if (val === 0) {
-      return {
-        totalValue: 0,
-        downPayment: 0,
-        principalPaid: 0,
-        appreciation: 0,
-        mortgageOwed: 0,
-        totalEquity: 0,
-        downPaymentPct: 0,
-        principalPaidPct: 0,
-        appreciationPct: 0,
-        mortgageOwedPct: 0,
-        totalEquityPct: 0,
-        effectivePurchasePrice: 0,
-        isWhollyOwned: true,
-        isUnderwater: false,
-      };
-    }
-
-    const currentTotalMortgage = activeMortgages.reduce(
-      (sum, m) => sum + Math.abs(m.balance),
-      0
-    );
-    const originalTotalMortgage = activeMortgages.reduce(
-      (sum, m) => sum + (m.originalLoanAmount > 0 ? m.originalLoanAmount : Math.abs(m.balance)),
-      0
-    );
-
-    // Determine purchase price or best estimate
-    let purchasePrice = explicitPurchasePrice;
-    if (!purchasePrice || purchasePrice <= 0) {
-      if (initialValue && initialValue > 0) {
-        purchasePrice = initialValue;
-      } else if (originalTotalMortgage > 0) {
-        // Assume standard 20% down payment (80% LTV)
-        purchasePrice = originalTotalMortgage / 0.8;
-      } else {
-        purchasePrice = val;
-      }
-    }
-
-    // 1. Mortgage Balance Still Owed
-    const mortgageOwed = currentTotalMortgage;
-
-    // 2. Principal Paid Off (Loan Amortization)
-    const rawPrincipalPaid = Math.max(0, originalTotalMortgage - currentTotalMortgage);
-
-    // 3. Down Payment (Initial Equity at Purchase)
-    const rawDownPayment = Math.max(0, purchasePrice - originalTotalMortgage);
-
-    // 4. Value Appreciation (Market Growth)
-    const rawAppreciation = Math.max(0, val - purchasePrice);
-
-    // Handle edge case: Depreciated / Underwater property
-    const isUnderwater = currentTotalMortgage > val;
-    const computedTotalEquity = Math.max(0, val - currentTotalMortgage);
-
-    let downPayment = rawDownPayment;
-    let principalPaid = rawPrincipalPaid;
-    let appreciation = rawAppreciation;
-
-    if (val < purchasePrice) {
-      // Property lost value: appreciation is 0, scale down payment / principal paid to fit actual equity
-      appreciation = 0;
-      const initialTotalEquity = rawDownPayment + rawPrincipalPaid;
-      if (initialTotalEquity > 0) {
-        const ratio = Math.min(1, computedTotalEquity / initialTotalEquity);
-        downPayment = rawDownPayment * ratio;
-        principalPaid = rawPrincipalPaid * ratio;
-      } else {
-        downPayment = 0;
-        principalPaid = 0;
-      }
-    } else {
-      // If purchasePrice + appreciation mismatch val due to rounding
-      const sumComponents = downPayment + principalPaid + appreciation + mortgageOwed;
-      if (Math.abs(sumComponents - val) > 1 && sumComponents > 0) {
-        const factor = val / sumComponents;
-        downPayment *= factor;
-        principalPaid *= factor;
-        appreciation *= factor;
-      }
-    }
-
-    const totalEquity = Math.max(0, val - mortgageOwed);
-
-    // Calculate percentages relative to Total Current Value (100%)
-    const downPaymentPct = (downPayment / val) * 100;
-    const principalPaidPct = (principalPaid / val) * 100;
-    const appreciationPct = (appreciation / val) * 100;
-    const mortgageOwedPct = (mortgageOwed / val) * 100;
-    const totalEquityPct = (totalEquity / val) * 100;
-
-    return {
-      totalValue: val,
-      downPayment,
-      principalPaid,
-      appreciation,
-      mortgageOwed,
-      totalEquity,
-      downPaymentPct,
-      principalPaidPct,
-      appreciationPct,
-      mortgageOwedPct,
-      totalEquityPct,
-      effectivePurchasePrice: purchasePrice,
-      isWhollyOwned: activeMortgages.length === 0 || currentTotalMortgage === 0,
-      isUnderwater,
-    };
-  }, [propertyValue, explicitPurchasePrice, initialValue, activeMortgages]);
+  }: EquityBreakdownResult = useMemo(
+    () =>
+      computeEquityBreakdown(
+        propertyValue,
+        explicitPurchasePrice,
+        initialValue,
+        linkedMortgages,
+      ),
+    [propertyValue, explicitPurchasePrice, initialValue, linkedMortgages],
+  );
 
   const segments = useMemo(() => {
     return [
