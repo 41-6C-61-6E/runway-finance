@@ -193,7 +193,6 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
             {initial}
           </button>
         </TooltipTrigger>
-            onClick={() => { void clearAllClientCaches(); signOut({ redirectTo: '/signin' }); }}
       </Tooltip>
       {open && (
         <div className="absolute right-[-12px] sm:right-0 top-full mt-1 w-56 py-1 bg-card border border-border rounded-lg shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">
@@ -313,7 +312,7 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
 
           <button
             type="button"
-            onClick={() => signOut({ redirectTo: '/signin' })}
+            onClick={() => { setOpen(false); void clearAllClientCaches(); signOut({ redirectTo: '/signin' }); }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
           >
             <LogOut className="w-4 h-4 text-muted-foreground" />

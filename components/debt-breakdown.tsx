@@ -7,13 +7,10 @@ import { useRouter } from 'next/navigation';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { isAssetAccount, isLiabilityAccount, isAccountActiveOnDate, isReportableAccount, computeNetWorthTotals } from '@/lib/utils/account-scope';
 import { convertCurrency } from '@/lib/constants/currency-rates';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { formatInTimezone } from '@/lib/utils/timeframe';
 import { useUserSettings } from '@/components/user-settings-provider';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { TrendingDown } from 'lucide-react';
 
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 
@@ -99,7 +96,6 @@ export function DebtBreakdown() {
   const { privacyMode } = usePrivacyMode();
   const { settings } = useUserSettings() ?? {};
   const baseCurrency = settings?.currency || 'USD';
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('debtBreakdown');
   const [unit, setUnit] = useState<'$' | '%'>('$');
   const [activeTab, setActiveTab] = useState<'assets' | 'debt'>('assets');
   const [showFilters, setShowFilters] = useState(false);
@@ -188,17 +184,7 @@ export function DebtBreakdown() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-primary shrink-0" />
-              <span>Breakdown</span>
-            </div>
-          }
-        />
-        <div className="p-5 animate-pulse">
+        <div className="p-3 sm:p-5 animate-pulse">
           <div className="h-[180px] bg-muted rounded mb-4" />
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
@@ -217,19 +203,7 @@ export function DebtBreakdown() {
           {srSummary}
         </div>
       )}
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <TrendingDown className="w-4 h-4 text-primary shrink-0" />
-            <span>Breakdown</span>
-          </div>
-        }
-      />
-      {!isCollapsed && (
-        <>
-          <CollapsibleFilterPanel
+      <CollapsibleFilterPanel
             isOpen={showFilters}
             onToggle={() => setShowFilters(!showFilters)}
             feedback={
@@ -363,8 +337,6 @@ export function DebtBreakdown() {
             </div>
           </div>
         </div>
-      </>
-    )}
   </div>
   );
 }

@@ -16,6 +16,17 @@ interface MobileViewSwitcherProps {
   desktopHeader?: ReactNode;
   desktopLayout?: 'grid' | 'stacked';
   summaryCardId?: string;
+  /**
+   * Optional sub-tabs for the main pane (e.g. Net Worth's History /
+   * Breakdown). On mobile they join the sub-nav capsule alongside the
+   * summary view — the same way tab pages (Spending, Investments) expose
+   * their tabs — so the capsule switches between History, Breakdown and
+   * Overview. The desktop layout is unaffected; the page renders its own
+   * tab row there.
+   */
+  mainTabs?: { id: string; label: string }[];
+  activeMainTab?: string;
+  onMainTabChange?: (id: string) => void;
 }
 
 export function MobileViewSwitcher({
@@ -27,6 +38,9 @@ export function MobileViewSwitcher({
   desktopHeader,
   desktopLayout = 'grid',
   summaryCardId,
+  mainTabs,
+  activeMainTab,
+  onMainTabChange,
 }: MobileViewSwitcherProps) {
   const [activeTab, setActiveTab] = useState<'main' | 'summary'>('main');
   const { registerSubNav, unregisterSubNav } = useMobileSubNav();
@@ -38,21 +52,39 @@ export function MobileViewSwitcher({
   const startYRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
 
-  const subNavTabs = useMemo(() => [
-    { id: 'main', label: mainLabel },
-    { id: 'summary', label: summaryLabel },
-  ], [mainLabel, summaryLabel]);
+  // On mobile the sub-nav capsule mirrors the page structure: one entry per
+  // main sub-tab (when provided), plus the summary view at the end.
+  const subNavTabs = useMemo(() => {
+    const tabs = (mainTabs && mainTabs.length > 0 ? mainTabs : [{ id: 'main', label: mainLabel }])
+      .map((t) => ({ id: t.id, label: t.label }));
+    tabs.push({ id: 'summary', label: summaryLabel });
+    return tabs;
+  }, [mainTabs, mainLabel, summaryLabel]);
+
+  // Which sub-nav entry is highlighted: the active main sub-tab, or the
+  // summary view (falling back to the first main entry in the meantime).
+  const subNavActiveId =
+    activeTab === 'summary'
+      ? 'summary'
+      : (mainTabs && mainTabs.length > 0 ? (activeMainTab ?? mainTabs[0].id) : 'main');
+
+  const handleSelectMainTab = (id: string) => {
+    onMainTabChange?.(id);
+    setActiveTab('main');
+  };
 
   useEffect(() => {
-    registerSubNav(subNavTabs, activeTab, (id) => {
-      if (id === 'main' || id === 'summary') {
-        setActiveTab(id);
+    registerSubNav(subNavTabs, subNavActiveId, (id) => {
+      if (id === 'summary') {
+        setActiveTab('summary');
+      } else {
+        handleSelectMainTab(id);
       }
     });
     return () => {
       unregisterSubNav();
     };
-  }, [subNavTabs, activeTab, registerSubNav, unregisterSubNav]);
+  }, [subNavTabs, subNavActiveId, mainTabs, onMainTabChange, registerSubNav, unregisterSubNav]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
@@ -97,14 +129,28 @@ export function MobileViewSwitcher({
       return;
     }
 
-    if (dX < -50 && activeTab === 'main') {
-      // Swipe Left -> switch to Summary
+      // Swipe sequence on mobile: main sub-tabs (left→right), then the
+      // summary view at the end.
+      const viewSequence = (mainTabs && mainTabs.length > 0 ? mainTabs.map((t) => t.id) : ['main']).concat(['summary']);
+      const currentView = activeTab === 'summary' ? 'summary' : (mainTabs && mainTabs.length > 0 ? (activeMainTab ?? viewSequence[0]) : 'main');
+      const idx = viewSequence.indexOf(currentView);
+
+      if (dX < -50 && idx !== -1 && idx < viewSequence.length - 1) {
+        // Swipe Left -> next view
       haptic.light();
-      setActiveTab('summary');
-    } else if (dX > 50 && activeTab === 'summary') {
-      // Swipe Right -> switch to Main
+        if (viewSequence[idx + 1] === 'summary') {
+          setActiveTab('summary');
+        } else {
+          handleSelectMainTab(viewSequence[idx + 1]);
+        }
+      } else if (dX > 50 && idx !== -1 && idx > 0) {
+        // Swipe Right -> previous view
       haptic.light();
-      setActiveTab('main');
+        if (viewSequence[idx - 1] === 'summary') {
+          setActiveTab('summary');
+        } else {
+          handleSelectMainTab(viewSequence[idx - 1]);
+        }
     }
   };
 

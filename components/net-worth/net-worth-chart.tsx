@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import {
   AreaChart,
   Area,
@@ -33,9 +32,8 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { Activity, TrendingUp, BarChart3 } from 'lucide-react';
+import { TrendingUp, BarChart3 } from 'lucide-react';
 import { getMonthRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
@@ -76,7 +74,6 @@ export function NetWorthChart() {
     showWindowNav,
     dateRange,
   } = useDateWindow('finance:net-worth-chart:timeframe', 'finance:net-worth-chart:windowEnd', '1y');
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('netWorthChart');
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showPercent, setShowPercent] = useState(false);
@@ -376,17 +373,7 @@ export function NetWorthChart() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary shrink-0" />
-              <span>History</span>
-            </div>
-          }
-        />
-        {!isCollapsed && <LoadingSpinner category="chart" className="h-[240px] m-5" />}
+        <LoadingSpinner category="chart" className="h-[240px] m-5" />
       </div>
     );
   }
@@ -394,21 +381,9 @@ export function NetWorthChart() {
   if (error) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary shrink-0" />
-              <span>History</span>
-            </div>
-          }
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState variant="error" error={error} />
-          </div>
-        )}
+        <div className="p-5">
+          <ChartEmptyState variant="error" error={error} />
+        </div>
       </div>
     );
   }
@@ -416,21 +391,9 @@ export function NetWorthChart() {
   if (chartData.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-primary shrink-0" />
-              <span>History</span>
-            </div>
-          }
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState variant="nodata" description="Net worth trend data will appear once you connect accounts" />
-          </div>
-        )}
+        <div className="p-5">
+          <ChartEmptyState variant="nodata" description="Net worth trend data will appear once you connect accounts" />
+        </div>
       </div>
     );
   }
@@ -444,19 +407,7 @@ export function NetWorthChart() {
           {srSummary}
         </div>
       )}
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-primary shrink-0" />
-            <span>History</span>
-          </div>
-        }
-      />
-      {!isCollapsed && (
-        <>
-          <CollapsibleFilterPanel
+      <CollapsibleFilterPanel
             isOpen={showFilters}
             onToggle={() => setShowFilters(!showFilters)}
             feedback={
@@ -631,8 +582,6 @@ export function NetWorthChart() {
               </div>
             </div>
           </div>
-        </>
-      )}
     </div>
   );
 }
