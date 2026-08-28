@@ -364,19 +364,14 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
 
   const renderEnvelopeBadge = (b: BudgetData) => {
     if (!isEnvelope(b)) return null;
-    const meta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
     const per = b.nativePeriodType === 'quarterly' ? 'qt' : 'yr';
     return (
       <span
         title={envelopeExplainText(b as EnvelopeBudgetRow, { formatCurrency })}
-        className={cn(
-          'inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold border rounded shrink-0',
-          meta ? meta.badgeClass : 'bg-muted/60 text-muted-foreground border-border/60'
-        )}
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold border rounded shrink-0 bg-muted/60 text-muted-foreground border-border/60"
       >
         <Layers className="w-3 h-3 shrink-0" />
         {formatCurrency(b.nativeAmount ?? 0)}/{per}
-        {meta && b.envelopeStatus !== 'within' && <span>{meta.label}</span>}
       </span>
     );
   };
@@ -394,16 +389,17 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     );
   };
 
-  const envelopeVarianceText = (b: BudgetData) => {
-    if (!isEnvelope(b) || b.envelopeRemaining == null || b.nativeAmount == null) return null;
+  // Small grey qualifier for an envelope row whose native timeframe differs:
+  // e.g. "$300 over $12,000/yr" or "$6,000 of $12,000/yr left". Only shown
+  // when the envelope amount differs from the displayed (selected-period)
+  // variance, so it never duplicates the main aligned number.
+  const envelopeSubText = (b: BudgetData): string | null => {
+    if (!isEnvelope(b) || b.envelopeSpent == null || b.envelopeRemaining == null || b.nativeAmount == null) return null;
+    if (Math.abs(b.remaining - b.envelopeSpent) < 0.01) return null;
     const per = b.nativePeriodType === 'quarterly' ? 'qt' : 'yr';
-    if (b.envelopeRemaining <= 0) {
-      return { text: `−${formatCurrency(Math.abs(b.envelopeRemaining))} over ${formatCurrency(b.nativeAmount)}/${per}`, cls: 'text-destructive' };
-    }
-    if (b.envelopeStatus === 'nearlyUsed') {
-      return { text: `${formatCurrency(b.envelopeRemaining)} left of ${formatCurrency(b.nativeAmount)}/${per}`, cls: 'text-amber-500 font-medium' };
-    }
-    return { text: `+${formatCurrency(b.envelopeRemaining)} of ${formatCurrency(b.nativeAmount)}/${per}`, cls: 'text-constructive' };
+    if (b.envelopeRemaining < 0) return `${formatCurrency(Math.abs(b.envelopeRemaining))} over ${formatCurrency(b.nativeAmount)}/${per}`;
+    if (b.envelopeStatus === 'nearlyUsed') return `${formatCurrency(b.envelopeRemaining)} of ${formatCurrency(b.nativeAmount)}/${per} left`;
+    return `${formatCurrency(b.envelopeRemaining)} of ${formatCurrency(b.nativeAmount)}/${per}`;
   };
 
   const renderEnvelopeProgress = (b: BudgetData) => {
@@ -411,7 +407,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     const pct = b.envelopePercentUsed ?? 0;
     const meta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
     const noun = b.nativePeriodType === 'quarterly' ? 'quarter' : 'year';
-    return (
+    return ( // Render the envelope progress bar
       <div
         className="flex items-center gap-1 sm:gap-1.5 min-w-0"
         title={`${Math.max(0, Math.round(pct))}% of the full ${noun} envelope used (${formatCurrency(b.envelopeSpent ?? 0)} of ${formatCurrency(b.nativeAmount ?? 0)}). Lumpy budget — tracked over the whole ${noun}, no pace applied.`}
@@ -661,7 +657,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               const isOver = b.remaining < 0;
               const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
               const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
-              const envVariance = envelopeVarianceText(b);
+              const envSub = envelopeSubText(b);
               return (
                 <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
@@ -732,10 +728,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       {renderEnvelopeProgress(b)}
                     </div>
                   )}
-                  {envVariance && !isEE && (
-                    <div className="text-[11px] font-mono">
-                      <span className={envVariance.cls}>{envVariance.text}</span>
-                    </div>
+                  {envSub && !isEE && (
+                    <div className="text-[10px] text-muted-foreground font-sans">{envSub}</div>
                   )}
 
                   {/* Everything Else Mobile Breakout sub-card */}
@@ -934,7 +928,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       const isOver = b.remaining < 0;
                       const isEE = b.isEverythingElse || b.isCatchAll || (b.categoryName || '').toLowerCase() === 'everything else';
                       const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
-                      const envVariance = isEnvelope(b) ? envelopeVarianceText(b) : null;
+                      const envSub = envelopeSubText(b);
                       return (
                         <Fragment key={b.id}>
                           <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
@@ -995,21 +989,25 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
                             <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
                             {showVarianceCol && (
-                              <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? (envVariance?.cls ?? '') : (isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground')}`}>
-                                {envVariance ? envVariance.text : formatCurrency(b.remaining)}
+                              <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
+                                {formatCurrency(b.remaining)}
+                                {envSub && <div className="text-[10px] text-muted-foreground font-sans mt-0.5">{envSub}</div>}
                               </td>
                             )}
                             {showProgressCol && (
                               <td className="px-1.5 sm:px-2.5 py-2.5 whitespace-nowrap overflow-hidden">
-                                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                                  <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
-                                    <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                {isEnvelope(b) ? (
+                                  renderEnvelopeProgress(b)
+                                ) : (
+                                  <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                                    <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
+                                      <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                    </div>
+                                    <span className={`text-[10px] font-mono shrink-0 ${isOver ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                                      {(b.percentUsed || 0).toFixed(0)}%
+                                    </span>
                                   </div>
-                                  <span className={`text-[10px] font-mono shrink-0 ${isOver ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                                    {(b.percentUsed || 0).toFixed(0)}%
-                                  </span>
-                                </div>
-                                {isEnvelope(b) && <div className="mt-1">{renderEnvelopeProgress(b)}</div>}
+                                )}
                               </td>
                             )}
                             {showAccountCol && (

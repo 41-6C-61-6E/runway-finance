@@ -103,7 +103,6 @@ function BudgetsContent() {
       <div className="lg:hidden">
         <BudgetPeriodSelector />
       </div>
-      <EnvelopeInfoBanner />
       <Suspense fallback={<LoadingSpinner category="summary" />}>
         <BudgetSummary />
       </Suspense>
