@@ -15,6 +15,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # The unit tests and app code run `git log` (e.g. GET /api/changelog).
+          # CI's default fetch-depth of 1 would leave the repo with a single
+          # commit, breaking tests that expect real commit history.
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
