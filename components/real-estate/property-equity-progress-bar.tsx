@@ -9,6 +9,7 @@ import {
   type EquityBreakdownResult,
   computeEquityBreakdown,
 } from '@/lib/services/real-estate-equity-breakdown';
+import { IconTip } from '@/components/ui/icon-tip';
 import { ShieldCheck, TrendingUp, Wallet, Landmark } from 'lucide-react';
 
 interface PropertyEquityProgressBarProps {
@@ -63,7 +64,8 @@ export function PropertyEquityProgressBar({
         dotColorClass: 'bg-sky-500',
         textColorClass: 'text-sky-600 dark:text-sky-400',
         icon: Wallet,
-        description: 'Initial cash equity invested at purchase',
+        subLabel: 'and Loan Costs',
+        description: 'Purchase price minus the original purchase-time mortgage. Loan costs are included here when they are rolled into the purchase or financed amount; they are not calculated separately.',
       },
       {
         id: 'principalPaid',
@@ -74,7 +76,7 @@ export function PropertyEquityProgressBar({
         dotColorClass: 'bg-emerald-500',
         textColorClass: 'text-emerald-600 dark:text-emerald-400',
         icon: ShieldCheck,
-        description: 'Mortgage principal paid down to date',
+        description: 'Estimated from original loan amounts and refinance payoff balances. This is not a transaction-level total of every principal payment.',
       },
       {
         id: 'appreciation',
@@ -85,7 +87,7 @@ export function PropertyEquityProgressBar({
         dotColorClass: 'bg-violet-500',
         textColorClass: 'text-violet-600 dark:text-violet-400',
         icon: TrendingUp,
-        description: 'Market growth above original purchase price',
+        description: 'Current property value minus the recorded purchase price. It may reflect an estimated valuation and excludes selling costs.',
       },
       {
         id: 'mortgageOwed',
@@ -99,7 +101,7 @@ export function PropertyEquityProgressBar({
         dotColorClass: 'bg-slate-400 dark:bg-slate-600 border border-slate-500/30',
         textColorClass: 'text-slate-600 dark:text-slate-400',
         icon: Landmark,
-        description: 'Remaining loan balance owed to lender(s)',
+        description: 'Balances on active linked mortgages only. Closed or refinanced loans are reflected in Principal Paid instead.',
         isDebt: true,
       },
     ].filter((s) => s.pct > 0.05);
@@ -122,7 +124,12 @@ export function PropertyEquityProgressBar({
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-foreground">Asset Breakdown</span>
-          <span className="text-[10px] text-muted-foreground">(100% = Property Value)</span>
+          <span className="text-[10px] text-muted-foreground">(estimated attribution)</span>
+          <IconTip
+            size={13}
+            content="These buckets estimate how the current property value is attributed. Percentages use current property value; refinance fees, cash-out amounts, or incomplete loan history can create small differences."
+            aria-label="About asset breakdown calculations"
+          />
         </div>
         <div className="flex items-center gap-2">
           {isWhollyOwned ? (
@@ -143,6 +150,12 @@ export function PropertyEquityProgressBar({
           )}
         </div>
       </div>
+
+      {isUnderwater && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px] text-amber-700 dark:text-amber-300">
+          Property value is below the recorded purchase price. Equity buckets are proportionally scaled to the current equity.
+        </div>
+      )}
 
       {/* Multi-segment Progress Bar with Interactive Hover Tooltips */}
       <div className="relative group">
@@ -215,7 +228,20 @@ export function PropertyEquityProgressBar({
             >
               <div className="flex items-center gap-1.5 mb-1">
                 <div className={cn('w-2 h-2 rounded-full shrink-0', seg.dotColorClass)} />
-                <span className="text-[11px] font-medium text-muted-foreground truncate">{seg.label}</span>
+                <span className="text-[11px] font-medium text-muted-foreground truncate">
+                  <span className="block truncate">{seg.label}</span>
+                  {'subLabel' in seg && seg.subLabel && (
+                    <span className="block text-[9px] font-normal text-muted-foreground/75 truncate">
+                      {seg.subLabel}
+                    </span>
+                  )}
+                </span>
+                <IconTip
+                  size={12}
+                  content={seg.description}
+                  aria-label={`${seg.label} calculation details`}
+                  className="shrink-0"
+                />
               </div>
               <div className="flex items-baseline justify-between gap-1">
                 <span className="font-mono text-xs font-semibold text-foreground blur-number">

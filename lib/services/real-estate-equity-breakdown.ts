@@ -2,7 +2,7 @@
  * Pure computation for the "Asset Breakdown" bar on real estate cards.
  *
  * Decomposes a property's current value into:
- *   - Down Payment: cash equity at purchase (purchase price - original loan)
+ *   - Down Payment and Loan Costs: initial equity bucket (purchase price - original loan)
  *   - Principal Paid: all principal paid off to date (across refinances)
  *   - Appreciation: market growth above purchase price
  *   - Mortgage Owed: remaining balance on active loan(s)
@@ -29,7 +29,7 @@ export interface EquityBreakdownResult {
   appreciation: number;
   mortgageOwed: number;
   totalEquity: number;
-  /** Percent of current property value (bar segments sum ~100%). */
+  /** Percent of current property value for each attribution bucket. */
   downPaymentPct: number;
   principalPaidPct: number;
   appreciationPct: number;
@@ -140,7 +140,7 @@ export function computeEquityBreakdown(
       return sum + Math.max(0, original - payoffBalance);
     }, 0);
 
-  // 3. Down Payment (Initial Equity at Purchase)
+  // 3. Down Payment and Loan Costs (Initial Equity at Purchase)
   const downPayment = Math.max(0, pp - originalTotalMortgage);
 
   // 4. Value Appreciation (Market Growth)
