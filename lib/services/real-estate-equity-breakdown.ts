@@ -104,9 +104,15 @@ export function computeEquityBreakdown(
   const purchaseTimeLoan =
     [...mortgages].sort((a, b) => loanDate(a).localeCompare(loanDate(b)) || a.id.localeCompare(b.id))[0] ?? null;
 
-  const originalTotalMortgage = purchaseTimeLoan
-    ? originalOf(purchaseTimeLoan)
-    : activeMortgages.reduce((sum, m) => sum + originalOf(m), 0);
+  // With no closed loans, all active loans belong to the original financing
+  // (for example, a first mortgage plus a HELOC). Once a loan has been
+  // refinanced or paid off, use the original purchase-time loan as the
+  // funding baseline so the refinance chain is not double-counted.
+  const originalTotalMortgage = closedMortgages.length === 0
+    ? activeMortgages.reduce((sum, m) => sum + originalOf(m), 0)
+    : purchaseTimeLoan
+      ? originalOf(purchaseTimeLoan)
+      : activeMortgages.reduce((sum, m) => sum + originalOf(m), 0);
 
   // Determine purchase price or best estimate
   const explicitPurchasePrice = purchasePrice && purchasePrice > 0 ? purchasePrice : undefined;
@@ -147,7 +153,10 @@ export function computeEquityBreakdown(
   const appreciation = Math.max(0, val - pp);
 
   // Handle edge case: Depreciated / Underwater property
-  const isUnderwater = currentTotalMortgage > val;
+  // “Underwater” here describes a property whose current value is below its
+  // recorded purchase price. A debt balance above the property value is also
+  // underwater in the conventional sense.
+  const isUnderwater = val < pp || currentTotalMortgage > val;
   const computedTotalEquity = Math.max(0, val - currentTotalMortgage);
 
   if (val < pp) {
