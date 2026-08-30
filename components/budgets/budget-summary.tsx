@@ -791,14 +791,14 @@ export function BudgetSummary() {
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-foreground flex items-center gap-1">
                       <PiggyBank className="w-3.5 h-3.5 text-chart-1 shrink-0" />
-                      Budgeted Savings Rate
+                      Target Savings Rate
                       <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                     </span>
                     <span className="font-mono text-[11px] font-bold">
                       <span className={cn(actualSavingsRate >= budgetedSavingsRate ? 'text-constructive' : 'text-amber-500')}>
                         {actualSavingsRate.toFixed(0)}%
                       </span>
-                      <span className="text-muted-foreground font-normal"> / {budgetedSavingsRate.toFixed(0)}% budgeted</span>
+                      <span className="text-muted-foreground font-normal"> / {budgetedSavingsRate.toFixed(0)}% target</span>
                     </span>
                   </div>
                   <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
