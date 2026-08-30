@@ -1324,7 +1324,7 @@ export function ProjectionTab({
         desktopHeader={desktopHeader}
         main={mainContent}
         summary={summaryContent}
-        mainLabel="Projections"
+        mainLabel="Forecast"
         summaryLabel="Scorecard"
         summaryCardId="fireProjectionsSidePanel"
       />

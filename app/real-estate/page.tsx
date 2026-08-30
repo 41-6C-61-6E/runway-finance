@@ -20,7 +20,7 @@ function RealEstateContent() {
   const showEquity = isVisible('equityOverTimeChart');
   const showProperties = isVisible('propertyCards');
   const availableTabs = [
-    ...(showEquity ? [{ id: 'equity', label: 'Equity Over Time' }] : []),
+    ...(showEquity ? [{ id: 'equity', label: 'Equity' }] : []),
     ...(showProperties ? [{ id: 'properties', label: 'Properties' }] : []),
   ];
   const [activeTab, setActiveTab] = useState<RealEstateTab>(showEquity ? 'equity' : 'properties');

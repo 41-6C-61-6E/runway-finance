@@ -224,6 +224,7 @@ interface MobileTabSwipeContainerProps {
   children: ReactNode;
   className?: string;
   desktopHeader?: ReactNode;
+  priority?: number;
 }
 
 export function MobileTabSwipeContainer({
@@ -233,6 +234,7 @@ export function MobileTabSwipeContainer({
   children,
   className = '',
   desktopHeader,
+  priority = 0,
 }: MobileTabSwipeContainerProps) {
   const { registerSubNav } = useMobileSubNav();
   const subNavOwnerId = useId();
@@ -246,11 +248,11 @@ export function MobileTabSwipeContainer({
   useEffect(() => {
     const unregister = registerSubNav(tabs, activeTabId, (id) => {
       onTabChange(id);
-    }, subNavOwnerId);
+    }, subNavOwnerId, priority);
     return () => {
       unregister();
     };
-  }, [tabs, activeTabId, onTabChange, registerSubNav, subNavOwnerId]);
+  }, [tabs, activeTabId, onTabChange, registerSubNav, subNavOwnerId, priority]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;

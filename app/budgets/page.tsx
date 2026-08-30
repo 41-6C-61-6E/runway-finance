@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { BudgetPeriodProvider, BudgetPeriodSelector } from '@/components/budgets/budget-period-selector';
+import { BudgetPeriodProvider, BudgetPeriodSelector, useBudgetPeriod, type PeriodType } from '@/components/budgets/budget-period-selector';
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 import { BudgetTable } from '@/components/budgets/budget-table';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
@@ -10,7 +10,7 @@ import { Wallet, Info, X } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
-import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
+import { MobileTabSwipeContainer, MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
 const ENVELOPE_BANNER_KEY = 'finance:budgets:envelope-info-dismissed';
 
@@ -61,6 +61,7 @@ function EnvelopeInfoBanner() {
 }
 
 function BudgetsContent() {
+  const { periodType, setPeriodType } = useBudgetPeriod();
   const { isVisible } = useChartVisibility();
   const showSummary = isVisible('budgetSummary');
   const showTable = isVisible('budgetTable');
@@ -87,7 +88,7 @@ function BudgetsContent() {
     <div className="space-y-6">
       {/* On mobile, selector appears inside the main view content below swipe indicator */}
       <div className="lg:hidden">
-        <BudgetPeriodSelector />
+        <BudgetPeriodSelector hideTypeTabsOnMobile />
       </div>
       <EnvelopeInfoBanner />
       {showTable && (
@@ -101,7 +102,7 @@ function BudgetsContent() {
   const summaryContent = (
     <div className="space-y-6">
       <div className="lg:hidden">
-        <BudgetPeriodSelector />
+        <BudgetPeriodSelector hideTypeTabsOnMobile />
       </div>
       <Suspense fallback={<LoadingSpinner category="summary" />}>
         <BudgetSummary />
@@ -114,21 +115,33 @@ function BudgetsContent() {
       {/* ── Page Header ── */}
       <PageHeader title="Budgets" icon={Wallet} />
       <PageContent>
-        {showSummary ? (
-          <MobileViewSwitcher
-            desktopHeader={<BudgetPeriodSelector />}
-            main={mainContent}
-            summary={summaryContent}
-            mainLabel="Table"
-            summaryLabel="Overview"
-            summaryCardId="budgetSummary"
-          />
-        ) : (
-          <div className="space-y-6">
-            <BudgetPeriodSelector />
-            {mainContent}
-          </div>
-        )}
+        <MobileTabSwipeContainer
+          tabs={[
+            { id: 'monthly', label: 'Monthly' },
+            { id: 'quarterly', label: 'Quarterly' },
+            { id: 'yearly', label: 'Yearly' },
+          ]}
+          activeTabId={periodType}
+          onTabChange={(tabId) => setPeriodType(tabId as PeriodType)}
+        >
+          {showSummary ? (
+            <MobileViewSwitcher
+              desktopHeader={<BudgetPeriodSelector hideTypeTabsOnMobile />}
+              main={mainContent}
+              summary={summaryContent}
+              mainLabel="Table"
+              summaryLabel="Overview"
+              summaryCardId="budgetSummary"
+            />
+          ) : (
+            <div className="space-y-6">
+              <div className="hidden lg:block">
+                <BudgetPeriodSelector hideTypeTabsOnMobile />
+              </div>
+              {mainContent}
+            </div>
+          )}
+        </MobileTabSwipeContainer>
       </PageContent>
     </div>
   );

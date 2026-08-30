@@ -313,6 +313,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
       tabs={settingsSubTabs}
       activeTabId={subTab}
       onTabChange={(tabId) => setSubTab(tabId as any)}
+      priority={1}
     >
       {subHeader && <div className="lg:hidden">{subHeader}</div>}
 

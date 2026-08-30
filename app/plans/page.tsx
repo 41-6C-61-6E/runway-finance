@@ -12,6 +12,7 @@ import { PlanWizardModal } from '@/components/plans/plan-wizard-modal';
 import { DeletePlanDialog } from '@/components/plans/delete-plan-dialog';
 import { PlanManagementMenu } from '@/components/plans/plan-management-menu';
 import { FirePlanExportModal } from '@/components/plans/fire-plan-export-modal';
+import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
@@ -340,56 +341,54 @@ export default function PlansPage() {
           );
 
           return (
-            <div className="space-y-6">
-              {/* Tab Content */}
-              {activeTab === 'projection' && selectedPlan && (
-                <ProjectionTab
-                  plan={selectedPlan}
-                  accounts={accountsList}
-                  onUpdatePlan={handleUpdatePlan}
-                  dollarMode={dollarMode}
-                  onToggleDollarMode={setDollarMode}
-                  viewMode={viewMode}
-                  onToggleViewMode={setViewMode}
-                  desktopHeader={planSubNav}
-                  subHeader={planSubNav}
-                />
-              )}
+            <MobileTabSwipeContainer
+              tabs={tabs}
+              activeTabId={activeTab}
+              onTabChange={(tabId) => setActiveTab(tabId as 'projection' | 'scenarios' | 'settings')}
+              desktopHeader={planSubNav}
+            >
+              <div className="space-y-6">
+                {/* Tab Content */}
+                {activeTab === 'projection' && selectedPlan && (
+                  <ProjectionTab
+                    plan={selectedPlan}
+                    accounts={accountsList}
+                    onUpdatePlan={handleUpdatePlan}
+                    dollarMode={dollarMode}
+                    onToggleDollarMode={setDollarMode}
+                    viewMode={viewMode}
+                    onToggleViewMode={setViewMode}
+                  />
+                )}
 
-              {activeTab === 'scenarios' && selectedPlan && (
-                <ScenariosTab
-                  plan={selectedPlan}
-                  allPlans={plansList}
-                  onUpdatePlan={handleUpdatePlan}
-                  dollarMode={dollarMode}
-                  onToggleDollarMode={setDollarMode}
-                  viewMode={viewMode}
-                  onToggleViewMode={setViewMode}
-                  desktopHeader={planSubNav}
-                  subHeader={planSubNav}
-                />
-              )}
+                {activeTab === 'scenarios' && selectedPlan && (
+                  <ScenariosTab
+                    plan={selectedPlan}
+                    allPlans={plansList}
+                    onUpdatePlan={handleUpdatePlan}
+                    dollarMode={dollarMode}
+                    onToggleDollarMode={setDollarMode}
+                    viewMode={viewMode}
+                    onToggleViewMode={setViewMode}
+                  />
+                )}
 
-              {activeTab === 'settings' && selectedPlan && (
-                <SettingsTab
-                  plan={selectedPlan}
-                  onUpdatePlan={handleUpdatePlan}
-                  desktopHeader={planSubNav}
-                  subHeader={planSubNav}
-                />
-              )}
+                {activeTab === 'settings' && selectedPlan && (
+                  <SettingsTab
+                    plan={selectedPlan}
+                    onUpdatePlan={handleUpdatePlan}
+                  />
+                )}
 
-              {!selectedPlan && (
-                <>
-                  {planSubNav}
+                {!selectedPlan && (
                   <div className="bg-card border border-border rounded-xl p-8 text-center">
                     <p className="text-sm text-muted-foreground font-medium">
                       No plan selected. Create a plan to get started.
                     </p>
                   </div>
-                </>
-              )}
-            </div>
+                )}
+              </div>
+            </MobileTabSwipeContainer>
           );
         })()}
       </PageContent>

@@ -296,6 +296,7 @@ export function ScenariosTab({
       tabs={subTabs}
       activeTabId={activeSubTab}
       onTabChange={(tabId) => setActiveSubTab(tabId as any)}
+      priority={1}
     >
       {subHeader && <div className="lg:hidden">{subHeader}</div>}
 

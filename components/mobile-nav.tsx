@@ -74,6 +74,29 @@ export function MobileNav() {
 
   const { tabs, activeTabId, navLevels, selectTabAtLevel, activeTabIndex, nextTab, prevTab } = useMobileSubNav();
   const hasSubNav = tabs.length > 0;
+  const subNavMeasureRef = useRef<HTMLDivElement | null>(null);
+  const [wrappedSubNavSignature, setWrappedSubNavSignature] = useState<string | null>(null);
+  const subNavSignature = navLevels
+    .slice(1)
+    .map((level) => level.tabs.map((tab) => `${tab.id}:${tab.label}`).join('|'))
+    .join('||');
+
+  // Keep nested menus on one row unless flex-shrinking has cut a label down
+  // to less than half its natural width. The signature prevents a fallback
+  // needed by one FIRE section from carrying over to another section.
+  useEffect(() => {
+    if (!subNavSignature || wrappedSubNavSignature === subNavSignature) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const labels = subNavMeasureRef.current?.querySelectorAll<HTMLElement>('[data-subnav-child-label]') || [];
+      const needsWrap = Array.from(labels).some((label) => (
+        label.clientWidth > 0 && label.scrollWidth > label.clientWidth * 2
+      ));
+      if (needsWrap) setWrappedSubNavSignature(subNavSignature);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [subNavSignature, wrappedSubNavSignature]);
 
   // Scroll detection state for floating subnav smart auto-dimming
   const [isScrollingDown, setIsScrollingDown] = useState(false);
@@ -453,14 +476,22 @@ export function MobileNav() {
           <div
             onTouchStart={handleSubNavTouchStart}
             onTouchEnd={handleSubNavTouchEnd}
+            ref={subNavMeasureRef}
             className="pointer-events-auto flex items-center justify-center gap-1 max-w-[92vw] w-[calc(100vw-1rem)] select-none"
           >
             {/* Nested sub-navigation: parent menu > child menu. */}
-            <div className="flex items-center justify-center gap-1 min-w-0 w-full">
+            <div className={`flex items-center justify-center gap-1 min-w-0 w-full ${wrappedSubNavSignature === subNavSignature ? 'flex-col' : ''}`}>
               {navLevels.map((level, levelIndex) => (
                 <React.Fragment key={level.id}>
-                  {levelIndex > 0 && <ChevronRight className="w-3 h-3 shrink-0 text-sidebar-foreground/55" aria-hidden="true" />}
-                  <div className="flex min-w-0 shrink items-center gap-1 overflow-hidden rounded-full bg-sidebar/75 p-1 shadow-lg backdrop-blur-xl border border-sidebar-border/35">
+                  {levelIndex > 0 && (
+                    <ChevronRight
+                      className={`w-3 h-3 shrink-0 text-sidebar-foreground/55 ${wrappedSubNavSignature === subNavSignature ? 'rotate-90' : ''}`}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <div
+                    className={`${levelIndex > 0 ? `w-fit max-w-full justify-center ${wrappedSubNavSignature === subNavSignature ? 'flex-wrap' : ''}` : ''} flex min-w-0 shrink items-center gap-1 overflow-hidden rounded-full bg-sidebar/75 p-1 shadow-lg backdrop-blur-xl border border-sidebar-border/35`}
+                  >
                     {level.tabs.map((tab) => {
                       const isActiveTab = tab.id === level.activeTabId;
                       return (
@@ -474,12 +505,19 @@ export function MobileNav() {
                             }
                           }}
                           className={`flex min-w-0 shrink items-center justify-center gap-1.5 py-1 px-2 text-xs rounded-full transition-all duration-200 cursor-pointer select-none whitespace-nowrap ${
+                            wrappedSubNavSignature === subNavSignature && levelIndex > 0 ? 'shrink-0' : ''
+                          } ${
                             isActiveTab
                               ? 'text-primary font-semibold'
                               : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'
                           }`}
                         >
-                          <span className="min-w-0 truncate">{tab.label}</span>
+                          <span
+                            data-subnav-child-label={levelIndex > 0 ? '' : undefined}
+                            className={`${wrappedSubNavSignature === subNavSignature && levelIndex > 0 ? '' : 'min-w-0 truncate'}`}
+                          >
+                            {tab.label}
+                          </span>
                         </button>
                       );
                     })}

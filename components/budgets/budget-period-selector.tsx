@@ -89,7 +89,7 @@ export function BudgetPeriodProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function BudgetPeriodSelector() {
+export function BudgetPeriodSelector({ hideTypeTabsOnMobile = false }: { hideTypeTabsOnMobile?: boolean }) {
   const { periodType, periodKey, setPeriodType, goNext, goPrev } = useBudgetPeriod();
   const label = getKeyLabel(periodType, periodKey);
 
@@ -106,7 +106,7 @@ export function BudgetPeriodSelector() {
         activeTab={periodType}
         onChange={(tabId) => setPeriodType(tabId as PeriodType)}
         variant="underline"
-        className="border-b-0"
+        className={hideTypeTabsOnMobile ? 'hidden lg:flex border-b-0' : 'border-b-0'}
       />
       <div className="flex items-center gap-1 self-start sm:self-center pb-2 sm:pb-2.5">
         <button
