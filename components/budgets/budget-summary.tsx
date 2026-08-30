@@ -176,10 +176,10 @@ export function BudgetSummary() {
   const expenseBudgets = budgets.filter((b) => b.type === 'expense');
 
   // Envelope budgets (quarterly/yearly budgets shown in a shorter period) have
-  // an AVERAGE per-period figure, not a spendable limit. They are excluded
+  // an AVERAGE per-period figure, not a separate spendable budget. They are excluded
   // from period totals, pace math, and the donut so lumpy spending (e.g. a
   // $6,000 vacation month under a $12,000/yr budget) doesn't look like an
-  // overrun. They are tracked separately over their full native period.
+  // over-budget state. They are tracked separately over their full native period.
   const isEnvelope = (b: BudgetData) => isEnvelopeRow(b as EnvelopeBudgetRow);
   const envelopeExpenseBudgets = expenseBudgets.filter(isEnvelope);
   const coreExpenseBudgets = expenseBudgets.filter((b) => !isEnvelope(b));
@@ -267,7 +267,7 @@ export function BudgetSummary() {
   );
 
   // Envelope budgets over their FULL native-period amount — the real
-  // overrun condition for lumpy budgets (tracked over the whole year/quarter,
+  // over-budget condition for lumpy budgets (tracked over the whole year/quarter,
   // no pace).
   const envelopeExceeded = envelopeExpenseBudgets.filter((b) => b.envelopeStatus === 'exceeded');
 
@@ -276,7 +276,7 @@ export function BudgetSummary() {
   const surplusOrDeficit = isPast ? (totalExpenseBudgeted - totalExpenseActual) : projectedSurplusOrDeficit;
 
   const onTrackDescription = minorOverBudgets.length > 0 && totalExpenseCushion > 0
-    ? `${minorOverBudgets.length} minor category overrun${minorOverBudgets.length === 1 ? ' is' : 's are'} absorbed by remaining budget cushion. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} deficit`}).`
+    ? `${minorOverBudgets.length} small over-budget categor${minorOverBudgets.length === 1 ? 'y is' : 'ies are'} absorbed by remaining budget cushion. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} deficit`}).`
     : isFuture
       ? `Overall budget is planned and on track for upcoming ${periodConfig.noun}.`
       : `Overall budget is healthy. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} deficit`}).`;
@@ -288,32 +288,39 @@ export function BudgetSummary() {
     description: onTrackDescription,
   };
 
-  // Rule 1: Critical Overrun (Red)
-  if (totalExpenseActual > totalExpenseBudgeted || significantOverBudgets.length > 0 || envelopeExceeded.length > 0) {
+  // Rule 1: Major Over Budget (Red). Longer-period envelope budgets are
+  // evaluated separately because exceeding their full period is not critical.
+  if (totalExpenseActual > totalExpenseBudgeted || significantOverBudgets.length > 0) {
     healthStatus = {
-      label: 'Critical Overrun',
+      label: 'Major Over Budget',
       badgeClass: 'bg-destructive/10 text-destructive border-destructive/20',
       icon: AlertTriangle,
       description: totalExpenseActual > totalExpenseBudgeted
         ? `Total actual spending (${formatCurrency(totalExpenseActual)}) has exceeded total expense budget (${formatCurrency(totalExpenseBudgeted)}).`
-        : significantOverBudgets.length > 0
-          ? `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'category is' : 'categories are'} >200% of budget or >${formatCurrency(overBudgetThreshold)} over budget.`
-          : `${envelopeExceeded.length} ${envelopeExceeded.length === 1 ? 'envelope budget is' : 'envelope budgets are'} over their full ${envelopeExceeded[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} amount (${envelopeExceeded.map((b) => b.categoryName).join(', ')}).`,
+        : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'budget is' : 'budgets are'} more than 200% used or more than ${formatCurrency(overBudgetThreshold)} over budget.`,
     };
   }
-  // Rule 2: Over Target (Orange)
-  else if (!isPast && !isFuture && projectedExpenseTotal > totalExpenseBudgeted + toleranceBuffer) {
+  // Rule 2: Over Budget (Orange)
+  else if (envelopeExceeded.length > 0) {
     healthStatus = {
-      label: 'Over Target',
+      label: 'Over Budget',
       badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
       icon: TrendingUp,
-      description: `Based on daily variable spending pace (${formatCurrency(variableDailyRate)}/day), projected ${periodConfig.endNoun} total (${formatCurrency(projectedExpenseTotal)}) exceeds overall budget target.`,
+      description: `${envelopeExceeded.length} longer-period ${envelopeExceeded.length === 1 ? 'budget is' : 'budgets are'} over the full ${envelopeExceeded[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} budget amount (${envelopeExceeded.map((b) => b.categoryName).join(', ')}).`,
     };
   }
-  // Rule 3: Watch Pacing (Amber)
+  else if (!isPast && !isFuture && projectedExpenseTotal > totalExpenseBudgeted + toleranceBuffer) {
+    healthStatus = {
+      label: 'Over Budget',
+      badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+      icon: TrendingUp,
+      description: `Based on daily variable spending pace (${formatCurrency(variableDailyRate)}/day), projected ${periodConfig.endNoun} spending (${formatCurrency(projectedExpenseTotal)}) exceeds the overall budget.`,
+    };
+  }
+  // Rule 3: Watch Budget Pace (Amber)
   else if (!isPast && !isFuture && daysElapsed < totalDays && (variableBudgeted > 0 ? (variableActual / variableBudgeted) * 100 > timePercent + 15 : false)) {
     healthStatus = {
-      label: 'Watch Pacing',
+      label: 'Watch Budget Pace',
       badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
       icon: AlertTriangle,
       description: `Discretionary spending is pacing ahead of schedule (${((variableActual / (variableBudgeted || 1)) * 100).toFixed(0)}% spent vs ${timePercent.toFixed(0)}% of ${periodConfig.noun}).`,
@@ -359,12 +366,12 @@ export function BudgetSummary() {
     alertText = `${significantOverBudgets.length} categories over budget`;
     alertHref = getTxUrl(significantOverBudgets.map((b) => b.categoryId));
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
-  } else if (healthStatus.label === 'Over Target') {
-    alertText = `Projected to exceed budget by end of ${periodConfig.noun}`;
+  } else if (healthStatus.label === 'Over Budget' && envelopeExceeded.length === 0) {
+    alertText = `Projected spending exceeds the budget by end of ${periodConfig.noun}`;
     alertHref = `/budgets`;
     alertClass = 'text-orange-500 bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15';
-  } else if (healthStatus.label === 'Watch Pacing') {
-    alertText = `Discretionary spending is pacing fast`;
+  } else if (healthStatus.label === 'Watch Budget Pace') {
+    alertText = `Discretionary spending is ahead of its budget pace`;
     alertHref = `/budgets`;
     alertClass = 'text-amber-500 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15';
   }
@@ -388,11 +395,11 @@ export function BudgetSummary() {
   // Category Risk / Variance Distribution (Metric 1.3)
   const totalCatCount = coreExpenseBudgets.length;
   const underBudgetCount = coreExpenseBudgets.filter((b) => b.percentUsed <= 85).length;
-  const nearLimitCount = coreExpenseBudgets.filter((b) => b.percentUsed > 85 && b.percentUsed <= 100).length;
+  const nearBudgetCount = coreExpenseBudgets.filter((b) => b.percentUsed > 85 && b.percentUsed <= 100).length;
   const overBudgetCount = coreExpenseBudgets.filter((b) => b.percentUsed > 100).length;
 
   const underPct = totalCatCount > 0 ? (underBudgetCount / totalCatCount) * 100 : 0;
-  const nearPct = totalCatCount > 0 ? (nearLimitCount / totalCatCount) * 100 : 0;
+  const nearPct = totalCatCount > 0 ? (nearBudgetCount / totalCatCount) * 100 : 0;
   const overPct = totalCatCount > 0 ? (overBudgetCount / totalCatCount) * 100 : 0;
 
   const isPacingExpanded = !isPacingCollapsed;
@@ -450,7 +457,7 @@ export function BudgetSummary() {
 
       {minorOverBudgets.length > 0 && (
         <div className="pt-1 space-y-1 text-[11px]">
-          <span className="font-semibold text-amber-500 block">Absorbed Minor Overruns:</span>
+          <span className="font-semibold text-amber-500 block">Small Over-Budget Categories:</span>
           <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-amber-500/40">
             {minorOverBudgets.map((b) => (
               <div key={b.id} className="flex justify-between text-[10px]">
@@ -464,7 +471,7 @@ export function BudgetSummary() {
 
       {significantOverBudgets.length > 0 && (
         <div className="pt-1 space-y-1 text-[11px]">
-          <span className="font-semibold text-destructive block">Major Overruns (&gt;200% or &gt;{formatCurrency(overBudgetThreshold)}):</span>
+          <span className="font-semibold text-destructive block">Major Over-Budget Categories (&gt;200% or &gt;{formatCurrency(overBudgetThreshold)}):</span>
           <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-destructive/40">
             {significantOverBudgets.map((b) => (
               <div key={b.id} className="flex justify-between text-[10px]">
@@ -640,7 +647,7 @@ export function BudgetSummary() {
                   </div>
                   <div className="flex justify-end">
                     <span className={cn('text-[11px] font-mono blur-number font-medium', expenseRemaining < 0 ? 'text-destructive' : 'text-muted-foreground')}>
-                      {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over limit`}
+                      {expenseRemaining >= 0 ? `${formatCurrency(expenseRemaining)} remaining` : `${formatCurrency(Math.abs(expenseRemaining))} over budget`}
                     </span>
                   </div>
                 </div>
@@ -651,7 +658,7 @@ export function BudgetSummary() {
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="flex items-center gap-1 text-foreground font-semibold">
                       <TrendingUp className="w-3.5 h-3.5 text-chart-1 shrink-0" />
-                      Income Target
+                    Income Budget
                     </span>
                     <span className="font-mono text-xs text-foreground">
                       <span className="blur-number font-bold">{formatCurrency(totalIncomeActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalIncomeBudgeted)}</span>
@@ -718,7 +725,7 @@ export function BudgetSummary() {
                   <>
                     <TooltipHeader>Category Budget Risk Breakdown</TooltipHeader>
                     <TooltipRow label="On Track (<=85%)" value={`${underBudgetCount} categories (${underPct.toFixed(0)}%)`} color="var(--color-chart-1)" />
-                    <TooltipRow label="Near Limit (85-100%)" value={`${nearLimitCount} categories (${nearPct.toFixed(0)}%)`} color="var(--color-status-warning)" />
+                    <TooltipRow label="Near Budget (85-100%)" value={`${nearBudgetCount} categories (${nearPct.toFixed(0)}%)`} color="var(--color-status-warning)" />
                     <TooltipRow label="Over Budget (>100%)" value={`${overBudgetCount} categories (${overPct.toFixed(0)}%)`} color="var(--color-destructive)" />
                   </>
                 }
@@ -756,7 +763,7 @@ export function BudgetSummary() {
                   </div>
                   <div className="flex justify-between text-[11px] font-mono font-medium text-muted-foreground">
                     <span className="text-emerald-500 font-semibold">{underBudgetCount} On Track</span>
-                    {nearLimitCount > 0 && <span className="text-amber-500 font-semibold">{nearLimitCount} Near</span>}
+                    {nearBudgetCount > 0 && <span className="text-amber-500 font-semibold">{nearBudgetCount} Near</span>}
                     {overBudgetCount > 0 && <span className="text-destructive font-semibold">{overBudgetCount} Over</span>}
                   </div>
                 </div>
@@ -764,7 +771,7 @@ export function BudgetSummary() {
             </div>
           )}
 
-          {/* Section 6: Target vs. Actual Savings Rate */}
+          {/* Section 6: Budgeted vs. Actual Savings Rate */}
           {hasIncome && totalIncomeBudgeted > 0 && (
             <div className="py-4 first:pt-0 last:pb-0">
               <ChartHoverTooltip
@@ -784,14 +791,14 @@ export function BudgetSummary() {
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-foreground flex items-center gap-1">
                       <PiggyBank className="w-3.5 h-3.5 text-chart-1 shrink-0" />
-                      Target Savings Rate
+                      Budgeted Savings Rate
                       <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                     </span>
                     <span className="font-mono text-[11px] font-bold">
                       <span className={cn(actualSavingsRate >= budgetedSavingsRate ? 'text-constructive' : 'text-amber-500')}>
                         {actualSavingsRate.toFixed(0)}%
                       </span>
-                      <span className="text-muted-foreground font-normal"> / {budgetedSavingsRate.toFixed(0)}% target</span>
+                      <span className="text-muted-foreground font-normal"> / {budgetedSavingsRate.toFixed(0)}% budgeted</span>
                     </span>
                   </div>
                   <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">

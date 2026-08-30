@@ -1053,7 +1053,6 @@ export function CashFlowSankey() {
   const sankeyTooltip = useMemo(() => (
     <Tooltip
       isAnimationActive={false}
-      allowEscapeViewBox={{ x: true, y: true }}
       content={(props: any) => {
           const { active, payload, coordinate } = props;
           const x = coordinate?.x;

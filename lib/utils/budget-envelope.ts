@@ -1,13 +1,13 @@
 // Shared types + copy for "envelope budgets": budgets defined in a longer
 // timeframe (quarterly/yearly) that appear in a shorter viewed period.
 //
-// Envelope budgets are NOT prorated limits. A $12,000/yr vacation budget is
+// Envelope budgets are NOT prorated monthly budgets. A $12,000/yr vacation budget is
 // within budget the entire year as long as total yearly spending never exceeds
 // $12,000 — even if it's all spent in January. Pace is deliberately not part
 // of the model; lumpy categories are tracked over their full native period.
 //
 // The per-period `budgeted` value for these rows is an informational AVERAGE
-// ("≈ $1,000/mo"), never a limit.
+// ("≈ $1,000/mo"), never a separate monthly budget.
 
 export type EnvelopeStatus = 'within' | 'nearlyUsed' | 'exceeded';
 

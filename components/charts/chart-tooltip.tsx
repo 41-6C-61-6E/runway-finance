@@ -12,51 +12,69 @@ interface ChartTooltipProps {
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
+function getHorizontalScrollParent(element: HTMLElement): HTMLElement | null {
+  let parent = element.parentElement;
+
+  while (parent && parent !== document.body) {
+    const { overflowX } = window.getComputedStyle(parent);
+    if (/(auto|scroll|overlay)/.test(overflowX)) return parent;
+    parent = parent.parentElement;
+  }
+
+  return null;
+}
+
 export function ChartTooltip({ children, x, y, containerRef, className }: ChartTooltipProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [translateX, setTranslateX] = useState<number>(0);
-  const [translateY, setTranslateY] = useState<number>(0);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const isCustomPositioned = typeof x === 'number' && typeof y === 'number';
 
   useIsomorphicLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    const container = containerRef?.current;
+    setPosition(null);
+    if (!el || !container || !isCustomPositioned || Number.isNaN(x) || Number.isNaN(y)) return;
 
-    if (containerRef && containerRef.current && isCustomPositioned && !Number.isNaN(x) && !Number.isNaN(y)) {
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const initialLeft = containerRect.left + (x ?? 0);
-      const initialTop = containerRect.top + (y ?? 0);
-      el.style.left = `${initialLeft}px`;
-      el.style.top = `${initialTop}px`;
-    }
-
-    // Reset styles to measure original position
-    el.style.transform = 'none';
-
-    const rect = el.getBoundingClientRect();
     const margin = 12;
-    let tx = 0;
-    let ty = 0;
+    const scrollParent = getHorizontalScrollParent(container);
 
-    // Check horizontal bounds with bidirectional safety
-    if (rect.right > window.innerWidth - margin) {
-      tx -= (rect.right - (window.innerWidth - margin));
-    }
-    if (rect.left + tx < margin) {
-      tx += (margin - (rect.left + tx));
-    }
+    const updatePosition = () => {
+      const containerRect = container.getBoundingClientRect();
+      const tooltipRect = el.getBoundingClientRect();
+      const scrollLeft = scrollParent?.scrollLeft ?? 0;
 
-    // Check vertical bounds with bidirectional safety
-    if (rect.bottom > window.innerHeight - margin) {
-      ty -= (rect.bottom - (window.innerHeight - margin));
-    }
-    if (rect.top + ty < margin) {
-      ty += (margin - (rect.top + ty));
-    }
+      // Recharts coordinates are relative to the chart's unscrolled content.
+      // Convert them to viewport coordinates before applying the clamp.
+      const anchorLeft = containerRect.left + (x ?? 0) - scrollLeft;
+      const anchorTop = containerRect.top + (y ?? 0);
+      const maxLeft = Math.max(margin, window.innerWidth - tooltipRect.width - margin);
+      const maxTop = Math.max(margin, window.innerHeight - tooltipRect.height - margin);
 
-    setTranslateX(tx);
-    setTranslateY(ty);
-  }, [children, x, y, containerRef]);
+      setPosition({
+        left: Math.min(Math.max(margin, anchorLeft), maxLeft),
+        top: Math.min(Math.max(margin, anchorTop), maxTop),
+      });
+    };
+
+    updatePosition();
+
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updatePosition)
+      : null;
+    resizeObserver?.observe(el);
+    resizeObserver?.observe(container);
+
+    window.addEventListener('resize', updatePosition, { passive: true });
+    window.addEventListener('scroll', updatePosition, { passive: true, capture: true });
+    scrollParent?.addEventListener('scroll', updatePosition, { passive: true });
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      scrollParent?.removeEventListener('scroll', updatePosition);
+    };
+  }, [children, x, y, containerRef, isCustomPositioned]);
 
   const tooltipContent = (
     <div
@@ -68,12 +86,14 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
       style={{
         position: containerRef ? 'fixed' : isCustomPositioned ? 'absolute' : 'relative',
         ...(isCustomPositioned && !containerRef ? { left: `${x}px`, top: `${y}px` } : {}),
-        maxWidth: 'min(380px, calc(100vw - 32px))',
-        maxHeight: 'calc(100vh - 32px)',
+        ...(containerRef && position ? { left: `${position.left}px`, top: `${position.top}px` } : {}),
+        width: 'min(380px, calc(100vw - 24px))',
+        maxWidth: 'calc(100vw - 24px)',
+        maxHeight: 'calc(100vh - 24px)',
         overflowY: 'auto',
-        width: 'max-content',
-        transform: `translate(${translateX}px, ${translateY}px)`,
-        transition: 'transform 0.05s ease-out, opacity 0.15s ease-out',
+        overflowWrap: 'anywhere',
+        visibility: containerRef && !position ? 'hidden' : 'visible',
+        transition: 'opacity 0.15s ease-out',
         boxSizing: 'border-box',
         pointerEvents: 'none',
       }}
@@ -123,5 +143,3 @@ export function TooltipHeader({ children, className }: TooltipHeaderProps) {
     </div>
   );
 }
-
-

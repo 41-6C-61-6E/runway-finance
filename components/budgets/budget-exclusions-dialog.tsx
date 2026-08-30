@@ -323,7 +323,7 @@ export function BudgetExclusionsDialog({ open, onClose }: BudgetExclusionsDialog
               <div className="p-2.5 rounded-lg bg-accent/40 border border-border/60 text-xs text-muted-foreground flex items-start gap-2">
                 <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <span>
-                  Excluded categories are ignored from budget target pacing, actuals aggregation, and the "Everything Else" catch-all bucket.
+                  Excluded categories are ignored from budget pacing, actuals aggregation, and the "Everything Else" catch-all bucket.
                 </span>
               </div>
 

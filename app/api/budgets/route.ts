@@ -236,8 +236,8 @@ export async function GET(request: Request) {
       /**
        * true when the budget is expressed in a LONGER timeframe than the
        * viewed period (a yearly budget shown in a monthly view). `budgeted`
-       * is then an informational monthly/quarterly average, NOT a limit —
-       * the real limit is the full native amount (the "envelope").
+       * is then an informational monthly/quarterly average, NOT a separate
+       * budget — the full native-period amount is the budget for that envelope.
        */
       prorated: boolean;
       /** The native period key this budget is defined over (e.g. "2026" for a yearly budget), derived from the viewed period for recurring budgets. */
@@ -647,7 +647,7 @@ export async function GET(request: Request) {
             if (isNaN(amt)) continue;
             const catInfo = categoryByIdMap.get(tx.categoryId);
             // Income categories: deposits are positive in DB, and they
-            // INCREASE the remaining envelope (income envelope = target).
+            // INCREASE the remaining envelope (income envelope = budget).
             spent += catInfo?.isIncome ? amt : -amt;
           }
 

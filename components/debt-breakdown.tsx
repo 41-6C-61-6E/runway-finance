@@ -438,10 +438,10 @@ export function DebtBreakdown() {
               )}
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 flex justify-center">
               {activeCategories.length > 0 ? (
-                <div className="max-h-40 overflow-y-auto">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="w-fit max-w-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                     {activeCategories.map((cat) => {
                       const share = activeTotal > 0 ? (cat.amount / activeTotal) * 100 : 0;
                       return (

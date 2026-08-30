@@ -381,7 +381,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     return (
       <span
         className="text-muted-foreground"
-        title={`Averaged from ${formatCurrency(b.nativeAmount ?? 0)} per ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} — not a ${periodType === 'quarterly' ? 'quarterly' : 'monthly'} limit`}
+        title={`Averaged from ${formatCurrency(b.nativeAmount ?? 0)} per ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} — not a separate ${periodType === 'quarterly' ? 'quarterly' : 'monthly'} budget`}
       >
         {formatCurrency(b.budgeted)}
         <span className="text-[9px] font-sans text-muted-foreground/70 ml-0.5">avg</span>
@@ -806,16 +806,18 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
         ) : (
           <div ref={containerRef} className="w-full overflow-x-auto min-w-0 border-collapse">
             {(() => {
-              const showProgressCol = containerWidth >= 850;
-              const showVarianceCol = containerWidth >= 650;
+              // Preserve progress longer; variance is the first metric removed
+              // as the table gets narrower. The category cell yields width first.
+              const showProgressCol = containerWidth >= 650;
+              const showVarianceCol = containerWidth >= 850;
               const showAccountCol = containerWidth >= 1050 && hasAnyAccount;
               const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
 
               return (
-                <table className="w-full text-xs sm:text-sm border-collapse min-w-[360px]">
+                <table className="w-full table-fixed text-xs sm:text-sm border-collapse min-w-[360px]">
                   <thead>
                     <tr className="border-t border-border">
-                      <th className="text-left px-2.5 sm:px-3.5 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
+                      <th className="w-[30%] text-left px-2.5 sm:px-3.5 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
                       <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
                       <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
                       {showVarianceCol && (
@@ -853,7 +855,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
                               <Link
                                 href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
-                                className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
+                                className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-[140px] md:max-w-[200px] inline-block align-middle"
                               >
                                 {b.categoryName}
                               </Link>
@@ -940,7 +942,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                       : b.coveredCategoryIds,
                                     b.categoryId
                                   )}
-                                  className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors shrink min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[260px] inline-block align-middle"
+                                    className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-[140px] md:max-w-[200px] inline-block align-middle"
                                 >
                                   {b.categoryName}
                                 </Link>
