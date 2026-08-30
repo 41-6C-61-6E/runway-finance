@@ -7,14 +7,21 @@ export interface SubNavTab {
   label: string;
 }
 
+export interface SubNavLevel {
+  id: number;
+  tabs: SubNavTab[];
+  activeTabId: string;
+}
+
 interface MobileSubNavContextType {
   tabs: SubNavTab[];
   activeTabId: string | null;
   activeTabIndex: number;
-  registerSubNav: (tabs: SubNavTab[], activeTabId: string, onSelect: (id: string) => void) => void;
-  unregisterSubNav: () => void;
+  navLevels: SubNavLevel[];
+  registerSubNav: (tabs: SubNavTab[], activeTabId: string, onSelect: (id: string) => void, ownerId: string, priority?: number) => () => void;
   setActiveTabId: (id: string) => void;
   selectTab: (id: string) => void;
+  selectTabAtLevel: (levelId: number, id: string) => void;
   nextTab: () => void;
   prevTab: () => void;
 }
@@ -22,32 +29,73 @@ interface MobileSubNavContextType {
 const MobileSubNavContext = createContext<MobileSubNavContextType | null>(null);
 
 export function MobileSubNavProvider({ children }: { children: ReactNode }) {
-  const [tabs, setTabs] = useState<SubNavTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [onSelectCallback, setOnSelectCallback] = useState<((id: string) => void) | null>(null);
+  const [registrations, setRegistrations] = useState<Array<{
+    id: number;
+    ownerId: string;
+    priority: number;
+    tabs: SubNavTab[];
+    activeTabId: string;
+    onSelect: (id: string) => void;
+  }>>([]);
+  const nextRegistrationId = React.useRef(0);
+
+  const activeRegistration = registrations.reduce<typeof registrations[number] | undefined>(
+    (active, registration) => !active || registration.priority >= active.priority ? registration : active,
+    undefined
+  );
+  const tabs = activeRegistration?.tabs || [];
+  const activeTabId = activeRegistration?.activeTabId || null;
+  const navLevels = registrations.map(({ id, tabs, activeTabId: levelActiveTabId }) => ({
+    id,
+    tabs,
+    activeTabId: levelActiveTabId,
+  }));
 
   const registerSubNav = useCallback((
     newTabs: SubNavTab[],
     currentActiveId: string,
-    onSelect: (id: string) => void
+    onSelect: (id: string) => void,
+    ownerId: string,
+    priority = 0
   ) => {
-    setTabs(newTabs);
-    setActiveTabId(currentActiveId);
-    setOnSelectCallback(() => onSelect);
-  }, []);
+    const id = nextRegistrationId.current++;
+    setRegistrations((current) => {
+      const existingIndex = current.findIndex((registration) => registration.ownerId === ownerId);
+      if (existingIndex === -1) {
+        return [...current, { id, ownerId, priority, tabs: newTabs, activeTabId: currentActiveId, onSelect }];
+      }
 
-  const unregisterSubNav = useCallback(() => {
-    setTabs([]);
-    setActiveTabId(null);
-    setOnSelectCallback(null);
+      return current.map((registration, index) => index === existingIndex
+        ? { ...registration, priority, tabs: newTabs, activeTabId: currentActiveId, onSelect }
+        : registration
+      );
+    });
+    return () => setRegistrations((current) => current.filter((registration) => registration.ownerId !== ownerId));
   }, []);
 
   const selectTab = useCallback((id: string) => {
-    setActiveTabId(id);
-    if (onSelectCallback) {
-      onSelectCallback(id);
-    }
-  }, [onSelectCallback]);
+    const registration = activeRegistration;
+    if (!registration) return;
+    setRegistrations((current) => current.map((item) => item.id === registration.id ? { ...item, activeTabId: id } : item));
+    registration.onSelect(id);
+  }, [activeRegistration]);
+
+  const setActiveTabId = useCallback((id: string) => {
+    setRegistrations((current) => {
+      const active = current.reduce<typeof current[number] | undefined>(
+        (top, item) => !top || item.priority >= top.priority ? item : top,
+        undefined
+      );
+      return current.map((item) => item.id === active?.id ? { ...item, activeTabId: id } : item);
+    });
+  }, []);
+
+  const selectTabAtLevel = useCallback((levelId: number, id: string) => {
+    const registration = registrations.find((item) => item.id === levelId);
+    if (!registration) return;
+    setRegistrations((current) => current.map((item) => item.id === levelId ? { ...item, activeTabId: id } : item));
+    registration.onSelect(id);
+  }, [registrations]);
 
   const activeTabIndex = useMemo(() => {
     if (!activeTabId || tabs.length === 0) return -1;
@@ -74,13 +122,14 @@ export function MobileSubNavProvider({ children }: { children: ReactNode }) {
     tabs,
     activeTabId,
     activeTabIndex,
+    navLevels,
     registerSubNav,
-    unregisterSubNav,
     setActiveTabId,
     selectTab,
+    selectTabAtLevel,
     nextTab,
     prevTab,
-  }), [tabs, activeTabId, activeTabIndex, registerSubNav, unregisterSubNav, selectTab, nextTab, prevTab]);
+  }), [tabs, activeTabId, activeTabIndex, navLevels, registerSubNav, setActiveTabId, selectTab, selectTabAtLevel, nextTab, prevTab]);
 
   return (
     <MobileSubNavContext.Provider value={value}>
@@ -96,10 +145,11 @@ export function useMobileSubNav() {
       tabs: [],
       activeTabId: null,
       activeTabIndex: -1,
-      registerSubNav: () => {},
-      unregisterSubNav: () => {},
+      navLevels: [],
+      registerSubNav: () => () => {},
       setActiveTabId: () => {},
       selectTab: () => {},
+      selectTabAtLevel: () => {},
       nextTab: () => {},
       prevTab: () => {},
     };

@@ -145,6 +145,32 @@ export default function GroupDetailPanel({
     [slicedHistory, accounts]
   );
 
+  // Keep the largest account at the base of the stacked area chart. This makes
+  // changes in smaller accounts move their own boundary instead of shifting
+  // every series below them.
+  const chartAccounts = useMemo(() => {
+    const latestBalances = new Map<string, number>();
+    for (const acc of accounts) {
+      for (let i = slicedHistory.length - 1; i >= 0; i--) {
+        const value = slicedHistory[i][acc.id];
+        if (value != null) {
+          latestBalances.set(acc.id, Math.abs(Number(value) || 0));
+          break;
+        }
+      }
+    }
+
+    return accounts
+      .map((acc, index) => ({ acc, index }))
+      .sort(
+        (a, b) =>
+          (latestBalances.get(b.acc.id) || 0) -
+            (latestBalances.get(a.acc.id) || 0) ||
+          a.index - b.index
+      )
+      .map(({ acc }) => acc);
+  }, [accounts, slicedHistory]);
+
   const maxStackedTotal = useMemo(() => {
     if (chartData.length === 0 || accounts.length === 0) return 0;
     let max = 0;
@@ -260,7 +286,7 @@ export default function GroupDetailPanel({
                   margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
                 >
                   <defs>
-                    {accounts.map((acc) => {
+                    {chartAccounts.map((acc) => {
                       const color = colorByAccount.get(acc.id) || 'var(--chart-1)';
                       return (
                         <linearGradient
@@ -312,7 +338,7 @@ export default function GroupDetailPanel({
                     }
                     cursor={{ stroke: 'var(--color-border)', opacity: 0.5 }}
                   />
-                  {accounts.map((acc) => (
+                  {chartAccounts.map((acc) => (
                     <Area
                       key={acc.id}
                       type="monotone"

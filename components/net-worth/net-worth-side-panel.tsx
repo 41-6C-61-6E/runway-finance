@@ -294,6 +294,7 @@ export function NetWorthSidePanel() {
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
         collapseDirection="horizontal"
+        showMobileToggle={false}
         title={
           <div className="flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-primary shrink-0" />

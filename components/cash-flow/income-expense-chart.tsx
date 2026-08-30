@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import {
   ComposedChart,
@@ -155,7 +154,7 @@ export function IncomeExpenseChart() {
     showWindowNav,
   } = useDateWindow('finance:income-expense:timeframe', 'finance:income-expense:windowEnd', '1y');
   const [chartType, setChartType] = useState<ChartType>('bar');
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('incomeExpenseChart');
+  const isCollapsed = false;
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -409,7 +408,6 @@ export function IncomeExpenseChart() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
@@ -427,7 +425,6 @@ export function IncomeExpenseChart() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
@@ -449,7 +446,6 @@ export function IncomeExpenseChart() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
           title={
             <div className="flex items-center gap-2">
               <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
@@ -475,7 +471,6 @@ export function IncomeExpenseChart() {
       )}
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
         title={
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />

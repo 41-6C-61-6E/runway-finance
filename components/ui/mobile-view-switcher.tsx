@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useId, type ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -43,7 +43,8 @@ export function MobileViewSwitcher({
   onMainTabChange,
 }: MobileViewSwitcherProps) {
   const [activeTab, setActiveTab] = useState<'main' | 'summary'>('main');
-  const { registerSubNav, unregisterSubNav } = useMobileSubNav();
+  const { registerSubNav } = useMobileSubNav();
+  const subNavOwnerId = useId();
   const [isSummaryCollapsed, setIsSummaryCollapsed] = useCardCollapsed(summaryCardId || '_none_', false);
 
   const isHorizontalCollapseEnabled = Boolean(summaryCardId) && isSummaryCollapsed;
@@ -74,17 +75,17 @@ export function MobileViewSwitcher({
   };
 
   useEffect(() => {
-    registerSubNav(subNavTabs, subNavActiveId, (id) => {
+    const unregister = registerSubNav(subNavTabs, subNavActiveId, (id) => {
       if (id === 'summary') {
         setActiveTab('summary');
       } else {
         handleSelectMainTab(id);
       }
-    });
+    }, subNavOwnerId, 1);
     return () => {
-      unregisterSubNav();
+      unregister();
     };
-  }, [subNavTabs, subNavActiveId, mainTabs, onMainTabChange, registerSubNav, unregisterSubNav]);
+  }, [subNavTabs, subNavActiveId, mainTabs, onMainTabChange, registerSubNav, subNavOwnerId]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
@@ -233,7 +234,8 @@ export function MobileTabSwipeContainer({
   className = '',
   desktopHeader,
 }: MobileTabSwipeContainerProps) {
-  const { registerSubNav, unregisterSubNav } = useMobileSubNav();
+  const { registerSubNav } = useMobileSubNav();
+  const subNavOwnerId = useId();
 
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
@@ -242,13 +244,13 @@ export function MobileTabSwipeContainer({
   const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
 
   useEffect(() => {
-    registerSubNav(tabs, activeTabId, (id) => {
+    const unregister = registerSubNav(tabs, activeTabId, (id) => {
       onTabChange(id);
-    });
+    }, subNavOwnerId);
     return () => {
-      unregisterSubNav();
+      unregister();
     };
-  }, [tabs, activeTabId, onTabChange, registerSubNav, unregisterSubNav]);
+  }, [tabs, activeTabId, onTabChange, registerSubNav, subNavOwnerId]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;

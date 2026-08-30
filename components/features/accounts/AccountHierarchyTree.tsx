@@ -20,7 +20,6 @@ import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filte
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Sparkline } from '@/components/ui/sparkline';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
@@ -56,7 +55,7 @@ export default function AccountHierarchyTree({
   targetAccountId,
 }: AccountHierarchyTreeProps) {
   const { hideSubheadings } = useAccountSubheadings();
-  const [hierarchyCollapsed, setHierarchyCollapsed] = useCardCollapsed('accountsHierarchy');
+  const hierarchyCollapsed = false;
   const [showHierarchyFilters, setShowHierarchyFilters] = useState(false);
   const [hierarchyTimeframe, setHierarchyTimeframe] = usePersistentState<TimeRange>('finance:accounts:hierarchyTimeframe', '1m');
 
@@ -86,6 +85,7 @@ export default function AccountHierarchyTree({
   const hierarchyTypesRef = useRef<HTMLDivElement>(null);
   const hierarchyAccountsRef = useRef<HTMLDivElement>(null);
   const hierarchyTagsRef = useRef<HTMLDivElement>(null);
+  const pendingMobileAccountScrollRef = useRef<string | null>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -123,10 +123,6 @@ export default function AccountHierarchyTree({
       }
     }
 
-    if (hierarchyCollapsed) {
-      setHierarchyCollapsed(false);
-    }
-
     const timer = setTimeout(() => {
       const el = document.getElementById(`account-row-${targetAccountId}`);
       if (el) {
@@ -135,7 +131,7 @@ export default function AccountHierarchyTree({
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [targetAccountId, filteredAllAccounts, hierarchyCollapsed, setHierarchyCollapsed]);
+  }, [targetAccountId, filteredAllAccounts]);
 
   const hierarchyAvailableGroups = useMemo(() => {
     const groups = new Set<string>();
@@ -344,6 +340,32 @@ export default function AccountHierarchyTree({
     setExpandedAccounts({});
   }, []);
 
+  const handleAccountSelect = useCallback((accountId: string, isExpanded: boolean) => {
+    if (!isExpanded && window.innerWidth < 1024) {
+      pendingMobileAccountScrollRef.current = accountId;
+    }
+    setSelectedGroup(null);
+    setExpandedAccounts(isExpanded ? {} : { [accountId]: true });
+  }, []);
+
+  // Selecting an account can remove a tall combined panel above it. Once the
+  // new account detail has been laid out, keep its row at the top of the view
+  // so the detail the user opened stays visible on mobile.
+  useEffect(() => {
+    const accountId = pendingMobileAccountScrollRef.current;
+    if (!accountId || !expandedAccounts[accountId] || selectedGroup) return;
+
+    pendingMobileAccountScrollRef.current = null;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`account-row-${accountId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [expandedAccounts, selectedGroup]);
+
   // Selected-group detail (combined chart) — below lg it renders inline under the group heading,
   // identical to how an account's transaction card opens under its row; at lg+ it fills the side column
   const groupDetailPanel =
@@ -362,7 +384,6 @@ export default function AccountHierarchyTree({
       <Card className="@container lg:col-span-5 bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
       <CollapsibleCardHeader
         isCollapsed={hierarchyCollapsed}
-        onToggle={setHierarchyCollapsed}
         title={
           <div className="flex items-center gap-2">
             <Landmark className="w-4 h-4 text-primary shrink-0" />
@@ -864,7 +885,7 @@ export default function AccountHierarchyTree({
                                 const row = (
                                     <div 
                                       id={`account-row-${acc.id}`}
-                                      onClick={() => { setSelectedGroup(null); setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true }); }}
+                                      onClick={() => handleAccountSelect(acc.id, isAccExpanded)}
                                       className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
                                         isAccExpanded 
                                           ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
@@ -1044,7 +1065,7 @@ export default function AccountHierarchyTree({
                                       const row = (
                                           <div 
                                             id={`account-row-${acc.id}`}
-                                            onClick={() => { setSelectedGroup(null); setExpandedAccounts(isAccExpanded ? {} : { [acc.id]: true }); }}
+                                          onClick={() => handleAccountSelect(acc.id, isAccExpanded)}
                                             className={`w-full flex items-center justify-between px-0 py-2 transition-all cursor-pointer select-none ${
                                               isAccExpanded 
                                                 ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
@@ -1184,7 +1205,7 @@ export default function AccountHierarchyTree({
                               const row = (
                                   <div 
                                     id={`account-row-${singleAcc.id}`}
-                                    onClick={() => { setSelectedGroup(null); setExpandedAccounts(isAccExpanded ? {} : { [singleAcc.id]: true }); }}
+                                    onClick={() => handleAccountSelect(singleAcc.id, isAccExpanded)}
                                     className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
                                       isAccExpanded 
                                         ? 'bg-primary/10 hover:bg-primary/15 font-medium' 

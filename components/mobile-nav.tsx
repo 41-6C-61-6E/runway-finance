@@ -72,7 +72,7 @@ export function MobileNav() {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isHidden } = useHiddenPages();
 
-  const { tabs, activeTabId, selectTab, activeTabIndex, nextTab, prevTab } = useMobileSubNav();
+  const { tabs, activeTabId, navLevels, selectTabAtLevel, activeTabIndex, nextTab, prevTab } = useMobileSubNav();
   const hasSubNav = tabs.length > 0;
 
   // Scroll detection state for floating subnav smart auto-dimming
@@ -453,40 +453,39 @@ export function MobileNav() {
           <div
             onTouchStart={handleSubNavTouchStart}
             onTouchEnd={handleSubNavTouchEnd}
-            className="pointer-events-auto flex items-center gap-1 p-1 bg-sidebar/75 backdrop-blur-xl border border-sidebar-border/35 rounded-full shadow-lg transition-all duration-300 max-w-[92vw] select-none"
+            className="pointer-events-auto flex items-center justify-center gap-1 max-w-[92vw] w-[calc(100vw-1rem)] select-none"
           >
-            {/* SubNav Tabs with Page Dots */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 px-1">
-              {tabs.map((tab) => {
-                const isActiveTab = tab.id === activeTabId;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      if (!isActiveTab) {
-                        haptic.light();
-                        selectTab(tab.id);
-                      }
-                    }}
-                    className={`flex items-center gap-1.5 py-1 px-2.5 text-xs rounded-full transition-all duration-200 cursor-pointer select-none whitespace-nowrap ${
-                      isActiveTab
-                        ? 'text-primary font-semibold'
-                        : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'
-                    }`}
-                  >
-                    {/* Page Indicator Dot */}
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
-                        isActiveTab
-                          ? 'bg-primary scale-110 shadow-[0_0_6px_rgba(var(--primary-rgb),0.7)]'
-                          : 'bg-sidebar-foreground/30 scale-90'
-                      }`}
-                    />
-                    <span className="truncate">{tab.label}</span>
-                  </button>
-                );
-              })}
+            {/* Nested sub-navigation: parent menu > child menu. */}
+            <div className="flex items-center justify-center gap-1 min-w-0 w-full">
+              {navLevels.map((level, levelIndex) => (
+                <React.Fragment key={level.id}>
+                  {levelIndex > 0 && <ChevronRight className="w-3 h-3 shrink-0 text-sidebar-foreground/55" aria-hidden="true" />}
+                  <div className={`flex items-center gap-1 min-w-0 rounded-full p-1 bg-sidebar/75 backdrop-blur-xl border border-sidebar-border/35 shadow-lg ${navLevels.length > 1 ? 'flex-1 max-w-[calc(50%_-_0.375rem)]' : 'max-w-full'}`}>
+                    {level.tabs.map((tab) => {
+                      const isActiveTab = tab.id === level.activeTabId;
+                      return (
+                        <button
+                          key={`${level.id}-${tab.id}`}
+                          type="button"
+                          onClick={() => {
+                            if (!isActiveTab) {
+                              haptic.light();
+                              selectTabAtLevel(level.id, tab.id);
+                            }
+                          }}
+                          className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 py-1 px-2 text-xs rounded-full transition-all duration-200 cursor-pointer select-none ${
+                            isActiveTab
+                              ? 'text-primary font-semibold'
+                              : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'
+                          }`}
+                        >
+                          <span className="min-w-0 truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </React.Fragment>
+              ))}
             </div>
           </div>
         </div>
@@ -751,4 +750,3 @@ export function MobileNav() {
     </>
   );
 }
-

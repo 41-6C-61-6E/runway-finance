@@ -13,10 +13,13 @@ interface CollapsibleCardHeaderProps extends Omit<React.HTMLAttributes<HTMLDivEl
   icon?: React.ElementType;
   actions?: React.ReactNode;
   collapseDirection?: 'vertical' | 'horizontal';
+  /** Hide the responsive toggle when collapsing is not useful at that breakpoint. */
+  showMobileToggle?: boolean;
+  showDesktopToggle?: boolean;
 }
 
 const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHeaderProps>(
-  ({ isCollapsed = false, onToggle, title, description, icon: Icon, actions, collapseDirection = 'vertical', className, children, ...props }, ref) => {
+  ({ isCollapsed = false, onToggle, title, description, icon: Icon, actions, collapseDirection = 'vertical', showMobileToggle = true, showDesktopToggle = true, className, children, ...props }, ref) => {
     const showActions = actions && !isCollapsed;
 
     const renderToggleIcon = (isDesktop: boolean) => {
@@ -86,14 +89,15 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
             </div>
             {children}
           </div>
-          <button
+          {onToggle && showMobileToggle && <button
             onClick={() => onToggle?.(!isCollapsed)}
             className="p-1 rounded hover:bg-accent transition-colors cursor-pointer shrink-0 text-muted-foreground hover:text-foreground sm:hidden"
             aria-label={isCollapsed ? 'Expand card' : 'Collapse card'}
+            aria-expanded={!isCollapsed}
             type="button"
           >
             {renderToggleIcon(false)}
-          </button>
+          </button>}
         </div>
 
         <div
@@ -107,14 +111,15 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
               {actions}
             </div>
           )}
-          <button
+          {onToggle && showDesktopToggle && <button
             onClick={() => onToggle?.(!isCollapsed)}
             className="p-1 rounded hover:bg-accent transition-colors cursor-pointer shrink-0 text-muted-foreground hover:text-foreground hidden sm:block"
             aria-label={isCollapsed ? 'Expand card' : 'Collapse card'}
+            aria-expanded={!isCollapsed}
             type="button"
           >
             {renderToggleIcon(true)}
-          </button>
+          </button>}
         </div>
       </div>
     );

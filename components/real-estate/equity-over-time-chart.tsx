@@ -20,7 +20,6 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { EstimatePill } from '@/components/ui/estimate-pill';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { TrendingUp } from 'lucide-react';
@@ -62,7 +61,7 @@ interface RealEstateData {
 
 export function EquityOverTimeChart() {
   const { privacyMode } = usePrivacyMode();
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('equityOverTimeChart');
+  const isCollapsed = false;
   const { isEnabled } = useSyntheticData();
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -399,7 +398,6 @@ export function EquityOverTimeChart() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
           title={
             <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
@@ -416,7 +414,6 @@ export function EquityOverTimeChart() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
           title={
             <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
@@ -437,7 +434,6 @@ export function EquityOverTimeChart() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
           title={
             <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
@@ -458,7 +454,6 @@ export function EquityOverTimeChart() {
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
           title={
             <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
@@ -531,7 +526,6 @@ export function EquityOverTimeChart() {
       )}
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
         title={
           <div className="flex items-center gap-2">
             <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">

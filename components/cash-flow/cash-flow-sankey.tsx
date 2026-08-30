@@ -9,7 +9,6 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { GitMerge, ChevronDown, Search } from 'lucide-react';
@@ -734,7 +733,7 @@ const SankeyCustomLink = ({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export function CashFlowSankey() {
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('cashFlowSankey');
+  const isCollapsed = false;
   const [showFilters, setShowFilters] = useState(false);
   const router = useRouter();
   const {
@@ -1126,7 +1125,6 @@ export function CashFlowSankey() {
     <div className="bg-card border border-border rounded-xl shadow-sm">
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
         title={
           <div className="flex items-center gap-2">
             <GitMerge className="w-4 h-4 text-primary shrink-0" />

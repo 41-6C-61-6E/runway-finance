@@ -164,7 +164,7 @@ export default function AccountsSidebar() {
         return (
           <div key={`${group}::${subGroup}`}>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-md hover:bg-muted/30 transition-colors">
-              <button onClick={() => toggle(group, subGroup)} className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0">
+              <button onClick={() => toggle(group, subGroup)} aria-expanded={subGroupExpanded} aria-label={`${subGroupExpanded ? 'Collapse' : 'Expand'} ${subGroup} accounts`} className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0">
                 {subGroupExpanded ? (
                   <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30" />
                 ) : (
@@ -326,6 +326,8 @@ export default function AccountsSidebar() {
                   <div className="flex items-center gap-1.5 px-2 py-2 rounded-md bg-muted/40 transition-colors">
                     <button
                       onClick={() => toggleGroup(group)}
+                      aria-expanded={groupExpanded}
+                      aria-label={`${groupExpanded ? 'Collapse' : 'Expand'} ${group} accounts`}
                       className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0"
                     >
                       {groupExpanded ? (

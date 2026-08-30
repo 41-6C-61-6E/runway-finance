@@ -59,6 +59,7 @@ export default function RecurringSidePanel({ summary }: RecurringSidePanelProps)
         isCollapsed={collapsed}
         onToggle={setCollapsed}
         collapseDirection="horizontal"
+        showMobileToggle={false}
         title={
           <div className="flex items-center gap-2">
             <span className="font-bold text-foreground">Overview</span>

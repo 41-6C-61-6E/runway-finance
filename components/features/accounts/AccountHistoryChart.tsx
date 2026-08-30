@@ -26,7 +26,6 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { isAssetAccount } from '@/lib/utils/account-scope';
 import { formatCurrency } from '@/lib/utils/format';
@@ -117,7 +116,7 @@ export default function AccountHistoryChart({
 
   const [chartType, setChartType] = usePersistentState<ChartType>('finance:accounts:chartType', 'line');
   const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('finance:accounts:groupMode', 'type');
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('balanceHistoryChart');
+  const isCollapsed = false;
   const [showHistoryFilters, setShowHistoryFilters] = useState(false);
 
   // Viewport pan/zoom state
@@ -745,7 +744,6 @@ export default function AccountHistoryChart({
     <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
         title={
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary shrink-0" />

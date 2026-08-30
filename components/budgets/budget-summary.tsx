@@ -499,6 +499,7 @@ export function BudgetSummary() {
         isCollapsed={collapsed}
         onToggle={setCollapsed}
         collapseDirection="horizontal"
+        showMobileToggle={false}
         title={
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4 text-primary shrink-0" />

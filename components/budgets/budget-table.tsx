@@ -390,12 +390,9 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   };
 
   // Small grey qualifier for an envelope row whose native timeframe differs:
-  // e.g. "$300 over $12,000/yr" or "$6,000 of $12,000/yr left". Only shown
-  // when the envelope amount differs from the displayed (selected-period)
-  // variance, so it never duplicates the main aligned number.
+  // e.g. "$300 over $12,000/yr" or "$6,000 of $12,000/yr left".
   const envelopeSubText = (b: BudgetData): string | null => {
     if (!isEnvelope(b) || b.envelopeSpent == null || b.envelopeRemaining == null || b.nativeAmount == null) return null;
-    if (Math.abs(b.remaining - b.envelopeSpent) < 0.01) return null;
     const per = b.nativePeriodType === 'quarterly' ? 'qt' : 'yr';
     if (b.envelopeRemaining < 0) return `${formatCurrency(Math.abs(b.envelopeRemaining))} over ${formatCurrency(b.nativeAmount)}/${per}`;
     if (b.envelopeStatus === 'nearlyUsed') return `${formatCurrency(b.envelopeRemaining)} of ${formatCurrency(b.nativeAmount)}/${per} left`;
@@ -848,6 +845,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                     )}
                     {incomeBudgets.map((b) => {
                       const isTargetMet = b.remaining >= 0;
+                      const envSub = envelopeSubText(b);
                       return (
                         <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
                           <td className={`px-2.5 sm:px-3.5 py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
@@ -879,8 +877,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                           <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
                           <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground font-medium blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
                           {showVarianceCol && (
-                            <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
-                              {b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}
+                            <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? 'text-muted-foreground' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
+                              {isEnvelope(b) ? <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span> : <>{b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}</>}
                             </td>
                           )}
                           {showProgressCol && (
@@ -989,9 +987,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
                             <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
                             {showVarianceCol && (
-                              <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
-                                {formatCurrency(b.remaining)}
-                                {envSub && <div className="text-[10px] text-muted-foreground font-sans mt-0.5">{envSub}</div>}
+                              <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? 'text-muted-foreground' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
+                                {isEnvelope(b) ? <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span> : formatCurrency(b.remaining)}
                               </td>
                             )}
                             {showProgressCol && (
