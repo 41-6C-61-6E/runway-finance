@@ -460,7 +460,7 @@ export function MobileNav() {
               {navLevels.map((level, levelIndex) => (
                 <React.Fragment key={level.id}>
                   {levelIndex > 0 && <ChevronRight className="w-3 h-3 shrink-0 text-sidebar-foreground/55" aria-hidden="true" />}
-                  <div className={`flex items-center gap-1 min-w-0 rounded-full p-1 bg-sidebar/75 backdrop-blur-xl border border-sidebar-border/35 shadow-lg ${navLevels.length > 1 ? 'flex-1 max-w-[calc(50%_-_0.375rem)]' : 'max-w-full'}`}>
+                  <div className="flex min-w-0 shrink items-center gap-1 overflow-hidden rounded-full bg-sidebar/75 p-1 shadow-lg backdrop-blur-xl border border-sidebar-border/35">
                     {level.tabs.map((tab) => {
                       const isActiveTab = tab.id === level.activeTabId;
                       return (
@@ -473,7 +473,7 @@ export function MobileNav() {
                               selectTabAtLevel(level.id, tab.id);
                             }
                           }}
-                          className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 py-1 px-2 text-xs rounded-full transition-all duration-200 cursor-pointer select-none ${
+                          className={`flex min-w-0 shrink items-center justify-center gap-1.5 py-1 px-2 text-xs rounded-full transition-all duration-200 cursor-pointer select-none whitespace-nowrap ${
                             isActiveTab
                               ? 'text-primary font-semibold'
                               : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'
