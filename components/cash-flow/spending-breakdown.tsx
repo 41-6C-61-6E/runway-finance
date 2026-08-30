@@ -295,7 +295,7 @@ export function SpendingBreakdown() {
       />
 
       <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2">
-        <TogglePill
+        <TogglePill<BreakdownView>
           options={[{ id: 'donut' as const, label: 'Donut' }, { id: 'treemap' as const, label: 'Treemap' }, { id: 'bar' as const, label: 'Bar' }]}
           value={view}
           onChange={setView}
