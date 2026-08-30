@@ -81,6 +81,7 @@ export async function GET(request: Request) {
       categoryName: row.categoryName,
       categoryColor: row.categoryColor,
       categoryType: row.categoryType || 'standard',
+      isDiscretionary: row.isDiscretionary ?? true,
       expenseParentId: row.expenseParentId || null,
       previousAmount,
     };
@@ -183,6 +184,7 @@ export async function GET(request: Request) {
         parentId: categories.parentId,
         isIncome: categories.isIncome,
         categoryType: categories.categoryType,
+        isDiscretionary: categories.isDiscretionary,
         expenseParentId: categories.expenseParentId,
       })
       .from(transactions)
@@ -219,6 +221,7 @@ export async function GET(request: Request) {
         isIncome: categories.isIncome,
         parentId: categories.parentId,
         categoryType: categories.categoryType,
+        isDiscretionary: categories.isDiscretionary,
         expenseParentId: categories.expenseParentId,
       })
       .from(categories)
@@ -236,6 +239,7 @@ export async function GET(request: Request) {
         isIncome: info?.isIncome || false,
         parentId: info?.parentId || null,
         categoryType: info?.categoryType || 'standard',
+        isDiscretionary: info?.isDiscretionary ?? true,
         expenseParentId: info?.expenseParentId || null,
         amount: catTotals.get(catId) || 0,
         transactionCount: catCounts.get(catId) || 0,
@@ -368,6 +372,7 @@ export async function GET(request: Request) {
         isIncome: categories.isIncome,
         parentId: categories.parentId,
         categoryType: categories.categoryType,
+        isDiscretionary: categories.isDiscretionary,
         expenseParentId: categories.expenseParentId,
       })
           .from(categorySpendingSummary)
@@ -382,8 +387,9 @@ export async function GET(request: Request) {
             categoryName: categories.name,
             categoryColor: categories.color,
             isIncome: categories.isIncome,
-            categoryType: categories.categoryType,
-            expenseParentId: categories.expenseParentId,
+          categoryType: categories.categoryType,
+          isDiscretionary: categories.isDiscretionary,
+          expenseParentId: categories.expenseParentId,
           })
           .from(categoryIncomeSummary)
           .innerJoin(categories, eq(categoryIncomeSummary.categoryId, categories.id))
@@ -439,6 +445,7 @@ export async function GET(request: Request) {
             isIncome: r.isIncome || false,
             parentId: r.parentId || null,
             categoryType: r.categoryType || 'compound',
+            isDiscretionary: r.isDiscretionary ?? true,
             expenseParentId: r.expenseParentId || null,
               amount: sideAmount,
               transactionCount: sideCount,
@@ -464,6 +471,7 @@ export async function GET(request: Request) {
             isIncome: r.isIncome || false,
             parentId: r.parentId || null,
             categoryType: r.categoryType || 'standard',
+            isDiscretionary: r.isDiscretionary ?? true,
             expenseParentId: r.expenseParentId || null,
             amount,
             transactionCount,
@@ -550,8 +558,9 @@ export async function GET(request: Request) {
           categoryName: categories.name,
           categoryColor: categories.color,
           isIncome: categories.isIncome,
-          categoryType: categories.categoryType,
-          expenseParentId: categories.expenseParentId,
+            categoryType: categories.categoryType,
+            isDiscretionary: categories.isDiscretionary,
+            expenseParentId: categories.expenseParentId,
         })
         .from(categorySpendingSummary)
         .innerJoin(categories, eq(categorySpendingSummary.categoryId, categories.id))
@@ -566,6 +575,7 @@ export async function GET(request: Request) {
           categoryColor: categories.color,
           isIncome: categories.isIncome,
           categoryType: categories.categoryType,
+          isDiscretionary: categories.isDiscretionary,
           expenseParentId: categories.expenseParentId,
         })
         .from(categoryIncomeSummary)
@@ -693,6 +703,7 @@ export async function GET(request: Request) {
         categoryColor: row.categoryColor || '#6366f1',
         isIncome: row.isIncome,
         categoryType: row.categoryType,
+        isDiscretionary: row.isDiscretionary ?? true,
         expenseParentId: row.expenseParentId || null,
         amount,
         transactionCount,

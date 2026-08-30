@@ -87,7 +87,7 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
         position: containerRef ? 'fixed' : isCustomPositioned ? 'absolute' : 'relative',
         ...(isCustomPositioned && !containerRef ? { left: `${x}px`, top: `${y}px` } : {}),
         ...(containerRef && position ? { left: `${position.left}px`, top: `${position.top}px` } : {}),
-        width: 'min(380px, calc(100vw - 24px))',
+        width: 'fit-content',
         maxWidth: 'calc(100vw - 24px)',
         maxHeight: 'calc(100vh - 24px)',
         overflowY: 'auto',

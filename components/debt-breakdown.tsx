@@ -12,23 +12,23 @@ import { useUserSettings } from '@/components/user-settings-provider';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 
 const CHART_COLOR_MAP = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-  'var(--chart-synthetic)',
-  'var(--destructive-synthetic)',
+  'var(--color-chart-1)',
+  'var(--color-chart-2)',
+  'var(--color-chart-3)',
+  'var(--color-chart-4)',
+  'var(--color-chart-5)',
+  'var(--color-chart-synthetic)',
+  'var(--color-destructive-synthetic)',
 ];
 
 const DEBT_COLOR_MAP = [
-  'var(--destructive-synthetic)',
-  'var(--destructive)',
-  'var(--status-warning)',
-  'var(--destructive)',
-  'var(--destructive-synthetic)',
-  'var(--status-warning)',
-  'var(--destructive)',
+  'var(--color-destructive-synthetic)',
+  'var(--color-destructive)',
+  'var(--color-status-warning)',
+  'var(--color-destructive)',
+  'var(--color-destructive-synthetic)',
+  'var(--color-status-warning)',
+  'var(--color-destructive)',
 ];
 
 const ASSET_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
@@ -80,6 +80,11 @@ function formatCompact(value: number): string {
   if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
   if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
   return `$${value.toFixed(0)}`;
+}
+
+function truncateTreemapLabel(label: string, width: number): string {
+  const maxChars = Math.max(4, Math.floor((width - 16) / 7));
+  return label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
 }
 
 function TogglePill<T extends string>({ options, value, onChange }: {
@@ -331,7 +336,7 @@ export function DebtBreakdown() {
               )}
             </div>
 
-            <div className="flex-1 space-y-2 max-h-[220px] overflow-y-auto pt-1">
+            <div className="flex-1 space-y-2 pt-1">
               {activeCategories.map((cat) => {
                 return (
                   <div
@@ -371,7 +376,9 @@ export function DebtBreakdown() {
                     data={treemapData}
                     dataKey="value"
                     nameKey="name"
-                    stroke="#ffffff"
+                    stroke="var(--color-card)"
+                    animationDuration={280}
+                    animationEasing="ease-out"
                     content={(props: any) => {
                       const { x, y, width, height, index } = props;
                       if (typeof width === 'number' && typeof height === 'number' && width <= 0 && height <= 0) {
@@ -381,31 +388,37 @@ export function DebtBreakdown() {
                       if (!item) return <rect key={`tm-${index}`} />;
                       const groupTotal = activeTotal;
                       const sharePct = groupTotal > 0 ? ((item.value as number) / groupTotal) * 100 : 0;
-                      const showLabel = width > 72 && height > 36;
-                      const showPct = width > 72 && height > 50;
+                      const showLabel = width > 42 && height > 24;
+                      const showAmount = height > 40;
+                      const showPct = height > 54;
                       const r = 3;
                       return (
                         <g key={`tm-${index}`} style={{ cursor: 'pointer' }} onClick={() => item.key && handleClick(String(item.key))}>
+                          <defs>
+                            <clipPath id={`net-worth-tm-label-${index}`}>
+                              <rect x={x + 4} y={y + 2} width={Math.max(0, width - 8)} height={Math.max(0, height - 4)} />
+                            </clipPath>
+                          </defs>
                           <path
                             d={`M${x + r},${y} h${width - 2 * r} a${r},${r} 0 0 1 ${r},${r} v${height - 2 * r} a${r},${r} 0 0 1 -${r},${r} h${-(width - 2 * r)} a${r},${r} 0 0 1 -${r},-${r} v${-(height - 2 * r)} a${r},${r} 0 0 1 ${r},-${r} Z`}
                             fill={item.color}
                             fillOpacity={0.85}
-                            stroke="var(--card)"
+                            stroke="var(--color-card)"
                           />
                           {showLabel && (
-                            <>
-                                <text x={x + 8} y={y + 17} fill="var(--foreground)" fontSize="12" fontWeight="600">
-                                  {item.name}
+                            <g clipPath={`url(#net-worth-tm-label-${index})`}>
+                                <text x={x + 6} y={y + 15} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 12} fontWeight="600">
+                                  {truncateTreemapLabel(item.name, width)}
                                 </text>
-                                <text x={x + 8} y={y + 32} fill="var(--foreground)" fontSize="11" opacity="0.9" className="blur-number">
+                                {showAmount && <text x={x + 6} y={y + 30} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 11} opacity="0.9" className="blur-number">
                                 {formatCompact(item.value as number)}
-                              </text>
+                              </text>}
                               {showPct && (
-                                <text x={x + 8} y={y + 45} fill="var(--foreground)" fontSize="10" opacity="0.75">
+                                <text x={x + 6} y={y + 44} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize="10" opacity="0.75">
                                   {sharePct.toFixed(1)}%
                                 </text>
                               )}
-                            </>
+                            </g>
                           )}
                         </g>
                       );

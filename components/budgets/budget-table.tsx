@@ -419,6 +419,43 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     );
   };
 
+  // Compact mobile treatment: every row gets the same visual budget meter.
+  // Envelope rows use their full native-period total so the label and meter
+  // describe the same number (rather than the informational monthly average).
+  const renderMobileProgress = (b: BudgetData, isIncome = false) => {
+    const envelope = isEnvelope(b);
+    const spent = envelope ? (b.envelopeSpent ?? b.actual) : b.actual;
+    const total = envelope ? (b.nativeAmount ?? b.budgeted) : (b.availableBudget ?? b.budgeted);
+    const pct = envelope
+      ? (b.envelopePercentUsed ?? (total > 0 ? (spent / total) * 100 : 0))
+      : (b.percentUsed ?? 0);
+    const isOver = !isIncome && spent > total;
+    const fillClass = isOver ? 'bg-destructive' : pct > 85 ? 'bg-amber-500' : 'bg-primary';
+
+    return (
+      <div className="space-y-1.5 pt-0.5">
+        <div className="flex items-center justify-between gap-3 text-xs font-mono">
+          <span className="text-muted-foreground blur-number">
+            {formatCurrency(spent)} <span className="text-muted-foreground/60">of</span> {formatCurrency(total)}
+          </span>
+          <span className={cn('shrink-0 font-medium', isOver ? 'text-destructive' : pct > 85 ? 'text-amber-500' : 'text-muted-foreground')}>
+            {Math.round(pct)}%
+          </span>
+        </div>
+        <div
+          className="h-2 w-full overflow-hidden rounded-full bg-muted/80"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.min(Math.max(Math.round(pct), 0), 100)}
+          aria-label={`${formatCurrency(spent)} of ${formatCurrency(total)} used`}
+        >
+          <div className={`h-full rounded-full transition-all ${fillClass}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
+        </div>
+      </div>
+    );
+  };
+
   const renderSortHeader = (field: SortField, label: string, align: 'left' | 'right' = 'left') => {
     const isActive = sortField === field;
     return (
@@ -636,10 +673,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-muted-foreground">Budget: <span className="text-foreground blur-number">{formatCurrency(b.budgeted)}</span></span>
-                    <span className="text-muted-foreground">Actual: <span className="text-foreground blur-number font-medium">{formatCurrency(b.actual)}</span></span>
-                  </div>
+                  {renderMobileProgress(b, true)}
                 </div>
               );
             })}
@@ -651,10 +685,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               </div>
             )}
             {expenseBudgets.map((b) => {
-              const isOver = b.remaining < 0;
               const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
-              const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
-              const envSub = envelopeSubText(b);
               return (
                 <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
@@ -716,18 +747,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-muted-foreground">Budget: <span className="text-foreground blur-number">{renderBudgetCell(b)}</span></span>
-                    <span className="text-muted-foreground">Actual: <span className="text-foreground blur-number">{formatCurrency(b.actual)}</span></span>
-                  </div>
-                  {isEnvelope(b) && (
-                    <div className="space-y-1">
-                      {renderEnvelopeProgress(b)}
-                    </div>
-                  )}
-                  {envSub && !isEE && (
-                    <div className="text-[10px] text-muted-foreground font-sans">{envSub}</div>
-                  )}
+                  {renderMobileProgress(b)}
 
                   {/* Everything Else Mobile Breakout sub-card */}
                   {isEE && expandedCatchAll && b.groupedBreakout && (

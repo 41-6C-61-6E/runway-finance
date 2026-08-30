@@ -431,6 +431,18 @@ export async function GET(request: Request) {
       }
     }
 
+    // Everything Else is a catch-all for categories that do not resolve to a
+    // budgeted category. Keep those IDs available for envelope calculations as
+    // well; otherwise an annual Everything Else budget shows the breakout's
+    // actual spending but its yearly envelope still sees zero spending.
+    const everythingElseCategoryIds = decryptedAllCategories
+      .filter((cat) => {
+        if (cat.isIncome || cat.categoryType === 'compound' || cat.categoryType === 'transfer') return false;
+        if (cat.name.toLowerCase() === 'everything else') return false;
+        return getClosestBudgetedCategory(cat.id) === null;
+      })
+      .map((cat) => cat.id);
+
     // User settings & account exclusion configuration
     const userSettingsList = await db
       .select()
@@ -612,13 +624,23 @@ export async function GET(request: Request) {
             continue;
           }
 
+          const isEverythingElse = (row.categoryName || '').toLowerCase().includes('everything else') ||
+                                   (row.categoryName || '').toLowerCase().includes('all other') ||
+                                   (row.categoryName || '').toLowerCase().includes('misc');
+          const envelopeCategoryIds = isEverythingElse
+            ? Array.from(new Set([
+                ...(coveredCategoriesMap.get(row.categoryId) || [row.categoryId]),
+                ...everythingElseCategoryIds,
+              ]))
+            : (coveredCategoriesMap.get(row.categoryId) || [row.categoryId]);
+
           const envTxConditions = [
             eq(transactions.userId, dataUserId),
             gte(transactions.date, envStart),
             lt(transactions.date, stopDate),
             eq(transactions.deleted, false),
             eq(transactions.ignored, false),
-            inArray(transactions.categoryId, coveredCategoriesMap.get(row.categoryId) || [row.categoryId]),
+            inArray(transactions.categoryId, envelopeCategoryIds),
           ];
           if (!isImportTransactionsEnabled) {
             envTxConditions.push(eq(transactions.isImported, false));
