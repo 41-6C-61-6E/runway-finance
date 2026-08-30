@@ -45,11 +45,15 @@ export function MobileSubNavProvider({ children }: { children: ReactNode }) {
   );
   const tabs = activeRegistration?.tabs || [];
   const activeTabId = activeRegistration?.activeTabId || null;
-  const navLevels = registrations.map(({ id, tabs, activeTabId: levelActiveTabId }) => ({
-    id,
-    tabs,
-    activeTabId: levelActiveTabId,
-  }));
+  // Keep the route-level menu on the left and nested view menus on the right,
+  // even when a child registration is refreshed after a parent rerender.
+  const navLevels = [...registrations]
+    .sort((a, b) => a.priority - b.priority || a.id - b.id)
+    .map(({ id, tabs, activeTabId: levelActiveTabId }) => ({
+      id,
+      tabs,
+      activeTabId: levelActiveTabId,
+    }));
 
   const registerSubNav = useCallback((
     newTabs: SubNavTab[],

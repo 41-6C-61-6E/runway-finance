@@ -88,26 +88,20 @@ function TogglePill<T extends string>({ options, value, onChange }: {
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="relative inline-flex items-center rounded-full bg-muted p-1 border border-border">
-      <span
-        className="absolute top-1 bottom-1 rounded-full bg-card shadow-sm border border-border transition-all duration-300 ease-out"
-        style={{
-          left: value === options[0].id ? '4px' : '50%',
-          width: 'calc(50% - 4px)',
-        }}
-        aria-hidden="true"
-      />
+    <div className="inline-flex w-max min-w-0 max-w-full items-center gap-1 p-1 bg-sidebar/75 backdrop-blur-xl border border-sidebar-border/35 rounded-full shadow-lg select-none">
       {options.map((opt) => (
         <button
           key={opt.id}
           type="button"
           onClick={() => onChange(opt.id)}
           aria-pressed={value === opt.id}
-          className={`relative z-10 px-5 sm:px-7 py-1.5 text-sm font-semibold rounded-full transition-colors duration-300 ${
-            value === opt.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+          className={`min-w-0 flex-[0_1_auto] py-1 px-2.5 text-xs rounded-full transition-all duration-200 cursor-pointer select-none whitespace-nowrap active:scale-95 ${
+            value === opt.id
+              ? 'text-primary font-semibold'
+              : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'
           }`}
         >
-          {opt.label}
+          <span className="block truncate">{opt.label}</span>
         </button>
       ))}
     </div>
@@ -260,7 +254,7 @@ export function DebtBreakdown() {
         </div>
       )}
       <div className="px-3 sm:px-5 pt-4">
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-1">
           <TogglePill
             options={[
               { id: 'donut', label: 'Donut' },
@@ -269,6 +263,7 @@ export function DebtBreakdown() {
             value={view as 'donut' | 'treemap'}
             onChange={(v) => setView(v)}
           />
+          <span className="px-0.5 text-xs text-sidebar-foreground/55 select-none" aria-hidden="true">|</span>
           <TogglePill
             options={[
               { id: 'assets', label: 'Assets' },
@@ -445,12 +440,8 @@ export function DebtBreakdown() {
 
             <div className="mt-3">
               {activeCategories.length > 0 ? (
-                <details className="max-h-40 overflow-y-auto">
-                  <summary className="cursor-pointer select-none list-none text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors pt-1">
-                    View {activeCategories.length} categories
-                    <span className="ml-2 font-normal text-muted-foreground/70">(click to {''}expand)</span>
-                  </summary>
-                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="max-h-40 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {activeCategories.map((cat) => {
                       const share = activeTotal > 0 ? (cat.amount / activeTotal) * 100 : 0;
                       return (
@@ -472,7 +463,7 @@ export function DebtBreakdown() {
                       );
                     })}
                   </div>
-                </details>
+                </div>
               ) : (
                 <p className="text-center text-xs text-muted-foreground">No categories</p>
               )}

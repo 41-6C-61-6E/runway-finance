@@ -587,7 +587,7 @@ export function UpcomingBills() {
       <MobileViewSwitcher
         main={mainContent}
         summary={summaryContent}
-        mainLabel="Calendar"
+        mainLabel="Schedule"
         summaryLabel="Overview"
         summaryCardId="upcomingBillsSummary"
       />
