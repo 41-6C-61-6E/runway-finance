@@ -16,7 +16,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { isCashFlowRelevantAccount } from '@/lib/utils/account-scope';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
@@ -255,7 +255,7 @@ export function IncomeExpenseChart() {
     const totalIncome = chartData.reduce((sum, d) => sum + d.income, 0);
     const totalExpenses = chartData.reduce((sum, d) => sum + Math.abs(d.expenses), 0);
     const formattedLastPointMonth = formatChartXAxisDate(lastPoint.yearMonth + '-01', timeframe, { isMonthly: true });
-    return `Income versus expenses chart. Over the selected period, total income was ${formatCurrency(totalIncome)} and total expenses were ${formatCurrency(totalExpenses)}. In the most recent month (${formattedLastPointMonth}), income was ${formatCurrency(lastPoint.income)} and expenses were ${formatCurrency(Math.abs(lastPoint.expenses))}. Average savings rate was ${avgSavingsRate.toFixed(1)}%.`;
+    return `Income versus expenses chart. Over the selected period, total income was ${formatCurrency(totalIncome)} and total expenses were ${formatCurrency(totalExpenses)}. In the most recent month (${formattedLastPointMonth}), income was ${formatCurrency(lastPoint.income)} and expenses were ${formatCurrency(Math.abs(lastPoint.expenses))}. Average savings rate was ${formatPlainPercent(avgSavingsRate)}.`;
   }, [chartData, timeframe, avgSavingsRate]);
 
   // Left Y-Axis domains (Income vs Expenses)
@@ -397,7 +397,7 @@ export function IncomeExpenseChart() {
         </div>
         <div className="font-semibold text-primary flex justify-between gap-8 text-xs">
           <span>Savings Rate:</span>
-          <span>{Number(point.savingsRate || 0).toFixed(1)}%</span>
+          <span>{formatPlainPercent(point.savingsRate)}</span>
         </div>
       </ChartTooltip>
     );
@@ -1076,7 +1076,7 @@ export function IncomeExpenseChart() {
                   </>
                 ) : (
                   <>
-                    Avg. Savings Rate ({windowLabel}): <span className="text-primary font-bold">{avgSavingsRate.toFixed(1)}%</span>
+                    Avg. Savings Rate ({windowLabel}): <span className="text-primary font-bold">{formatPlainPercent(avgSavingsRate)}</span>
                   </>
                 )}
               </div>
@@ -1263,7 +1263,7 @@ export function IncomeExpenseChart() {
                       {totSav >= 0 ? '+' : ''}{formatCurrency(totSav)}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Savings Rate: <span className="font-bold text-primary blur-number">{Number(selectedSavingsPoint.savingsRate || 0).toFixed(1)}%</span>
+                      Savings Rate: <span className="font-bold text-primary blur-number">{formatPlainPercent(selectedSavingsPoint.savingsRate)}</span>
                       {' '}• Total Income: <span className="font-semibold text-foreground blur-number">{formatCurrency(selectedSavingsPoint.income || 0)}</span>
                     </div>
                   </div>

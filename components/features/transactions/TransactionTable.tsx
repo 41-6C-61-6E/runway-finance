@@ -53,6 +53,7 @@ import {
   Repeat,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { ListRow } from "@/components/ui/list-row";
 
 
 type Transaction = {
@@ -1793,12 +1794,16 @@ export default function TransactionTable({
                     categories.filter((c) => c.parentId === parentId);
 
                   return (
-                    <div
+                    <ListRow
                       key={row.id}
-                      className={`grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 sm:gap-x-3 gap-y-0.5 px-3 sm:px-4 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer group w-full ${
+                      element="div"
+                      data-list-row="transaction"
+                      ariaLabel={`${tx.payee || tx.description}${isPending ? ' (pending)' : ''}, ${formattedAmount}`}
+                      className={`px-3 sm:px-4 py-2.5 group ${
                         isPending ? "bg-primary/[0.04] dark:bg-primary/[0.08]" : ""
                       }`}
-                      onClick={() => {
+                      bodyClassName="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 sm:gap-x-3 gap-y-0.5"
+                      onActivate={() => {
                         const anyTx = tx as any;
                         if (anyTx.isSplitChild && anyTx.parentTxId) {
                           const parent = transactions.find((t) => t.id === anyTx.parentTxId);
@@ -2191,7 +2196,7 @@ export default function TransactionTable({
                         )}
                       </div>
 
-                    </div>
+                    </ListRow>
                   );
                 })}
               </div>
@@ -2279,9 +2284,12 @@ export default function TransactionTable({
                     return (
                       <tr
                         key={row.id}
-                        className={`border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer group ${
+                        className={`border-b border-border/50 hover:bg-muted/30 active:bg-muted/40 transition-colors cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
                           isPending ? "bg-primary/[0.04] dark:bg-primary/[0.08]" : ""
                         }`}
+                        role="button"
+                        tabIndex={0}
+                        data-list-row="transaction"
                         onClick={() => {
                           const tx = row.original as any;
                           if (tx.isSplitChild && tx.parentTxId) {
@@ -2289,6 +2297,12 @@ export default function TransactionTable({
                             if (parent) onTransactionClick?.(parent);
                           } else {
                             onTransactionClick?.(tx);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLElement).click();
                           }
                         }}
                       >

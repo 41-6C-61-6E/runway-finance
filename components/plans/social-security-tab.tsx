@@ -5,6 +5,7 @@ import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-e
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency } from '@/lib/utils/format';
 import {
   LineChart,
   Line,
@@ -430,7 +431,7 @@ export function SocialSecurityTab({
                   <YAxis
                     stroke="#888888"
                     fontSize={10}
-                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v) => formatCompactCurrency(v)}
                     tickLine={false}
                   />
                   <RechartsTooltip content={<SocialSecurityTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />

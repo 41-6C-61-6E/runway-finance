@@ -5,6 +5,7 @@ import { Upload, FileText, Check, AlertTriangle, Trash2, Loader2, ChevronLeft, C
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { parseCsv, parseDateField } from '@/lib/utils/csv-parser';
 
@@ -495,7 +496,7 @@ export default function ImportTab() {
       {/* ═══════════════════════ Wizard ═══════════════════════ */}
       <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
         <div className="flex items-start sm:items-center justify-between gap-2 mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Import Data</h2>
+          <SectionHeading>Import Data</SectionHeading>
           {step > 1 && step < 7 && (
             <span className="text-xs text-muted-foreground shrink-0">
               Step {step - 1} of {importType === 'transactions' ? (uniqueCategoryNames.length > 0 ? 5 : 4) : 4}
@@ -1140,9 +1141,7 @@ export default function ImportTab() {
                       <AlertTriangle className="w-6 h-6 text-chart-3" />
                     )}
                   </div>
-                  <h3 className="text-lg font-semibold text-foreground mb-1">
-                    {importResult.status === 'completed' ? 'Import Complete' : 'Import Completed with Issues'}
-                  </h3>
+                  <SectionHeading className="mb-1">{importResult.status === 'completed' ? 'Import Complete' : 'Import Completed with Issues'}</SectionHeading>
                   <div className="text-sm text-muted-foreground space-y-1">
                     <p>{importResult.recordsImported} records imported</p>
                     {importResult.recordsSkipped > 0 && <p>{importResult.recordsSkipped} records skipped</p>}
@@ -1244,7 +1243,7 @@ export default function ImportTab() {
 
       {/* ═══════════════════════ Import History ═══════════════════════ */}
       <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Import History</h2>
+        <SectionHeading className="mb-4">Import History</SectionHeading>
 
         {logsLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">

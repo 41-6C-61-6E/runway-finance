@@ -69,7 +69,7 @@ export default function DataExport({ table, filters, search, columns, total }: D
       <button
         onClick={handleExport}
         disabled={exporting || total === 0}
-        className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex items-center gap-1.5 px-2.5 py-1 min-h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         title="Export CSV"
       >
         {exporting ? (

@@ -111,7 +111,7 @@ export function BudgetPeriodSelector({ hideTypeTabsOnMobile = false }: { hideTyp
       <div className="flex items-center gap-1 self-start sm:self-center pb-2 sm:pb-2.5">
         <button
           onClick={goPrev}
-          className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+          className="-m-3.5 p-3.5 rounded-md hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
           aria-label="Previous period"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -121,7 +121,7 @@ export function BudgetPeriodSelector({ hideTypeTabsOnMobile = false }: { hideTyp
         </span>
         <button
           onClick={goNext}
-          className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+          className="-m-3.5 p-3.5 rounded-md hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
           aria-label="Next period"
         >
           <ChevronRight className="w-4 h-4" />

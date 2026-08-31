@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { SectionHeading } from '@/components/ui/section-heading';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1002,7 +1003,7 @@ export default function PayrollTab() {
       <div className="p-5 bg-card border border-border rounded-xl">
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">Paystub Integration</h2>
+            <SectionHeading>Paystub Integration</SectionHeading>
             <p className="text-xs text-muted-foreground mt-1">
               {paystubEnabled
                 ? 'Paystub data is included in charts and calculations.'
@@ -1018,7 +1019,7 @@ export default function PayrollTab() {
 
       {/* Import Section */}
       <div className="p-5 bg-card border border-border rounded-xl">
-        <h2 className="text-base font-semibold text-foreground mb-4">Import Paystubs</h2>
+        <SectionHeading className="mb-4">Import Paystubs</SectionHeading>
 
         {importMode === 'idle' && (
           <div className="space-y-3">

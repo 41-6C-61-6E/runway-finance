@@ -15,6 +15,7 @@ import { GitMerge, ChevronDown, Search } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { Switch } from '@/components/ui/switch';
+import { getOrFetch } from '@/lib/fetch-cache';
 
 interface CategoryData {
   categoryId: string;
@@ -542,7 +543,7 @@ const SankeyCustomNode = ({
         x={x}
         y={shiftedY}
         width={width}
-        height={height}
+        height={Math.max(0, height)}
         fill={payload.color || 'var(--color-primary)'}
         rx={0}
         fillOpacity={isDimmed ? 0.3 : 0.95}
@@ -564,22 +565,23 @@ const SankeyCustomNode = ({
           {/* Background box for readability */}
           <foreignObject
             x={x + width + 4}
-            y={hubLabelCenterY - 24}
-            width={400}
-            height={50}
+            y={hubLabelCenterY - 30}
+            width={Math.min(400, (typeof window !== 'undefined' ? window.innerWidth : 400) - (x + width) - 12)}
+            height={58}
             pointerEvents="none"
             style={{ opacity: isDimmed ? 0.3 : 1 }}
           >
             <div style={{
-              display: 'inline-block',
-              width: 'fit-content',
+              display: 'block',
+              width: '100%',
+              boxSizing: 'border-box',
               background: 'var(--background)',
               border: '1px solid var(--border)',
               borderRadius: '6px',
               padding: '4px 10px',
             }}>
               <div style={{
-                fontSize: isMobileSize ? 8 : 10,
+                fontSize: 10,
                 fontWeight: 600,
                 lineHeight: 1.4,
               }}>
@@ -590,6 +592,7 @@ const SankeyCustomNode = ({
                 fontWeight: 800,
                 color: isNetSurplus ? '#10b981' : '#ef4444',
                 lineHeight: 1.3,
+                whiteSpace: 'nowrap',
               }}>
                 {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
               </div>
@@ -604,7 +607,7 @@ const SankeyCustomNode = ({
             y={shiftedY + height / 2 - (valueLabel ? 4 : 0)}
             textAnchor={isRightSide ? 'end' : 'start'}
             dominantBaseline="central"
-            fontSize={isMobileSize ? 8 : 10}
+            fontSize={10}
             fontWeight={600}
             fill="currentColor"
             className="fill-foreground select-none"
@@ -619,7 +622,7 @@ const SankeyCustomNode = ({
               y={shiftedY + height / 2 + 5}
               textAnchor={isRightSide ? 'end' : 'start'}
               dominantBaseline="central"
-              fontSize={isMobileSize ? 7 : 9}
+              fontSize={9}
               fill="currentColor"
               className="fill-muted-foreground select-none blur-number"
               style={{ opacity: isDimmed ? 0.3 : 0.75 }}
@@ -775,14 +778,14 @@ export function CashFlowSankey() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/accounts')
-      .then((r) => r.ok ? r.json() : [])
+    getOrFetch('/api/accounts')
+      .then((r) => (r.ok ? r.json() : []))
       .then((json) => setAllAccounts(Array.isArray(json) ? json : []))
       .catch(() => {});
   }, []);
 
   useEffect(() => {
-    fetch('/api/categories')
+    getOrFetch('/api/categories')
       .then((r) => r.json())
       .then((data) => setAllCategoryInfo(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -832,14 +835,14 @@ export function CashFlowSankey() {
         let totalIncome = 0;
         let totalExpenses = 0;
 
-        const categoriesRes = await fetch(
+        const categoriesRes = await getOrFetch(
           `/api/cash-flow/categories?startDate=${dateRange.start}&endDate=${dateRange.end}${acctParam}`
         );
         if (!categoriesRes.ok) {
           const body = await categoriesRes.text().catch(() => '');
           throw new Error(`Failed to fetch sankey data (${categoriesRes.status}): ${body}`);
         }
-        categories = await categoriesRes.json();
+        categories = (await categoriesRes.json()) as CategoryData[];
 
         totalIncome = categories
           .filter((c) => c.isIncome && c.amount > 0)
@@ -972,7 +975,7 @@ export function CashFlowSankey() {
 
   const margin = useMemo(() => (
     isMobile
-      ? { top: 15, right: 65, bottom: 15, left: 65 }
+      ? { top: 15, right: 140, bottom: 15, left: 100 }
       : { top: 20, right: 160, bottom: 20, left: 160 }
   ), [isMobile]);
 

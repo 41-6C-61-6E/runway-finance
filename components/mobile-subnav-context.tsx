@@ -137,7 +137,9 @@ export function MobileSubNavProvider({ children }: { children: ReactNode }) {
 
   return (
     <MobileSubNavContext.Provider value={value}>
-      {children}
+      <div style={{ '--mobile-subnav-height': '34px', '--mobile-subnav-clear': tabs.length > 0 ? 'calc(34px + 68px + env(safe-area-inset-bottom) * 0.3)' : '0px' } as React.CSSProperties}>
+        {children}
+      </div>
     </MobileSubNavContext.Provider>
   );
 }

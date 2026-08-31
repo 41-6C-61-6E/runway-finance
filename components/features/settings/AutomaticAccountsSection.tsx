@@ -20,6 +20,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { getBadgeClasses } from '@/lib/utils/account-badge';
@@ -778,7 +779,7 @@ export default function AutomaticAccountsSection({
       {/* Transaction Settings Section */}
       {view === 'transactions' && (
         <div className="mb-6 pb-6 border-b border-border/60">
-          <h2 className="text-base font-semibold text-foreground mb-1">Transaction Settings</h2>
+          <SectionHeading className="mb-1">Transaction Settings</SectionHeading>
         <p className="text-xs text-muted-foreground mb-4 font-normal">
           Configure cleanup policies and rules for your bank-synced transactions.
         </p>
@@ -993,7 +994,7 @@ export default function AutomaticAccountsSection({
       {/* Existing Connections */}
       {view === 'transactions' && hasConnection && (
         <div className="p-0 mb-6">
-          <h2 className="text-base font-semibold text-foreground mb-4">Automatic Bank Connections</h2>
+          <SectionHeading className="mb-4">Automatic Bank Connections</SectionHeading>
           {connectionsLoading ? (
             <div className="text-muted-foreground text-sm">Loading...</div>
           ) : (
@@ -1148,7 +1149,7 @@ export default function AutomaticAccountsSection({
       {/* Account Management Table */}
       {view === 'management' && (
       <div className="p-0">
-          <h2 className="text-base font-semibold text-foreground mb-1">Account Management</h2>
+          <SectionHeading className="mb-1">Account Management</SectionHeading>
           <p className="text-xs text-muted-foreground mb-4">
             Manage your connected bank and brokerage accounts.
           </p>

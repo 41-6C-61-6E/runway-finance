@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AppTabs } from '@/components/ui/app-tabs';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { toast } from 'sonner';
 
 import { useUserSettings } from '@/components/user-settings-provider';
@@ -291,10 +292,7 @@ export default function NotificationsTab() {
       {activeSubTab === 'subscriptions' && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <div>
-            <h2 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              Device Subscription
-            </h2>
+            <SectionHeading className="mb-1" icon={<Bell className="h-5 w-5 text-primary" />}>Device Subscription</SectionHeading>
             <p className="text-xs text-muted-foreground">
               Enable notifications on this specific browser or installed PWA.
             </p>
@@ -397,10 +395,7 @@ export default function NotificationsTab() {
       {activeSubTab === 'alerts' && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <div>
-            <h2 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
-              <BellOff className="h-5 w-5 text-primary" />
-              Alert Preferences
-            </h2>
+            <SectionHeading className="mb-1" icon={<BellOff className="h-5 w-5 text-primary" />}>Alert Preferences</SectionHeading>
             <p className="text-xs text-muted-foreground">
               Configure which events trigger push notifications.
             </p>
@@ -663,10 +658,7 @@ export default function NotificationsTab() {
           {/* Rate Limiter Section */}
           <div className="space-y-4 pt-4 border-t border-border/40">
             <div>
-              <h2 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" />
-                Rate Limiter Configuration
-              </h2>
+              <SectionHeading className="mb-1" icon={<Bell className="h-5 w-5 text-primary" />}>Rate Limiter Configuration</SectionHeading>
               <p className="text-xs text-muted-foreground">
                 Configure sliding-window rate limiting to prevent notifications from spamming your devices.
               </p>
@@ -715,10 +707,7 @@ export default function NotificationsTab() {
       {activeSubTab === 'custom' && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <div>
-            <h2 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              Custom Event Alerts
-            </h2>
+            <SectionHeading className="mb-1" icon={<Bell className="h-5 w-5 text-primary" />}>Custom Event Alerts</SectionHeading>
             <p className="text-xs text-muted-foreground">
               Define your own rules and triggers for transactions, account balances, savings goals, and cash flow.
             </p>

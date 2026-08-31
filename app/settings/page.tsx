@@ -37,6 +37,7 @@ import NotificationsTab from '@/components/features/settings/NotificationsTab';
 import AiTab from '@/components/features/settings/AiTab';
 import ImportExportTab from '@/components/features/settings/ImportExportTab';
 import { AppTabs } from '@/components/ui/app-tabs';
+import { MobileTabStrip } from '@/components/ui/mobile-tab-strip';
 import PayrollTab from '@/components/features/settings/PayrollTab';
 
 
@@ -48,8 +49,8 @@ const SETTINGS_TABS = [
   { id: 'rules' as const, label: 'Rules', description: 'Automatic transaction categorization rules', icon: GitBranch },
   { id: 'tags' as const, label: 'Tags', description: 'Labels for transactional tagging and filtering', icon: Tag },
   { id: 'analytics' as const, label: 'Analytics', description: 'Chart color schemes and forecasting bounds', icon: BarChart3 },
-  { id: 'ai' as const, label: 'AI Suggestions', description: 'AI provider endpoints, model parameters, and keys', icon: Sparkles },
-  { id: 'import' as const, label: 'Import / Export', description: 'Import bank statements, export financial data, and manage full backups', icon: UploadCloud },
+  { id: 'ai' as const, label: 'AI', description: 'AI provider endpoints, model parameters, and keys', icon: Sparkles },
+  { id: 'import' as const, label: 'Data', description: 'Import bank statements, export financial data, and manage full backups', icon: UploadCloud },
   { id: 'payroll' as const, label: 'Payroll', description: 'Paystub parsing templates and forecasts', icon: FileText },
   { id: 'sharing' as const, label: 'Sharing', description: 'Invite others to share your financial data', icon: Users2 },
   { id: 'notifications' as const, label: 'Notifications', description: 'Configure push notifications and alert preferences', icon: Bell },
@@ -152,6 +153,18 @@ function SettingsPageBody() {
           <OnboardingChecklist />
         </div>
 
+        {/* Mobile: in-page tab switcher (desktop uses the sidebar aside) */}
+        <div className="w-full mb-4 lg:hidden">
+          <MobileTabStrip
+            tabs={SETTINGS_TABS.map((t) => ({ id: t.id, label: t.label }))}
+            activeTab={activeTab}
+            onChange={(tabId) => goToTab(tabId as typeof activeTab)}
+            fullWidth={false}
+            aria-label="Settings sections"
+            className="px-1"
+          />
+        </div>
+
         <div className="flex flex-col lg:flex-row gap-5 lg:gap-8 items-start w-full">
           {/* Desktop Navigation Sidebar */}
           <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-0.5 sticky top-24 bg-sidebar/45 backdrop-blur-md border border-border p-2 rounded-xl shadow-sm">
@@ -207,8 +220,8 @@ function SettingsPageBody() {
                 <AppTabs
                   tabs={[
                     { id: 'connections', label: 'Connections' },
-                    { id: 'automatic', label: 'Automatic Accounts' },
-                    { id: 'manual', label: 'Manual Accounts' },
+                    { id: 'automatic', label: 'Automatic' },
+                    { id: 'manual', label: 'Manual' },
                   ]}
                   activeTab={accountSubTab}
                   onChange={(sub) => {

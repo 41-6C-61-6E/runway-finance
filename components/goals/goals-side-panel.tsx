@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils/goals';
+import { formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -190,7 +191,7 @@ export function GoalsSidePanel() {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                 <span className="text-2xl font-extrabold text-foreground font-mono blur-number">
-                  {progressPercent.toFixed(1)}%
+                  {formatPlainPercent(progressPercent)}
                 </span>
                 <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mt-0.5">
                   Funded

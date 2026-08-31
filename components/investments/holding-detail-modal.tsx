@@ -8,6 +8,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency, formatAmount } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import {
   AreaChart,
@@ -464,7 +465,7 @@ export function HoldingDetailSheet({
                         tickLine={false}
                         axisLine={false}
                         tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
-                        tickFormatter={(v) => `$${v.toFixed(0)}`}
+                        tickFormatter={(v) => formatCompactCurrency(v)}
                       />
                       <RechartsTooltip
                         content={({ active, payload }) => {
@@ -578,7 +579,7 @@ export function HoldingDetailSheet({
                 52-Week Range
               </span>
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="blur-number">${historyData.fiftyTwoWeekLow?.toFixed(2) ?? '—'}</span>
+                <span className="blur-number">{historyData.fiftyTwoWeekLow != null ? formatAmount(historyData.fiftyTwoWeekLow) : '—'}</span>
                 <div className="flex-1 mx-4 h-1.5 bg-muted rounded-full relative">
                   {historyData.fiftyTwoWeekHigh && historyData.fiftyTwoWeekLow && historyData.fiftyTwoWeekHigh > historyData.fiftyTwoWeekLow && currentLivePrice ? (
                     <div
@@ -589,7 +590,7 @@ export function HoldingDetailSheet({
                     />
                   ) : null}
                 </div>
-                <span className="blur-number">${historyData.fiftyTwoWeekHigh?.toFixed(2) ?? '—'}</span>
+                <span className="blur-number">{historyData.fiftyTwoWeekHigh != null ? formatAmount(historyData.fiftyTwoWeekHigh) : '—'}</span>
               </div>
             </div>
           ) : null}

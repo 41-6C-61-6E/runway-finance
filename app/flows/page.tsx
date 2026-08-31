@@ -23,6 +23,16 @@ function FlowsContent() {
 
   const [activeTab, setActiveTab] = useState<Tab>('wealth');
 
+  // Track which tabs the user has actually selected. Panels stay mounted
+  // once visited (their data is memoized in lib/fetch-cache, so re-showing
+  // is instant and free) — but we never mount a tab the user hasn't asked
+  // for, which keeps the initial page load to a single chart fetch.
+  const [visited, setVisited] = useState<Set<Tab>>(new Set(['wealth']));
+  const selectTab = (tabId: Tab) => {
+    setActiveTab(tabId);
+    setVisited((v) => (v.has(tabId) ? v : new Set(v).add(tabId)));
+  };
+
   useEffect(() => {
     const visible: Tab[] = [];
     if (showWealth) visible.push('wealth');
@@ -30,13 +40,14 @@ function FlowsContent() {
     if (showIncome) visible.push('income');
     if (visible.length > 0 && !visible.includes(activeTab)) {
       setActiveTab(visible[0]);
+      setVisited((v) => new Set(v).add(visible[0]));
     }
   }, [showWealth, showCash, showIncome, activeTab]);
 
   const availableTabs = [
-    showWealth && { id: 'wealth', label: 'Wealth Flow' },
-    showCash && { id: 'cash', label: 'Cash Flow' },
-    showIncome && { id: 'income', label: 'Net Income' },
+    showWealth && { id: 'wealth', label: 'Wealth' },
+    showCash && { id: 'cash', label: 'Cash' },
+    showIncome && { id: 'income', label: 'Income' },
   ].filter(Boolean) as { id: Tab; label: string }[];
 
   return (
@@ -47,42 +58,69 @@ function FlowsContent() {
           <MobileTabSwipeContainer
             tabs={availableTabs}
             activeTabId={activeTab}
-            onTabChange={(tabId) => setActiveTab(tabId as Tab)}
+            onTabChange={(tabId) => selectTab(tabId as Tab)}
           >
             {availableTabs.length > 1 && (
               <div className="hidden md:block mb-5 sm:mb-6">
                 <AppTabs
                   tabs={availableTabs}
                   activeTab={activeTab}
-                  onChange={(tabId) => setActiveTab(tabId as Tab)}
+                  onChange={(tabId) => selectTab(tabId as Tab)}
                   variant="underline"
                 />
               </div>
             )}
 
-            {activeTab === 'wealth' && showWealth && (
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <WealthFlowSankey />
-              </Suspense>
-            )}
+            {(visited.has('wealth') && showWealth && (
+              <div
+                aria-hidden={activeTab !== 'wealth'}
+                className={
+                  activeTab === 'wealth'
+                    ? undefined
+                    : 'pointer-events-none opacity-60'
+                }
+              >
+                <Suspense fallback={null}>
+                  <WealthFlowSankey />
+                </Suspense>
+              </div>
+            ))}
 
-            {activeTab === 'cash' && showCash && (
-              <Suspense fallback={<LoadingSpinner category="sankey" />}>
-                <ChartErrorBoundary name="Cash Flow Sankey">
-                  <div>
-                    <CashFlowSankey />
-                  </div>
-                </ChartErrorBoundary>
-              </Suspense>
-            )}
+            {(visited.has('cash') && showCash && (
+              <div
+                aria-hidden={activeTab !== 'cash'}
+                className={
+                  activeTab === 'cash'
+                    ? undefined
+                    : 'pointer-events-none opacity-60'
+                }
+              >
+                <Suspense fallback={null}>
+                  <ChartErrorBoundary name="Cash Flow Sankey">
+                    <div>
+                      <CashFlowSankey />
+                    </div>
+                  </ChartErrorBoundary>
+                </Suspense>
+              </div>
+            ))}
 
-            {activeTab === 'income' && showIncome && (
-              <Suspense fallback={<LoadingSpinner category="chart" />}>
-                <ChartErrorBoundary name="Net Income">
-                  <IncomeExpenseChart />
-                </ChartErrorBoundary>
-              </Suspense>
-            )}
+            {(visited.has('income') && showIncome && (
+              <div
+                aria-hidden={activeTab !== 'income'}
+                className={
+                  activeTab === 'income'
+                    ? undefined
+                    : 'pointer-events-none opacity-60'
+                }
+              >
+                <Suspense fallback={null}>
+                  <ChartErrorBoundary name="Net Income">
+                    <IncomeExpenseChart />
+                  </ChartErrorBoundary>
+                </Suspense>
+              </div>
+            ))}
           </MobileTabSwipeContainer>
         ) : (
           <div className="py-12 text-center text-muted-foreground text-sm">

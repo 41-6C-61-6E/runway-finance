@@ -8,6 +8,7 @@ import BugReportingDropdown from '@/components/bug-reporting-dropdown';
 import NotificationsDropdown from '@/components/notifications-dropdown';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { EyeOff } from 'lucide-react';
+import { glassBar } from '@/components/ui/seg-pill';
 
 interface PageHeaderProps {
   title: string;
@@ -71,7 +72,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         style={{
           top: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 10px))',
         } as React.CSSProperties}
-        className={`fixed right-4 z-40 md:hidden flex items-center gap-0.5 py-1 px-1.5 rounded-full border border-sidebar-border/25 bg-sidebar/35 backdrop-blur-2xl shadow-md transition-all duration-300 ease-out ${
+        className={`fixed right-4 z-40 md:hidden flex items-center gap-0.5 py-1 px-1.5 rounded-full ${glassBar} transition-all duration-300 ease-out ${
           isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
         }`}
       >

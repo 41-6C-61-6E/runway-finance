@@ -5,6 +5,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { Bell, Check, ExternalLink, Inbox, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Landmark, Calendar, CreditCard, Target, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { glassIconButton, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
 
 
 interface UserNotification {
@@ -374,7 +375,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
           <button
             type="button"
             onClick={handleToggleOpen}
-            className="relative p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+            className={`${glassIconButton} focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${open ? glassItemActive : glassItemInactive}`}
             aria-label="Notifications"
           >
             <Bell className={`w-5 h-5 ${shouldWiggle ? 'animate-bounce' : ''}`} />

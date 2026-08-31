@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/utils/goals';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { useGoalInflow } from './goal-inflow-context';
 import { Target, Coins, PiggyBank, TrendingUp, PieChart, ChevronDown, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -163,25 +164,19 @@ export function GoalsSummary() {
             {/* 3-column metrics */}
             <div className="grid grid-cols-3 divide-x divide-border">
               <div className="pr-3 sm:pr-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <Coins className="w-3.5 h-3.5" /> Total Target
-                </p>
+                <SectionHeading label className="mb-1" icon={<Coins className="w-3.5 h-3.5" />}>Total Target</SectionHeading>
                 <p className="text-lg sm:text-2xl font-bold text-foreground truncate font-mono blur-number">
                   {formatCurrency(data.totalTarget)}
                 </p>
               </div>
               <div className="px-3 sm:px-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <PiggyBank className="w-3.5 h-3.5 text-chart-1" /> Total Saved
-                </p>
+                <SectionHeading label className="mb-1" icon={<PiggyBank className="w-3.5 h-3.5 text-chart-1" />}>Total Saved</SectionHeading>
                 <p className="text-lg sm:text-2xl font-bold text-chart-1 truncate font-mono blur-number">
                   {formatCurrency(data.totalCurrent)}
                 </p>
               </div>
               <div className="pl-3 sm:pl-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <TrendingUp className="w-3.5 h-3.5" /> Remaining
-                </p>
+                <SectionHeading label className="mb-1" icon={<TrendingUp className="w-3.5 h-3.5" />}>Remaining</SectionHeading>
                 <p className="text-lg sm:text-2xl font-bold text-foreground truncate font-mono blur-number">
                   {formatCurrency(remaining)}
                 </p>

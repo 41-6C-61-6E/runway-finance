@@ -5,6 +5,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
 
 type Condition = {
@@ -663,7 +664,7 @@ export default function RulesTab() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Categorization Rules</h2>
+        <SectionHeading>Categorization Rules</SectionHeading>
         <div className="flex items-center gap-2 flex-wrap">
           {feedback && (
             <span className={`text-xs px-2 py-1 rounded-lg shrink-0 ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>

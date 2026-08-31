@@ -272,9 +272,9 @@ export function UpcomingBills() {
                   </span>
                   <AppTabs
                     tabs={[
-                      { id: 'all', label: 'All Items' },
-                      { id: 'expense', label: 'Bills Only' },
-                      { id: 'income', label: 'Income Only' },
+                      { id: 'all', label: 'All' },
+                      { id: 'expense', label: 'Bills' },
+                      { id: 'income', label: 'Income' },
                     ]}
                     activeTab={flowFilter}
                     onChange={(tab) => setFlowFilter(tab as any)}

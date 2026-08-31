@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatAmount } from '@/lib/utils/format';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { cn } from '@/lib/utils';
 import {
@@ -305,7 +306,7 @@ export default function RecurringDetailDrawer({
                     />
                     <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
                     <Tooltip
-                      formatter={(val: any) => [privacyMode ? '••••' : `$${Number(val).toFixed(2)}`, 'Amount']}
+                      formatter={(val: any) => [privacyMode ? '••••' : formatAmount(val), 'Amount']}
                       labelFormatter={(l) => `Date: ${l}`}
                       contentStyle={{
                         backgroundColor: 'var(--card)',

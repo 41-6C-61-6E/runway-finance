@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { glassIconButton, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
 
 interface Issue {
   id: string;
@@ -304,7 +305,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
+            className={`${glassIconButton} ${open ? glassItemActive : glassItemInactive}`}
             aria-label="Submit Feedback / Track issues"
           >
             <MessageSquare className="w-5 h-5" />

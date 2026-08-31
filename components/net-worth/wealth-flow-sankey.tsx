@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { ArrowLeftRight, HelpCircle, Search, Eye, EyeOff, TrendingUp, TrendingDown, Info, ChevronDown } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
+import { getOrFetch } from '@/lib/fetch-cache';
 import type { WealthFlowData, WealthFlowNode, WealthFlowSummary, WealthFlowAccountDetail } from '@/lib/types/financial';
 
 interface AccountData {
@@ -113,7 +114,7 @@ const SankeyCustomNode = ({
       className="cursor-pointer"
     >
       <rect
-        x={x} y={y} width={width} height={height}
+        x={x} y={y} width={width} height={Math.max(0, height)}
         fill={payload.color || 'var(--color-primary)'}
         rx={0}
         fillOpacity={isDimmed ? 0.3 : 0.95}
@@ -133,24 +134,24 @@ const SankeyCustomNode = ({
           )}
           <foreignObject
             x={x + width + 4}
-            y={hubDeltaCenterY - 24}
-            width={400}
-            height={50}
+            y={hubDeltaCenterY - 30}
+            width={Math.min(400, (window.innerWidth || 400) - (x + width) - 12)}
+            height={58}
             pointerEvents="none"
             style={{ opacity: isDimmed ? 0.3 : 1 }}
           >
             <div style={{
-              display: 'inline-block', width: 'fit-content',
+              display: 'block', width: '100%', boxSizing: 'border-box',
               background: 'var(--background)',
               border: '1px solid var(--border)',
               borderRadius: '6px', padding: '4px 10px',
             }}>
-              <div style={{ fontSize: isMobile ? 8 : 10, fontWeight: 600, lineHeight: 1.4 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.4 }}>
                 {payload.label}
               </div>
               {hubVisualImbalance !== undefined && (
                 <div className="blur-number" style={{
-                  fontSize: isMobile ? 13 : 17, fontWeight: 800,
+                  fontSize: isMobile ? 13 : 17, fontWeight: 800, whiteSpace: 'nowrap',
                   color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
                   lineHeight: 1.3,
                 }}>
@@ -169,7 +170,7 @@ const SankeyCustomNode = ({
             y={y + height / 2 - (valueLabel ? 4 : 0)}
             textAnchor={isRightSide ? 'end' : 'start'}
             dominantBaseline="central"
-            fontSize={isMobile ? 8 : 10}
+            fontSize={10}
             fontWeight={600}
             fill="currentColor"
             className="fill-foreground select-none"
@@ -183,7 +184,7 @@ const SankeyCustomNode = ({
               y={y + height / 2 + 5}
               textAnchor={isRightSide ? 'end' : 'start'}
               dominantBaseline="central"
-              fontSize={isMobile ? 7 : 9}
+              fontSize={9}
               fill="currentColor"
               className="fill-muted-foreground select-none blur-number"
               style={{ opacity: isDimmed ? 0.3 : 0.75 }}
@@ -495,7 +496,7 @@ export function WealthFlowSankey() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/accounts')
+    getOrFetch('/api/accounts')
       .then((r) => (r.ok ? r.json() : []))
       .then((json) => setAllAccounts(Array.isArray(json) ? json : []))
       .catch(() => setAllAccounts([]))
@@ -547,9 +548,9 @@ export function WealthFlowSankey() {
         const acctParam = getAccountIdsParam(excludedAccountIds, allAccounts);
         const url = `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}&timeframe=${timeframe}${acctParam}`;
 
-        const res = await fetch(url);
+        const res = await getOrFetch(url);
         if (!res.ok) throw new Error(`Failed to load wealth flow data (${res.status})`);
-        const data = await res.json();
+        const data = (await res.json()) as WealthFlowData;
         if (isCurrent) setWealthFlowData(data);
       } catch (err) {
         if (isCurrent) setError(err instanceof Error ? err.message : String(err));
@@ -658,7 +659,7 @@ export function WealthFlowSankey() {
 
   const margin = useMemo(
     () => isMobile
-      ? { top: 15, right: 75, bottom: 15, left: 75 }
+      ? { top: 15, right: 140, bottom: 15, left: 100 }
       : { top: 25, right: 180, bottom: 25, left: 180 },
     [isMobile]
   );

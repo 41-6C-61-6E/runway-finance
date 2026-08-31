@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency } from '@/lib/utils/format';
 import { isAssetAccount, isReportableAccount } from '@/lib/utils/account-scope';
 import { convertCurrency } from '@/lib/constants/currency-rates';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -67,9 +68,7 @@ const MILESTONE_TIERS = [
 ];
 
 function formatMilestone(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${value.toFixed(0)}`;
+  return formatCompactCurrency(value);
 }
 
 function getNextMilestone(netWorth: number) {
@@ -318,7 +317,7 @@ export function NetWorthSidePanel() {
                     <TooltipRow
                       label="1-Year Growth"
                       value={`${deltas.netWorth >= 0 ? '+' : ''}${formatCurrency(deltas.netWorth)} (${deltas.pctNetWorth.toFixed(1)}%)`}
-                      color={deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+                      color={deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-status-negative)'}
                     />
                   </div>
                 </>

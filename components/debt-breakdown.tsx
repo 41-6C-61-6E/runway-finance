@@ -10,6 +10,8 @@ import { convertCurrency } from '@/lib/constants/currency-rates';
 import { formatInTimezone } from '@/lib/utils/timeframe';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
+import { formatCompactCurrency } from '@/lib/utils/format';
+import { SegPill } from '@/components/ui/seg-pill';
 
 const CHART_COLOR_MAP = [
   'var(--color-chart-1)',
@@ -76,10 +78,7 @@ const DEBT_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
 type BreakdownView = 'donut' | 'treemap';
 
 function formatCompact(value: number): string {
-  if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-  return `$${value.toFixed(0)}`;
+  return formatCompactCurrency(value);
 }
 
 function truncateTreemapLabel(label: string, width: number): string {
@@ -87,31 +86,6 @@ function truncateTreemapLabel(label: string, width: number): string {
   return label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
 }
 
-function TogglePill<T extends string>({ options, value, onChange }: {
-  options: { id: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="inline-flex w-max min-w-0 max-w-full items-center gap-1 p-1 bg-sidebar/75 backdrop-blur-xl border border-sidebar-border/35 rounded-full shadow-lg select-none">
-      {options.map((opt) => (
-        <button
-          key={opt.id}
-          type="button"
-          onClick={() => onChange(opt.id)}
-          aria-pressed={value === opt.id}
-          className={`min-w-0 flex-[0_1_auto] py-1 px-2.5 text-xs rounded-full transition-all duration-200 cursor-pointer select-none whitespace-nowrap active:scale-95 ${
-            value === opt.id
-              ? 'text-primary font-semibold'
-              : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'
-          }`}
-        >
-          <span className="block truncate">{opt.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
 interface AccountData {
   id: string;
   type: string;
@@ -260,22 +234,24 @@ export function DebtBreakdown() {
       )}
       <div className="px-3 sm:px-5 pt-4">
         <div className="flex flex-wrap items-center justify-center gap-1">
-          <TogglePill
+          <SegPill
             options={[
               { id: 'donut', label: 'Donut' },
               { id: 'treemap', label: 'Treemap' },
             ]}
             value={view as 'donut' | 'treemap'}
             onChange={(v) => setView(v)}
+            truncateLabels
           />
           <span className="px-0.5 text-xs text-sidebar-foreground/55 select-none" aria-hidden="true">|</span>
-          <TogglePill
+          <SegPill
             options={[
               { id: 'assets', label: 'Assets' },
               { id: 'debt', label: 'Debt' },
             ]}
             value={activeTab}
             onChange={(v) => setActiveTab(v)}
+            truncateLabels
           />
         </div>
       </div>
@@ -407,14 +383,14 @@ export function DebtBreakdown() {
                           />
                           {showLabel && (
                             <g clipPath={`url(#net-worth-tm-label-${index})`}>
-                                <text x={x + 6} y={y + 15} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 12} fontWeight="600">
+                                <text x={x + 6} y={y + 15} fill="white" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 12} fontWeight="600">
                                   {truncateTreemapLabel(item.name, width)}
                                 </text>
-                                {showAmount && <text x={x + 6} y={y + 30} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 11} opacity="0.9" className="blur-number">
+                                {showAmount && <text x={x + 6} y={y + 30} fill="white" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 11} opacity="0.9" className="blur-number">
                                 {formatCompact(item.value as number)}
                               </text>}
                               {showPct && (
-                                <text x={x + 6} y={y + 44} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize="10" opacity="0.75">
+                                <text x={x + 6} y={y + 44} fill="white" stroke="none" strokeWidth={0} fontSize="10" opacity="0.75">
                                   {sharePct.toFixed(1)}%
                                 </text>
                               )}

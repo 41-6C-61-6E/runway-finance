@@ -271,7 +271,7 @@ export function PropertyCard({
                 <TogglePill
                   options={[
                     { id: 'overview', label: 'Overview' },
-                    { id: 'payoff', label: 'Payoff Projections' },
+                    { id: 'payoff', label: 'Payoff' },
                   ]}
                   value={currentTab}
                   onChange={(tab) => setActiveTab(tab)}

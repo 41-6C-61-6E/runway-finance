@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { SectionHeading } from '@/components/ui/section-heading';
 import {
   Users,
   UserPlus,
@@ -427,7 +428,7 @@ export default function SharingTab() {
     return (
       <div className="space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-foreground">Account Sharing</h2>
+          <SectionHeading>Account Sharing</SectionHeading>
           <p className="text-xs text-muted-foreground mt-1">
             Invite up to 3 other users to share your financial data. You&apos;ll remain the owner.
           </p>
@@ -492,7 +493,7 @@ export default function SharingTab() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold text-foreground">Account Sharing</h2>
+        <SectionHeading>Account Sharing</SectionHeading>
         <p className="text-xs text-muted-foreground mt-1">
           {isPrimary
             ? `You are the account owner. ${memberCount} of 4 slots used.`

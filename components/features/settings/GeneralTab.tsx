@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { SectionHeading } from '@/components/ui/section-heading';
 import ModeToggle from '@/components/mode-toggle';
 import AccentPicker from '@/components/features/settings/AccentPicker';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
@@ -429,7 +430,7 @@ export default function GeneralTab() {
       <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
         <div className="space-y-5 sm:space-y-6">
           <div>
-            <h2 className="text-base font-semibold text-foreground">Navigation</h2>
+            <SectionHeading>Navigation</SectionHeading>
             <p className="text-xs text-muted-foreground mt-1">
               Show or hide pages in the sidebar navigation. Hidden pages can still be accessed via direct URL.
             </p>

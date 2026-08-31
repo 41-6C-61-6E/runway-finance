@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import {
   Search,
   ChevronDown,
@@ -766,7 +766,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
 
                     {/* Weight */}
                     <td className="p-3 text-right text-muted-foreground font-mono tabular-nums">
-                      {(weight ?? 0).toFixed(1)}%
+                      {formatPlainPercent(weight ?? 0)}
                     </td>
                   </tr>
                 );
@@ -863,7 +863,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                     {hasReturn && returnPct != null ? (
                       <span className={`text-[10px] font-semibold flex items-center justify-end gap-0.5 ${isReturnPositive ? 'text-chart-1' : 'text-destructive'}`}>
                         {isReturnPositive ? '▲' : '▼'}
-                        {returnPct.toFixed(1)}%
+                        {formatPlainPercent(returnPct)}
                       </span>
                     ) : (
                       <span className="text-[10px] text-muted-foreground/50">No return data</span>
@@ -883,7 +883,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                     <div className="text-right">
                       <span className="block text-micro uppercase tracking-wider text-muted-foreground/60 mb-0.5">Portfolio Weight</span>
                       <span className="font-mono text-foreground font-semibold">
-                        {(weight ?? 0).toFixed(1)}% of total
+                        {formatPlainPercent(weight ?? 0)} of total
                       </span>
                     </div>
 

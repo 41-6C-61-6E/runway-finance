@@ -6,7 +6,7 @@ import TableSelector from './TableSelector';
 import DataToolbar from './DataToolbar';
 import DataTable from './DataTable';
 import DataCleanup from './DataCleanup';
-import ContentWrapper from '@/components/content-wrapper';
+import PageContent from '@/components/page-content';
 import { PageHeader } from '@/components/page-header';
 import { Database } from 'lucide-react';
 import { AppTabs } from '@/components/ui/app-tabs';
@@ -260,13 +260,12 @@ export default function DataExplorerPage() {
         )}
       </PageHeader>
       <div className="relative z-10">
-        <ContentWrapper>
-          <div className="px-0 sm:px-1 lg:px-3 max-w-[1920px]">
-            {/* Tabs */}
+        <PageContent maxWidth="max-w-[1920px]">
+          {/* Tabs */}
             <AppTabs
               tabs={[
-                { id: 'explore', label: 'Explore Data' },
-                { id: 'cleanup', label: 'Data Cleanup' },
+                { id: 'explore', label: 'Explore' },
+                { id: 'cleanup', label: 'Cleanup' },
               ]}
               activeTab={activeTab}
               onChange={(tabId) => setActiveTab(tabId as 'explore' | 'cleanup')}
@@ -319,8 +318,7 @@ export default function DataExplorerPage() {
             ) : (
               <DataCleanup />
             )}
-          </div>
-        </ContentWrapper>
+        </PageContent>
       </div>
     </div>
   );

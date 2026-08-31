@@ -6,6 +6,7 @@ import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filt
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { SectionHeading } from '@/components/ui/section-heading';
 
 type CategoryType = 'standard' | 'compound' | 'transfer';
 type FormCategoryType = 'expense' | 'income' | 'compound' | 'transfer';
@@ -353,7 +354,7 @@ export default function CategoriesTab() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Categories</h2>
+        <SectionHeading>Categories</SectionHeading>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative group/tooltip overflow-visible">
             <button

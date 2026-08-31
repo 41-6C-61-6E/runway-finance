@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Treemap } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -18,6 +19,7 @@ import { Filter, ChevronDown, ChevronUp, PieChart as PieIcon } from 'lucide-reac
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { SegPill } from '@/components/ui/seg-pill';
 
 interface CategoryData {
   categoryId: string;
@@ -44,40 +46,6 @@ const CHART_COLORS = [
 
 
 type BreakdownView = 'donut' | 'treemap' | 'bar';
-
-function TogglePill<T extends string>({ options, value, onChange }: {
-  options: { id: T; label: string }[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="inline-flex w-max items-center gap-1 p-1 bg-sidebar/75 backdrop-blur-xl border border-sidebar-border/35 rounded-full shadow-lg select-none">
-      {options.map((option) => (
-        <button key={option.id} type="button" onClick={() => onChange(option.id)} aria-pressed={value === option.id}
-          className={`py-1 px-2.5 text-xs rounded-full transition-all cursor-pointer whitespace-nowrap ${value === option.id ? 'text-primary font-semibold' : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'}`}>
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function MultiTogglePill<T extends string>({ options, values, onToggle }: {
-  options: { id: T; label: string }[];
-  values: Set<T>;
-  onToggle: (value: T) => void;
-}) {
-  return (
-    <div className="inline-flex w-max items-center gap-1 p-1 bg-sidebar/75 backdrop-blur-xl border border-sidebar-border/35 rounded-full shadow-lg select-none">
-      {options.map((option) => (
-        <button key={option.id} type="button" onClick={() => onToggle(option.id)} aria-pressed={values.has(option.id)}
-          className={`py-1 px-2.5 text-xs rounded-full transition-all cursor-pointer whitespace-nowrap ${values.has(option.id) ? 'text-primary font-semibold' : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'}`}>
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function SpendingBreakdown() {
   const router = useRouter();
@@ -295,16 +263,18 @@ export function SpendingBreakdown() {
       />
 
       <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2">
-        <TogglePill<BreakdownView>
-          options={[{ id: 'donut' as const, label: 'Donut' }, { id: 'treemap' as const, label: 'Treemap' }, { id: 'bar' as const, label: 'Bar' }]}
+        <SegPill<BreakdownView>
+          options={[{ id: 'donut', label: 'Donut' }, { id: 'treemap', label: 'Treemap' }, { id: 'bar', label: 'Bar' }]}
           value={view}
           onChange={setView}
+          aria-label="Chart type"
         />
         <span className="text-xs text-muted-foreground/50">|</span>
-        <MultiTogglePill
-          options={[{ id: 'discretionary' as const, label: 'Discretionary' }, { id: 'fixed' as const, label: 'Fixed' }]}
+        <SegPill
+          options={[{ id: 'discretionary', label: 'Discretionary' }, { id: 'fixed', label: 'Fixed' }]}
           values={safeSelectedGroups}
           onToggle={toggleGroup}
+          aria-label="Spending groups"
         />
         <span className="text-xs text-muted-foreground/50">|</span>
         <button type="button" onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}
@@ -359,7 +329,7 @@ export function SpendingBreakdown() {
                             margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
                           >
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
-                            <XAxis type="number" tickFormatter={(v) => `$${v}`} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
+                            <XAxis type="number" tickFormatter={(v) => formatCompactCurrency(v)} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
                             <YAxis dataKey="label" type="category" width={dynamicLeft - 10} tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }} axisLine={{ stroke: 'var(--color-border)' }} tickLine={false} />
                             <Tooltip
                               cursor={false}
@@ -404,9 +374,9 @@ export function SpendingBreakdown() {
                             </defs>
                             <path d={`M${x + radius},${y} h${width - 2 * radius} a${radius},${radius} 0 0 1 ${radius},${radius} v${height - 2 * radius} a${radius},${radius} 0 0 1 -${radius},${radius} h${-(width - 2 * radius)} a${radius},${radius} 0 0 1 -${radius},-${radius} v${-(height - 2 * radius)} a${radius},${radius} 0 0 1 ${radius},-${radius} Z`} fill={item.color} fillOpacity={0.85} stroke="var(--color-card)" />
                             {width > 42 && height > 24 && <g clipPath={`url(#spending-tm-label-${index})`}>
-                              <text x={x + 6} y={y + 15} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 12} fontWeight="600">{treemapLabel(item.name, width)}</text>
-                              {height > 40 && <text x={x + 6} y={y + 30} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 11} className="blur-number">{formatCurrency(item.value)}</text>}
-                              {height > 54 && <text x={x + 6} y={y + 44} fill="var(--foreground)" stroke="none" strokeWidth={0} fontSize="10" opacity="0.8">{pct.toFixed(1)}%</text>}
+                              <text x={x + 6} y={y + 15} fill="white" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 12} fontWeight="600">{treemapLabel(item.name, width)}</text>
+                              {height > 40 && <text x={x + 6} y={y + 30} fill="white" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 11} className="blur-number">{formatCurrency(item.value)}</text>}
+                              {height > 54 && <text x={x + 6} y={y + 44} fill="white" stroke="none" strokeWidth={0} fontSize="10" opacity="0.8">{pct.toFixed(1)}%</text>}
                             </g>}
                           </g>
                         );

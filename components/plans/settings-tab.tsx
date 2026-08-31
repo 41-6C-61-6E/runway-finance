@@ -34,6 +34,7 @@ import {
 } from '@/lib/constants/retirement-defaults';
 import { getYearSalary } from '@/lib/services/retirement-engine';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 import { AppTabs } from '@/components/ui/app-tabs';
@@ -302,9 +303,9 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
 
   const settingsSubTabs = [
     { id: 'milestones', label: 'Profile', icon: Flag },
-    { id: 'details', label: 'Plan Details', icon: ListChecks },
-    { id: 'rates_estate', label: 'Assumptions & Strategy', icon: TrendingUp },
-    { id: 'engine_rules', label: 'Engine Rules', icon: Database },
+    { id: 'details', label: 'Details', icon: ListChecks },
+    { id: 'rates_estate', label: 'Assumptions', icon: TrendingUp },
+    { id: 'engine_rules', label: 'Engine', icon: Database },
   ];
 
   return (
@@ -343,10 +344,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
               isCollapsed={isPrimaryProfileCollapsed}
               onToggle={setIsPrimaryProfileCollapsed}
               title={
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Flag className="w-4 h-4 text-primary" />
-                  Primary Profile
-                </h3>
+                    <SectionHeading size="sm" icon={<Flag className="w-4 h-4 text-primary" />}>Primary Profile</SectionHeading>
               }
               actions={
                 <span className="text-[10px] uppercase font-bold text-muted-foreground px-2 py-0.5 bg-muted rounded">Primary</span>
@@ -579,10 +577,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                 isCollapsed={isSpouseProfileCollapsed}
                 onToggle={setIsSpouseProfileCollapsed}
                 title={
-                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <Users className="w-4 h-4 text-emerald-500" />
-                    Partner / Spouse Profile
-                  </h3>
+                    <SectionHeading size="sm" icon={<Users className="w-4 h-4 text-emerald-500" />}>Partner / Spouse Profile</SectionHeading>
                 }
                 actions={
                   <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">MFJ Active</span>
@@ -1024,10 +1019,10 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                 <div className="flex items-center gap-2 border-b border-border pb-3">
                   <TrendingUp className="w-5 h-5 text-primary" />
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">Macroeconomic & Tax Rates</h3>
+                    <SectionHeading size="sm">Macroeconomic & Tax Rates</SectionHeading>
                     <p className="text-[11px] text-muted-foreground">General inflation rate and state/local income tax overlay</p>
                   </div>
-                </div>
+                  </div>
 
                 <div className="space-y-3.5 text-xs">
                   <div className="space-y-1.5 bg-muted/20 border border-border rounded-xl p-3.5">
@@ -1275,7 +1270,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                 <div className="flex items-center gap-2 border-b border-border pb-3">
                   <ShieldCheck className="w-5 h-5 text-amber-500" />
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">Estate & Legacy Settlement</h3>
+                    <SectionHeading size="sm">Estate & Legacy Settlement</SectionHeading>
                     <p className="text-[11px] text-muted-foreground">Heir tax drag and estate liquidation friction upon plan end</p>
                   </div>
                 </div>

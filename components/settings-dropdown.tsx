@@ -17,6 +17,7 @@ import {
   Bell,
   ShieldAlert 
 } from 'lucide-react';
+import { glassIconButton, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
 
 const settingsSections = [
   { id: 'general', label: 'General', icon: Settings },
@@ -41,7 +42,6 @@ export default function SettingsDropdown({ onOpenChange }: SettingsDropdownProps
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
@@ -76,7 +76,7 @@ export default function SettingsDropdown({ onOpenChange }: SettingsDropdownProps
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className={`${glassIconButton} ${open ? glassItemActive : glassItemInactive}`}
             aria-label="Settings"
           >
             <Settings className="w-5 h-5" />
@@ -85,7 +85,7 @@ export default function SettingsDropdown({ onOpenChange }: SettingsDropdownProps
         <TooltipContent side="bottom" className="hidden md:block">Settings</TooltipContent>
       </Tooltip>
       {open && (
-        <div className="absolute right-[-40px] sm:right-0 top-full mt-1 w-48 py-1 bg-popover border border-border rounded-lg shadow-lg z-50">
+        <div className="absolute right-6 sm:right-0 top-full mt-1 w-48 max-h-[70vh] overflow-y-auto py-1 bg-popover border border-border rounded-lg shadow-lg z-50">
           {settingsSections.map((section) => {
             const Icon = section.icon;
             return (

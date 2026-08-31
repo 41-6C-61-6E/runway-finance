@@ -306,7 +306,7 @@ export function NetWorthChart() {
 
   const formatBarYTick = useCallback((v: number) => {
     if (showPercent) {
-      return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+      return formatPercent(v, 1);
     }
     return formatChartYAxisCurrency(v, barYDomain[0], barYDomain[1]);
   }, [barYDomain, showPercent]);

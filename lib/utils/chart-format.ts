@@ -4,6 +4,10 @@ import { formatSafeUTCDate } from './date';
  * Dynamically formats values on the Y-axis.
  * Automatically adjusts precision based on the range of data being displayed.
  * Helps prevent repeated labels (e.g. all labels showing "$1.3M") when range is narrow.
+ *
+ * Axis role (R-7 role table, see lib/utils/format.ts JSDoc): below $1,000 the
+ * axis prints **whole dollars** — `$15`, never `$15.0`. Above that, 3-sig-fig
+ * K/M compaction (unchanged: `$1.9K`, `$3.2M`).
  */
 export function formatChartYAxisCurrency(
   value: number,
@@ -45,7 +49,9 @@ export function formatChartYAxisCurrency(
     return `${sign}$${formatWithSigFigs(vK, sigFigs)}K`;
   }
 
-  return `${sign}$${formatWithSigFigs(absV, sigFigs)}`;
+  // Sub-$1,000 axis ticks are whole dollars — money axes don't earn decimals
+  // here (this is what used to print "$15.0").
+  return `${sign}$${Math.round(absV)}`;
 }
 
 /**

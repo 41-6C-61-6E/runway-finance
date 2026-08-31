@@ -548,7 +548,7 @@ export default function AccountHierarchyTree({
                       <button
                         type="button"
                         onClick={() => setHierarchyTypesOpen(!hierarchyTypesOpen)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                        className={`px-3 py-1.5 min-h-8 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
                           hierarchySelectedTypes.size > 0
                             ? 'bg-primary/15 border border-primary text-primary'
                             : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
@@ -695,7 +695,7 @@ export default function AccountHierarchyTree({
                       <button
                         type="button"
                         onClick={() => setHierarchyTagsOpen(!hierarchyTagsOpen)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+                        className={`px-3 py-1.5 min-h-8 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
                           hierarchySelectedTags.size > 0
                             ? 'bg-primary/15 border border-primary text-primary'
                             : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
@@ -826,7 +826,7 @@ export default function AccountHierarchyTree({
                                 if (isGroupExpanded) setSelectedGroup(null);
                               setExpandedGroups((prev) => ({ ...prev, [group]: !isGroupExpanded }));
                             }}
-                            className="w-6 h-6 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
+                            className="-m-2.5 p-2.5 w-11 h-11 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
                             aria-label={isGroupExpanded ? `Collapse ${group}` : `Expand ${group}`}
                           >
                             {isGroupExpanded ? (

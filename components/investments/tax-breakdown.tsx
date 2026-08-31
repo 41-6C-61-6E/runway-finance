@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { ShieldCheck } from 'lucide-react';
@@ -138,7 +138,7 @@ export function TaxBreakdown({ accounts }: TaxBreakdownProps) {
                     key={wrapper}
                     style={{ width: `${pct}%`, background: WRAPPER_COLORS[wrapper] }}
                     className="transition-all duration-500 first:rounded-l-full last:rounded-r-full"
-                    title={`${wrapper}: ${pct.toFixed(1)}%`}
+                    title={`${wrapper}: ${formatPlainPercent(pct)}`}
                   />
                 );
               })}
@@ -169,7 +169,7 @@ export function TaxBreakdown({ accounts }: TaxBreakdownProps) {
                       <span className="text-xs font-semibold text-foreground">{wrapper}</span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs font-mono font-bold text-foreground blur-number">{formatCurrency(value)}</span>
-                        <span className="text-[10px] text-muted-foreground/70 w-9 text-right tabular-nums">{pct.toFixed(1)}%</span>
+                        <span className="text-[10px] text-muted-foreground/70 w-9 text-right tabular-nums">{formatPlainPercent(pct)}</span>
                       </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground/70 leading-relaxed truncate" title={WRAPPER_DESCRIPTIONS[wrapper]}>

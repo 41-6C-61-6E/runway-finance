@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
 import {
   type EquityBreakdownMortgage,
@@ -140,11 +140,11 @@ export function PropertyEquityProgressBar({
           ) : (
             <div className="flex items-center gap-1.5 text-[11px] font-mono font-medium">
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold blur-number">
-                {totalEquityPct.toFixed(1)}% Equity
+                {formatPlainPercent(totalEquityPct)} Equity
               </span>
               <span className="text-muted-foreground">/</span>
               <span className="text-slate-500 dark:text-slate-400 blur-number">
-                {mortgageOwedPct.toFixed(1)}% Debt
+                {formatPlainPercent(mortgageOwedPct)} Debt
               </span>
             </div>
           )}
@@ -185,7 +185,7 @@ export function PropertyEquityProgressBar({
                   isLast && 'rounded-r-md',
                   isHovered && 'brightness-110 scale-y-110 z-10 shadow-sm'
                 )}
-                title={`${seg.label}: ${formatCurrency(seg.amount)} (${seg.pct.toFixed(1)}%)`}
+                title={`${seg.label}: ${formatCurrency(seg.amount)} (${formatPlainPercent(seg.pct)})`}
               />
             );
           })}
@@ -202,7 +202,7 @@ export function PropertyEquityProgressBar({
                   <div className={cn('w-2 h-2 rounded-full', seg.dotColorClass)} />
                   <span className="font-medium text-foreground">{seg.label}:</span>
                   <span className="font-mono font-semibold blur-number">{formatCurrency(seg.amount)}</span>
-                  <span className="text-muted-foreground font-mono">({seg.pct.toFixed(1)}%)</span>
+                  <span className="text-muted-foreground font-mono">({formatPlainPercent(seg.pct)})</span>
                 </div>
               );
             })()}
@@ -248,7 +248,7 @@ export function PropertyEquityProgressBar({
                   {formatCurrency(seg.amount)}
                 </span>
                 <span className="font-mono text-[10px] text-muted-foreground/80 blur-number">
-                  {seg.pct.toFixed(1)}%
+                  {formatPlainPercent(seg.pct)}
                 </span>
               </div>
             </div>

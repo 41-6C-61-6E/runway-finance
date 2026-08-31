@@ -6,6 +6,7 @@ import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
 import { DEFAULT_AI_SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from '@/config/defaults';
 import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { SectionHeading } from '@/components/ui/section-heading';
 
 type Provider = {
   id: string;
@@ -339,7 +340,7 @@ export default function AiTab() {
       <div className="p-5 bg-card border border-border rounded-xl">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">AI Providers</h2>
+            <SectionHeading>AI Providers</SectionHeading>
             <p className="text-xs text-muted-foreground">
               Configure OpenAI-compatible API endpoints. Compatible with Ollama, Open WebUI, and any OpenAI-compatible provider.
             </p>
@@ -586,7 +587,7 @@ export default function AiTab() {
       <div className="p-5 bg-card border border-border rounded-xl">
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">System Prompt</h2>
+            <SectionHeading>System Prompt</SectionHeading>
             <p className="text-xs text-muted-foreground">
               Customize the AI system prompt. Changes take effect on the next analysis run.
             </p>
@@ -632,7 +633,7 @@ export default function AiTab() {
       <div className="p-5 bg-card border border-border rounded-xl">
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">Test Prompt</h2>
+            <SectionHeading>Test Prompt</SectionHeading>
             <p className="text-xs text-muted-foreground">
               Customize the message sent when testing a provider connection. A short prompt speeds up the test.
             </p>
@@ -675,7 +676,7 @@ export default function AiTab() {
       </div>
 
       <div className="p-5 bg-card border border-border rounded-xl">
-        <h2 className="text-base font-semibold text-foreground mb-1">Automation</h2>
+        <SectionHeading className="mb-1">Automation</SectionHeading>
         <p className="text-xs text-muted-foreground mb-4">
           Control how and when AI analysis runs.
         </p>

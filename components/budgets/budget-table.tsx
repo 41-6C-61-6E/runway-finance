@@ -665,10 +665,10 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       )}
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
+                      <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
+                      <button onClick={() => setDeleteBudget(b)} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground hover:text-destructive">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -738,10 +738,10 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       )}
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
+                      <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
+                      <button onClick={() => setDeleteBudget(b)} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground hover:text-destructive">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -922,10 +922,10 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                           )}
                           <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                              <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
+                              <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground">
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
-                              <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
+                              <button onClick={() => setDeleteBudget(b)} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground hover:text-destructive">
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
@@ -1036,10 +1036,10 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             )}
                             <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                                <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="p-1 rounded hover:bg-accent text-muted-foreground">
+                                <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground">
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
-                                <button onClick={() => setDeleteBudget(b)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive">
+                                <button onClick={() => setDeleteBudget(b)} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground hover:text-destructive">
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>

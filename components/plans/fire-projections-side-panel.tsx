@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { Card, CardContent } from '@/components/ui/card';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -235,7 +235,7 @@ export function FireProjectionsSidePanel({
                             : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
                         )}
                       >
-                        {peakWithdrawalRate.toFixed(1)}%
+                        {formatPlainPercent(peakWithdrawalRate)}
                       </span>
                     </div>
                   </TooltipTrigger>
@@ -274,7 +274,7 @@ export function FireProjectionsSidePanel({
                     <TooltipHeader>Coast FIRE Analysis</TooltipHeader>
                     <TooltipRow label="Coast FI Target Today" value={formatCurrency(coastFireInfo.coastTarget)} color="var(--color-primary)" />
                     <TooltipRow label="Current Net Worth" value={formatCurrency(currentNetWorth)} color="var(--color-chart-1)" />
-                    <TooltipRow label="Assumed Real Return" value={`${coastFireInfo.realReturnRate.toFixed(1)}%/yr`} color="var(--color-chart-2)" />
+                    <TooltipRow label="Assumed Real Return" value={`${formatPlainPercent(coastFireInfo.realReturnRate)}/yr`} color="var(--color-chart-2)" />
                     <div className="mt-2 border-t border-border/40 pt-1.5 text-[10px] text-muted-foreground">
                       No further contributions needed if net worth ≥ Coast target.
                     </div>

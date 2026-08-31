@@ -2,6 +2,7 @@
 
 import { Switch } from '@/components/ui/switch';
 import { AppTabs } from '@/components/ui/app-tabs';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { useChartVisibility, CHARTS } from '@/lib/hooks/use-chart-visibility';
 
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
@@ -134,7 +135,7 @@ export default function AnalyticsTab() {
       <AppTabs
         tabs={[
           { id: 'general', label: 'General' },
-          { id: 'data', label: 'Data Sources' },
+          { id: 'data', label: 'Data' },
         ]}
         activeTab={activeSubTab}
         onChange={(tab) => setActiveSubTab(tab as any)}
@@ -149,7 +150,7 @@ export default function AnalyticsTab() {
         <div className="space-y-8">
           {/* ── Chart Defaults ──────────────────────────────────────────────── */}
           <div>
-            <h2 className="text-lg font-semibold text-foreground mb-1">Chart Defaults</h2>
+            <SectionHeading className="mb-1">Chart Defaults</SectionHeading>
             <p className="text-xs text-muted-foreground mb-4">
               Choose default view options for all charts. These can be changed per-chart when viewing.
             </p>
@@ -209,7 +210,7 @@ export default function AnalyticsTab() {
 
           {/* ── Forecasting & Projections Defaults ──────────────────────── */}
           <div>
-            <h2 className="text-lg font-semibold text-foreground mb-1">Forecasting &amp; Projections</h2>
+            <SectionHeading className="mb-1">Forecasting &amp; Projections</SectionHeading>
             <p className="text-xs text-muted-foreground mb-4">
               Configure baseline projection algorithms and lookback horizons for cash flow and account balance forecasts.
             </p>
@@ -284,7 +285,7 @@ export default function AnalyticsTab() {
 
           {/* ── Chart Visibility ─────────────────────────────────────────── */}
           <div>
-            <h2 className="text-lg font-semibold text-foreground mb-1">Chart Visibility</h2>
+            <SectionHeading className="mb-1">Chart Visibility</SectionHeading>
             <p className="text-xs text-muted-foreground mb-6">
               Toggle charts on or off per page. Hidden charts will not be displayed.
             </p>
@@ -353,7 +354,7 @@ export default function AnalyticsTab() {
 
           {/* ── Synthetic & Estimated Data ─────────────────────────────────── */}
           <div>
-            <h2 className="text-lg font-semibold text-foreground mb-1">Synthetic &amp; Estimated Data</h2>
+            <SectionHeading className="mb-1">Synthetic &amp; Estimated Data</SectionHeading>
             <p className="text-xs text-muted-foreground mb-4">
               Synthetic or estimated data fills in gaps where no live snapshot from your financial institution
               is available. When enabled, estimated values appear with dashed lines and &ldquo;estimated&rdquo;
@@ -405,7 +406,7 @@ export default function AnalyticsTab() {
 
           {/* ── Imported Data ─────────────────────────────────────────────── */}
           <div>
-            <h2 className="text-lg font-semibold text-foreground mb-1">Imported Data</h2>
+            <SectionHeading className="mb-1">Imported Data</SectionHeading>
             <p className="text-xs text-muted-foreground mb-4">
               Data imported via CSV files can be toggled on or off per module. Disabling a module hides
               all imported data points from that area while keeping the data in the database.
@@ -443,7 +444,7 @@ export default function AnalyticsTab() {
 
           {/* ── Manual Snapshot Recalculation ───────────────────────────────── */}
           <div className="border-t border-border/60 pt-6">
-            <h2 className="text-lg font-semibold text-foreground mb-1">Manual Data Recalculation</h2>
+            <SectionHeading className="mb-1">Manual Data Recalculation</SectionHeading>
             <p className="text-xs text-muted-foreground mb-4">
               If your charts or summaries appear out of sync, you can trigger a full historical recalculation.
               This process runs in the background and yields execution threads to keep the application responsive.

@@ -4,7 +4,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { formatSafeUTCDate, shiftDaysUTC } from '@/lib/utils/date';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import { AppTabs } from '@/components/ui/app-tabs';
+import { MobileTabStrip } from '@/components/ui/mobile-tab-strip';
 import {
   ArrowLeftRight,
   Landmark,
@@ -201,16 +201,15 @@ export function RecentActivity({ transactions, startDate, endDate, value, onValu
         <div className="flex-1 flex flex-col p-4 sm:p-5 gap-3">
           {/* Type filter */}
           {transactions.length > 0 && (
-            <AppTabs
+            <MobileTabStrip
               tabs={FILTER_OPTIONS.map((opt) => ({ id: opt.value, label: opt.label }))}
               activeTab={filter}
               onChange={(val) => {
                 setFilter(val as string);
                 setShowAll(false);
               }}
-              variant="pills"
-              size="sm"
               className="mb-1"
+              aria-label="Activity filter"
             />
           )}
 

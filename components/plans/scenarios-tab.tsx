@@ -5,6 +5,7 @@ import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-e
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency } from '@/lib/utils/format';
 import {
   LineChart,
   Line,
@@ -38,6 +39,7 @@ import { IrmaaTab } from '@/components/plans/irmaa-tab';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
 import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
+import { TableScroll } from '@/components/ui/table-scroll';
 
 interface ScenariosTabProps {
   plan: any;
@@ -252,7 +254,7 @@ export function ScenariosTab({
 
   const subTabs = [
     { id: 'withdraw' as const, label: 'Withdrawal', icon: Layers },
-    { id: 'social-security' as const, label: 'Social Security', icon: HeartHandshake },
+    { id: 'social-security' as const, label: 'SS', icon: HeartHandshake },
     { id: 'roth-conversion' as const, label: 'Roth', icon: Flame },
     { id: 'irmaa' as const, label: 'IRMAA', icon: ShieldCheck },
   ];
@@ -355,7 +357,7 @@ export function ScenariosTab({
                         <YAxis
                           stroke="#888888"
                           fontSize={10}
-                          tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`}
+                          tickFormatter={(v) => formatCompactCurrency(v)}
                           tickLine={false}
                         />
                         <Tooltip
@@ -385,7 +387,7 @@ export function ScenariosTab({
                 </div>
 
                 {/* Strategy Metrics Comparison Table */}
-                <div className="border border-border rounded-xl overflow-x-auto shadow-sm">
+                <TableScroll className="border border-border rounded-xl shadow-sm">
                   <table className="w-full text-xs text-left min-w-[720px]">
                     <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border">
                       <tr>
@@ -543,7 +545,7 @@ export function ScenariosTab({
                                         <h5 className="font-bold text-foreground text-xs">Annual Drawdown & Tax Breakdown Log</h5>
                                         <span className="text-[10px] text-muted-foreground">Retirement Phase Projections</span>
                                       </div>
-                                      <div className="max-h-56 overflow-y-auto border border-border rounded-xl bg-card shadow-inner">
+                                      <TableScroll maxHeight={224} className="border border-border rounded-xl bg-card shadow-inner">
                                         <table className="w-full text-[11px] text-left">
                                           <thead className="bg-muted/80 text-muted-foreground font-semibold sticky top-0 backdrop-blur-sm">
                                             <tr>
@@ -572,7 +574,7 @@ export function ScenariosTab({
                                               ))}
                                           </tbody>
                                         </table>
-                                      </div>
+                                        </TableScroll>
                                     </div>
                                   </div>
                                 </td>
@@ -583,7 +585,7 @@ export function ScenariosTab({
                       })}
                     </tbody>
                   </table>
-                </div>
+                </TableScroll>
               </div>
             )}
           </div>

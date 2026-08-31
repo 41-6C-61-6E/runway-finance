@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
@@ -252,7 +252,7 @@ export function InvestmentsSummary({
       label: 'Cost Basis',
       value: totalCostBasis != null ? formatCurrency(totalCostBasis) : '—',
       subValue: totalCostBasis != null && totalCostBasis > 0 && totalBalance > 0
-        ? `${((totalBalance / totalCostBasis - 1) * 100).toFixed(1)}% growth`
+        ? `${formatPlainPercent((totalBalance / totalCostBasis - 1) * 100)} growth`
         : 'No basis data',
       icon: DollarSign,
       isPositive: totalCostBasis != null ? totalBalance >= totalCostBasis : null,

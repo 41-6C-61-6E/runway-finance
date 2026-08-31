@@ -21,10 +21,14 @@ const buttonVariants = cva(
         link: "underline-offset-4 hover:underline text-primary",
       },
       size: {
-        default: "h-10 py-2 px-4",
-        sm: "h-9 px-3 rounded-lg",
-        lg: "h-11 px-8 rounded-lg",
-        icon: "h-10 w-10",
+        // G4 / W-4: three real sizes — sm (h-8) in-card chips, default (h-9)
+        // standard, xl (h-11) sheet-primary CTAs. Icon sizes match their row height.
+        default: "h-9 py-2 px-4",
+        sm: "h-8 px-3 rounded-lg text-xs",
+        lg: "h-11 px-6 rounded-lg",
+        xl: "h-11 px-6 rounded-lg",
+        icon: "h-9 w-9",
+        iconSm: "h-8 w-8",
       },
     },
     defaultVariants: {

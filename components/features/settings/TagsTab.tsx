@@ -6,6 +6,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Plus, Pencil, Trash2, Tag, Search, Hash } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { useUserSettings } from '@/components/user-settings-provider';
 
 type Tag = {
@@ -203,7 +204,7 @@ export default function TagsTab() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-semibold text-foreground">Tags</h2>
+          <SectionHeading>Tags</SectionHeading>
           <p className="text-xs text-muted-foreground mt-0.5">
             Create tags to organize transactions, accounts, budgets, and goals across categories.
           </p>

@@ -19,6 +19,8 @@ import {
   GripVertical,
 } from 'lucide-react';
 import RowExpansion from './RowExpansion';
+import { TableScroll } from '@/components/ui/table-scroll';
+import { PageLoading } from '@/components/ui/page-loading';
 
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
@@ -273,9 +275,9 @@ export default function DataTable({
   const currentPage = Math.floor(offset / limit);
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden" ref={containerRef}>
+    <div className="bg-card border border-border rounded-xl overflow-hidden min-w-0" ref={containerRef}>
       {loading ? (
-        <div className="p-12 text-center text-muted-foreground">Loading data...</div>
+        <PageLoading cards={4} lines={3} className="p-3" aria-label="Loading table data" />
       ) : data.length === 0 ? (
         <div className="p-12 text-center">
           <p className="text-muted-foreground text-base mb-2">No data found.</p>
@@ -285,7 +287,7 @@ export default function DataTable({
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto no-scrollbar scroll-contain-x">
+          <TableScroll className="border-b border-border/40">
             <table className="text-sm border-collapse" style={{ tableLayout: 'fixed', width: tableWidth }}>
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -373,7 +375,7 @@ export default function DataTable({
                 })}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
 
           {/* Pagination */}
           <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">

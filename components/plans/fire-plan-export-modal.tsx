@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { runRetirementSimulation } from '@/lib/services/retirement-engine';
 import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
@@ -389,7 +389,7 @@ Please perform a detailed, multi-dimensional review of this plan:
                     </h2>
                   </div>
                   <div className="text-left sm:text-right text-xs text-muted-foreground print:text-gray-600">
-                    <span className="block font-medium">As of {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    <span className="block font-medium">As of {formatDate(new Date(), 'mdy')}</span>
                     <span className="text-[11px]">Planning horizon: Age {plan?.lifeExpectancyAge || 100}</span>
                   </div>
                 </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatAmount, formatBalance } from '@/lib/utils/format';
 import {
   Database,
   RotateCcw,
@@ -961,10 +962,10 @@ export function EngineRulesView({
                   {(rules?.irmaaThresholds || []).map((t: any, idx: number) => (
                     <tr key={idx} className="hover:bg-muted/20">
                       <td className="p-2.5 font-sans font-bold">{idx === 0 ? 'Standard' : `Tier ${idx}`}</td>
-                      <td className="p-2.5 font-bold">{t.magiSingle === 0 ? '≤ $103,000' : `> $${t.magiSingle.toLocaleString()}`}</td>
-                      <td className="p-2.5 font-bold">{t.magiJoint === 0 ? '≤ $206,000' : `> $${t.magiJoint.toLocaleString()}`}</td>
-                      <td className="p-2.5 text-emerald-500 font-bold">{t.partBMonthly > 0 ? `+$${t.partBMonthly.toFixed(2)}` : '$0.00'}</td>
-                      <td className="p-2.5 text-blue-500 font-bold">{t.partDMonthly > 0 ? `+$${t.partDMonthly.toFixed(2)}` : '$0.00'}</td>
+                      <td className="p-2.5 font-bold">{t.magiSingle === 0 ? '≤ $103,000' : `> ${formatBalance(t.magiSingle)}`}</td>
+                      <td className="p-2.5 font-bold">{t.magiJoint === 0 ? '≤ $206,000' : `> ${formatBalance(t.magiJoint)}`}</td>
+                      <td className="p-2.5 text-emerald-500 font-bold">{t.partBMonthly > 0 ? `+${formatAmount(t.partBMonthly)}` : '$0.00'}</td>
+                      <td className="p-2.5 text-blue-500 font-bold">{t.partDMonthly > 0 ? `+${formatAmount(t.partDMonthly)}` : '$0.00'}</td>
                     </tr>
                   ))}
                 </tbody>

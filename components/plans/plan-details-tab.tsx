@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import {
   Plus, ArrowUpCircle, ArrowDownCircle, Landmark,
   Trash2, X, CheckSquare, Square, Eye, EyeOff,
@@ -433,7 +433,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
             <Zap className="w-4 h-4 text-amber-500" />
           </div>
           <p className={`text-xl font-extrabold font-mono ${savingsRate >= 20 ? 'text-emerald-500' : savingsRate >= 10 ? 'text-amber-500' : 'text-rose-500'}`}>
-            {savingsRate.toFixed(1)}%
+            {formatPlainPercent(savingsRate)}
           </p>
           <p className="text-[10px] text-muted-foreground">
             {combinedSalary > 0 ? `of ${formatCurrency(combinedSalary)} salary` : 'Set salary in Profile'}

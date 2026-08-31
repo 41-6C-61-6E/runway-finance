@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Trash2, GitMerge, AlertCircle, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useUserSettings } from '@/components/user-settings-provider';
+import { AsyncCard } from '@/components/ui/async-card';
 
 type Transaction = {
   id: string;
@@ -42,6 +43,7 @@ export default function DataCleanup() {
   const showCleanupTags = settingsContext?.settings?.accountTagVisibility?.suggestions !== false;
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [selectedKeeps, setSelectedKeeps] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export default function DataCleanup() {
 
   const fetchDuplicates = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = new URLSearchParams();
       if (accountId) params.set('accountId', accountId);
@@ -86,9 +89,16 @@ export default function DataCleanup() {
           }
         }
         setSelectedKeeps(defaultKeeps);
+      } else {
+        // R-8: a non-2xx response used to fall straight into the "All Clean!"
+        // empty state — a wrong answer presented confidently.
+        setGroups([]);
+        setLoadError(`HTTP ${res.status}`);
       }
     } catch (err) {
       console.error('Failed to fetch duplicates:', err);
+      setGroups([]);
+      setLoadError('Network error');
     } finally {
       setLoading(false);
     }
@@ -369,20 +379,18 @@ export default function DataCleanup() {
         )}
       </div>
 
-      {loading ? (
-        <div className="p-12 text-center border border-dashed border-border rounded-xl">
-          <RefreshCw className="h-8 w-8 text-primary/70 animate-spin mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">Scanning database for duplicate transactions...</p>
-        </div>
-      ) : activeGroups.length === 0 ? (
-        <div className="p-12 text-center border border-dashed border-border rounded-xl">
-          <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
-          <h3 className="font-bold text-base text-foreground">All Clean!</h3>
-          <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1">
-            No duplicate transactions were found matching your current filter criteria.
-          </p>
-        </div>
-      ) : (
+      {/* R-8: loading / empty / error / ready in one place; a 500 is never "All Clean!" */}
+      <AsyncCard
+        state={loadError ? 'error' : loading ? 'loading' : activeGroups.length === 0 ? 'empty' : 'ready'}
+        error={loadError ? `Couldn't load duplicates (${loadError}).` : undefined}
+        onRetry={fetchDuplicates}
+        loadingLabel="Scanning database for duplicate transactions…"
+        empty={{
+          icon: CheckCircle2,
+          title: 'All Clean!',
+          description: 'No duplicate transactions were found matching your current filter criteria.',
+        }}
+      >
         <div className="space-y-4">
           <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-500">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -565,7 +573,7 @@ export default function DataCleanup() {
             })}
           </div>
         </div>
-      )}
+      </AsyncCard>
     </div>
   );
 }

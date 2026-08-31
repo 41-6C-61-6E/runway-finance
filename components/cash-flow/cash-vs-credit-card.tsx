@@ -15,7 +15,7 @@ import {
   Line,
   ComposedChart,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
@@ -92,7 +92,7 @@ function StatBox({ label, value, change, changePercent, color, icon, className }
           {isNegative && <TrendingDown className="w-3 h-3 text-destructive" />}
           {change === 0 && <Minus className="w-3 h-3 text-muted-foreground" />}
           <span className={isPositive ? 'text-chart-1' : isNegative ? 'text-destructive' : 'text-muted-foreground'}>
-            {isPositive ? '+' : ''}{formatCurrency(change)} ({isPositive ? '+' : ''}{changePercent?.toFixed(1)}%)
+            {formatCurrency(change)} ({isPositive ? '+' : ''}{formatPlainPercent(changePercent, 1)})
           </span>
         </div>
       )}

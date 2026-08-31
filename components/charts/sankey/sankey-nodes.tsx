@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { sanitizeRestProps } from './sankey-links';
 
 export interface SankeyNodeProps {
@@ -89,7 +89,7 @@ export function SankeyCustomNode({
       ? formatCurrency(payload.netChange)
       : ''
     : showPercentages && payload.percentage !== undefined
-    ? `${signPrefix}${payload.percentage.toFixed(1)}%`
+    ? `${signPrefix}${formatPlainPercent(payload.percentage)}`
     : payload.value !== undefined
     ? `${signPrefix}${formatCurrency(payload.value)}`
     : '';
@@ -129,7 +129,7 @@ export function SankeyCustomNode({
         x={x}
         y={shiftedY}
         width={width}
-        height={height}
+        height={Math.max(0, height)}
         fill={payload.color || 'var(--color-primary)'}
         rx={0}
         fillOpacity={isDimmed ? 0.3 : 0.95}

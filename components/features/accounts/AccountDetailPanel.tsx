@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { X, MousePointerClick, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
 import { AccountTransactions } from '@/components/features/accounts/AccountTransactions';
 import type { TimeRange } from '@/components/charts/chart-filters';
@@ -123,7 +123,7 @@ export default function AccountDetailPanel({
                   <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
                 )}
                 <span className="blur-number">{formatCurrency(Math.abs(trendStats.change), account.currency)}</span>
-                <span className="opacity-80">({trendStats.percentChange >= 0 ? '+' : ''}{trendStats.percentChange.toFixed(1)}%)</span>
+                <span className="opacity-80">({formatPercent(trendStats.percentChange)})</span>
               </div>
             )}
           </div>

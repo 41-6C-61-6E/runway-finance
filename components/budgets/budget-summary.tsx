@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
 import { getPeriodDateRange } from './budget-transactions-tooltip';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -682,8 +682,8 @@ export function BudgetSummary() {
                 content={
                   <>
                     <TooltipHeader>Fixed vs. Discretionary Expenses</TooltipHeader>
-                    <TooltipRow label="Fixed (Essential)" value={`${formatCurrency(fixedBudgeted)} (${fixedPct.toFixed(1)}%)`} color="var(--color-chart-1)" />
-                    <TooltipRow label="Discretionary" value={`${formatCurrency(discretionaryBudgeted)} (${discretionaryPct.toFixed(1)}%)`} color="var(--color-chart-4)" />
+                    <TooltipRow label="Fixed (Essential)" value={`${formatCurrency(fixedBudgeted)} (${formatPlainPercent(fixedPct)})`} color="var(--color-chart-1)" />
+                    <TooltipRow label="Discretionary" value={`${formatCurrency(discretionaryBudgeted)} (${formatPlainPercent(discretionaryPct)})`} color="var(--color-chart-4)" />
                     <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1 text-[10px] text-muted-foreground">
                       <div>Fixed: Rent, Utilities, Insurance, Debt</div>
                       <div>Discretionary: Dining, Entertainment, Shopping</div>
@@ -778,8 +778,8 @@ export function BudgetSummary() {
                 content={
                   <>
                     <TooltipHeader>Budgeted vs. Actual Savings Rate</TooltipHeader>
-                    <TooltipRow label="Planned Savings Rate" value={`${budgetedSavingsRate.toFixed(1)}% (${formatCurrency(Math.max(0, totalIncomeBudgeted - totalExpenseBudgeted))})`} color="var(--color-chart-1)" />
-                    <TooltipRow label="Actual Savings Rate" value={`${actualSavingsRate.toFixed(1)}% (${formatCurrency(Math.max(0, totalIncomeActual - totalExpenseActual))})`} color={actualSavingsRate >= budgetedSavingsRate ? 'var(--color-status-success)' : 'var(--color-status-warning)'} />
+                    <TooltipRow label="Planned Savings Rate" value={`${formatPlainPercent(budgetedSavingsRate)} (${formatCurrency(Math.max(0, totalIncomeBudgeted - totalExpenseBudgeted))})`} color="var(--color-chart-1)" />
+                    <TooltipRow label="Actual Savings Rate" value={`${formatPlainPercent(actualSavingsRate)} (${formatCurrency(Math.max(0, totalIncomeActual - totalExpenseActual))})`} color={actualSavingsRate >= budgetedSavingsRate ? 'var(--color-status-success)' : 'var(--color-status-warning)'} />
                     <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1 text-[10px] text-muted-foreground">
                       <div>Planned: (Budgeted Income - Budgeted Expenses) / Budgeted Income</div>
                       <div>Actual: (Actual Income - Actual Expenses) / Actual Income</div>

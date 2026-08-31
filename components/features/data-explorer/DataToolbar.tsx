@@ -143,7 +143,7 @@ export default function DataToolbar({
         {SYNTHETIC_TABLES.has(tableKey) && (
           <button
             onClick={handleSyntheticToggle}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-8 text-xs rounded-lg border transition-colors ${
               isSyntheticOnly
                 ? 'bg-amber-500/20 text-amber-500 border-amber-500/30'
                 : 'text-muted-foreground border-border hover:text-foreground hover:bg-muted'
@@ -158,7 +158,7 @@ export default function DataToolbar({
         <div ref={filterRef} className="relative">
           <button
             onClick={() => setShowFilterBuilder(!showFilterBuilder)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg border border-border transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg border border-border transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             Filter
@@ -216,7 +216,7 @@ export default function DataToolbar({
         <div ref={colMenuRef} className="relative">
           <button
             onClick={() => setShowColumnMenu(!showColumnMenu)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg border border-border transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg border border-border transition-colors"
           >
             <Settings2 className="h-3.5 w-3.5" />
             Columns
@@ -261,7 +261,7 @@ export default function DataToolbar({
         {(filters.length > 0 || search) && (
           <button
             onClick={onClearAll}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg border border-border transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 min-h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg border border-border transition-colors"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Clear

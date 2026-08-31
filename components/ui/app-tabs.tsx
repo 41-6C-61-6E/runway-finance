@@ -3,6 +3,8 @@
 import * as React from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { glassSurface, glassItemBase, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
+import { useScrollFades, ScrollFadeOverlays } from '@/components/ui/scroll-fade';
 
 export interface TabItem {
   id: string;
@@ -40,6 +42,16 @@ function AppTabsInner({
   fullWidth = false,
   'aria-label': ariaLabel,
 }: AppTabsInnerProps) {
+  const pillsRef = React.useRef<HTMLDivElement>(null);
+  const { fadeRef, fades, update } = useScrollFades<HTMLDivElement>();
+  // Keep the active pill visible in a horizontal scroller (mobile chip rows).
+  React.useLayoutEffect(() => {
+    const scroller = pillsRef.current;
+    if (!scroller || variant !== 'pills') return;
+    const active = scroller.querySelector<HTMLButtonElement>('[data-active="true"]');
+    if (active) active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [activeTab, variant, tabs.length]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
 
@@ -62,22 +74,29 @@ function AppTabsInner({
 
   if (variant === 'pills') {
     return (
-      <div
-        className={cn(
-          'items-center gap-0.5 p-0.5 rounded-lg bg-muted/60 border border-border/40 max-w-full overflow-x-auto no-scrollbar',
-          fullWidth ? 'flex w-full' : 'inline-flex',
-          className
-        )}
-        role="tablist"
-        aria-label={ariaLabel}
-        onKeyDown={handleKeyDown}
-      >
-        {tabs.map((tab) => {
+      <div className={cn('relative min-w-0 max-w-full', fullWidth ? 'w-full' : 'w-max', className)}>
+        <div
+          ref={(node) => {
+            pillsRef.current = node;
+            fadeRef.current = node;
+          }}
+          onScroll={update}
+          className={cn(
+            'flex items-center gap-1 p-1 rounded-full max-w-full overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x',
+            glassSurface,
+            fullWidth && 'w-full'
+          )}
+          role="tablist"
+          aria-label={ariaLabel}
+          onKeyDown={handleKeyDown}
+        >
+          {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
+              data-active={isActive || undefined}
               role="tab"
               aria-selected={isActive}
               aria-controls={`tabpanel-${tab.id}`}
@@ -86,12 +105,11 @@ function AppTabsInner({
               disabled={tab.disabled}
               onClick={() => !tab.disabled && onChange(tab.id)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-md font-medium transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap shrink-0',
+                'inline-flex items-center gap-1.5 min-h-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap shrink-0',
                 fullWidth && 'flex-1 justify-center text-center',
-                size === 'sm' ? 'px-2.5 py-0.5 text-xs min-h-[28px]' : 'px-3 py-1 text-xs sm:text-sm min-h-[32px]',
-                isActive
-                  ? 'bg-primary/10 text-primary border border-primary/30 font-semibold shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/40 border border-transparent'
+                size === 'sm' ? 'px-2.5 py-0.5 text-xs' : 'px-3 py-1 text-xs sm:text-sm',
+                glassItemBase,
+                isActive ? glassItemActive : glassItemInactive
               )}
             >
               {Icon && <Icon className={cn('shrink-0', size === 'sm' ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5 sm:w-4 sm:h-4')} />}
@@ -116,9 +134,11 @@ function AppTabsInner({
                   {tab.badge}
                 </span>
               )}
-            </button>
+          </button>
           );
-        })}
+          })}
+        </div>
+        <ScrollFadeOverlays {...fades} />
       </div>
     );
   }

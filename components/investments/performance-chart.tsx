@@ -17,7 +17,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
@@ -255,7 +255,7 @@ export function PerformanceChart() {
   }, [timeframe]);
 
   const formatYTick = useCallback((v: number) => {
-    if (displayMode === 'percent' || displayMode === 'twr') return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+    if (displayMode === 'percent' || displayMode === 'twr') return formatPercent(v, 1);
     return formatChartYAxisCurrency(v, yDomain[0], yDomain[1]);
   }, [displayMode, yDomain]);
 

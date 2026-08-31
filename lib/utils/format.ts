@@ -50,16 +50,49 @@ export function formatPercent(
 }
 
 /**
+ * The *measurement* percent role (R-7): a share or rate, not a signed delta.
+ * One decimal by default, no forced `+`, negatives print bare (`-0.2%`),
+ * exactly zero prints `0%` without a trailing decimal.
+ *
+ *   formatPlainPercent(12.34)   // "12.3%"
+ *   formatPlainPercent(-0.21)   // "-0.2%"
+ *   formatPlainPercent(0)       // "0%"
+ *
+ * Use `formatPercent` for signed deltas (`+0.00%`) instead.
+ */
+export function formatPlainPercent(
+  value: number | string | undefined | null,
+  decimals = 1,
+): string {
+  if (value === undefined || value === null) return '0%';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0%';
+  const fixed = num.toFixed(decimals);
+  if (Number(fixed) === 0) return '0%'; // -0.04 → "-0%" is meaningless
+  const trimmed = fixed.replace(/\.0+$/, '');
+  return `${trimmed}%`;
+}
+
+/**
  * Format date consistently across the app
  * If date is a string, appends T00:00:00 to ensure it's parsed as local time
  * (not UTC), which prevents off-by-one-day issues in different timezones.
+ *
+ * variant: "short" (default) → "Jul 7, 2026" for dense lists and charts;
+ *          "long"  → "July 7, 2026" for page headers and report titles.
  */
-export function formatDate(date: Date | string, locale = 'en-US'): string {
+export function formatDate(date: Date | string, variant: 'long' | 'short' | 'mdy' = 'short', locale = 'en-US'): string {
   let d: Date;
   if (typeof date === 'string') {
     d = new Date(date + 'T00:00:00');
   } else {
     d = date;
+  }
+  if (variant === 'long') {
+    return d.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+  if (variant === 'mdy') {
+    return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
   }
   return d.toLocaleDateString(locale);
 }
@@ -72,5 +105,82 @@ export function roundToCents(val: number | string | null | undefined): number {
   const num = typeof val === 'string' ? parseFloat(val) : val;
   if (isNaN(num)) return 0;
   return Math.round(num * 100) / 100;
+}
+
+/**
+ * Role-aware money formatters (G3 / W-3). One rule table for every place a
+ * number is printed — balances vs amounts vs projections were drifting:
+ *   - **balance**   → whole dollars              $98,635   (cards, lists, net worth)
+ *   - **amount**    → exactly 2 decimals         -$48.02   (per-transaction, ledger lines)
+ *   - **projected** → 1 decimal, no trailing .0  $420 / $1.5 (forecasts, milestones)
+ *
+ * Trailing zeros never appear; the sign is preserved (negatives print "-$48.02").
+ */
+
+/** Whole dollars — use where a number represents a *position* (balance, net worth, card totals). */
+export function formatBalance(
+  amount: number | string | null | undefined,
+  currency = 'USD',
+  locale = 'en-US'
+): string {
+  return formatCurrency(amount, currency, locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+/** Exactly 2 decimals — use for individual movements (per-transaction amounts, ledger lines). */
+export function formatAmount(
+  amount: number | string | null | undefined,
+  currency = 'USD',
+  locale = 'en-US'
+): string {
+  return formatCurrency(amount, currency, locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * Forecasts / milestones. One decimal when the decimals matter, otherwise
+ * whole dollars, so "$420.0" never renders — e.g. `$420`, `$1.5`, `$0`.
+ */
+export function formatProjected(
+  amount: number | string | null | undefined,
+  currency = 'USD',
+  locale = 'en-US'
+): string {
+  const val = amount === undefined || amount === null ? 0 : amount;
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  const safe = isNaN(num) ? 0 : num;
+  const rounded = Math.round(safe * 10) / 10;
+  const isWhole = rounded % 1 === 0;
+  return isWhole
+    ? formatCurrency(rounded, currency, locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    : formatCurrency(rounded, currency, locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+/**
+ * Compact currency for chart axes and dense tick labels: `$1.2M`, `$340k`, `$98`.
+ */
+export function formatCompactCurrency(
+  amount: number | string | null | undefined,
+  locale = 'en-US'
+): string {
+  const val = amount === undefined || amount === null ? 0 : amount;
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  const n = isNaN(num) ? 0 : num;
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return `${sign}$${trimOneDecimal(abs / 1_000_000_000)}B`;
+  if (abs >= 1_000_000) return `${sign}$${trimOneDecimal(abs / 1_000_000)}M`;
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`;
+  return `${sign}$${Math.round(abs)}`;
+}
+
+/** "1.0" → "1", "1.5" → "1.5" (drops a single trailing zero). */
+function trimOneDecimal(n: number): string {
+  const s = n.toFixed(1);
+  return s.endsWith('.0') ? s.slice(0, -2) : s;
 }
 

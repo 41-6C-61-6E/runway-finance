@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useDeferredValue } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency } from '@/lib/utils/format';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
@@ -9,8 +10,10 @@ import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { TableScroll } from '@/components/ui/table-scroll';
 import {
   AreaChart,
   Area,
@@ -814,7 +817,7 @@ export function ProjectionTab({
                   tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)}
+                  tickFormatter={(val) => formatCompactCurrency(val)}
                 />
 
                 <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
@@ -921,7 +924,7 @@ export function ProjectionTab({
                   );
                 }}
               />
-                <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} tickFormatter={(val) => (val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : `$${(val / 1000).toFixed(0)}k`)} />
+                <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} tickFormatter={(val) => formatCompactCurrency(val)} />
                 <Tooltip content={<MonteCarloTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
                 <Area type="monotone" dataKey="p90" stroke="#f59e0b" strokeWidth={1} fill="url(#mcBandGrad)" name="90th Percentile (Optimistic)" />
                 <Area type="monotone" dataKey="p75" stroke="#3b82f6" strokeWidth={1.5} fill="none" name="75th Percentile" />
@@ -1035,7 +1038,7 @@ export function ProjectionTab({
             <ComposedChart data={chartData} maxBarSize={40} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
               <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} />
-              <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`} />
+              <YAxis stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} tickFormatter={(val) => formatCompactCurrency(val)} />
               <Tooltip content={<DrawdownTooltip />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />
               <Legend content={<GroupedLegend />} />
 
@@ -1084,10 +1087,7 @@ export function ProjectionTab({
           isCollapsed={isWhatIfCollapsed}
           onToggle={setIsWhatIfCollapsed}
           title={
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Interactive What-If Scenario Explorer
-            </h3>
+              <SectionHeading size="sm" icon={<Sparkles className="w-3.5 h-3.5 text-primary" />}>Interactive What-If Scenario Explorer</SectionHeading>
           }
         />
 
@@ -1237,7 +1237,7 @@ export function ProjectionTab({
                 <span>💡 Click any row below to open the complete 4-section Year Breakdown Modal (Tax Waterfall, Cash Flow, Account Balances &amp; Rules Engine).</span>
               </span>
             </div>
-            <div className="border-t border-border overflow-x-auto max-h-[550px] overflow-y-auto">
+            <TableScroll maxHeight={550} className="border-t border-border">
             <table className="w-full text-xs text-left border-collapse">
               <thead className="bg-muted/60 text-muted-foreground font-semibold sticky top-0 bg-card z-20">
                 <tr>
@@ -1311,7 +1311,7 @@ export function ProjectionTab({
                 })}
               </tbody>
             </table>
-            </div>
+            </TableScroll>
           </div>
         )}
       </div>
@@ -1965,7 +1965,7 @@ function YearDetailModal({ isOpen, yearData, onClose }: { isOpen: boolean; yearD
               <Building2 className="w-4 h-4 text-primary" />
               Projected Account Balances & Drawdowns
             </h3>
-            <div className="border border-border rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+            <TableScroll maxHeight={192} className="border border-border rounded-xl">
               <table className="w-full text-xs text-left">
                 <thead className="bg-muted/50 text-muted-foreground font-semibold">
                   <tr>
@@ -1998,7 +1998,7 @@ function YearDetailModal({ isOpen, yearData, onClose }: { isOpen: boolean; yearD
                   ))}
                 </tbody>
               </table>
-            </div>
+              </TableScroll>
           </div>
         )}
 

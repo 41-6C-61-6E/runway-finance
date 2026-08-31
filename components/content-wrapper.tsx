@@ -1,14 +1,8 @@
-import { ReactNode } from 'react';
+/**
+ * @deprecated Use `PageContent` (`@/components/page-content`) instead.
+ * Kept as a thin re-export so any remaining callers get the unified
+ * gutter/max-width behavior; new code must not import this file.
+ */
+import PageContent from '@/components/page-content';
 
-interface ContentWrapperProps {
-  children: ReactNode;
-  className?: string;
-}
-
-export default function ContentWrapper({ children, className = '' }: ContentWrapperProps) {
-  return (
-    <div className={`relative z-10 px-0 sm:px-1 lg:px-4 pt-0 pb-8 max-w-[1920px] overflow-visible ${className}`}>
-      {children}
-    </div>
-  );
-}
+export default PageContent;

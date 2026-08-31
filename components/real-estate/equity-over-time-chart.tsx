@@ -20,6 +20,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { EstimatePill } from '@/components/ui/estimate-pill';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { TrendingUp } from 'lucide-react';
@@ -399,9 +400,7 @@ export function EquityOverTimeChart() {
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
-            </h3>
+            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
           }
         />
         {!isCollapsed && <LoadingSpinner category="chart" className="h-[300px]" />}
@@ -415,9 +414,7 @@ export function EquityOverTimeChart() {
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
-            </h3>
+            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
           }
         />
         {!isCollapsed && (
@@ -435,9 +432,7 @@ export function EquityOverTimeChart() {
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
-            </h3>
+            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
           }
         />
         {!isCollapsed && (
@@ -455,9 +450,7 @@ export function EquityOverTimeChart() {
         <CollapsibleCardHeader
           isCollapsed={isCollapsed}
           title={
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
-            </h3>
+            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
           }
         />
         {!isCollapsed && (
@@ -528,9 +521,7 @@ export function EquityOverTimeChart() {
         isCollapsed={isCollapsed}
         title={
           <div className="flex items-center gap-2">
-            <h3 className="text-sm sm:text-base font-normal text-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" /> Equity Over Time
-            </h3>
+            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
             {!isCollapsed && hasEstimated && <EstimatePill />}
           </div>
         }

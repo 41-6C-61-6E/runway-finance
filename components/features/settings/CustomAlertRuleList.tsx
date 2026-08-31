@@ -29,6 +29,7 @@ import {
   Eye,
 } from 'lucide-react';
 import CustomAlertRuleForm from './CustomAlertRuleForm';
+import { formatBalance } from '@/lib/utils/format';
 import type { AlertCondition, AlertConditionField } from '@/lib/db/schema/notifications';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -121,14 +122,14 @@ function buildRuleSummary(
     } else if (cond.field.includes('goal')) {
       const goal = goalsList.find((g) => g.id === cond.goalId);
       const goalName = goal ? goal.name : 'unknown goal';
-      const pct = cond.field === 'goal_reached_percentage' ? `${cond.value}%` : `$${cond.value}`;
+      const pct = cond.field === 'goal_reached_percentage' ? `${cond.value}%` : formatBalance(cond.value);
       val = `${pct} (${goalName})`;
     } else if (cond.field === 'keyword') {
       val = `"${cond.value}"`;
     } else if (cond.field.startsWith('cf_savings_rate')) {
       val = `${cond.value}%`;
     } else {
-      val = `$${cond.value}`;
+      val = formatBalance(cond.value);
     }
     return `${label} ${val}`;
   });

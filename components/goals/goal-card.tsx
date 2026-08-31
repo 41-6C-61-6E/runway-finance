@@ -7,6 +7,8 @@ import { formatCurrency, getDaysRemaining, calcMonthlySavings } from '@/lib/util
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Target, AlertCircle, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { ListRow } from '@/components/ui/list-row';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface Goal {
   id: string;
@@ -115,6 +117,7 @@ export function GoalCard({
   priorityIndex
 }: GoalCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const target = Math.max(0, parseFloat(goal.targetAmount) || 0);
   // Use allocatedAmount for linked accounts (considers priority allocation), fall back to currentAmount
@@ -183,7 +186,7 @@ export function GoalCard({
               onMouseDown={() => onDragHandleActive?.(true)}
               onMouseUp={() => onDragHandleActive?.(false)}
               onMouseLeave={() => onDragHandleActive?.(false)}
-              className="cursor-grab active:cursor-grabbing p-1 hover:text-foreground hover:bg-background rounded transition-colors"
+              className="cursor-grab active:cursor-grabbing -m-[15px] p-[15px] rounded hover:text-foreground hover:bg-background transition-colors"
               title="Drag to reorder"
             >
               <GripVertical className="w-4 h-4" />
@@ -192,7 +195,7 @@ export function GoalCard({
               <button
                 onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }}
                 disabled={isFirst}
-                className="p-1 hover:text-foreground hover:bg-background rounded disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                className="-m-[15px] p-[15px] rounded hover:text-foreground hover:bg-background disabled:opacity-30 disabled:pointer-events-none transition-colors"
                 title="Move up"
               >
                 <ArrowUp className="w-3.5 h-3.5" />
@@ -200,7 +203,7 @@ export function GoalCard({
               <button
                 onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }}
                 disabled={isLast}
-                className="p-1 hover:text-foreground hover:bg-background rounded disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                className="-m-[15px] p-[15px] rounded hover:text-foreground hover:bg-background disabled:opacity-30 disabled:pointer-events-none transition-colors"
                 title="Move down"
               >
                 <ArrowDown className="w-3.5 h-3.5" />
@@ -210,7 +213,17 @@ export function GoalCard({
         )}
 
         {/* Main Card Content Container */}
-        <div className="flex-1 min-w-0 space-y-3.5">
+        <ListRow
+          element="div"
+          ariaLabel={`${goal.name} — ${formatCurrency(current)} of ${formatCurrency(target)}`}
+          data-list-row="goal"
+          showChevron={false}
+          className="flex-1 min-w-0 bg-transparent hover:bg-transparent active:bg-foreground/[0.06] focus-visible:bg-transparent"
+          bodyClassName="space-y-3.5"
+          onActivate={() => {
+            if (!showDeleteConfirm) setSummaryOpen(true);
+          }}
+        >
           {/* Header Row: Title, Badges, and Quick Action Buttons */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1">
@@ -275,8 +288,8 @@ export function GoalCard({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => onEdit(goal)}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background transition-colors border border-transparent hover:border-border/60"
+                    onClick={(e) => { e.stopPropagation(); onEdit(goal); }}
+                      className="-m-3.5 p-3.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background transition-colors border border-transparent hover:border-border/60"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -289,8 +302,8 @@ export function GoalCard({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={handleDelete}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-destructive/20"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                      className="-m-3.5 p-3.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-transparent hover:border-destructive/20"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -399,8 +412,34 @@ export function GoalCard({
               </div>
             </div>
           )}
-        </div>
+        </ListRow>
       </div>
+
+        {/* Read-only goal summary sheet (W-15): tap the card body */}
+        <Sheet open={summaryOpen} onOpenChange={setSummaryOpen}>
+          <SheetContent className="sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>{goal.name}</SheetTitle>
+            </SheetHeader>
+            <dl className="mt-3 divide-y divide-border/40">
+              {[
+                ['Current', formatCurrency(current)],
+                ['Target', formatCurrency(target)],
+                ['Progress', `${(isCompleted ? 100 : progress).toFixed(0)}%`],
+                ['Remaining', formatCurrency(remaining)],
+                ['Monthly savings', monthlySavings !== null ? `${formatCurrency(monthlySavings)}/mo` : '—'],
+                ['Target date', days !== null ? `${days >= 0 ? days : Math.abs(days)} ${days >= 0 ? 'days left' : 'days overdue'}` : 'Not set'],
+                ['Linked account', goal.accountName || 'None'],
+                ['Status', goal.status],
+              ].map(([label, value]) => (
+                <div key={label as string} className="flex items-center justify-between gap-4 py-2 text-sm">
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="font-medium text-foreground capitalize">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </SheetContent>
+        </Sheet>
     </div>
   );
 }

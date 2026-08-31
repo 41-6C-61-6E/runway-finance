@@ -12,6 +12,7 @@ import ChangePasswordDrawer from '@/components/change-password-drawer';
 import { toast } from 'sonner';
 import { isRealEstateType } from '@/lib/constants/account-types';
 import { clearAllClientCaches } from '@/lib/query-client';
+import { glassIconButton, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
 
 interface UserDropdownProps {
   onOpenChange?: (open: boolean) => void;
@@ -187,10 +188,12 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary hover:bg-primary/30 transition-colors"
+            className={`${glassIconButton} ${open ? glassItemActive : glassItemInactive}`}
             aria-label="User menu"
           >
-            {initial}
+            <span className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary hover:bg-primary/30 transition-colors">
+              {initial}
+            </span>
           </button>
         </TooltipTrigger>
       </Tooltip>

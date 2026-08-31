@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
@@ -196,11 +196,11 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
           <span className="font-semibold text-foreground">Mortgage Payoff</span>
           <div className="flex items-center gap-1.5 font-mono text-[11px]">
             <span className="text-emerald-600 dark:text-emerald-400 font-semibold blur-number">
-              {payoffProgress.toFixed(1)}% Paid
+              {formatPlainPercent(payoffProgress)} Paid
             </span>
             <span className="text-muted-foreground">/</span>
             <span className="text-slate-500 dark:text-slate-400 blur-number">
-              {(100 - Math.min(payoffProgress, 100)).toFixed(1)}% Owed
+              {formatPlainPercent(100 - Math.min(payoffProgress, 100))} Owed
             </span>
           </div>
         </div>
@@ -208,11 +208,11 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
           <div
             className="h-full bg-emerald-500 dark:bg-emerald-500/90 rounded-l-full transition-all duration-300 shadow-xs"
             style={{ width: `${Math.min(payoffProgress, 100)}%` }}
-            title={`Paid Off: ${formatCurrency(Math.max(0, mortgage.originalLoanAmount - currentBalance))} (${payoffProgress.toFixed(1)}%)`}
+            title={`Paid Off: ${formatCurrency(Math.max(0, mortgage.originalLoanAmount - currentBalance))} (${formatPlainPercent(payoffProgress)})`}
           />
           <div
             className="h-full bg-slate-400/40 dark:bg-slate-700/70 rounded-r-full flex-1 transition-all duration-300 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:4px_4px]"
-            title={`Remaining Balance: ${formatCurrency(currentBalance)} (${(100 - Math.min(payoffProgress, 100)).toFixed(1)}%)`}
+            title={`Remaining Balance: ${formatCurrency(currentBalance)} (${formatPlainPercent(100 - Math.min(payoffProgress, 100))})`}
           />
         </div>
         <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">

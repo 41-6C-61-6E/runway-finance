@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
@@ -123,7 +123,7 @@ function HoldingCard({ holding, history, quote, index, onClick }: HoldingCardPro
         </div>
         {/* Portfolio weight */}
         <div className="text-right shrink-0">
-          <div className="text-lg font-bold text-foreground blur-number">{holding.portfolioWeight.toFixed(1)}%</div>
+          <div className="text-lg font-bold text-foreground blur-number">{formatPlainPercent(holding.portfolioWeight)}</div>
           <div className="text-[10px] text-muted-foreground">of portfolio</div>
         </div>
       </div>
@@ -134,7 +134,7 @@ function HoldingCard({ holding, history, quote, index, onClick }: HoldingCardPro
           <span className="text-muted-foreground/70">30D Trend</span>
           {hasHistory && (
             <span className={`font-semibold flex items-center gap-0.5 ${is30dPositive ? 'text-chart-1' : 'text-destructive'}`}>
-              {is30dPositive ? '+' : ''}{pct30d.toFixed(1)}%
+              {is30dPositive ? '+' : ''}{formatPlainPercent(pct30d, 1)}
             </span>
           )}
         </div>
@@ -190,7 +190,7 @@ function HoldingCard({ holding, history, quote, index, onClick }: HoldingCardPro
           <div className="text-right">
             <div className="text-muted-foreground mb-0.5">Total Return</div>
             <div className={`font-bold blur-number ${isReturnPositive ? 'text-chart-1' : 'text-destructive'}`}>
-              {isReturnPositive ? '+' : ''}{holding.unrealizedReturnPct!.toFixed(1)}%
+              {isReturnPositive ? '+' : ''}{formatPlainPercent(holding.unrealizedReturnPct!, 1)}
             </div>
           </div>
         ) : quote?.changePercent != null ? (

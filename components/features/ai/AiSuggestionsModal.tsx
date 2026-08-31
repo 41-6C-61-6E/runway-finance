@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useUserSettings } from '@/components/user-settings-provider';
+import { Skeleton } from '@/components/ui/skeleton';
 import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { CategoryCombobox } from '@/components/budgets/category-combobox';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
-import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2, Clock, BarChart3, Layers, Pencil } from 'lucide-react';
+import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2, Clock, BarChart3, Layers, Pencil, AlertTriangle, RefreshCw } from 'lucide-react';
 
 type AiProposal = {
   id: string;
@@ -378,6 +379,7 @@ export interface AiSuggestionsModalProps {
 export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpdated }: AiSuggestionsModalProps) {
   const [proposals, setProposals] = useState<AiProposal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
@@ -430,16 +432,23 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   }, []);
 
   const fetchProposals = useCallback(async () => {
+    setLoadError(null);
     try {
       const params = new URLSearchParams();
       if (filterStatus !== 'all') params.set('status', filterStatus);
       if (filterType !== 'all') params.set('type', filterType);
       params.set('_t', Date.now().toString());
       const res = await fetch(`/api/ai/proposals?${params.toString()}`, { credentials: 'include', cache: 'no-store' });
+      if (!res.ok) {
+        setLoadError(`HTTP ${res.status}`);
+        setProposals([]);
+        return;
+      }
       const data = await res.json();
       setProposals(Array.isArray(data) ? data : []);
     } catch {
       setProposals([]);
+      setLoadError('network error');
     } finally {
       setLoading(false);
     }
@@ -1233,8 +1242,36 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
 
           {/* Proposal List Content */}
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            // Skeleton rows shaped like proposal cards — the shape of the
+            // answer, not a spinner wall (R-12).
+            <div className="space-y-3" role="status" aria-live="polite">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-start gap-3 border border-border rounded-lg p-4">
+                  <Skeleton className="h-4 w-4 rounded mt-1" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3.5 w-1/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              ))}
+              <span className="sr-only">Loading AI suggestions…</span>
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertTriangle className="h-8 w-8 text-destructive mb-3" />
+              <p className="text-muted-foreground text-sm mb-4">
+                Couldn't load AI suggestions ({loadError}).
+              </p>
+              <button
+                type="button"
+                onClick={fetchProposals}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </button>
             </div>
           ) : proposals.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">

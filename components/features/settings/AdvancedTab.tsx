@@ -269,36 +269,6 @@ export default function AdvancedTab() {
     <div className="space-y-3 w-full min-w-0">
 
 
-      {/* Danger Zone */}
-      <div className="p-4 bg-card border border-destructive/20 rounded-lg space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-destructive">Danger Zone</h2>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            Permanently delete your account, login credentials, and all settings.
-          </p>
-        </div>
-
-        {deleteError && (
-          <div className="p-2 bg-destructive/20 border border-destructive/30 rounded-lg">
-            <p className="text-xs text-destructive">{deleteError}</p>
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => {
-              setDeleteError(null);
-              setConfirmText('');
-              setConfirmDeleteOpen(true);
-            }}
-            disabled={loadingSharing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 rounded-lg transition-colors disabled:opacity-50"
-          >
-            Delete Account
-          </button>
-        </div>
-      </div>
-
       {/* Warning Banner */}
       <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
         <div className="flex items-start gap-2">
@@ -352,14 +322,14 @@ export default function AdvancedTab() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-medium text-foreground">{def.label}</span>
-                        <code className="text-[9px] text-muted-foreground/50 font-mono">{def.key}</code>
+                        <code className="text-[11px] text-muted-foreground/50 font-mono">{def.key}</code>
                         {isDirty && (
-                          <span className="text-[9px] font-medium text-primary px-1 py-0.5 bg-primary/10 rounded">Modified</span>
+                          <span className="text-[11px] font-medium text-primary px-1 py-0.5 bg-primary/10 rounded">Modified</span>
                         )}
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{def.description}</p>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <span className="text-[9px] text-muted-foreground/60 font-mono">
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{def.description}</p>
+                      <div className="mt-1 space-y-0.5 min-w-0">
+                        <span className="block text-[11px] text-muted-foreground/60 font-mono break-all max-w-full">
                           Value:{' '}
                           {def.type === 'boolean'
                             ? currentValue ? 'true' : 'false'
@@ -371,14 +341,14 @@ export default function AdvancedTab() {
                           }
                         </span>
                         {!isDefault && (
-                          <span className="text-[9px] text-muted-foreground/30">(default: {formatDefault(def.defaultValue)})</span>
+                          <span className="block text-[11px] text-muted-foreground/30 break-all max-w-full">(default: {formatDefault(def.defaultValue)})</span>
                         )}
                       </div>
                     </div>
                     <button
                       onClick={() => resetToDefault(def.key)}
                       disabled={isDefault || saving}
-                      className={`px-1.5 py-0.5 text-[9px] font-medium rounded transition-colors disabled:opacity-30 ${
+                      className={`px-1.5 py-0.5 text-[11px] font-medium rounded transition-colors disabled:opacity-30 ${
                         !isDefault
                           ? 'text-muted-foreground hover:text-foreground bg-muted hover:bg-accent'
                           : 'text-muted-foreground/30'
@@ -444,6 +414,36 @@ export default function AdvancedTab() {
           </div>
         </div>
       ))}
+
+      {/* Danger Zone */}
+      <div className="p-4 bg-card border border-destructive/20 rounded-lg space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-destructive">Danger Zone</h2>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Permanently delete your account, login credentials, and all settings.
+          </p>
+        </div>
+
+        {deleteError && (
+          <div className="p-2 bg-destructive/20 border border-destructive/30 rounded-lg">
+            <p className="text-xs text-destructive">{deleteError}</p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setDeleteError(null);
+              setConfirmText('');
+              setConfirmDeleteOpen(true);
+            }}
+            disabled={loadingSharing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 rounded-lg transition-colors disabled:opacity-50"
+          >
+            Delete Account
+          </button>
+        </div>
+      </div>
 
       {/* Apply / Discard bar */}
       <div className={`sticky bottom-0 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-card border border-border rounded-lg flex items-center justify-between gap-3 transition-opacity ${

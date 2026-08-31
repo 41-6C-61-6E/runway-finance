@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Calculator, ChevronDown, ChevronRight, Copy, Check, Info, Layers } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import type { CalculationTrace, TraceFormat } from '@/lib/types/financial';
 
 export function formatTraceResult(value: number, format: TraceFormat): string {
@@ -12,7 +12,7 @@ export function formatTraceResult(value: number, format: TraceFormat): string {
     case 'currency':
       return formatCurrency(value);
     case 'percentage':
-      return `${Math.min(value, 9999).toFixed(1)}%`;
+      return formatPlainPercent(Math.min(value, 9999));
     case 'ratio':
       return value === Infinity ? '100%+ (∞)' : value.toFixed(2);
     case 'years':

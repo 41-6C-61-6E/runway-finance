@@ -46,14 +46,14 @@ export function DateWindowNav({ prev, next, nextDisabled, label, options, curren
 
   return (
     <div className="flex items-center gap-1.5">
-      <button onClick={prev} className="px-3 py-1.5 sm:px-2 sm:py-0.5 rounded-md text-xs bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all" type="button">
+      <button onClick={prev} className="px-3 py-1.5 min-h-8 sm:px-2 sm:py-0.5 rounded-md text-xs bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all" type="button">
         &larr;
       </button>
       <div className="group relative font-sans" ref={ref}>
         {timeframe === '1d_discrete' || timeframe === '7d_discrete' ? (
           <>
             <button
-              className="text-xs font-medium text-foreground min-w-[100px] text-center whitespace-nowrap px-3 py-1.5 sm:px-1.5 sm:py-0.5 rounded transition-colors group-hover:bg-muted cursor-pointer"
+              className="text-xs font-medium text-foreground min-w-[100px] text-center whitespace-nowrap px-3 py-1.5 min-h-8 sm:px-1.5 sm:py-0.5 rounded transition-colors group-hover:bg-muted cursor-pointer"
               type="button"
             >
               {label}
@@ -81,7 +81,7 @@ export function DateWindowNav({ prev, next, nextDisabled, label, options, curren
           <>
             <button
               onClick={() => options.length > 0 && setOpen(!open)}
-              className={`text-xs font-medium text-foreground min-w-[100px] text-center whitespace-nowrap px-3 py-1.5 sm:px-1.5 sm:py-0.5 rounded transition-colors ${
+              className={`text-xs font-medium text-foreground min-w-[100px] text-center whitespace-nowrap px-3 py-1.5 min-h-8 sm:px-1.5 sm:py-0.5 rounded transition-colors ${
                 options.length > 0 ? 'hover:bg-muted cursor-pointer' : 'cursor-default'
               }`}
               type="button"
@@ -110,7 +110,7 @@ export function DateWindowNav({ prev, next, nextDisabled, label, options, curren
       <button
         onClick={next}
         disabled={nextDisabled}
-        className={`px-3 py-1.5 sm:px-2 sm:py-0.5 rounded-md text-xs transition-all ${
+        className={`px-3 py-1.5 min-h-8 sm:px-2 sm:py-0.5 rounded-md text-xs transition-all ${
           nextDisabled
             ? 'bg-muted/50 text-muted-foreground/30 cursor-not-allowed'
             : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'

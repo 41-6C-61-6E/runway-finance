@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Pencil, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { ListRow, RowAction } from '@/components/ui/list-row';
 
 export type Account = {
   id: string;
@@ -47,9 +48,13 @@ export default function AccountRow({
   const showTags = settingsContext?.settings?.accountTagVisibility?.sidebar !== false;
 
   return (
-    <div
-      className="flex items-center justify-between py-1 pl-6 pr-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors group/account"
-      onClick={() => router.push(`/accounts?accountId=${account.id}`)}
+    <ListRow
+      onActivate={() => router.push(`/accounts?accountId=${account.id}`)}
+      element="div"
+      ariaLabel={`${account.name}, ${fmt.sign}${fmt.text}`}
+      data-list-row="account"
+      className="rounded-md pl-6 pr-2 py-1"
+      bodyClassName="flex w-full items-center justify-between gap-2"
     >
       <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
         <span className="text-[15px] text-muted-foreground truncate blur-number">{account.name}</span>
@@ -101,17 +106,16 @@ export default function AccountRow({
         )}
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <button
-          onClick={(e) => { e.stopPropagation(); onOpenDrawer(account); }}
-          className="p-0.5 rounded hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-opacity duration-150 opacity-0 group-hover/account:opacity-100 cursor-pointer"
-          title="Edit account"
+        <RowAction
+          label="Edit account"
+          onActivate={() => onOpenDrawer(account)}
         >
           <Pencil className="w-3.5 h-3.5" />
-        </button>
+        </RowAction>
         <span className="font-mono text-[13px] font-semibold tabular-nums blur-number text-foreground">
           {fmt.sign}{fmt.text}
         </span>
       </div>
-    </div>
+    </ListRow>
   );
 }

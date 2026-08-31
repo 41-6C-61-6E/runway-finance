@@ -579,10 +579,7 @@ export default function AccountHistoryChart({
       const absV = Math.abs(v);
       const sign = v < 0 ? '-' : '';
       let formatted = '';
-      if (absV >= 1000000) formatted = `${sign}$${(absV / 1000000).toFixed(1)}M`;
-      else if (absV >= 1000) formatted = `${sign}$${(absV / 1000).toFixed(0)}K`;
-      else if (absV === 0) formatted = '$0';
-      else formatted = `${sign}$${absV.toFixed(0)}`;
+        formatted = formatChartYAxisCurrency(v, minVal, maxVal);
       if (formatted.length > maxLength) maxLength = formatted.length;
     }
     return Math.max(35, Math.ceil(maxLength * 7.5 + 8));

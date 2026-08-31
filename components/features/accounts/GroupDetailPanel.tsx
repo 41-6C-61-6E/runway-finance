@@ -20,7 +20,7 @@ import { getSeriesColor } from './account-types';
 import type { Account } from './account-types';
 import type { TimeRange } from '../../charts/chart-filters';
 import { getPreciseDateRange } from '../../../lib/utils/date-window';
-import { formatCurrency } from '../../../lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '../../../lib/utils/format';
 import { isAssetAccount, isLiabilityAccount } from '../../../lib/utils/account-scope';
 import { ChartTooltip, TooltipHeader, TooltipRow } from '../../charts/chart-tooltip';
 import {
@@ -262,7 +262,7 @@ export default function GroupDetailPanel({
                 <ArrowDownRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
               )}
               {formatCurrency(Math.abs(trendStats.change))} (
-              {Math.abs(trendStats.percentChange).toFixed(1)}%)
+              {formatPlainPercent(Math.abs(trendStats.percentChange))})
             </p>
           )}
         </div>

@@ -3,11 +3,13 @@
 import { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { AppTabs } from '@/components/ui/app-tabs';
+import { MobileTabStrip } from '@/components/ui/mobile-tab-strip';
 import { PieChart as PieIcon } from 'lucide-react';
 import { getDisplayTicker } from '@/lib/types/investments';
 
@@ -326,10 +328,10 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
   }
 
   const groupOptions: { value: GroupByOption; label: string }[] = [
-    { value: 'security', label: 'By Asset' },
-    { value: 'account', label: 'By Account' },
-    { value: 'assetClass', label: 'By Asset Class' },
-    { value: 'taxCategory', label: 'By Tax Wrapper' },
+    { value: 'security', label: 'Asset' },
+    { value: 'account', label: 'Account' },
+    { value: 'assetClass', label: 'Class' },
+    { value: 'taxCategory', label: 'Wrapper' },
   ];
 
   return (
@@ -349,15 +351,14 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
         <div className="flex-1 flex flex-col p-4 sm:p-5">
           {/* Main Mode Toggle: Allocation vs Rebalance */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-3 mb-4">
-            <AppTabs
+            <MobileTabStrip
               tabs={[
-                { id: 'allocation', label: 'Allocation Breakdown' },
-                { id: 'rebalance', label: 'Rebalancing Assistant' },
+                { id: 'allocation', label: 'Allocation' },
+                { id: 'rebalance', label: 'Rebalance' },
               ]}
               activeTab={viewMode}
               onChange={(tabId) => setViewMode(tabId as 'allocation' | 'rebalance')}
-              variant="pills"
-              size="sm"
+              aria-label="View mode"
             />
 
             {viewMode === 'allocation' && (
@@ -379,11 +380,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</span>
                   <span className="text-sm font-bold text-foreground blur-number">
-                    {totalValue >= 1_000_000
-                      ? `$${(totalValue / 1_000_000).toFixed(1)}M`
-                      : totalValue >= 1_000
-                      ? `$${(totalValue / 1_000).toFixed(0)}K`
-                      : `$${totalValue.toFixed(0)}`}
+                    {formatCompactCurrency(totalValue)}
                   </span>
                 </div>
                 <ResponsiveContainer width="100%" height="100%">

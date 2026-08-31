@@ -45,12 +45,12 @@ describe('MobileNav PWA & Accessibility', () => {
     const netWorthLink = getByLabelText('Net Worth');
     expect(netWorthLink).not.toBeNull();
     expect(netWorthLink.getAttribute('href')).toBe('/');
-    expect(netWorthLink.className).toContain('min-w-[44px]');
-    expect(netWorthLink.className).toContain('min-h-[44px]');
+    expect(netWorthLink.className).toContain('min-w-11');
+    expect(netWorthLink.className).toContain('min-h-11');
 
     const menuButton = getByLabelText('Open navigation menu');
     expect(menuButton).not.toBeNull();
-    expect(menuButton.className).toContain('min-w-[44px]');
+    expect(menuButton.className).toContain('min-w-11');
   });
 
   it('persists and restores custom home navigation items with fewer than 4 items', () => {

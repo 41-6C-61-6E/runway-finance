@@ -51,6 +51,14 @@ describe('chart-format utilities', () => {
       expect(formatChartYAxisCurrency(450, 0, 500)).toBe('$450');
     });
 
+    it('R-7: sub-$1,000 axis ticks are whole dollars (never "$15.0")', () => {
+      expect(formatChartYAxisCurrency(15, 0, 60)).toBe('$15');
+      expect(formatChartYAxisCurrency(30, 0, 60)).toBe('$30');
+      expect(formatChartYAxisCurrency(1.5, 0, 60)).toBe('$2');
+      expect(formatChartYAxisCurrency(999, 0, 1000)).toBe('$999');
+      expect(formatChartYAxisCurrency(-40, -60, 0)).toBe('-$40');
+    });
+
     it('handles negative values correctly', () => {
       expect(formatChartYAxisCurrency(-1340000, -1360000, -1340000)).toBe('-$1.340M');
     });

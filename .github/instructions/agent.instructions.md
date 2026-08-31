@@ -25,3 +25,5 @@ If working a large task, periodically output an estimated percentage complete wi
 The dev server is running at http://10.1.1.10:3001 You can use this to test your changes locally before committing them.
 
 All thinking, reasoning, planning, compaction, and coding shall be exclusively conducted in the english language. 
+
+This session has a hard cap of ~10 images (VS Code client limit) and vLLM enforces its own limit per request. If the conversation has accumulated several image attachments (screenshots, UI reviews, etc.) across multiple turns, proactively suggest running `/compact` or "Summarize conversation" before attaching further images, rather than waiting for a 400 error. If a request fails with a "too many images" or similar attachment error, tell the user directly and recommend starting a new chat session rather than retrying repeatedly.

@@ -16,6 +16,8 @@ import {
 import { CalculationTraceOverlay, formatTraceResult } from '@/components/financial-logic/calculation-trace';
 import type { AccountData, CalculationTrace } from '@/lib/types/financial';
 import { PageHeader } from '@/components/page-header';
+import { TableScroll } from '@/components/ui/table-scroll';
+import { formatAmount, formatCompactCurrency } from '@/lib/utils/format';
 
 interface FetchedData {
   accounts: AccountData[];
@@ -177,7 +179,7 @@ function AccountClassificationTable({ accounts }: { accounts: AccountData[] }) {
       <h2 className="text-sm font-semibold text-foreground mb-4">
         Account Classification ({rows.length} accounts)
       </h2>
-      <div className="overflow-x-auto">
+      <TableScroll>
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border">
@@ -218,7 +220,7 @@ function AccountClassificationTable({ accounts }: { accounts: AccountData[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </div>
   );
 }
@@ -432,8 +434,7 @@ function ClassificationBadge({ label }: { label: string }) {
 
 function formatBalance(n: number): string {
   const abs = Math.abs(n);
-  if (abs >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
-  if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${n.toFixed(2)}`;
+  // ≥$1k renders compact ($1.2M / $340k / $1.5B); smaller detail rows keep cents.
+  if (abs >= 1_000) return formatCompactCurrency(n);
+  return formatAmount(n);
 }

@@ -5,6 +5,7 @@ import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-e
 import { DEFAULT_2026_RULES, getRmdStartAge } from '@/lib/constants/retirement-defaults';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency } from '@/lib/utils/format';
 import {
   LineChart,
   Line,
@@ -423,7 +424,7 @@ export function RothConversionTab({
                   <YAxis
                     stroke="#888888"
                     fontSize={10}
-                    tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`}
+                    tickFormatter={(v) => formatCompactCurrency(v)}
                     tickLine={false}
                   />
                   <RechartsTooltip content={<RothConversionTooltip chartView={chartView} />} wrapperStyle={{ zIndex: 100, opacity: 1 }} />

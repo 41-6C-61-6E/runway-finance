@@ -99,7 +99,7 @@ function SpendingContent() {
 
   const availableTabs = [
     { id: 'spending', label: 'Breakdown' },
-    { id: 'cash', label: 'Cash vs Credit' },
+    { id: 'cash', label: 'Coverage' },
     { id: 'subscriptions', label: 'Subscriptions' },
   ];
 

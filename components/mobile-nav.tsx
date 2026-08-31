@@ -25,11 +25,15 @@ import {
   Bug,
   ChevronLeft,
   ChevronRight,
+  WifiOff,
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { haptic } from '@/lib/haptics';
 import { useMobileSubNav } from '@/components/mobile-subnav-context';
+import type { SubNavLevel } from '@/components/mobile-subnav-context';
 import { useQuery } from '@tanstack/react-query';
+import { glassBar, glassSurface, glassItemBase, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
+import { useScrollFades, ScrollFadeOverlays } from '@/components/ui/scroll-fade';
 
 interface NavItem {
   id: string;
@@ -53,6 +57,13 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'financial-logic', href: '/financial-logic', label: 'Financial Logic Explorer', icon: Calculator, pageKey: 'financialLogic', category: 'finances' },
   { id: 'data-explorer', href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer', category: 'finances' },
   { id: 'plans', href: '/plans', label: 'FIRE', icon: Flame, pageKey: 'plans', category: 'planning' },
+  {
+    id: 'offline',
+    href: '/offline',
+    label: 'Offline mode (preview)',
+    icon: WifiOff,
+    category: 'planning',
+  },
 ];
 
 export function MobileNav() {
@@ -74,29 +85,6 @@ export function MobileNav() {
 
   const { tabs, activeTabId, navLevels, selectTabAtLevel, activeTabIndex, nextTab, prevTab } = useMobileSubNav();
   const hasSubNav = tabs.length > 0;
-  const subNavMeasureRef = useRef<HTMLDivElement | null>(null);
-  const [wrappedSubNavSignature, setWrappedSubNavSignature] = useState<string | null>(null);
-  const subNavSignature = navLevels
-    .slice(1)
-    .map((level) => level.tabs.map((tab) => `${tab.id}:${tab.label}`).join('|'))
-    .join('||');
-
-  // Keep nested menus on one row unless flex-shrinking has cut a label down
-  // to less than half its natural width. The signature prevents a fallback
-  // needed by one FIRE section from carrying over to another section.
-  useEffect(() => {
-    if (!subNavSignature || wrappedSubNavSignature === subNavSignature) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      const labels = subNavMeasureRef.current?.querySelectorAll<HTMLElement>('[data-subnav-child-label]') || [];
-      const needsWrap = Array.from(labels).some((label) => (
-        label.clientWidth > 0 && label.scrollWidth > label.clientWidth * 2
-      ));
-      if (needsWrap) setWrappedSubNavSignature(subNavSignature);
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [subNavSignature, wrappedSubNavSignature]);
 
   // Scroll detection state for floating subnav smart auto-dimming
   const [isScrollingDown, setIsScrollingDown] = useState(false);
@@ -151,6 +139,28 @@ export function MobileNav() {
   const [homeItemIds, setHomeItemIds] = useState<string[]>(['net-worth', 'accounts', 'transactions', 'cash-flow']);
   const [isEditing, setIsEditing] = useState(false);
   
+  // Default pages the user explicitly removed in Edit Layout mode — the
+  // auto-fill must not add them back to the home bar.
+  const [excludedHomeIds, setExcludedHomeIds] = useState<string[]>([]);
+
+  // How many page buttons the bottom bar can fit at the current viewport width:
+  // the bar spans `viewport - 32px` (16px margin per side) capped at max-w-lg
+  // (512px), minus 12px horizontal padding per side and a 1px border.
+  // Every button (including the hamburger) is at least min-w-11 (44px) wide.
+  // One slot is always reserved for the hamburger; the floor of 3 slots keeps
+  // the bar from regressing below the old fixed layout on narrow phones.
+  const [homeNavSlotCount, setHomeNavSlotCount] = useState(3);
+  useEffect(() => {
+    const computeHomeNavSlots = () => {
+      const barWidth = Math.max(240, Math.min(window.innerWidth - 32, 512));
+      const contentWidth = barWidth - 24 - 2;
+      setHomeNavSlotCount(Math.max(3, Math.floor(contentWidth / 44) - 1));
+    };
+    computeHomeNavSlots();
+    window.addEventListener('resize', computeHomeNavSlots);
+    return () => window.removeEventListener('resize', computeHomeNavSlots);
+  }, []);
+
   // Custom Drag and Drop states
   const [draggedItem, setDraggedItem] = useState<NavItem | null>(null);
   const [dragCurrentPos, setDragCurrentPos] = useState({ x: 0, y: 0 });
@@ -222,11 +232,24 @@ export function MobileNav() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 4) {
+        if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 12) {
           setHomeItemIds(parsed);
         }
       } catch (e) {
         console.error('Failed to parse mobile nav items', e);
+      }
+    }
+
+    // Load pages excluded from the home bar auto-fill
+    const excluded = localStorage.getItem('mobile-home-nav-excluded');
+    if (excluded) {
+      try {
+        const parsed = JSON.parse(excluded);
+        if (Array.isArray(parsed)) {
+          setExcludedHomeIds(parsed.filter((id): id is string => typeof id === 'string'));
+        }
+      } catch (e) {
+        console.error('Failed to parse mobile nav exclusions', e);
       }
     }
   }, []);
@@ -257,8 +280,30 @@ export function MobileNav() {
     .map(id => ALL_NAV_ITEMS.find(item => item.id === id))
     .filter((item): item is NavItem => !!item && isItemVisible(item));
 
-  // Limit to max 4 items
-  activeHomeNavItems = activeHomeNavItems.slice(0, 4);
+  // Limit the bar to the number of slots that fit at the current width
+  // (extra saved items stay in localStorage and reappear at wider sizes).
+  activeHomeNavItems = activeHomeNavItems.slice(0, homeNavSlotCount);
+
+  // Pages used to auto-fill the bar (dev-mode and preview pages are
+  // never added to the home bar automatically).
+  const defaultHomeFill: NavItem[] = ALL_NAV_ITEMS.filter(
+    (item) =>
+      item.id !== 'offline' &&
+      !(item.pageKey && (DEV_MODE_PAGE_KEYS as readonly string[]).includes(item.pageKey))
+  );
+
+  // Show saved items first (user's order/choice), then fill any remaining
+  // capacity with the default pages so the bar grows with the viewport.
+  const shownHomeNavItems =
+    activeHomeNavItems.length >= homeNavSlotCount
+      ? activeHomeNavItems
+      : [
+          ...activeHomeNavItems,
+          ...defaultHomeFill
+            .filter((item) => !activeHomeNavItems.some((a) => a.id === item.id))
+            .filter((item) => !excludedHomeIds.includes(item.id))
+            .filter((item) => isItemVisible(item)),
+        ].slice(0, homeNavSlotCount);
 
   // Pointer event handlers for custom drag and drop
   const handleItemPointerMove = (e: React.PointerEvent) => {
@@ -366,7 +411,7 @@ export function MobileNav() {
       }
 
       if (hoveredSlotIndex !== null) {
-        const currentHomeIds = activeHomeNavItems.map(item => item.id);
+        const currentHomeIds = shownHomeNavItems.map(item => item.id);
         const oldIndex = currentHomeIds.indexOf(draggedItem.id);
         
         let newIds = [...currentHomeIds];
@@ -388,8 +433,9 @@ export function MobileNav() {
           }
         }
         
-        const uniqueIds = Array.from(new Set(newIds)).slice(0, 4);
+        const uniqueIds = Array.from(new Set(newIds)).slice(0, homeNavSlotCount);
         updateHomeItems(uniqueIds);
+        setExcludedHomeIds((prev) => prev.filter((id) => id !== draggedItem.id));
         haptic.success();
       }
 
@@ -414,7 +460,7 @@ export function MobileNav() {
       window.removeEventListener('touchend', handleDrop);
       window.removeEventListener('touchcancel', handleDrop);
     };
-  }, [draggedItem, hoveredSlotIndex, activeHomeNavItems]);
+  }, [draggedItem, hoveredSlotIndex, shownHomeNavItems, homeNavSlotCount]);
 
   const handleItemClick = (e: React.MouseEvent) => {
     if (isEditing) {
@@ -424,11 +470,13 @@ export function MobileNav() {
   };
 
   const handleRemoveSlot = (indexToRemove: number) => {
-    if (activeHomeNavItems.length <= 1) return; // Keep at least 1 item
-    const newIds = activeHomeNavItems
+    const item = shownHomeNavItems[indexToRemove];
+    if (!item || shownHomeNavItems.length <= 1) return; // Keep at least 1 item
+    const newIds = shownHomeNavItems
       .filter((_, idx) => idx !== indexToRemove)
-      .map(item => item.id);
+      .map(navItem => navItem.id);
     updateHomeItems(newIds);
+    setExcludedHomeIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
   };
 
   const getWiggleClass = (index: number) => {
@@ -466,7 +514,7 @@ export function MobileNav() {
       {/* Decoupled Floating Sub-Navigation Capsule (View & Swipe Control) */}
       {hasSubNav && !isOpen && (
         <div
-          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden transition-all duration-300 ${
+          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none lg:hidden transition-all duration-300 ${
             isScrollingDown ? 'opacity-55 hover:opacity-100 scale-95' : 'opacity-100 scale-100'
           }`}
           style={{
@@ -476,52 +524,16 @@ export function MobileNav() {
           <div
             onTouchStart={handleSubNavTouchStart}
             onTouchEnd={handleSubNavTouchEnd}
-            ref={subNavMeasureRef}
             className="pointer-events-auto flex items-center justify-center gap-1 max-w-[92vw] w-[calc(100vw-1rem)] select-none"
           >
             {/* Nested sub-navigation: parent menu > child menu. */}
-            <div className={`flex items-center justify-center gap-1 min-w-0 w-full ${wrappedSubNavSignature === subNavSignature ? 'flex-col' : ''}`}>
+            <div className="flex items-center justify-center gap-1 min-w-0 w-full">
               {navLevels.map((level, levelIndex) => (
                 <React.Fragment key={level.id}>
                   {levelIndex > 0 && (
-                    <ChevronRight
-                      className={`w-3 h-3 shrink-0 text-sidebar-foreground/55 ${wrappedSubNavSignature === subNavSignature ? 'rotate-90' : ''}`}
-                      aria-hidden="true"
-                    />
+                    <ChevronRight className="w-3 h-3 shrink-0 text-sidebar-foreground/55" aria-hidden="true" />
                   )}
-                  <div
-                    className={`${levelIndex > 0 ? `w-fit max-w-full justify-center ${wrappedSubNavSignature === subNavSignature ? 'flex-wrap' : ''}` : ''} flex min-w-0 shrink items-center gap-1 overflow-hidden rounded-full bg-sidebar/75 p-1 shadow-lg backdrop-blur-xl border border-sidebar-border/35`}
-                  >
-                    {level.tabs.map((tab) => {
-                      const isActiveTab = tab.id === level.activeTabId;
-                      return (
-                        <button
-                          key={`${level.id}-${tab.id}`}
-                          type="button"
-                          onClick={() => {
-                            if (!isActiveTab) {
-                              haptic.light();
-                              selectTabAtLevel(level.id, tab.id);
-                            }
-                          }}
-                          className={`flex min-w-0 shrink items-center justify-center gap-1.5 py-1 px-2 text-xs rounded-full transition-all duration-200 cursor-pointer select-none whitespace-nowrap ${
-                            wrappedSubNavSignature === subNavSignature && levelIndex > 0 ? 'shrink-0' : ''
-                          } ${
-                            isActiveTab
-                              ? 'text-primary font-semibold'
-                              : 'text-sidebar-foreground/50 hover:text-sidebar-foreground/80 font-medium'
-                          }`}
-                        >
-                          <span
-                            data-subnav-child-label={levelIndex > 0 ? '' : undefined}
-                            className={`${wrappedSubNavSignature === subNavSignature && levelIndex > 0 ? '' : 'min-w-0 truncate'}`}
-                          >
-                            {tab.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <SubNavCapsule level={level} onSelect={(tabId) => selectTabAtLevel(level.id, tabId)} />
                 </React.Fragment>
               ))}
             </div>
@@ -531,12 +543,12 @@ export function MobileNav() {
 
       {/* Main Single-Row Floating Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-2 left-4 right-4 z-40 bg-sidebar/55 backdrop-blur-md border border-sidebar-border/25 flex items-center justify-around md:hidden shadow-xl transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden"
+          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center justify-around lg:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
         }}
-      >
-        {activeHomeNavItems.map((item) => {
+        >
+        {shownHomeNavItems.map((item) => {
           const Icon = item.icon;
           const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
 
@@ -546,11 +558,9 @@ export function MobileNav() {
               href={item.href}
               aria-label={item.label}
               onClick={() => setPendingHref(item.href)}
-              className={`flex flex-col items-center justify-center p-2.5 min-w-[44px] min-h-[44px] rounded-full transition-all duration-200 active:scale-95 group ${
-                active
-                  ? 'text-primary bg-primary/20 font-semibold shadow-xs'
-                  : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
-              }`}
+                className={`flex flex-col items-center justify-center p-2.5 min-w-11 min-h-11 group ${glassItemBase} ${
+                  active ? glassItemActive : glassItemInactive
+                }`}
             >
               <Icon className="h-5 w-5 flex-shrink-0" />
             </Link>
@@ -562,11 +572,9 @@ export function MobileNav() {
           type="button"
           aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex flex-col items-center justify-center p-2.5 min-w-[44px] min-h-[44px] rounded-full transition-all duration-200 active:scale-95 group cursor-pointer ${
-            isOpen
-              ? 'text-primary bg-primary/20 font-semibold shadow-xs'
-              : 'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-foreground/8 font-medium'
-          }`}
+            className={`flex flex-col items-center justify-center p-2.5 min-w-11 min-h-11 group ${glassItemBase} ${
+              isOpen ? glassItemActive : glassItemInactive
+            }`}
         >
           {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
         </button>
@@ -620,99 +628,65 @@ export function MobileNav() {
               </div>
             </div>
             <div className="grid grid-cols-4 gap-y-3 gap-x-2 mb-4 border border-sidebar-border/20 bg-sidebar-foreground/3 rounded-3xl p-3">
-              {[0, 1, 2, 3].map((index) => {
-                const item = activeHomeNavItems[index];
+              {shownHomeNavItems.map((item, index) => {
                 const isHoveredSlot = hoveredSlotIndex === index;
+                const Icon = item.icon;
+                const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
+                const isCurrentlyDragged = draggedItem?.id === item.id;
 
-                if (item) {
-                  const Icon = item.icon;
-                  const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
-                  const isCurrentlyDragged = draggedItem?.id === item.id;
-
-                  return (
+                return (
+                  <div
+                    key={`home-slot-${index}`}
+                    data-slot-index={index}
+                    className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-200 ${
+                      isHoveredSlot
+                        ? 'bg-primary/10 border border-primary/30 scale-105 shadow-[0_0_8px_rgba(var(--primary-rgb),0.15)]'
+                        : 'border border-transparent'
+                    } ${getWiggleClass(index)}`}
+                    style={{
+                      opacity: isCurrentlyDragged ? 0.3 : 1,
+                    }}
+                  >
                     <div
-                      key={`home-slot-${index}`}
-                      data-slot-index={index}
-                      className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-200 ${
-                        isHoveredSlot
-                          ? 'bg-primary/10 border border-primary/30 scale-105 shadow-[0_0_8px_rgba(var(--primary-rgb),0.15)]'
-                          : 'border border-transparent'
-                      } ${getWiggleClass(index)}`}
-                      style={{
-                        opacity: isCurrentlyDragged ? 0.3 : 1,
-                      }}
-                    >
-                      <div
-                        onPointerDown={handleItemPointerDown(item)}
-                        onPointerMove={handleItemPointerMove}
-                        onPointerUp={handleItemPointerUp}
-                        onPointerCancel={handleItemPointerCancel}
-                        onClick={handleItemClick}
-                        className={`p-3 rounded-2xl relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
-                          active 
-                            ? 'bg-primary/20 text-primary' 
-                            : 'bg-sidebar-foreground/8 text-sidebar-foreground/65'
-                        }`}
-                        style={{
-                          touchAction: 'none'
-                        }}
-                      >
-                        <Icon className="h-5 w-5 flex-shrink-0" />
-                      </div>
-                      
-                      {isEditing && (
-                        <button
-                          type="button"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            haptic.medium();
-                            handleRemoveSlot(index);
-                          }}
-                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1.5 shadow-md active:scale-90 z-20 cursor-pointer min-touch-target-inline"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                      )}
-
-                      <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors select-none ${
-                        active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65'
-                      }`}>{item.label}</span>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div
-                      key={`home-slot-empty-${index}`}
-                      data-slot-index={index}
-                      className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl border border-dashed transition-all duration-200 ${
-                        isHoveredSlot
-                          ? 'border-primary/50 bg-primary/10 scale-105'
-                          : 'border-muted-foreground/20 bg-transparent'
+                      onPointerDown={handleItemPointerDown(item)}
+                      onPointerMove={handleItemPointerMove}
+                      onPointerUp={handleItemPointerUp}
+                      onPointerCancel={handleItemPointerCancel}
+                      onClick={handleItemClick}
+                      className={`p-3 rounded-2xl relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
+                        active 
+                          ? 'bg-primary/20 text-primary' 
+                          : 'bg-sidebar-foreground/8 text-sidebar-foreground/65'
                       }`}
                       style={{
                         touchAction: 'none'
                       }}
                     >
-                      <div
-                        className="p-3 rounded-2xl flex items-center justify-center text-muted-foreground/30"
-                        style={{
-                          width: 46,
-                          height: 46,
-                        }}
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
-                      </div>
-                      <span className="text-[10px] tracking-wide text-center text-muted-foreground/30 select-none">
-                        Empty
-                      </span>
+                      <Icon className="h-5 w-5 flex-shrink-0" />
                     </div>
-                  );
-                }
+                    
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          haptic.medium();
+                          handleRemoveSlot(index);
+                        }}
+                        className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-1.5 shadow-md active:scale-90 z-20 cursor-pointer min-touch-target-inline"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                    )}
+
+                    <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors select-none ${
+                      active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65'
+                    }`}>{item.label}</span>
+                  </div>
+                );
               })}
             </div>
 
@@ -786,5 +760,61 @@ export function MobileNav() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * One scrollable level of the floating sub-nav.
+ *
+ * Each level is a single-row glass capsule whose items never shrink or
+ * truncate — when the row exceeds the available width it scrolls, and the
+ * shared edge fades (see `scroll-fade`) hint that it can be dragged.
+ */
+function SubNavCapsule({ level, onSelect }: { level: SubNavLevel; onSelect: (tabId: string) => void }) {
+  const { fadeRef, fades, update } = useScrollFades<HTMLDivElement>();
+
+  // Keep the active tab visible when it isn't the current scroll anchor.
+  React.useLayoutEffect(() => {
+    const scroller = fadeRef.current;
+    if (!scroller) return;
+    const active = scroller.querySelector<HTMLButtonElement>('[data-active="true"]');
+    if (!active) return;
+    const start = active.offsetLeft - scroller.scrollLeft;
+    if (start < 0 || start > scroller.clientWidth - active.offsetWidth) {
+      active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }
+  }, [level.activeTabId]);
+
+  return (
+    <div className="relative min-w-0 shrink max-w-full">
+      <div
+        ref={fadeRef}
+        onScroll={update}
+        className={`flex items-center gap-1 p-1 overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x rounded-full max-w-full w-fit ${glassSurface}`}
+      >
+        {level.tabs.map((tab) => {
+          const isActiveTab = tab.id === level.activeTabId;
+          return (
+            <button
+              key={`${level.id}-${tab.id}`}
+              type="button"
+              data-active={isActiveTab || undefined}
+              onClick={() => {
+                if (!isActiveTab) {
+                  haptic.light();
+                  onSelect(tab.id);
+                }
+              }}
+              className={`flex shrink-0 items-center justify-center gap-1.5 py-1 px-2 min-h-9 text-xs whitespace-nowrap ${glassItemBase} ${
+                isActiveTab ? glassItemActive : glassItemInactive
+              }`}
+            >
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <ScrollFadeOverlays {...fades} />
+    </div>
   );
 }
