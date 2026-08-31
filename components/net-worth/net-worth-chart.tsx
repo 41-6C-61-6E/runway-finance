@@ -253,7 +253,7 @@ export function NetWorthChart() {
   const ActiveDot = useCallback((props: any) => {
     const { cx, cy, payload } = props;
     if (!cx || !cy || !payload) return null;
-    const color = payload.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)';
+    const color = payload.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-status-negative)';
 
     const handleClick = () => {
       if (payload.date) {
@@ -320,7 +320,7 @@ export function NetWorthChart() {
         <TooltipRow
           label="Net Worth"
           value={formatCurrency(point.netWorth)}
-          color={point.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+          color={point.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-status-negative)'}
         />
         <TooltipRow label="Total Assets" value={formatCurrency(point.totalAssets)} color="var(--color-chart-1)" />
         <TooltipRow label="Total Liabilities" value={formatCurrency(point.totalLiabilities)} color="var(--color-destructive)" />
@@ -349,19 +349,19 @@ export function NetWorthChart() {
             <TooltipRow
               label="Change (%)"
               value={formatPercent(point.percentChange)}
-              color={point.percentChange >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+              color={point.percentChange >= 0 ? 'var(--color-chart-1)' : 'var(--color-status-negative)'}
             />
             <TooltipRow
               label="Change"
               value={`${point.change >= 0 ? '+' : ''}${formatCurrency(point.change)}`}
-              color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+              color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-status-negative)'}
             />
           </>
         ) : (
           <TooltipRow
             label="Change"
             value={`${point.change >= 0 ? '+' : ''}${formatCurrency(point.change)}`}
-            color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+            color={point.change >= 0 ? 'var(--color-chart-1)' : 'var(--color-status-negative)'}
           />
         )}
         <TooltipRow label="Starting Net Worth" value={formatCurrency(point.startNetWorth)} color="var(--color-chart-1)" />
@@ -452,15 +452,15 @@ export function NetWorthChart() {
                           </>
                         ) : areaGradientOffset === 0 ? (
                           <>
-                            <stop offset="0%" stopColor="var(--color-chart-5)" stopOpacity={0} />
-                            <stop offset="100%" stopColor="var(--color-chart-5)" stopOpacity={0.35} />
+                            <stop offset="0%" stopColor="var(--color-status-negative)" stopOpacity={0} />
+                            <stop offset="100%" stopColor="var(--color-status-negative)" stopOpacity={0.35} />
                           </>
                         ) : (
                           <>
                             <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
                             <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" stopOpacity={0} />
-                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" stopOpacity={0} />
-                            <stop offset="100%" stopColor="var(--color-chart-5)" stopOpacity={0.35} />
+                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-status-negative)" stopOpacity={0} />
+                            <stop offset="100%" stopColor="var(--color-status-negative)" stopOpacity={0.35} />
                           </>
                         )}
                       </linearGradient>
@@ -468,11 +468,11 @@ export function NetWorthChart() {
                         {areaGradientOffset === 1 ? (
                           <stop offset="0%" stopColor="var(--color-chart-1)" />
                         ) : areaGradientOffset === 0 ? (
-                          <stop offset="0%" stopColor="var(--color-chart-5)" />
+                          <stop offset="0%" stopColor="var(--color-status-negative)" />
                         ) : (
                           <>
                             <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-1)" />
-                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-chart-5)" />
+                            <stop offset={`${areaGradientOffset * 100}%`} stopColor="var(--color-status-negative)" />
                           </>
                         )}
                       </linearGradient>
@@ -502,7 +502,7 @@ export function NetWorthChart() {
                     <ReferenceArea
                       y1={0}
                       y2={areaYDomain[0]}
-                      fill="var(--color-chart-5)"
+                      fill="var(--color-status-negative)"
                       fillOpacity={0.04}
                     />
                     <Area
@@ -571,7 +571,7 @@ export function NetWorthChart() {
                       {barDataWithPercent.map((entry, index) => (
                         <Cell
                           key={index}
-                          fill={(showPercent ? entry.percentChange : entry.change) >= 0 ? 'var(--color-chart-1)' : 'var(--color-chart-5)'}
+                          fill={(showPercent ? entry.percentChange : entry.change) >= 0 ? 'var(--color-chart-1)' : 'var(--color-status-negative)'}
                           onClick={() => handleBarClick(entry)}
                           style={{ cursor: 'pointer' }}
                         />
