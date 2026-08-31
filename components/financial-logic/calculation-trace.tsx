@@ -60,7 +60,7 @@ export function CalculationTraceOverlay({
             {trace.title}
           </span>
           {trace.isEstimate && (
-            <span className="px-1.5 py-0.2 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded text-[9px] font-mono font-medium">
+            <span className="px-1.5 py-0.2 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded text-micro font-mono font-medium">
               [ESTIMATE]
             </span>
           )}
@@ -161,7 +161,7 @@ export function CalculationTraceOverlay({
                     <span className="font-mono text-[11px] text-foreground truncate mr-2 flex items-center gap-1.5">
                       {step.label}
                       {step.isEstimate && (
-                        <span className="px-1 py-0.2 bg-amber-500/10 text-amber-500 rounded text-[9px]">
+                        <span className="px-1 py-0.2 bg-amber-500/10 text-amber-500 rounded text-micro">
                           [ESTIMATE]
                         </span>
                       )}

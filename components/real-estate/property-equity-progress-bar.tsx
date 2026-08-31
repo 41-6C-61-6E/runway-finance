@@ -231,7 +231,7 @@ export function PropertyEquityProgressBar({
                 <span className="text-[11px] font-medium text-muted-foreground truncate">
                   <span className="block truncate">{seg.label}</span>
                   {'subLabel' in seg && seg.subLabel && (
-                    <span className="block text-[9px] font-normal text-muted-foreground/75 truncate">
+                    <span className="block text-[11px] font-normal text-muted-foreground/75 truncate">
                       {seg.subLabel}
                     </span>
                   )}

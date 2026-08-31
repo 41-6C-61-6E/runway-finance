@@ -720,7 +720,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                                   <span className="font-medium text-foreground">{item.categoryName}</span>
                                 </div>
                                 {item.isIncome ? (
-                                  <span className="px-1.5 py-0.2 text-[9px] font-semibold bg-constructive/15 text-constructive rounded">
+                                  <span className="px-1.5 py-0.2 text-micro font-semibold bg-constructive/15 text-constructive rounded">
                                     Income
                                   </span>
                                 ) : (
@@ -728,7 +728,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                                     type="button"
                                     onClick={() => toggleDiscretionary(item.categoryId)}
                                     title="Click to toggle Essential / Discretionary"
-                                    className={`px-1.5 py-0.2 text-[9px] font-semibold rounded transition-colors ${
+                                    className={`px-1.5 py-0.2 text-micro font-semibold rounded transition-colors ${
                                       item.isDiscretionary
                                         ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25'
                                         : 'bg-primary/15 text-primary hover:bg-primary/25'

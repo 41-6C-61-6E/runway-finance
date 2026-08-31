@@ -337,7 +337,7 @@ export function FireProjectionsSidePanel({
                       <Tooltip key={idx}>
                         <TooltipTrigger asChild>
                           <div className="relative flex items-center justify-between gap-2 text-xs py-0.5 cursor-help hover:bg-sidebar-accent/50 rounded px-1 -mx-1 transition-colors">
-                            <div className="absolute -left-4 top-1 w-3.5 h-3.5 rounded-full bg-sidebar border-2 border-primary flex items-center justify-center text-[8px]">
+                            <div className="absolute -left-4 top-1 w-3.5 h-3.5 rounded-full bg-sidebar border-2 border-primary flex items-center justify-center text-micro">
                               {m.emoji}
                             </div>
                             <span className="font-bold text-foreground truncate min-w-0">{m.title}</span>

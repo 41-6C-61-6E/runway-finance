@@ -520,7 +520,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                                   e.stopPropagation();
                                   setSelectedAccountIds(new Set([acc.id]));
                                 }}
-                                className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 text-[9px] font-semibold bg-muted hover:bg-primary hover:text-primary-foreground text-muted-foreground rounded transition-all shrink-0 cursor-pointer"
+                                className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 text-[11px] font-semibold bg-muted hover:bg-primary hover:text-primary-foreground text-muted-foreground rounded transition-all shrink-0 cursor-pointer"
                                 title="Show only this account"
                               >
                                 Only
@@ -642,10 +642,10 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                             {displayTicker && (
-                            <span className="px-1.5 py-0.5 font-mono text-[9px] font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
+                            <span className="px-1.5 py-0.5 font-mono text-micro font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
                                 {displayTicker}
                                 {h.tickerOverride ? (
-                                  <span className="ml-1 text-[8px] font-sans opacity-70" title="Custom ticker">
+                                  <span className="ml-1 text-micro font-sans opacity-70" title="Custom ticker">
                                     ✦
                                   </span>
                                 ) : null}
@@ -656,7 +656,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[9px] px-1 py-0.5 bg-muted/60 text-muted-foreground rounded border border-border/40 font-medium">
+                          <span className="text-micro px-1 py-0.5 bg-muted/60 text-muted-foreground rounded border border-border/40 font-medium">
                             {assetType}
                           </span>
                         </div>
@@ -673,7 +673,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                           </span>
                         </div>
                         {relativeSync && (
-                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60">
+                          <div className="flex items-center gap-1 text-micro text-muted-foreground/60">
                             <RefreshCw className="w-2.5 h-2.5 opacity-70 shrink-0" />
                             <span>Synced {relativeSync}</span>
                           </div>
@@ -697,7 +697,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                             {isDayChangePositive ? '+' : ''}
                             {dayChangePct.toFixed(2)}%
                           </span>
-                          <span className={`text-[9px] text-muted-foreground/65`}>
+                          <span className={`text-micro text-muted-foreground/65`}>
                             {isDayChangePositive ? '+' : ''}
                             {formatCurrency(dayChangeVal ?? 0)}
                           </span>
@@ -717,7 +717,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                               style={{ left: `calc(${rangePct}% - 4px)` }}
                             />
                           </div>
-                          <div className="flex justify-between w-full text-[9px] text-muted-foreground/60 font-mono">
+                          <div className="flex justify-between w-full text-micro text-muted-foreground/60 font-mono">
                             <span className="blur-number">${low52.toFixed(0)}</span>
                             <span className="blur-number">${high52.toFixed(0)}</span>
                           </div>
@@ -838,10 +838,10 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {displayTicker && (
-                        <span className="px-1.5 py-0.5 font-mono text-[9px] font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
+                        <span className="px-1.5 py-0.5 font-mono text-micro font-bold rounded bg-primary/10 text-primary border border-primary/20 leading-none">
                           {displayTicker}
                           {h.tickerOverride ? (
-                            <span className="ml-1 text-[8px] font-sans opacity-70" title="Custom ticker">
+                            <span className="ml-1 text-micro font-sans opacity-70" title="Custom ticker">
                               ✦
                             </span>
                           ) : null}
@@ -875,20 +875,20 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                 {isExpanded && (
                   <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-2 gap-y-2.5 gap-x-4 text-[11px] text-muted-foreground animate-in fade-in slide-in-from-top-1 duration-200">
                     <div>
-                      <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Quantity / Price</span>
+                      <span className="block text-micro uppercase tracking-wider text-muted-foreground/60 mb-0.5">Quantity / Price</span>
                       <span className="font-mono text-foreground font-semibold blur-number">
                         {(h.quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} @ {formatCurrency(price)}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Portfolio Weight</span>
+                      <span className="block text-micro uppercase tracking-wider text-muted-foreground/60 mb-0.5">Portfolio Weight</span>
                       <span className="font-mono text-foreground font-semibold">
                         {(weight ?? 0).toFixed(1)}% of total
                       </span>
                     </div>
 
                     <div>
-                      <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Today's Performance</span>
+                      <span className="block text-micro uppercase tracking-wider text-muted-foreground/60 mb-0.5">Today's Performance</span>
                       {dayChangePct != null ? (
                         <span className={`font-semibold font-mono ${isDayChangePositive ? 'text-chart-1' : 'text-destructive'}`}>
                           {isDayChangePositive ? '+' : ''}{dayChangePct.toFixed(2)}% ({formatCurrency(dayChangeVal ?? 0)})
@@ -898,7 +898,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                       )}
                     </div>
                     <div className="text-right">
-                      <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-0.5">Account / Institution</span>
+                      <span className="block text-micro uppercase tracking-wider text-muted-foreground/60 mb-0.5">Account / Institution</span>
                       <span className="text-foreground font-medium truncate max-w-[130px] inline-block font-sans" title={`${h.institutionName} - ${h.accountName}`}>
                         {h.institutionName ? `${h.institutionName}` : h.accountName}
                       </span>
@@ -906,7 +906,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
 
                     {low52 && high52 ? (
                       <div className="col-span-2 pt-1">
-                        <span className="block text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-1">52-Week Price Range</span>
+                        <span className="block text-micro uppercase tracking-wider text-muted-foreground/60 mb-1">52-Week Price Range</span>
                         <div className="flex items-center gap-2">
                           <span className="font-mono blur-number">${low52.toFixed(0)}</span>
                           <div className="flex-1 h-1 bg-muted rounded-full relative">
@@ -921,7 +921,7 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                     ) : null}
 
                     {relativeSync && (
-                      <div className="col-span-2 pt-1 border-t border-border/20 text-[9px] flex items-center gap-1">
+                      <div className="col-span-2 pt-1 border-t border-border/20 text-micro flex items-center gap-1">
                         <RefreshCw className="w-2.5 h-2.5 opacity-60" />
                         <span>Account Synced {relativeSync}</span>
                       </div>

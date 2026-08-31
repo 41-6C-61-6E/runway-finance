@@ -301,7 +301,7 @@ export function SubscriptionTracker({ items, loading = false }: SubscriptionTrac
                     </span>
                   )}
                   {item.isPaused && (
-                    <span className="text-[9px] font-bold bg-muted text-muted-foreground border border-border/50 rounded px-1.5 py-0.5 uppercase tracking-wider shrink-0">
+                    <span className="text-micro font-bold bg-muted text-muted-foreground border border-border/50 rounded px-1.5 py-0.5 uppercase tracking-wider shrink-0">
                       Paused
                     </span>
                   )}

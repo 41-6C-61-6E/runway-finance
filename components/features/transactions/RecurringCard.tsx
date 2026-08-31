@@ -107,7 +107,7 @@ export function formatFrequencyUnit(freq: FrequencyType): string {
 function getStatusBadge(item: RecurringItem) {
   if (item.isPaused) {
     return (
-      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-muted text-muted-foreground border border-border/50 uppercase tracking-wider shrink-0">
+      <span className="px-1.5 py-0.5 rounded text-micro font-bold bg-muted text-muted-foreground border border-border/50 uppercase tracking-wider shrink-0">
         Paused
       </span>
     );

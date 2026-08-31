@@ -282,6 +282,16 @@ html.text-size-lg {
   }
 }
 
+/* ── text-micro (desktop audit R-5) ────────────────────────────────────
+   The one sanctioned 10px. Reserved for chart axis ticks and small count
+   badges — never body/field/section text (that lives at 11px+, via
+   SectionHeading label / FormField label). text-[8px]/text-[9px] are banned
+   by lint. */
+@utility text-micro {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 /* Ensure Recharts tooltips disappear when the mouse leaves the chart area */
 /* Only apply on devices with hover (mouse/trackpad), not touch */
 @media (hover: hover) {

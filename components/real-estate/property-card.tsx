@@ -180,11 +180,11 @@ export function PropertyCard({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <h3 className="text-sm font-semibold text-foreground">{property.name}</h3>
                 {propertyType && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
+                  <span className="px-1.5 py-0.5 text-micro font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
                     {PROPERTY_TYPE_LABELS[propertyType] || propertyType}
                   </span>
                 )}
-                <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-muted/60 text-muted-foreground border border-border">
+                <span className="px-1.5 py-0.5 text-micro font-medium rounded bg-muted/60 text-muted-foreground border border-border">
                   {valuationLabel}
                 </span>
               </div>
@@ -317,7 +317,7 @@ export function PropertyCard({
                       title="Estimated net proceeds assuming 8% seller closing costs and agent commissions"
                     >
                       <span>Est. Net Proceeds</span>
-                      <span className="text-[9px] text-muted-foreground/70 font-sans lowercase">(net 8%)</span>
+                      <span className="text-micro text-muted-foreground/70 font-sans lowercase">(net 8%)</span>
                     </div>
                     <div className="font-mono text-sm font-bold text-chart-1 blur-number">
                       {formatCurrency(property.saleProceeds)}
@@ -334,7 +334,7 @@ export function PropertyCard({
                       </span>
                       <span
                         className={cn(
-                          'px-1.5 py-0.2 rounded text-[9px] font-semibold border uppercase tracking-wider',
+                          'px-1.5 py-0.2 rounded text-micro font-semibold border uppercase tracking-wider',
                           ltvColor
                         )}
                       >
@@ -432,7 +432,7 @@ export function PropertyCard({
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-semibold text-foreground truncate">{m.name}</span>
                                   {m.interestRate > 0 && (
-                                    <span className="px-1.5 py-0.2 text-[9px] font-mono font-medium rounded bg-muted text-muted-foreground border border-border">
+                                    <span className="px-1.5 py-0.2 text-micro font-mono font-medium rounded bg-muted text-muted-foreground border border-border">
                                       {m.interestRate.toFixed(2)}% APR
                                     </span>
                                   )}
@@ -544,7 +544,7 @@ export function PropertyCard({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-muted-foreground truncate">{m.name}</span>
-                                <span className="px-1.5 py-0.2 text-[9px] font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
+                                <span className="px-1.5 py-0.2 text-micro font-medium rounded bg-muted text-muted-foreground border border-border uppercase">
                                   {closedLabel}
                                 </span>
                               </div>

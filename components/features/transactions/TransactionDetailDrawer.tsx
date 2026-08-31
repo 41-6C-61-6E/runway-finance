@@ -855,7 +855,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                       {transaction.accountTags.map((tag) => (
                         <span
                           key={tag.id}
-                          className="tag-pill px-1.5 py-0.2 rounded-full text-[8px] font-medium"
+                          className="tag-pill px-1.5 py-0.2 rounded-full text-micro font-medium"
                           style={{
                             '--tag-color': tag.color
                           } as React.CSSProperties}

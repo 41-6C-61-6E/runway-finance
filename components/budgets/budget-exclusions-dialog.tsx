@@ -365,7 +365,7 @@ export function BudgetExclusionsDialog({ open, onClose }: BudgetExclusionsDialog
                               {root.name}
                             </span>
                             {root.isIncome && (
-                              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                              <span className="px-1.5 py-0.2 text-micro font-bold rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                                 Income
                               </span>
                             )}

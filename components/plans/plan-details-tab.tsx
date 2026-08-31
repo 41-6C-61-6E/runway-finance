@@ -622,7 +622,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                 {accName}
                               </span>
                               {!isIncluded && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+                                <span className="inline-flex items-center gap-0.5 text-micro font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
                                   <EyeOff className="w-2.5 h-2.5" /> Excluded
                                 </span>
                               )}

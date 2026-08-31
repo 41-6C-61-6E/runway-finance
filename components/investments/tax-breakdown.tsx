@@ -144,7 +144,7 @@ export function TaxBreakdown({ accounts }: TaxBreakdownProps) {
               })}
             </div>
             {/* % labels */}
-            <div className="flex justify-between text-[9px] text-muted-foreground/60">
+            <div className="flex justify-between text-micro text-muted-foreground/60">
               {activeWrappers.map((wrapper) => {
                 const pct = total > 0 ? ((wrapperTotals[wrapper] ?? 0) / total) * 100 : 0;
                 if (pct < 5) return null;

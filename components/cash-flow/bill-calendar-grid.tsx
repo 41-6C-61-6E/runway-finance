@@ -422,7 +422,7 @@ export function BillCalendarGrid({
                         </div>
                         <span
                           className={cn(
-                            'font-mono shrink-0 text-[9px] font-semibold',
+                            'font-mono shrink-0 text-micro font-semibold',
                             privacyMode && 'blur-xs select-none'
                           )}
                         >
@@ -434,7 +434,7 @@ export function BillCalendarGrid({
                   })}
 
                   {cell.bills.length > 2 && (
-                    <div className="text-[9px] font-semibold text-muted-foreground text-center bg-muted/40 rounded py-0.5">
+                    <div className="text-micro font-semibold text-muted-foreground text-center bg-muted/40 rounded py-0.5">
                       +{cell.bills.length - 2} more
                     </div>
                   )}

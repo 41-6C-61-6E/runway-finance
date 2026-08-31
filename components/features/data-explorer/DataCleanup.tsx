@@ -504,7 +504,7 @@ export default function DataCleanup() {
                                 <div className="text-[11px] text-muted-foreground bg-muted/20 border border-border/40 rounded-lg p-2 mt-1.5 space-y-1">
                                   {tx.memo && (
                                     <div>
-                                      <span className="font-semibold uppercase text-[8px] tracking-wider text-muted-foreground mr-1">
+                                      <span className="font-semibold uppercase text-[11px] tracking-wider text-muted-foreground mr-1">
                                         Memo:
                                       </span>
                                       {tx.memo}
@@ -512,7 +512,7 @@ export default function DataCleanup() {
                                   )}
                                   {tx.notes && (
                                     <div>
-                                      <span className="font-semibold uppercase text-[8px] tracking-wider text-muted-foreground mr-1">
+                                      <span className="font-semibold uppercase text-[11px] tracking-wider text-muted-foreground mr-1">
                                         Notes:
                                       </span>
                                       {tx.notes}

@@ -257,10 +257,10 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
                       <div className="min-w-0 flex-1 pr-4">
                         <p className="font-medium text-foreground truncate text-xs sm:text-sm">{tx.payee || tx.description || 'Unidentified Transaction'}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[9px] sm:text-[10px] text-muted-foreground">{formatDate(tx.date)}</span>
+                          <span className="text-[11px] text-muted-foreground">{formatDate(tx.date)}</span>
                           {tx.category && (
                             <span 
-                              className="px-1.5 py-0.2 text-[8px] sm:text-[9px] rounded-full font-medium"
+                              className="px-1.5 py-0.2 text-micro rounded-full font-medium"
                               style={{ 
                                 backgroundColor: `${tx.category.color}15`, 
                                 color: tx.category.color 

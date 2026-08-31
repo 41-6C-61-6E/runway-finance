@@ -340,7 +340,7 @@ function ConditionGroupNode({
             />
             {condIdx < node.conditions.length - 1 && (
               <div className="flex justify-center py-1">
-                <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                <span className="text-micro uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                   {node.operator}
                 </span>
               </div>
@@ -353,7 +353,7 @@ function ConditionGroupNode({
           <div key={sgIdx}>
             {node.conditions.length > 0 && (
               <div className="flex justify-center py-1">
-                <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                <span className="text-micro uppercase font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                   {node.operator}
                 </span>
               </div>

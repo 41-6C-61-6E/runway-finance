@@ -44,7 +44,7 @@ export function CollapsibleFilterPanel({
             <Filter size={12} className="text-primary shrink-0" />
             <span className="hidden sm:inline">Options</span>
             {activeFilterCount != null && activeFilterCount > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold bg-primary/20 text-primary">
+              <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-micro font-bold bg-primary/20 text-primary">
                 {activeFilterCount}
               </span>
             )}
