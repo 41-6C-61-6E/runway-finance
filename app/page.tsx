@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { AppTabs, type TabItem } from '@/components/ui/app-tabs';
 import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
+import { UpcomingBillsStrip } from '@/components/upcoming-bills-strip';
 
 type ChartTab = 'history' | 'breakdown';
 
@@ -122,6 +123,9 @@ function NetWorthContent() {
         ) : (
           mainContent
         )}
+        <div className="mt-4">
+          <UpcomingBillsStrip />
+        </div>
       </PageContent>
     </div>
   );
