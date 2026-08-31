@@ -109,6 +109,7 @@ html.text-size-lg {
   --color-chart-synthetic: var(--chart-synthetic);
   --color-destructive-synthetic: var(--destructive-synthetic);
   --color-status-positive: var(--status-positive);
+  --color-status-negative: var(--status-negative);
   --color-status-warning: var(--status-warning);
   --color-info: var(--info);
   --color-info-border: var(--info-border);
@@ -289,6 +290,25 @@ html.text-size-lg {
     opacity: 0 !important;
     visibility: hidden !important;
   }
+}
+
+/* ── Global keyboard focus ring ─────────────────────────────────────────
+   One ring for every interactive element on keyboard focus (desktop audit
+   P2-2 → R-4). :where() keeps selector specificity at zero, so component
+   rings (Button / AppTabs pills with focus-visible:ring-2) still win where
+   they already exist. Recharts keeps its outline:none !important block, so
+   SVG chart nodes stay clean. */
+:where(
+  button,
+  a,
+  select,
+  input,
+  textarea,
+  [role='tab'],
+  [role='button']
+):focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
 }
 
 /* Remove focus highlight outline from charts */
