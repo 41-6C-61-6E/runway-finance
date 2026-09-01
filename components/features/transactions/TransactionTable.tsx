@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ListRow } from "@/components/ui/list-row";
+import { TableScroll } from "@/components/ui/table-scroll";
 
 
 type Transaction = {
@@ -1050,6 +1051,7 @@ export default function TransactionTable({
                 )}
                 <span
                   className={`text-sm truncate min-w-0 ${isPending ? "text-muted-foreground" : "text-foreground"} ${tx.isSplitChild ? "text-muted-foreground/75 font-normal italic" : "font-medium"}`}
+                  title={searchQuery || undefined}
                 >
                   {tx.payee || tx.description}
                 </span>
@@ -1166,7 +1168,10 @@ export default function TransactionTable({
           const tx = row.original;
           return (
             <div className="flex items-center gap-1.5 min-w-0 max-w-full">
-              <span className="text-sm text-muted-foreground truncate block">
+              <span
+                className="text-sm text-muted-foreground truncate block"
+                title={tx.accountName || undefined}
+              >
                 {tx.accountName || "—"}
               </span>
               {showAccountTags && tx.accountTags && tx.accountTags.length > 0 && (
@@ -2201,7 +2206,7 @@ export default function TransactionTable({
                 })}
               </div>
             ) : (
-            <div className="overflow-x-auto no-scrollbar scroll-contain-x">
+            <TableScroll>
               <table
                 className="text-sm border-collapse"
                 style={{ tableLayout: "fixed", width: tableWidth }}
@@ -2328,7 +2333,7 @@ export default function TransactionTable({
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             )}
 
             {/* Sentinel for infinite scroll */}
