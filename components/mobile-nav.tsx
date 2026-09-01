@@ -548,7 +548,7 @@ export function MobileNav() {
       {/* Decoupled Floating Sub-Navigation Capsule (View & Swipe Control) */}
       {hasSubNav && !isOpen && (
         <div
-          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden transition-all duration-300 ${
+          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none lg:hidden transition-all duration-300 ${
             isScrollingDown ? 'opacity-55 hover:opacity-100 scale-95' : 'opacity-100 scale-100'
           }`}
           style={{
@@ -577,7 +577,7 @@ export function MobileNav() {
 
       {/* Main Single-Row Floating Bottom Navigation Bar */}
       <nav
-          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center gap-2 md:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
+          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center gap-2 lg:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
         }}
