@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Switch } from '@/components/ui/switch';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 
 type Condition = {
   id: string; // temp id for UI
@@ -1003,35 +1004,33 @@ export default function RulesTab() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">Field</label>
-                        <select
+                        <Select
                           value={condition.field}
                           onChange={(e) => {
                             const updated = [...formConditions];
                             updated[idx] = { ...updated[idx], field: e.target.value };
                             setFormConditions(updated);
                           }}
-                          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         >
                           {FIELD_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                       <div>
                         <label className="block text-xs text-muted-foreground mb-1">Operator</label>
-                        <select
+                        <Select
                           value={condition.operator}
                           onChange={(e) => {
                             const updated = [...formConditions];
                             updated[idx] = { ...updated[idx], operator: e.target.value };
                             setFormConditions(updated);
                           }}
-                          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         >
                           {OPERATOR_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                     </div>
 
@@ -1085,10 +1084,9 @@ export default function RulesTab() {
               <h4 className="text-sm font-medium text-foreground mb-3">Action</h4>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Set Category</label>
-                <select
+                <Select
                   value={formCategoryId || ''}
                   onChange={(e) => setFormCategoryId(e.target.value || null)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Don't change category</option>
                   {categories.map((cat) => (
@@ -1096,7 +1094,7 @@ export default function RulesTab() {
                       {cat.parentId ? '  ' : ''}{cat.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div className="mt-3">
@@ -1111,16 +1109,15 @@ export default function RulesTab() {
 
               <div className="mt-3">
                 <label className="block text-xs text-muted-foreground mb-1">Set Tag (optional)</label>
-                <select
+                <Select
                   value={formTagId || ''}
                   onChange={(e) => setFormTagId(e.target.value || null)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Don&apos;t set a tag</option>
                   {tags.map((tag) => (
                     <option key={tag.id} value={tag.id}>{tag.name}</option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div className="mt-3 flex items-center justify-between">
@@ -1284,10 +1281,9 @@ export default function RulesTab() {
               {bulkUpdateFields.setCategoryId && (
                 <div className="mt-2 pt-2 border-t border-border/40">
                   <label className="block text-[11px] text-muted-foreground mb-1">Category</label>
-                  <select
+                  <Select
                     value={bulkFormCategoryId || ''}
                     onChange={(e) => setBulkFormCategoryId(e.target.value || null)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Don&apos;t set category (Clear category)</option>
                     {categories.map((cat) => (
@@ -1295,7 +1291,7 @@ export default function RulesTab() {
                         {cat.parentId ? '  ' : ''}{cat.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )}
             </div>
@@ -1317,16 +1313,15 @@ export default function RulesTab() {
               {bulkUpdateFields.setTagId && (
                 <div className="mt-2 pt-2 border-t border-border/40">
                   <label className="block text-[11px] text-muted-foreground mb-1">Tag</label>
-                  <select
+                  <Select
                     value={bulkFormTagId || ''}
                     onChange={(e) => setBulkFormTagId(e.target.value || null)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Don&apos;t set a tag (Clear tag)</option>
                     {tags.map((tag) => (
                       <option key={tag.id} value={tag.id}>{tag.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )}
             </div>

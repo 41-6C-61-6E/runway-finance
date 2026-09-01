@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select } from '@/components/ui/select';
 
 export type SettingsAccount = {
   id: string;
@@ -327,7 +328,7 @@ export default function OrphanedAccountsSection({
               <p className="text-xs text-muted-foreground mb-2">
                 The account you want to keep. It retains all history, settings, and its ID.
               </p>
-              <select
+              <Select
                 value={remapSourceId}
                 onChange={(e) => {
                   setRemapSourceId(e.target.value);
@@ -335,7 +336,6 @@ export default function OrphanedAccountsSection({
                     setRemapTargetId('');
                   }
                 }}
-                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">Select account to keep...</option>
                 {orphanedAccounts.length > 0 && (
@@ -356,7 +356,7 @@ export default function OrphanedAccountsSection({
                     ))}
                   </optgroup>
                 )}
-              </select>
+              </Select>
             </div>
 
             <div className="flex justify-center my-1">
@@ -377,7 +377,7 @@ export default function OrphanedAccountsSection({
               <p className="text-xs text-muted-foreground mb-2">
                 The duplicate account to merge. Its new transactions and sync credentials will be transferred, and then this record will be deleted.
               </p>
-              <select
+              <Select
                 value={remapTargetId}
                 onChange={(e) => {
                   setRemapTargetId(e.target.value);
@@ -385,7 +385,6 @@ export default function OrphanedAccountsSection({
                     setRemapSourceId('');
                   }
                 }}
-                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">Select account to merge & delete...</option>
                 {orphanedAccounts.length > 0 && (
@@ -406,7 +405,7 @@ export default function OrphanedAccountsSection({
                     ))}
                   </optgroup>
                 )}
-              </select>
+              </Select>
             </div>
 
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2.5">
@@ -468,10 +467,9 @@ export default function OrphanedAccountsSection({
               <p className="text-xs text-muted-foreground mb-2">
                 Choose the sync connection to link this account back to. Sync will resume on the next update.
               </p>
-              <select
+              <Select
                 value={relinkTargetConnectionId}
                 onChange={(e) => setRelinkTargetConnectionId(e.target.value)}
-                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">Select sync connection...</option>
                 {connections.length > 0 ? (
@@ -483,7 +481,7 @@ export default function OrphanedAccountsSection({
                 ) : (
                   <option disabled>No connections found</option>
                 )}
-              </select>
+              </Select>
             </div>
 
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2.5">

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Info, Loader2, ChevronDown, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 import type {
   AlertCondition,
   AlertConditionField,
@@ -108,7 +109,8 @@ function ConditionRow({
       {/* Field selector */}
       <div className="flex-1 min-w-[200px] space-y-1.5">
         <Label htmlFor={`cond-field-${idx}`} className="text-xs font-semibold">Condition</Label>
-        <select
+        <Select
+          className="h-9 rounded-md"
           id={`cond-field-${idx}`}
           value={cond.field}
           onChange={(e) =>
@@ -120,27 +122,26 @@ function ConditionRow({
               consecutiveMonths: undefined,
             })
           }
-          className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
         >
           {FIELDS_FOR_TRIGGER[triggerType].map((f) => (
             <option key={f} value={f}>{FIELD_LABELS[f]}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {/* Goal selector (only for goal fields) */}
       {isGoalField && (
         <div className="flex-1 min-w-[160px] space-y-1.5">
           <Label htmlFor={`cond-goal-${idx}`} className="text-xs font-semibold">Goal</Label>
-          <select
+          <Select
+            className="h-9 rounded-md"
             id={`cond-goal-${idx}`}
             value={cond.goalId || ''}
             onChange={(e) => onChange({ goalId: e.target.value })}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
           >
             <option value="">Select a goal…</option>
             {goalsList.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
+          </Select>
         </div>
       )}
 
@@ -150,7 +151,8 @@ function ConditionRow({
           {isAccountField && cond.field !== 'account' ? 'Compare Account' : isAccountField ? 'Account' : 'Value'}
         </Label>
         {isAccountField ? (
-          <select
+          <Select
+            className="h-9 rounded-md"
             id={`cond-value-${idx}`}
             value={cond.field === 'account' ? String(cond.value) : (cond.compareAccountId || '')}
             onChange={(e) => {
@@ -160,11 +162,10 @@ function ConditionRow({
                 onChange({ compareAccountId: e.target.value, value: e.target.value });
               }
             }}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
           >
             <option value="">Select account…</option>
             {accountsList.map((acc) => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-          </select>
+          </Select>
         ) : cond.field === 'keyword' ? (
           <Input
             id={`cond-value-${idx}`}
@@ -206,16 +207,16 @@ function ConditionRow({
           <Label htmlFor={`cond-months-${idx}`} className="text-xs font-semibold whitespace-nowrap">
             For months
           </Label>
-          <select
+          <Select
+            className="h-9 rounded-md"
             id={`cond-months-${idx}`}
             value={cond.consecutiveMonths || 1}
             onChange={(e) => onChange({ consecutiveMonths: parseInt(e.target.value) || 1 })}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
           >
             {[1, 2, 3, 4, 5, 6].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
@@ -734,17 +735,17 @@ export default function CustomAlertRuleForm({ editingRule, accountsList, goalsLi
 
         <div className="space-y-1.5">
           <Label htmlFor="rule-type" className="text-xs font-semibold">Alert Type</Label>
-          <select
+          <Select
+            className="h-9 rounded-md"
             id="rule-type"
             value={triggerType}
             onChange={(e) => handleChangeTriggerType(e.target.value as TriggerType)}
             disabled={isEditing}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground disabled:opacity-60"
           >
             {(Object.keys(TRIGGER_TYPE_LABELS) as TriggerType[]).map((t) => (
               <option key={t} value={t}>{TRIGGER_TYPE_LABELS[t].label}</option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
 
@@ -760,17 +761,18 @@ export default function CustomAlertRuleForm({ editingRule, accountsList, goalsLi
           <Label htmlFor="target-account" className="text-xs font-semibold">
             Apply to Account <span className="text-muted-foreground font-normal">(optional — leave blank to monitor all accounts)</span>
           </Label>
-          <select
+          <Select
+            className="h-9 rounded-md"
+            wrapperClassName="max-w-sm"
             id="target-account"
             value={targetAccountId}
             onChange={(e) => setTargetAccountId(e.target.value)}
-            className="h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
           >
             <option value="">All accounts</option>
             {accountsList.map((acc) => (
               <option key={acc.id} value={acc.id}>{acc.name}</option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 

@@ -14,6 +14,7 @@ import { isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCompactEstimate, formatRedfinSuccessMessage } from '@/components/real-estate/estimate-helpers';
 import { getBadgeClasses } from '@/lib/utils/account-badge';
 import { RealEstateFormFields, extractZipCodeFromAddress } from '@/components/real-estate/real-estate-form';
+import { Select } from '@/components/ui/select';
 
 type ManualAccount = {
   id: string;
@@ -689,15 +690,14 @@ export default function ManualAccountsSection() {
     return (
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Sync Frequency</label>
-        <select
+        <Select
           value={meta.syncFrequency === 'best' ? 'daily' : (meta.syncFrequency || 'manual')}
           onChange={(e) => setMeta({ ...meta, syncFrequency: e.target.value })}
-          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           {frequencies.map((f) => (
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
-        </select>
+        </Select>
       </div>
     );
   };
@@ -707,10 +707,9 @@ export default function ManualAccountsSection() {
     return (
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Pricing Method (Redfin)</label>
-        <select
+        <Select
           value={meta.valuationMethod || 'normal'}
           onChange={(e) => setMeta({ ...meta, valuationMethod: e.target.value })}
-          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="conservative">
             {formatCompactEstimate('Conservative', est?.conservative) || 'Conservative (Low Range)'}
@@ -721,7 +720,7 @@ export default function ManualAccountsSection() {
           <option value="optimistic">
             {formatCompactEstimate('Optimistic', est?.optimistic) || 'Optimistic (High Range)'}
           </option>
-        </select>
+        </Select>
       </div>
     );
   };
@@ -736,16 +735,15 @@ export default function ManualAccountsSection() {
     return (
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Linked Mortgage (optional)</label>
-        <select
+        <Select
           value={meta.linkedMortgageId || ''}
           onChange={(e) => setMeta({ ...meta, linkedMortgageId: e.target.value })}
-          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">None (wholly owned)</option>
           {available.map((m) => (
             <option key={m.id} value={m.id}>{m.name}</option>
           ))}
-        </select>
+        </Select>
       </div>
     );
   };
@@ -761,16 +759,15 @@ export default function ManualAccountsSection() {
     return (
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Linked Property (optional)</label>
-        <select
+        <Select
           value={meta.linkedPropertyId || ''}
           onChange={(e) => setMeta({ ...meta, linkedPropertyId: e.target.value })}
-          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">None</option>
           {available.map((re) => (
             <option key={re.id} value={re.id}>{re.name}</option>
           ))}
-        </select>
+        </Select>
       </div>
     );
   };
@@ -781,16 +778,15 @@ export default function ManualAccountsSection() {
         <>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
-            <select
+            <Select
               value={createMeta.propertyType || ''}
               onChange={(e) => setCreateMeta((m) => ({ ...m, propertyType: e.target.value }))}
-              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="">Select property type...</option>
               {PROPERTY_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Property Address or Redfin ID</label>
@@ -1194,16 +1190,16 @@ export default function ManualAccountsSection() {
                   <div className="flex items-center justify-start mt-2">
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-muted-foreground">Sync:</label>
-                      <select
+                      <Select
+                        className="h-7 text-xs"
                         value={syncFrequency}
                         onChange={(e) => handleSyncFrequencyChange(account.id, e.target.value)}
-                        className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         <option value="manual">Manual</option>
                         <option value="daily">Daily</option>
                         <option value="weekly">Weekly</option>
                         <option value="monthly">Monthly</option>
-                      </select>
+                      </Select>
                     </div>
                   </div>
                 )}
@@ -1223,10 +1219,9 @@ export default function ManualAccountsSection() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Type</label>
-              <select
+              <Select
                 value={createType}
                 onChange={(e) => { setCreateType(e.target.value); setCreateMeta({}); }}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 {getGroupedOptions().map((g) => (
                   <optgroup key={g.group} label={g.group}>
@@ -1237,7 +1232,7 @@ export default function ManualAccountsSection() {
                     ))}
                   </optgroup>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Name</label>
@@ -1443,16 +1438,15 @@ export default function ManualAccountsSection() {
               <>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
-                  <select
+                  <Select
                     value={editMeta.propertyType || ''}
                     onChange={(e) => setEditMeta((m) => ({ ...m, propertyType: e.target.value }))}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Select property type...</option>
                     {PROPERTY_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>{t.label}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Property Address or Redfin ID</label>

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { parseCsv, parseDateField } from '@/lib/utils/csv-parser';
+import { Select } from '@/components/ui/select';
 
 type ImportType = 'transactions' | 'account_snapshots';
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -615,10 +616,11 @@ export default function ImportTab() {
                     {field.label}
                     {field.required && <span className="text-destructive ml-0.5">*</span>}
                   </div>
-                  <select
+                  <Select
+                    className="h-9 rounded-lg"
+                    wrapperClassName="sm:flex-1"
                     value={columnMapping[field.key] || ''}
                     onChange={(e) => handleColumnMapChange(field.key, e.target.value)}
-                    className="w-full sm:flex-1 h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="">— Select column —</option>
                     {csvPreview.headers.map((header) => (
@@ -626,7 +628,7 @@ export default function ImportTab() {
                         {header}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               ))}
             </div>
@@ -658,15 +660,16 @@ export default function ImportTab() {
                     Specific day:
                   </label>
                   {typeof snapshotDayOfMonth === 'number' && (
-                    <select
+                    <Select
+                      className="h-7 rounded-lg"
+                      wrapperClassName="w-16"
                       value={snapshotDayOfMonth}
                       onChange={(e) => setSnapshotDayOfMonth(parseInt(e.target.value, 10))}
-                      className="h-7 w-16 rounded-lg border border-input bg-background px-1.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
                         <option key={d} value={d}>{d}</option>
                       ))}
-                    </select>
+                    </Select>
                   )}
                 </div>
               </div>
@@ -792,10 +795,10 @@ export default function ImportTab() {
                 <div key={csvRef} className="p-3 rounded-lg border border-border bg-muted/20">
                   <div className="text-sm font-medium text-foreground mb-2">CSV Account: {csvRef}</div>
 
-                  <select
+                  <Select
+                    className={`h-9 rounded-lg mb-2 ${accountMapping[csvRef] === EXCLUDED || !accountMapping[csvRef] ? 'opacity-50' : ''}`}
                     value={accountMapping[csvRef] || ''}
                     onChange={(e) => handleAccountMappingChange(csvRef, e.target.value)}
-                    className={`w-full h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-2 ${accountMapping[csvRef] === EXCLUDED || !accountMapping[csvRef] ? 'opacity-50' : ''}`}
                   >
                     <option value="">— Select account —</option>
                     <optgroup label="Existing accounts">
@@ -807,7 +810,7 @@ export default function ImportTab() {
                     </optgroup>
                     <option value="new">+ Create new account</option>
                     <option value={EXCLUDED}>— Exclude from import —</option>
-                  </select>
+                  </Select>
                   {(accountMapping[csvRef] === EXCLUDED || !accountMapping[csvRef]) && (
                     <p className="text-xs text-chart-3 italic">Rows with this account will be skipped during import.</p>
                   )}
@@ -825,10 +828,10 @@ export default function ImportTab() {
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Type</label>
-                        <select
+                        <Select
+                          className="h-8 rounded-lg"
                           value={newAccounts[csvRef]?.type || 'checking'}
                           onChange={(e) => handleNewAccountChange(csvRef, 'type', e.target.value)}
-                          className="w-full h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <option value="checking">Checking</option>
                           <option value="savings">Savings</option>
@@ -840,7 +843,7 @@ export default function ImportTab() {
                           <option value="realestate">Real Estate</option>
                           <option value="vehicle">Vehicle</option>
                           <option value="other">Other</option>
-                        </select>
+                        </Select>
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Currency</label>
@@ -1076,16 +1079,16 @@ export default function ImportTab() {
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Parent Category</label>
-                        <select
+                        <Select
+                          className="h-8 rounded-lg"
                           value={newCategories[csvName]?.parentId || ''}
                           onChange={(e) => handleNewCategoryChange(csvName, 'parentId', e.target.value || null)}
-                          className="w-full h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <option value="">None (top-level)</option>
                           {allCategories.filter((c) => !c.parentId).map((p) => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Color</label>

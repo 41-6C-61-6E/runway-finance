@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { Select } from '@/components/ui/select';
 
 type CategoryType = 'standard' | 'compound' | 'transfer';
 type FormCategoryType = 'expense' | 'income' | 'compound' | 'transfer';
@@ -666,10 +667,9 @@ export default function CategoriesTab() {
               <label className="block text-sm font-medium text-foreground mb-1">
                 {formCategoryType === 'compound' ? 'Uses Income Category' : 'Parent Group'}
               </label>
-              <select
+              <Select
                 value={formParentId || ''}
                 onChange={(e) => setFormParentId(e.target.value || null)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">
                   {formCategoryType === 'compound' ? 'Select income category...' : 'None (top-level group)'}
@@ -677,7 +677,7 @@ export default function CategoriesTab() {
                 {parents.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
@@ -725,17 +725,16 @@ export default function CategoriesTab() {
             {formCategoryType === 'compound' && (
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Uses Expense Category</label>
-                <select
+                <Select
                   value={formExpenseParentId || ''}
                   onChange={(e) => setFormExpenseParentId(e.target.value || null)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Select expense category...</option>
                   {compoundExpenseOptions
                     .map((p) => (
                       <option key={p.id} value={p.id}>{p.path}</option>
                     ))}
-                </select>
+                </Select>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   This category is used as the expense-side category in charts and reporting. It can be top-level or nested.
                 </p>

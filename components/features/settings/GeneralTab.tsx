@@ -11,6 +11,7 @@ import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';
 import { CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
 import { useHiddenPages, HIDDEN_PAGE_KEYS, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
+import { Select } from '@/components/ui/select';
 
 export default function GeneralTab() {
   const [accentColor, setAccentColor] = useState('violet');
@@ -238,10 +239,10 @@ export default function GeneralTab() {
               <h3 className="text-sm font-medium text-foreground">Base Currency</h3>
               <p className="text-xs text-muted-foreground mt-1">Default currency symbol and denomination used across net worth, budgets, and plans</p>
             </div>
-            <select
+            <Select
+              className="h-9 text-xs font-medium"
               value={currency}
               onChange={(e) => handleCurrencyChange(e.target.value)}
-              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="USD">USD ($) - US Dollar</option>
               <option value="EUR">EUR (€) - Euro</option>
@@ -259,7 +260,7 @@ export default function GeneralTab() {
               <option value="NOK">NOK (kr) - Norwegian Krone</option>
               <option value="DKK">DKK (kr) - Danish Krone</option>
               <option value="MXN">MXN ($) - Mexican Peso</option>
-            </select>
+            </Select>
           </div>
 
           {/* Timezone */}
@@ -268,10 +269,11 @@ export default function GeneralTab() {
               <h3 className="text-sm font-medium text-foreground">Timezone</h3>
               <p className="text-xs text-muted-foreground mt-1">Timezone used for daily syncs, date boundaries, and automated alerts</p>
             </div>
-            <select
+            <Select
+              className="h-9 text-xs font-medium"
+              wrapperClassName="max-w-xs"
               value={timezone}
               onChange={(e) => handleTimezoneChange(e.target.value)}
-              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring max-w-xs"
             >
               <optgroup label="Americas">
                 <option value="America/New_York">Eastern Time (New York)</option>
@@ -303,7 +305,7 @@ export default function GeneralTab() {
               <optgroup label="UTC">
                 <option value="UTC">Coordinated Universal Time (UTC)</option>
               </optgroup>
-            </select>
+            </Select>
           </div>
 
           {/* Locale / Number Format */}
@@ -312,10 +314,10 @@ export default function GeneralTab() {
               <h3 className="text-sm font-medium text-foreground">Locale & Language</h3>
               <p className="text-xs text-muted-foreground mt-1">Number, currency, and decimal separator formatting</p>
             </div>
-            <select
+            <Select
+              className="h-9 text-xs font-medium"
               value={locale}
               onChange={(e) => handleLocaleChange(e.target.value)}
-              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="en-US">English (United States) - 1,234.56</option>
               <option value="en-GB">English (United Kingdom) - 1,234.56</option>
@@ -327,7 +329,7 @@ export default function GeneralTab() {
               <option value="zh-CN">简体中文 (China) - 1,234.56</option>
               <option value="it-IT">Italiano (Italy) - 1.234,56</option>
               <option value="pt-BR">Português (Brasil) - 1.234,56</option>
-            </select>
+            </Select>
           </div>
 
           {/* Date Format */}
@@ -336,17 +338,17 @@ export default function GeneralTab() {
               <h3 className="text-sm font-medium text-foreground">Date Format</h3>
               <p className="text-xs text-muted-foreground mt-1">How calendar dates are displayed across ledger tables and statements</p>
             </div>
-            <select
+            <Select
+              className="h-9 text-xs font-medium"
               value={dateFormat}
               onChange={(e) => handleDateFormatChange(e.target.value)}
-              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="MM/DD/YYYY">MM/DD/YYYY (US Standard)</option>
               <option value="DD/MM/YYYY">DD/MM/YYYY (International Standard)</option>
               <option value="YYYY-MM-DD">YYYY-MM-DD (ISO 8601)</option>
               <option value="YYYY/MM/DD">YYYY/MM/DD (East Asian)</option>
               <option value="DD.MM.YYYY">DD.MM.YYYY (European Dot)</option>
-            </select>
+            </Select>
           </div>
 
           {/* Compact Mode */}
@@ -367,15 +369,15 @@ export default function GeneralTab() {
               <h3 className="text-sm font-medium text-foreground">Text Size</h3>
               <p className="text-xs text-muted-foreground mt-1">Adjust typography scaling across tables, cards, charts, and headings</p>
             </div>
-            <select
+            <Select
+              className="h-9 text-xs font-medium"
               value={textSize}
               onChange={(e) => handleTextSizeChange(e.target.value)}
-              className="px-3 py-1.5 bg-background border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="sm">Small (Compact - 14px)</option>
               <option value="default">Default (Standard - 16px)</option>
               <option value="lg">Large (Comfortable - 18px)</option>
-            </select>
+            </Select>
           </div>
 
 

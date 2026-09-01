@@ -6,6 +6,7 @@ import { SETTING_DEFINITIONS, API_KEY_FIELD_KEYS, API_KEY_DEFAULTS } from '@/con
 import { Switch } from '@/components/ui/switch';
 import { signOut } from 'next-auth/react';
 import { useUserSettings } from '@/components/user-settings-provider';
+import { Select } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -361,10 +362,10 @@ export default function AdvancedTab() {
 
                   <div className="mt-1.5">
                     {def.key === 'timezone' && Object.keys(timezoneGroups).length > 0 ? (
-                      <select
+                      <Select
+                        className="h-7 text-[11px] font-mono"
                         value={(currentValue as string) ?? ''}
                         onChange={(e) => updateValue(def.key, e.target.value)}
-                        className="w-full px-2 py-1 bg-background border border-input rounded text-foreground text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         {Object.entries(timezoneGroups).map(([region, tzs]) => (
                           <optgroup key={region} label={region}>
@@ -373,7 +374,7 @@ export default function AdvancedTab() {
                             ))}
                           </optgroup>
                         ))}
-                      </select>
+                      </Select>
                     ) : def.type === 'boolean' ? (
                       <div className="flex items-center gap-2 pt-0.5">
                         <Switch

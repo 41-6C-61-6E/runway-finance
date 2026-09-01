@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { Select } from '@/components/ui/select';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1166,17 +1167,17 @@ export default function PayrollTab() {
               <label className="block text-sm font-medium text-foreground mb-1">Field Mapping</label>
               {mappings.length > 0 ? (
                 <div className="flex items-center gap-2">
-                  <select
+                  <Select
+                    wrapperClassName="flex-1"
                     value={selectedMappingId || ''}
                     onChange={(e) => setSelectedMappingId(e.target.value)}
-                    className="flex-1 text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
                     {mappings.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name} {m.employerName ? `(${m.employerName})` : ''} {m.isDefault ? '★' : ''}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <button
                     onClick={() => openMappingEditor(mappings.find((m) => m.id === selectedMappingId) || mappings[0])}
                     className="px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors"
@@ -1612,10 +1613,9 @@ export default function PayrollTab() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Target Account</label>
-                <select
+                <Select
                   value={mappingEditorAccount}
                   onChange={(e) => setMappingEditorAccount(e.target.value)}
-                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="">No Account (Virtual: From Paystub)</option>
                   {accounts.map((acc) => (
@@ -1623,14 +1623,13 @@ export default function PayrollTab() {
                       {acc.name} ({acc.institution || 'Manual'})
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Transaction Tag</label>
-                <select
+                <Select
                   value={mappingEditorTag}
                   onChange={(e) => setMappingEditorTag(e.target.value)}
-                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="">Default (paystub)</option>
                   {tags.map((tag) => (
@@ -1638,7 +1637,7 @@ export default function PayrollTab() {
                       {tag.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -1658,15 +1657,15 @@ export default function PayrollTab() {
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Add Field</label>
               <div className="flex gap-2">
-                <select
+                <Select
+                  className="h-7 text-xs"
                   id="newFieldSection"
-                  className="text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground"
                 >
                   <option value="earnings">Earnings</option>
                   <option value="taxes">Taxes</option>
                   <option value="before_tax_deductions">Pre-Tax Deductions</option>
                   <option value="after_tax_deductions">Post-Tax Deductions</option>
-                </select>
+                </Select>
                 <Input
                   id="newFieldName"
                   placeholder="Description name"
@@ -1720,7 +1719,8 @@ export default function PayrollTab() {
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-2 items-center">
-                          <select
+                          <Select
+                            className="h-7 text-xs"
                             value={field.action}
                             onChange={(e) => {
                               setMappingEditorFields((prev) => ({
@@ -1728,14 +1728,15 @@ export default function PayrollTab() {
                                 [key]: { ...prev[key], action: e.target.value as 'import' | 'ignore' },
                               }));
                             }}
-                            className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground"
                           >
                             <option value="import">Import</option>
                             <option value="ignore">Ignore</option>
-                          </select>
+                          </Select>
                           {field.action === 'import' && (
                             <>
-                              <select
+                              <Select
+                                className="h-7 text-xs"
+                                wrapperClassName="max-w-[130px]"
                                 value={field.categoryId || ''}
                                 onChange={(e) => {
                                   setMappingEditorFields((prev) => ({
@@ -1743,7 +1744,6 @@ export default function PayrollTab() {
                                     [key]: { ...prev[key], categoryId: e.target.value || null },
                                   }));
                                 }}
-                                className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground max-w-[130px]"
                               >
                                 <option value="">No category</option>
                                 {categories
@@ -1754,8 +1754,10 @@ export default function PayrollTab() {
                                       {c.name} {c.isIncome ? '(Income)' : ''}
                                     </option>
                                   ))}
-                              </select>
-                              <select
+                              </Select>
+                              <Select
+                                className="h-7 text-xs"
+                                wrapperClassName="max-w-[130px]"
                                 value={field.accountId || ''}
                                 onChange={(e) => {
                                   setMappingEditorFields((prev) => ({
@@ -1763,7 +1765,6 @@ export default function PayrollTab() {
                                     [key]: { ...prev[key], accountId: e.target.value || null },
                                   }));
                                 }}
-                                className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground max-w-[130px]"
                               >
                                 <option value="">Default Account</option>
                                 {accounts.map((acc) => (
@@ -1771,8 +1772,10 @@ export default function PayrollTab() {
                                     {acc.name}
                                   </option>
                                 ))}
-                              </select>
-                              <select
+                              </Select>
+                              <Select
+                                className="h-7 text-xs"
+                                wrapperClassName="max-w-[110px]"
                                 value={field.tagId || ''}
                                 onChange={(e) => {
                                   setMappingEditorFields((prev) => ({
@@ -1780,7 +1783,6 @@ export default function PayrollTab() {
                                     [key]: { ...prev[key], tagId: e.target.value || null },
                                   }));
                                 }}
-                                className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground max-w-[110px]"
                               >
                                 <option value="">Default Tag</option>
                                 {tags.map((tag) => (
@@ -1788,7 +1790,7 @@ export default function PayrollTab() {
                                     {tag.name}
                                   </option>
                                 ))}
-                              </select>
+                              </Select>
                             </>
                           )}
                         </div>
@@ -1842,37 +1844,34 @@ export default function PayrollTab() {
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Field Mapping</label>
-              <select
+              <Select
                 value={autoGenMappingId}
                 onChange={(e) => setAutoGenMappingId(e.target.value)}
-                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground"
               >
                 {mappings.map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Pay Frequency</label>
-              <select
+              <Select
                 value={autoGenFrequency}
                 onChange={(e) => setAutoGenFrequency(e.target.value)}
-                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground"
               >
                 <option value="weekly">Weekly</option>
                 <option value="biweekly">Biweekly</option>
                 <option value="semimonthly">Semi-monthly</option>
                 <option value="monthly">Monthly</option>
-              </select>
+              </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Base Paystub (template)</label>
-              <select
+              <Select
                 value={autoGenBasePaystubId}
                 onChange={(e) => setAutoGenBasePaystubId(e.target.value)}
-                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground"
               >
                 <option value="">Most recent</option>
                 {paystubs.filter((p) => !p.isAutoGenerated).slice(0, 20).map((p) => (
@@ -1880,7 +1879,7 @@ export default function PayrollTab() {
                     {formatDate(p.checkDate)} — {formatCurrency(p.grossCurrent)} gross
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -2033,7 +2032,7 @@ export default function PayrollTab() {
             {/* Field Mapping Selector */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Field Mapping (optional)</label>
-              <select
+              <Select
                 value={manualAddMappingId}
                 onChange={(e) => {
                   const mappingId = e.target.value;
@@ -2063,7 +2062,6 @@ export default function PayrollTab() {
                     setManualAddLineItems([]);
                   }
                 }}
-                className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">No mapping (line items optional)</option>
                 {mappings.map((m) => (
@@ -2071,7 +2069,7 @@ export default function PayrollTab() {
                     {m.name} {m.employerName ? `(${m.employerName})` : ''}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {manualAddError && (

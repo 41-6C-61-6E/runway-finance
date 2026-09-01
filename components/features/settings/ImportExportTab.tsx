@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { useQueryClient } from '@tanstack/react-query';
 import { useUserSettings } from '@/components/user-settings-provider';
 import ImportTab from './ImportTab';
+import { Select } from '@/components/ui/select';
 
 type SubTab = 'import' | 'export';
 
@@ -622,10 +623,10 @@ export default function ImportExportTab() {
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <div>
                       <label className="block text-xs font-medium text-muted-foreground mb-1">Account Filter</label>
-                      <select
+                      <Select
+                        className="h-8 rounded-md text-xs"
                         value={txAccountId}
                         onChange={(e) => setTxAccountId(e.target.value)}
-                        className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         <option value="all">All Accounts</option>
                         {accounts.map((a) => (
@@ -633,15 +634,15 @@ export default function ImportExportTab() {
                             {a.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-muted-foreground mb-1">Category Filter</label>
-                      <select
+                      <Select
+                        className="h-8 rounded-md text-xs"
                         value={txCategoryId}
                         onChange={(e) => setTxCategoryId(e.target.value)}
-                        className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         <option value="all">All Categories</option>
                         {categories.map((c) => (
@@ -649,7 +650,7 @@ export default function ImportExportTab() {
                             {c.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                   </div>
                 </div>
@@ -682,15 +683,15 @@ export default function ImportExportTab() {
                 <div className="space-y-3 mt-4 text-sm">
                   <div>
                     <label className="block text-xs font-medium text-muted-foreground mb-1">Snapshot Type</label>
-                    <select
+                    <Select
+                      className="h-8 rounded-md text-xs"
                       value={snapType}
                       onChange={(e) => setSnapType(e.target.value as any)}
-                      className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     >
                       <option value="net_worth">Net Worth History Snapshots</option>
                       <option value="account">Account Balance Snapshots</option>
                       <option value="holding">Investment Holding Snapshots</option>
-                    </select>
+                    </Select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 pt-1">
@@ -717,10 +718,10 @@ export default function ImportExportTab() {
                   {(snapType === 'account' || snapType === 'holding') && (
                     <div className="pt-1">
                       <label className="block text-xs font-medium text-muted-foreground mb-1">Account Filter</label>
-                      <select
+                      <Select
+                        className="h-8 rounded-md text-xs"
                         value={snapAccountId}
                         onChange={(e) => setSnapAccountId(e.target.value)}
-                        className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         <option value="all">All Accounts</option>
                         {accounts.map((a) => (
@@ -728,7 +729,7 @@ export default function ImportExportTab() {
                             {a.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                   )}
                 </div>
@@ -761,10 +762,10 @@ export default function ImportExportTab() {
                 <div className="space-y-3 mt-4 text-sm">
                   <div>
                     <label className="block text-xs font-medium text-muted-foreground mb-1">Select FIRE Plan</label>
-                    <select
+                    <Select
+                      className="h-8 rounded-md text-xs"
                       value={planId}
                       onChange={(e) => setPlanId(e.target.value)}
-                      className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     >
                       <option value="all">All FIRE Plans</option>
                       {plans.map((p) => (
@@ -772,7 +773,7 @@ export default function ImportExportTab() {
                           {p.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <div>

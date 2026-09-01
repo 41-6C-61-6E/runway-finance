@@ -7,6 +7,7 @@ import { DEFAULT_AI_SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from '@/config/defa
 import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { Select } from '@/components/ui/select';
 
 type Provider = {
   id: string;
@@ -487,10 +488,9 @@ export default function AiTab() {
               </div>
 
               {(!isCustomModel && fetchedModels.length > 0) ? (
-                <select
+                <Select
                   value={formModel}
                   onChange={(e) => setFormModel(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="" disabled>Select a model...</option>
                   {fetchedModels.map((modelName) => (
@@ -498,7 +498,7 @@ export default function AiTab() {
                       {modelName}
                     </option>
                   ))}
-                </select>
+                </Select>
               ) : (
                 <div className="space-y-1">
                   <input

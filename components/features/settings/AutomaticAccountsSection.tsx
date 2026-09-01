@@ -28,6 +28,7 @@ import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { useRouter } from 'next/navigation';
 import type { SettingsAccount, SettingsConnection } from './OrphanedAccountsSection';
+import { Select } from '@/components/ui/select';
 
 const SYNC_INTERVALS: Record<string, number> = {
   manual: 0,
@@ -1113,18 +1114,18 @@ export default function AutomaticAccountsSection({
                     <div className="flex items-center justify-between pt-1.5">
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-muted-foreground">Sync frequency:</label>
-                        <select
+                        <Select
+                          className="h-7 text-xs"
                           value={conn.syncFrequency}
                           disabled={currentUserId !== undefined && conn.userId !== currentUserId}
                           onChange={(e) => handleSyncFrequencyChange(conn.id, e.target.value)}
-                          className="text-xs bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                         >
                           <option value="manual">Manual</option>
                           <option value="hourly">Hourly</option>
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
                           <option value="monthly">Monthly</option>
-                        </select>
+                        </Select>
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {syncingId === conn.id ? (
@@ -1361,15 +1362,14 @@ export default function AutomaticAccountsSection({
                 <label htmlFor="plaidEnvironment" className="block text-sm font-medium text-foreground mb-1">
                   Plaid Environment
                 </label>
-                <select
+                <Select
                   id="plaidEnvironment"
                   value={plaidEnvironment}
                   onChange={(e) => setPlaidEnvironment(e.target.value)}
-                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="sandbox">Sandbox (Mock data)</option>
                   <option value="production">Production / Pay-as-you-go (Real bank connections)</option>
-                </select>
+                </Select>
               </div>
             </div>
             <DialogFooter className="p-6 pt-4 border-t border-border bg-muted/10 gap-2">

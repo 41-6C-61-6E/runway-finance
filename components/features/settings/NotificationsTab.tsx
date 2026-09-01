@@ -13,6 +13,7 @@ import { useUserSettings } from '@/components/user-settings-provider';
 import { Bell, BellOff, AlertTriangle, Play, Trash2 } from 'lucide-react';
 import type { AlertCondition, AlertConditionField, ConditionOperator, ConditionTreeNode } from '@/lib/db/schema/notifications';
 import CustomAlertRuleList from './CustomAlertRuleList';
+import { Select } from '@/components/ui/select';
 
 function urlBase64ToUint8Array(base64String: string) {
   let cleanStr = base64String.trim();
@@ -548,11 +549,11 @@ export default function NotificationsTab() {
               <div className="flex flex-col gap-1.5 pl-1 -mt-2 pb-2">
                 <div className="flex items-center gap-3">
                   <Label htmlFor="weekly-networth-day" className="text-xs text-muted-foreground whitespace-nowrap">Alert day</Label>
-                  <select
+                  <Select
+                    className="h-8 text-xs rounded-md capitalize"
                     id="weekly-networth-day"
                     value={weeklyNetWorthAlertDay}
                     onChange={(e) => handleUpdateSetting('weeklyNetWorthAlertDay', e.target.value)}
-                    className="h-8 text-xs bg-background border border-input rounded-md px-2 py-1 font-medium text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring capitalize"
                   >
                     <option value="sunday">Sunday</option>
                     <option value="monday">Monday</option>
@@ -561,7 +562,7 @@ export default function NotificationsTab() {
                     <option value="thursday">Thursday</option>
                     <option value="friday">Friday</option>
                     <option value="saturday">Saturday</option>
-                  </select>
+                  </Select>
                   <span className="text-xs text-muted-foreground">
                     Sent weekly on this day (<span className="font-mono">{userTimezone}</span>)
                   </span>
