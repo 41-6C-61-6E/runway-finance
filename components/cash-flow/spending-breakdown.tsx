@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Treemap } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatCompactCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -301,12 +301,12 @@ export function SpendingBreakdown() {
                               content={({ active, payload }) => {
                                 if (!active || !payload || !payload.length) return null;
                                 const data = payload[0].payload;
-                                const pct = totalSpending > 0 ? ((data.value / totalSpending) * 100).toFixed(1) : '0';
+                                const pct = totalSpending > 0 ? formatPlainPercent(data.value / totalSpending * 100) : '0%';
                                 return (
                                   <ChartTooltip>
                                     <TooltipHeader>{data.label}</TooltipHeader>
                                     <TooltipRow label="Amount" value={formatCurrency(data.value)} />
-                                    <TooltipRow label="Percentage" value={`${pct}%`} />
+                                    <TooltipRow label="Percentage" value={pct} />
                                   </ChartTooltip>
                                 );
                               }}
@@ -341,7 +341,7 @@ export function SpendingBreakdown() {
                             {width > 42 && height > 24 && <g clipPath={`url(#spending-tm-label-${index})`}>
                               <text x={x + 6} y={y + 15} fill="white" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 12} fontWeight="600">{treemapLabel(item.name, width)}</text>
                               {height > 40 && <text x={x + 6} y={y + 30} fill="white" stroke="none" strokeWidth={0} fontSize={width < 70 ? 10 : 11} className="blur-number">{formatCurrency(item.value)}</text>}
-                              {height > 54 && <text x={x + 6} y={y + 44} fill="white" stroke="none" strokeWidth={0} fontSize="10" opacity="0.8">{pct.toFixed(1)}%</text>}
+                              {height > 54 && <text x={x + 6} y={y + 44} fill="white" stroke="none" strokeWidth={0} fontSize="10" opacity="0.8">{formatPlainPercent(pct)}</text>}
                             </g>}
                           </g>
                         );
@@ -350,7 +350,7 @@ export function SpendingBreakdown() {
                       <Tooltip content={({ active, payload }) => {
                         if (!active || !payload?.length) return null;
                         const datum = payload[0].payload;
-                        return <ChartTooltip><TooltipHeader>{datum.name}</TooltipHeader><TooltipRow label="Amount" value={formatCurrency(datum.value)} /><TooltipRow label="Percent" value={`${totalSpending > 0 ? (datum.value / totalSpending * 100).toFixed(1) : '0.0'}%`} /></ChartTooltip>;
+                        return <ChartTooltip><TooltipHeader>{datum.name}</TooltipHeader><TooltipRow label="Amount" value={formatCurrency(datum.value)} /><TooltipRow label="Percent" value={totalSpending > 0 ? formatPlainPercent(datum.value / totalSpending * 100) : '0%'} /></ChartTooltip>;
                       }} />
                     </Treemap>
                   </ResponsiveContainer>
@@ -381,12 +381,12 @@ export function SpendingBreakdown() {
                           content={({ active, payload }) => {
                             if (!active || !payload || !payload.length) return null;
                             const datum = payload[0].payload;
-                            const pct = totalSpending > 0 ? ((datum.value / totalSpending) * 100).toFixed(1) : '0';
+                            const pct = totalSpending > 0 ? formatPlainPercent(datum.value / totalSpending * 100) : '0%';
                             return (
                               <ChartTooltip>
                                 <TooltipHeader>{datum.label}</TooltipHeader>
                                 <TooltipRow label="Amount" value={formatCurrency(datum.value)} />
-                                <TooltipRow label="Percent" value={`${pct}%`} />
+                                <TooltipRow label="Percent" value={pct} />
                               </ChartTooltip>
                             );
                           }}
@@ -423,7 +423,7 @@ export function SpendingBreakdown() {
                 sortedCategories.map((c) => {
                   const routeId = getCategoryRouteId(c);
                   const categoryColor = pieData.find((item) => item.categoryId === routeId)?.color || 'var(--color-chart-1)';
-                  const pct = totalSpending > 0 ? ((c.amount / totalSpending) * 100).toFixed(1) : '0.0';
+                  const pct = totalSpending > 0 ? formatPlainPercent(c.amount / totalSpending * 100) : '0%';
 
                   return (
                     <div
@@ -439,7 +439,7 @@ export function SpendingBreakdown() {
 
                       {/* Values */}
                       <div className="flex items-center gap-2.5 text-right flex-shrink-0 ml-2">
-                        <span className="text-[10px] text-muted-foreground/80 bg-muted/40 dark:bg-muted/20 px-1.5 py-0.5 rounded font-mono font-medium">{pct}%</span>
+                        <span className="text-[10px] text-muted-foreground/80 bg-muted/40 dark:bg-muted/20 px-1.5 py-0.5 rounded font-mono font-medium">{pct}</span>
                         <span className="font-semibold font-mono blur-number">
                           {formatCurrency(c.amount)}
                         </span>

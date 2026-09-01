@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatCompactCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -414,7 +414,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
                               </div>
                             </TooltipHeader>
                             <TooltipRow label="Value" value={formatCurrency(d.value)} />
-                            <TooltipRow label="Portfolio %" value={`${d.percentage.toFixed(1)}%`} />
+                            <TooltipRow label="Portfolio %" value={formatPlainPercent(d.percentage)} />
                           </ChartTooltip>
                         );
                       }}
@@ -446,7 +446,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
                     </div>
                     <div className="flex items-center gap-3 shrink-0 ml-2 font-medium">
                       <span className="text-foreground font-mono tabular-nums blur-number">{formatCurrency(item.value)}</span>
-                      <span className="text-muted-foreground/80 font-mono w-10 text-right tabular-nums">{item.percentage.toFixed(1)}%</span>
+                      <span className="text-muted-foreground/80 font-mono w-10 text-right tabular-nums">{formatPlainPercent(item.percentage)}</span>
                     </div>
                   </div>
                 ))}
@@ -511,7 +511,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
                       </div>
                       <div className="text-right font-mono blur-number">
                         <div>{formatCurrency(currVal)}</div>
-                        <div className="text-[10px] text-muted-foreground">{currPct.toFixed(1)}%</div>
+                        <div className="text-[10px] text-muted-foreground">{formatPlainPercent(currPct)}</div>
                       </div>
                       <div className="text-right font-mono blur-number">
                         <div>{formatCurrency(targetVal)}</div>

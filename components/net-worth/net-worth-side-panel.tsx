@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatCompactCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { isAssetAccount, isReportableAccount } from '@/lib/utils/account-scope';
 import { convertCurrency } from '@/lib/constants/currency-rates';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -316,7 +316,7 @@ export function NetWorthSidePanel() {
                   <div className="mt-2 border-t border-border/40 pt-1.5">
                     <TooltipRow
                       label="1-Year Growth"
-                      value={`${deltas.netWorth >= 0 ? '+' : ''}${formatCurrency(deltas.netWorth)} (${deltas.pctNetWorth.toFixed(1)}%)`}
+                      value={`${deltas.netWorth >= 0 ? '+' : ''}${formatCurrency(deltas.netWorth)} (${formatPlainPercent(deltas.pctNetWorth)})`}
                       color={deltas.netWorth >= 0 ? 'var(--color-chart-1)' : 'var(--color-status-negative)'}
                     />
                   </div>
@@ -343,7 +343,7 @@ export function NetWorthSidePanel() {
                     >
                       {deltas.netWorth >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                       <span className="blur-number">{formatCurrency(Math.abs(deltas.netWorth))}</span>
-                      <span className="opacity-80">({deltas.pctNetWorth >= 0 ? '+' : ''}{deltas.pctNetWorth.toFixed(1)}%)</span>
+                      <span className="opacity-80">({deltas.pctNetWorth >= 0 ? '+' : ''}{formatPlainPercent(deltas.pctNetWorth)})</span>
                     </div>
                     <span className="text-[11px] text-muted-foreground">past 1 year</span>
                   </div>
@@ -358,8 +358,8 @@ export function NetWorthSidePanel() {
               content={
                 <>
                   <TooltipHeader>Assets vs. Liabilities</TooltipHeader>
-                  <TooltipRow label="Total Assets" value={`${formatCurrency(totals.totalAssets)} (${assetRatio.assetPct.toFixed(1)}%)`} color="var(--color-chart-1)" />
-                  <TooltipRow label="Total Liabilities" value={`${formatCurrency(totals.totalLiabilities)} (${assetRatio.liabilityPct.toFixed(1)}%)`} color="var(--color-destructive)" />
+                  <TooltipRow label="Total Assets" value={`${formatCurrency(totals.totalAssets)} (${formatPlainPercent(assetRatio.assetPct)})`} color="var(--color-chart-1)" />
+                  <TooltipRow label="Total Liabilities" value={`${formatCurrency(totals.totalLiabilities)} (${formatPlainPercent(assetRatio.liabilityPct)})`} color="var(--color-destructive)" />
                   <div className="mt-2 border-t border-border/40 pt-1.5">
                     <TooltipRow label="Net Worth" value={formatCurrency(totals.netWorth)} color="var(--color-chart-1)" />
                   </div>
@@ -374,7 +374,7 @@ export function NetWorthSidePanel() {
                     <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                   </span>
                   <span className="text-muted-foreground font-mono text-[11px]">
-                    {assetRatio.assetPct.toFixed(1)}% / {assetRatio.liabilityPct.toFixed(1)}%
+                    {formatPlainPercent(assetRatio.assetPct)} / {formatPlainPercent(assetRatio.liabilityPct)}
                   </span>
                 </div>
                 <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
@@ -399,7 +399,7 @@ export function NetWorthSidePanel() {
                   <TooltipHeader>Debt-to-Asset Ratio</TooltipHeader>
                   <TooltipRow label="Liabilities" value={formatCurrency(totals.totalLiabilities)} color="var(--color-destructive)" />
                   <TooltipRow label="Assets" value={formatCurrency(totals.totalAssets)} color="var(--color-chart-1)" />
-                  <TooltipRow label="Ratio" value={`${debtPct.toFixed(1)}%`} color="var(--color-primary)" />
+                  <TooltipRow label="Ratio" value={formatPlainPercent(debtPct)} color="var(--color-primary)" />
                   <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
                     <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</div>
                     <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />Excellent: &lt;35%</span><span>Healthy</span></div>
@@ -444,8 +444,8 @@ export function NetWorthSidePanel() {
                 content={
                   <>
                     <TooltipHeader>Liquid vs. Illiquid Assets</TooltipHeader>
-                    <TooltipRow label="Liquid" value={`${formatCurrency(liquidity.liquid)} (${liquidity.liquidPct.toFixed(1)}%)`} color="var(--color-chart-2)" />
-                    <TooltipRow label="Illiquid" value={`${formatCurrency(liquidity.illiquid)} (${liquidity.illiquidPct.toFixed(1)}%)`} color="var(--color-chart-4)" />
+                    <TooltipRow label="Liquid" value={`${formatCurrency(liquidity.liquid)} (${formatPlainPercent(liquidity.liquidPct)})`} color="var(--color-chart-2)" />
+                    <TooltipRow label="Illiquid" value={`${formatCurrency(liquidity.illiquid)} (${formatPlainPercent(liquidity.illiquidPct)})`} color="var(--color-chart-4)" />
                     <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
                       <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Classification</div>
                       <div className="text-[10px] text-muted-foreground">Liquid: Checking, savings, brokerage, crypto, metals</div>
@@ -462,7 +462,7 @@ export function NetWorthSidePanel() {
                       <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                     </span>
                     <span className="text-muted-foreground font-mono text-[11px]">
-                      {liquidity.liquidPct.toFixed(1)}% / {liquidity.illiquidPct.toFixed(1)}%
+                      {formatPlainPercent(liquidity.liquidPct)} / {formatPlainPercent(liquidity.illiquidPct)}
                     </span>
                   </div>
                   <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
@@ -492,7 +492,7 @@ export function NetWorthSidePanel() {
                   <TooltipRow label="Next Milestone" value={milestone.label} color="var(--color-primary)" />
                   <div className="mt-2 border-t border-border/40 pt-1.5">
                     <TooltipRow label="Remaining" value={formatCurrency(milestone.remaining)} color="var(--color-chart-5)" />
-                    <TooltipRow label="Progress" value={`${milestone.progress.toFixed(1)}%`} color="var(--color-primary)" />
+                    <TooltipRow label="Progress" value={formatPlainPercent(milestone.progress)} color="var(--color-primary)" />
                   </div>
                 </>
               }

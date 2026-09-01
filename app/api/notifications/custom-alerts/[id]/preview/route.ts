@@ -10,6 +10,7 @@ import { eq, and, desc, gte, lt } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { isReportableAccount, filterReportableAccounts } from '@/lib/utils/account-scope';
+import { formatPlainPercent } from '@/lib/utils/format';
 import {
   evaluateConditionTree,
 } from '@/lib/services/notifications';
@@ -330,7 +331,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         }
 
         result.cashFlowMatches = matched
-          ? [{ yearMonth: latest.yearMonth, netCashFlow: latest.netCashFlow, savingsRate: latest.savingsRate, description: `Latest: Net $${latest.netCashFlow.toFixed(2)}, Rate ${latest.savingsRate.toFixed(1)}%` }]
+          ? [{ yearMonth: latest.yearMonth, netCashFlow: latest.netCashFlow, savingsRate: latest.savingsRate, description: `Latest: Net $${latest.netCashFlow.toFixed(2)}, Rate ${formatPlainPercent(latest.savingsRate)}` }]
           : [];
         result.matchCount = result.cashFlowMatches.length;
         result.notice = matched

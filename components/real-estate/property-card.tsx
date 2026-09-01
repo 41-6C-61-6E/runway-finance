@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { Home, BadgeCheck, Pencil, X, Link2, TrendingUp } from 'lucide-react';
 import { MortgagePaydownChart } from './mortgage-paydown-chart';
 import { PropertyEquityProgressBar } from './property-equity-progress-bar';
@@ -329,7 +329,7 @@ export function PropertyCard({
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-sm font-bold text-foreground blur-number">
-                        {property.ltv.toFixed(1)}%
+                        {formatPlainPercent(property.ltv)}
                       </span>
                       <span
                         className={cn(
@@ -471,7 +471,7 @@ export function PropertyCard({
                                 />
                               </div>
                               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                <span>{payoffProgress.toFixed(1)}% paid off</span>
+                                <span>{formatPlainPercent(payoffProgress)}% paid off</span>
                                 {m.monthlyPayment > 0 && (
                                   <span className="blur-number">{formatCurrency(m.monthlyPayment)}/mo</span>
                                 )}

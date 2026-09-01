@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatPlainPercent } from '@/lib/utils/format';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { runRetirementSimulation } from '@/lib/services/retirement-engine';
 import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
@@ -623,7 +623,7 @@ Please perform a detailed, multi-dimensional review of this plan:
                       ) : (
                         planAccounts.map((acc: any, i: number) => {
                           const bal = Number(acc.balance) || 0;
-                          const share = totalAccountBalance > 0 ? ((bal / totalAccountBalance) * 100).toFixed(1) : '0.0';
+                          const share = totalAccountBalance > 0 ? formatPlainPercent(bal / totalAccountBalance * 100) : '0%';
                           return (
                             <tr key={acc.id || i} className="hover:bg-muted/20 transition-colors">
                               <td className="py-2.5 px-2 font-medium text-foreground print:text-black">
@@ -641,7 +641,7 @@ Please perform a detailed, multi-dimensional review of this plan:
                                 {formatCurrency(Number(acc.annualContribution) || 0)}
                               </td>
                               <td className="py-2.5 px-2 text-right font-mono text-muted-foreground print:text-gray-600">
-                                {share}%
+                                {share}
                               </td>
                             </tr>
                           );

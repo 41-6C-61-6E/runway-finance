@@ -757,7 +757,7 @@ export function WealthFlowSankey() {
 
           const node = processedData.nodes.find((n: any) => n.name === (data.name || data.label)) || data;
           const displayValue = showPercentages
-            ? `${node.percentage?.toFixed(1)}%`
+            ? `${formatPlainPercent(node.percentage)}`
             : formatCurrency(node.value);
           const accounts = node.accounts as WealthFlowAccountDetail[] | undefined;
 
@@ -1182,7 +1182,7 @@ export function WealthFlowSankey() {
                   <span>Total Net Worth Change</span>
                   <span className={`font-semibold font-mono blur-number ${summary.netWorthChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                     {summary.netWorthChange >= 0 ? '+' : ''}{formatCurrency(summary.netWorthChange)}
-                    {' '}({summary.percentChange >= 0 ? '+' : ''}{summary.percentChange.toFixed(1)}%)
+                    {' '}({summary.percentChange >= 0 ? '+' : ''}{formatPlainPercent(summary.percentChange)})
                   </span>
                 </div>
               </div>

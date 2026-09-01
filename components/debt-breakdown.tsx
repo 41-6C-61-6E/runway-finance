@@ -10,7 +10,7 @@ import { convertCurrency } from '@/lib/constants/currency-rates';
 import { formatInTimezone } from '@/lib/utils/timeframe';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
-import { formatCompactCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { SegPill } from '@/components/ui/seg-pill';
 
 const CHART_COLOR_MAP = [
@@ -205,7 +205,7 @@ export function DebtBreakdown() {
   const srSummary = useMemo(() => {
     if (activeCategories.length === 0) return '';
     const breakDownStr = activeCategories
-      .map((cat) => `${cat.label}: ${formatCompact(cat.amount)} (${activeTotal > 0 ? ((cat.amount / activeTotal) * 100).toFixed(1) : 0}%)`)
+      .map((cat) => `${cat.label}: ${formatCompact(cat.amount)} (${activeTotal > 0 ? formatPlainPercent(cat.amount / activeTotal * 100) : '0%'}`)
       .join(', ');
     return `Total ${activeTab === 'assets' ? 'Assets' : 'Debt'} is ${formatCompact(activeTotal)}. Breakdown: ${breakDownStr}.`;
   }, [activeCategories, activeTotal, activeTab]);
@@ -296,7 +296,7 @@ export function DebtBreakdown() {
                             {activeTotal > 0 && (
                               <TooltipRow
                                 label="Share"
-                                value={`${((amount / activeTotal) * 100).toFixed(1)}%`}
+                                value={formatPlainPercent((amount / activeTotal) * 100)}
                               />
                             )}
                           </ChartTooltip>
@@ -391,7 +391,7 @@ export function DebtBreakdown() {
                               </text>}
                               {showPct && (
                                 <text x={x + 6} y={y + 44} fill="white" stroke="none" strokeWidth={0} fontSize="10" opacity="0.75">
-                                  {sharePct.toFixed(1)}%
+                                  {formatPlainPercent(sharePct)}
                                 </text>
                               )}
                             </g>
@@ -411,7 +411,7 @@ export function DebtBreakdown() {
                             {activeTotal > 0 && (
                               <TooltipRow
                                 label="Share"
-                                value={`${((datum.value as number) / activeTotal * 100).toFixed(1)}%`}
+                                value={formatPlainPercent(((datum.value as number) / activeTotal) * 100)}
                               />
                             )}
                           </ChartTooltip>
@@ -446,7 +446,7 @@ export function DebtBreakdown() {
                           <span className="text-xs text-foreground/80 flex-1 truncate">{cat.label}</span>
                           <span className="text-xs text-foreground font-medium tabular-nums blur-number flex-shrink-0 flex items-baseline gap-1.5">
                             {formatCompact(cat.amount)}
-                            <span className="text-[10px] text-muted-foreground font-normal">{share.toFixed(1)}%</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">{formatPlainPercent(share)}</span>
                           </span>
                         </div>
                       );

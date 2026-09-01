@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useDeferredValue } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatCompactCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
@@ -551,7 +551,7 @@ export function ProjectionTab({
       return {
         status: 'Elevated Risk',
         badge: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-        desc: `Peak withdrawal rate (${peakWithdrawalRate.toFixed(1)}%) exceeds 5.5% threshold`,
+        desc: `Peak withdrawal rate (${formatPlainPercent(peakWithdrawalRate)}) exceeds 5.5% threshold`,
         score: 'C',
       };
     }
@@ -559,14 +559,14 @@ export function ProjectionTab({
       return {
         status: 'Sustainable Plan',
         badge: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-        desc: `Peak withdrawal rate (${peakWithdrawalRate.toFixed(1)}%) fits 4% FIRE safety guidelines`,
+        desc: `Peak withdrawal rate (${formatPlainPercent(peakWithdrawalRate)}) fits 4% FIRE safety guidelines`,
         score: 'B+',
       };
     }
     return {
       status: 'Optimal Health',
       badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      desc: `Low withdrawal rate (${peakWithdrawalRate.toFixed(1)}%) with strong legacy growth buffer`,
+      desc: `Low withdrawal rate (${formatPlainPercent(peakWithdrawalRate)}) with strong legacy growth buffer`,
       score: 'A+',
     };
   }, [simulation, peakWithdrawalRate, localRetirementAge]);
@@ -634,7 +634,7 @@ export function ProjectionTab({
             <div className="flex items-center gap-2 sm:gap-3">
               {viewMode === 'monte_carlo' && monteCarloOutput ? (
                 <div className="hidden sm:flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg text-xs font-mono">
-                  <span className="font-bold text-amber-500">Success Rate: {monteCarloOutput.successRate.toFixed(1)}%</span>
+                  <span className="font-bold text-amber-500">Success Rate: {formatPlainPercent(monteCarloOutput.successRate)}</span>
                   <span className="text-muted-foreground">|</span>
                   <span className="text-foreground">Median Legacy: {formatCurrency(monteCarloOutput.medianLegacy)}</span>
                 </div>
@@ -1154,7 +1154,7 @@ export function ProjectionTab({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-muted-foreground">Inflation Rate</span>
-              <span className="font-mono font-bold text-primary text-sm">{localInflationRate.toFixed(1)}%</span>
+              <span className="font-mono font-bold text-primary text-sm">{formatPlainPercent(localInflationRate)}</span>
             </div>
             <Slider
               min={1.0}
@@ -1282,14 +1282,14 @@ export function ProjectionTab({
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="p-2.5 text-muted-foreground">{y.effectiveTaxRate ? `${y.effectiveTaxRate.toFixed(1)}%` : '0%'}</td>
+                      <td className="p-2.5 text-muted-foreground">{y.effectiveTaxRate ? `${formatPlainPercent(y.effectiveTaxRate)}` : '0%'}</td>
                       <td className="p-2.5 text-amber-500">{formatCurrency(y.taxableDrawdown)}</td>
                       <td className="p-2.5 text-purple-500">{formatCurrency(y.traditionalDrawdown)}</td>
                       <td className="p-2.5 text-pink-500">{formatCurrency(y.rothDrawdown)}</td>
                       <td className="p-2.5 font-bold">
                         {y.withdrawalRate > 0 ? (
                           <span className={y.withdrawalRate > 5 ? 'text-rose-500' : y.withdrawalRate > 3.5 ? 'text-amber-500' : 'text-emerald-500'}>
-                            {y.withdrawalRate.toFixed(1)}%
+                            {formatPlainPercent(y.withdrawalRate)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -1773,7 +1773,7 @@ function DrawdownTooltip({ active, payload }: any) {
                 ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                 : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
             }`}>
-              {data.withdrawalRate.toFixed(1)}%
+              {formatPlainPercent(data.withdrawalRate)}
             </span>
           </div>
         )}
@@ -1919,7 +1919,7 @@ function YearDetailModal({ isOpen, yearData, onClose }: { isOpen: boolean; yearD
             </div>
             <div className="flex justify-between items-center text-[11px] text-muted-foreground font-sans pt-0.5">
               <span>Effective Tax Rate (ETR %):</span>
-              <span className="font-mono font-bold text-foreground">{yearData.effectiveTaxRate ? `${yearData.effectiveTaxRate.toFixed(1)}%` : '0%'}</span>
+              <span className="font-mono font-bold text-foreground">{yearData.effectiveTaxRate ? `${formatPlainPercent(yearData.effectiveTaxRate)}` : '0%'}</span>
             </div>
           </div>
         </div>

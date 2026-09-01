@@ -1105,8 +1105,8 @@ export function CashFlowSankey() {
               <TooltipRow label="Amount" value={formatCurrency(linkValue)} />
               {showPercentages && (
                 <>
-                  <TooltipRow label="Of Source" value={`${pctOfSource.toFixed(1)}%`} />
-                  <TooltipRow label="Of Target" value={`${pctOfTarget.toFixed(1)}%`} />
+                  <TooltipRow label="Of Source" value={formatPlainPercent(pctOfSource)} />
+                  <TooltipRow label="Of Target" value={formatPlainPercent(pctOfTarget)} />
                 </>
               )}
             </ChartTooltip>
@@ -1125,7 +1125,7 @@ export function CashFlowSankey() {
             );
           }
           const displayValue = showPercentages && data.percentage !== undefined
-            ? `${data.percentage.toFixed(1)}%`
+            ? `${formatPlainPercent(data.percentage)}`
             : formatCurrency(data.value);
           return (
             <ChartTooltip x={x} y={y} containerRef={chartContainerRef}>

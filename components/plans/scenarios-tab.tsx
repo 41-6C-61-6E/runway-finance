@@ -5,7 +5,7 @@ import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-e
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 import { buildEnginePlan } from '@/lib/utils/build-engine-plan';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatCompactCurrency } from '@/lib/utils/format';
+import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import {
   LineChart,
   Line,
@@ -459,7 +459,7 @@ export function ScenariosTab({
                                   {formatCurrency(strat.summary.totalTaxes)}
                                 </div>
                                 <div className="text-[10px] text-muted-foreground/80 font-mono">
-                                  {strat.summary.effectiveTaxRate.toFixed(1)}% eff. rate
+                                  {formatPlainPercent(strat.summary.effectiveTaxRate)}% eff. rate
                                 </div>
                               </td>
 

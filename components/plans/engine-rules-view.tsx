@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { formatAmount, formatBalance } from '@/lib/utils/format';
+import { formatAmount, formatBalance, formatPlainPercent } from '@/lib/utils/format';
 import {
   Database,
   RotateCcw,
@@ -1002,7 +1002,7 @@ export function EngineRulesView({
                   {(rules?.acaSubsidyTable || []).map((t: any, idx: number) => (
                     <tr key={idx} className="hover:bg-muted/20">
                       <td className="p-2.5 font-bold">{t.fplPercent}% FPL</td>
-                      <td className="p-2.5 text-primary font-bold">{(t.premiumCapPercent * 100).toFixed(1)}%</td>
+                      <td className="p-2.5 text-primary font-bold">{formatPlainPercent(t.premiumCapPercent * 100)}</td>
                     </tr>
                   ))}
                 </tbody>

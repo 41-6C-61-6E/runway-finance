@@ -8,7 +8,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatCompactCurrency, formatAmount } from '@/lib/utils/format';
+import { formatCompactCurrency, formatAmount, formatPlainPercent } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import {
   AreaChart,
@@ -333,7 +333,7 @@ export function HoldingDetailSheet({
                 <div className="text-right">
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Portfolio Weight</span>
                   <span className="text-sm font-bold text-foreground blur-number">
-                    {(holding.portfolioWeight ?? 0).toFixed(1)}%
+                    {formatPlainPercent(holding.portfolioWeight ?? 0)}
                   </span>
                 </div>
               </div>
@@ -530,7 +530,7 @@ export function HoldingDetailSheet({
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">Total Return</span>
                 {totalGainLoss != null && totalReturnPct != null && !isNaN(totalReturnPct) ? (
                   <span className={`text-sm font-bold blur-number ${totalGainLoss >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
-                    {totalGainLoss >= 0 ? '+' : ''}{totalReturnPct.toFixed(1)}%
+                    {totalReturnPct >= 0 ? '+' : ''}{formatPlainPercent(totalReturnPct)}
                   </span>
                 ) : (
                   <span className="text-sm text-muted-foreground/40">—</span>

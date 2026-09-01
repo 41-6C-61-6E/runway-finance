@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/utils/goals';
+import { formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -187,7 +188,7 @@ export function GoalsSummary() {
             <div className="border-t border-border mt-4 pt-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs sm:text-sm font-medium text-foreground">Overall Progress</span>
-                <span className="text-xs sm:text-sm font-bold text-foreground blur-number">{progressPercent.toFixed(1)}%</span>
+                <span className="text-xs sm:text-sm font-bold text-foreground blur-number">{formatPlainPercent(progressPercent)}</span>
               </div>
               <div className={`w-full ${overallBarColor}/20 rounded-full h-2 overflow-hidden`}>
                 <div className={`h-full rounded-full transition-all duration-700 ${overallBarColor}`} style={{ width: `${progressPercent}%` }} />

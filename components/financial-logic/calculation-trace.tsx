@@ -16,7 +16,7 @@ export function formatTraceResult(value: number, format: TraceFormat): string {
     case 'ratio':
       return value === Infinity ? '100%+ (∞)' : value.toFixed(2);
     case 'years':
-      return value === Infinity ? '∞' : `${value.toFixed(1)} yrs`;
+      return value === Infinity ? '∞' : `${formatPlainPercent(value)} yrs`;
     case 'number':
       return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
     default:

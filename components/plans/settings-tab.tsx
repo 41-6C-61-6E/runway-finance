@@ -21,7 +21,7 @@ import {
   Trash2,
   ShieldAlert,
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import {
   calculateSocialSecurityPIA,
   calculateAdjustedSsBenefit,
@@ -1447,7 +1447,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                                 <div className="text-right font-mono">
                                   <span className="font-bold text-foreground block">{formatCurrency(item.balance)}</span>
                                   {withdrawalMethod === 'proportional' && (
-                                    <span className="text-[10px] text-muted-foreground block">{sharePct.toFixed(1)}% of drawdown</span>
+                                    <span className="text-[10px] text-muted-foreground block">{formatPlainPercent(sharePct)}% of drawdown</span>
                                   )}
                                 </div>
                               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { formatPlainPercent } from '@/lib/utils/format';
 import { Loader2, Check, X, Zap } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
@@ -165,7 +166,7 @@ export default function AiTestProgress({
 
   const formatTime = (ms: number) => {
     if (ms < 1000) return `${ms}ms`;
-    return `${(ms / 1000).toFixed(1)}s`;
+    return `${formatPlainPercent(ms / 1000)}s`;
   };
 
   return (

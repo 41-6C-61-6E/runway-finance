@@ -184,3 +184,38 @@ function trimOneDecimal(n: number): string {
   return s.endsWith('.0') ? s.slice(0, -2) : s;
 }
 
+/**
+ * R-7 number-formatting role table — the single source of truth for "how many
+ * decimals does this kind of number get?" (resolves P2-5 / mobile C-4).
+ *
+ * Pick the role by what the number *means*, never by where it is rendered:
+ *
+ *   role        formatter                  example     where
+ *   ----------  -------------------------  ---------   -----------------------------
+ *   balance     formatBalance()            $98,635     positions: net worth, card totals
+ *   amount      formatAmount()             -$48.02     ledger / per-transaction (2dp is CORRECT there)
+ *   projected   formatProjected()          $420 / $1.5 forecasts, milestones (1dp max, no trailing .0)
+ *   percent     formatPlainPercent()       12.3%       shares, rates; negative prints -0.2%, zero prints 0%
+ *   signed %    formatPercent()            +4.50%      deltas that earn an explicit sign
+ *   axis $      formatChartYAxisCurrency() $15 / $1.9K whole $ below $1,000, 3-sig-fig K/M above
+ *   compact $   formatCompactCurrency()    $340k       dense ticks, non-currency axes
+ *
+ * Rules:
+ *  - Never render a raw `$${n}` template — commas must come from `Intl`.
+ *  - A local `.toFixed(1)` on a *percent* (including per-second/per-year
+ *    rates printed with a unit suffix like "12.3s" or "2.5 yrs") should be
+ *    `formatPlainPercent(value)`. The `.toFixed(1)`s that legitimately remain
+ *    in the code base format non-money, non-percent *sizes and ratios* that
+ *    no role formatter owns (e.g. "1.4x" card ratio, "4.8 KB" file size) —
+ *    those are intentional and pinned by the R-7 ratchet baseline (count 2).
+ */
+export const MONEY_ROLES = {
+  balance: 'formatBalance',
+  amount: 'formatAmount',
+  projected: 'formatProjected',
+  percent: 'formatPlainPercent',
+  signedPercent: 'formatPercent',
+  axisCurrency: 'formatChartYAxisCurrency',
+  compactCurrency: 'formatCompactCurrency',
+} as const;
+

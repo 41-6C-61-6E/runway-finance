@@ -6,6 +6,7 @@ import {
   formatCompactCurrency,
   formatPercent,
   formatPlainPercent,
+  MONEY_ROLES,
 } from '@/lib/utils/format';
 
 describe('R-7 role formatters (G3 / W-3)', () => {
@@ -66,6 +67,20 @@ describe('R-7 role formatters (G3 / W-3)', () => {
     });
     it('honors an explicit decimal count', () => {
       expect(formatPlainPercent(12.345, 2)).toBe('12.35%');
+    });
+  });
+
+  describe('MONEY_ROLES — the R-7 role table (convention anchor)', () => {
+    it('maps each role to its canonical formatter', () => {
+      expect(MONEY_ROLES).toEqual({
+        balance: 'formatBalance',
+        amount: 'formatAmount',
+        projected: 'formatProjected',
+        percent: 'formatPlainPercent',
+        signedPercent: 'formatPercent',
+        axisCurrency: 'formatChartYAxisCurrency',
+        compactCurrency: 'formatCompactCurrency',
+      });
     });
   });
 });
