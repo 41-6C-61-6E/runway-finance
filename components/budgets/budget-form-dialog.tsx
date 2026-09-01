@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { useBudgetPeriod, type PeriodType } from './budget-period-selector';
 import { CategoryCombobox } from './category-combobox';
 
@@ -251,7 +252,7 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Period</label>
-              <select
+              <Select
                 value={form.periodType}
                 onChange={(e) => {
                   const newType = e.target.value as PeriodType;
@@ -261,12 +262,12 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
                     periodKey: convertPeriodKeyForType(f.periodKey || periodKey, newType),
                   }));
                 }}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="text-sm"
               >
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
                 <option value="yearly">Yearly</option>
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Amount</label>
@@ -333,16 +334,16 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Funding Account (optional)</label>
-            <select
+            <Select
               value={form.fundingAccountId}
               onChange={(e) => setForm((f) => ({ ...f, fundingAccountId: e.target.value }))}
-              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="text-sm"
             >
               <option value="">No specific account</option>
               {accounts.map((acct) => (
                 <option key={acct.id} value={acct.id}>{acct.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>

@@ -38,6 +38,7 @@ import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
+import { Select } from '@/components/ui/select';
 
 interface RothConversionTabProps {
   plan: any;
@@ -291,7 +292,7 @@ export function RothConversionTab({
                     </Tooltip>
                   </label>
                 </div>
-                <select
+                <Select
                   value={targetCeiling}
                   onChange={(e: any) => {
                     const val = e.target.value;
@@ -299,14 +300,14 @@ export function RothConversionTab({
                     updatePlanSettings({ rothConversionTargetCeiling: val });
                   }}
                   disabled={!enableRoth}
-                  className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground font-medium focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  className="h-9 px-2.5"
                 >
                   <option value="top_of_10">10% Bracket ($23.8k MFJ)</option>
                   <option value="top_of_12">12% Bracket ($96.9k MFJ) • Recommended</option>
                   <option value="top_of_22">22% Bracket ($206.7k MFJ)</option>
                   <option value="top_of_24">24% Bracket ($394.6k MFJ)</option>
                   <option value="top_of_32">32% Bracket ($501.0k MFJ)</option>
-                </select>
+                </Select>
               </div>
 
               {/* IRMAA Guardrail Checkbox */}

@@ -35,6 +35,7 @@ import {
 import { getYearSalary } from '@/lib/services/retirement-engine';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { Select } from '@/components/ui/select';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 import { AppTabs } from '@/components/ui/app-tabs';
@@ -356,7 +357,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                 <div className="space-y-3 text-xs">
                   <div className="space-y-1">
                     <label className="font-semibold text-muted-foreground">Tax Filing Status</label>
-                    <select
+                    <Select
                       value={filingStatus}
                       onChange={(e) => {
                         const status = e.target.value;
@@ -364,13 +365,13 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                         const hasSpouseUpdate = status === 'married_joint';
                         onUpdatePlan({ filingStatus: status, hasSpouse: hasSpouseUpdate });
                       }}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:ring-1 focus:ring-primary font-medium"
+                      className="font-medium"
                     >
                       <option value="single">Single</option>
                       <option value="married_joint">Married Filing Jointly (MFJ)</option>
                       <option value="married_separate">Married Filing Separately</option>
                       <option value="head_of_household">Head of Household</option>
-                    </select>
+                    </Select>
                   </div>
 
                   <div className="space-y-1">
@@ -1065,18 +1066,18 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                           </TooltipContent>
                         </Tooltip>
                       </label>
-                      <select
+                      <Select
                         value={projectionMode}
                         onChange={(e) => {
                           const v = e.target.value as 'statutory' | 'inflationEscalated';
                           setProjectionMode(v);
                           onUpdatePlan({ settings: { projectionMode: v } });
                         }}
-                        className="bg-background border border-border rounded-lg px-2 py-1.5 font-mono text-foreground font-bold text-[11px] focus:ring-1 focus:ring-primary"
+                        className="h-8 text-[11px] font-mono font-bold"
                       >
                         <option value="inflationEscalated">Inflation-escalated</option>
                         <option value="statutory">Statutory (per-year)</option>
-                      </select>
+                      </Select>
                     </div>
                   </div>
 

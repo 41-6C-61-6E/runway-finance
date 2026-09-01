@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils/format';
 import {
   Sparkles,
@@ -453,15 +454,15 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                 <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Calculation Strategy
                 </label>
-                <select
+                <Select
                   value={calculationMethod}
                   onChange={(e) => setCalculationMethod(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="text-sm"
                 >
                   <option value="average">Average Spending (Mean)</option>
                   <option value="median">Median Spending (Outlier resilient)</option>
                   <option value="max">Peak Spending (Conservative high)</option>
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -469,10 +470,10 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                   Adjustment Buffer (%)
                 </label>
                 <div className="flex items-center gap-2">
-                  <select
+                  <Select
                     value={bufferPercentage}
                     onChange={(e) => setBufferPercentage(parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="text-sm"
                   >
                     <option value={-15}>-15% Aggressive Reduction</option>
                     <option value={-10}>-10% Frugal Target</option>
@@ -482,7 +483,7 @@ export function AutoBudgetDialog({ open, onClose, periodType, periodKey }: AutoB
                     <option value={10}>+10% Safety Buffer</option>
                     <option value={15}>+15% Safety Buffer</option>
                     <option value={20}>+20% Safety Buffer</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
             </div>

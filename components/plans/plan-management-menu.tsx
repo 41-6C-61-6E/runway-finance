@@ -10,11 +10,11 @@ import {
   MoreVertical,
   Check,
   Flame,
-  ChevronDown,
   FileDown,
   Sparkles,
 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Select } from '@/components/ui/select';
 
 export interface PlanManagementMenuProps {
   plans: any[];
@@ -70,20 +70,17 @@ export function PlanManagementMenu({
       )}
 
       {/* Plan Selector Dropdown */}
-      <div className="relative">
-        <select
-          value={selectedPlan?.id || ''}
-          onChange={(e) => onSelectPlan(e.target.value)}
-          className="bg-card border border-border rounded-lg pl-3 pr-8 py-1.5 text-xs font-semibold text-foreground focus:ring-2 focus:ring-primary/40 focus:outline-none shadow-xs appearance-none cursor-pointer"
-        >
-          {plans.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-      </div>
+      <Select
+        value={selectedPlan?.id || ''}
+        onChange={(e) => onSelectPlan(e.target.value)}
+        className="h-8 bg-card text-[11px] font-semibold"
+      >
+        {plans.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </Select>
 
       {/* New Plan Button */}
       <button

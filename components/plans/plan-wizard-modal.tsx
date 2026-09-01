@@ -26,6 +26,7 @@ import {
   calculateAdjustedSsBenefit,
 } from '@/lib/utils/social-security';
 import { formatCurrency } from '@/lib/utils/format';
+import { Select } from '@/components/ui/select';
 
 export interface PlanWizardModalProps {
   isOpen: boolean;
@@ -494,16 +495,16 @@ export function PlanWizardModal({
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Tax Filing Status</label>
-                  <select
+                  <Select
                     value={filingStatus}
                     onChange={(e: any) => handleFilingStatusChange(e.target.value)}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="rounded-xl bg-muted/40 text-xs font-bold"
                   >
                     <option value="single">Single</option>
                     <option value="married_joint">Married Filing Jointly (MFJ)</option>
                     <option value="married_separate">Married Filing Separately</option>
                     <option value="head_of_household">Head of Household</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5 flex items-center justify-between bg-muted/20 border border-border rounded-xl px-4 py-2 mt-auto">
@@ -868,15 +869,15 @@ export function PlanWizardModal({
                   <>
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-muted-foreground">Roth Conversion Target Ceiling</label>
-                      <select
+                      <Select
                         value={rothConversionTargetCeiling}
                         onChange={(e: any) => setRothConversionTargetCeiling(e.target.value)}
-                        className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        className="rounded-xl bg-muted/40 text-xs font-bold"
                       >
                         <option value="top_of_10">Top of 10% Bracket</option>
                         <option value="top_of_12">Top of 12% Bracket (Recommended)</option>
                         <option value="top_of_22">Top of 22% Bracket</option>
-                      </select>
+                      </Select>
                     </div>
 
                     <div className="space-y-1.5 flex items-center justify-between bg-muted/20 border border-border rounded-xl px-3.5 py-2">

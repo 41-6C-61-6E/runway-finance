@@ -10,6 +10,7 @@ import {
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Slider } from '@/components/ui/slider';
+import { Select } from '@/components/ui/select';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
@@ -732,16 +733,16 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                   </Tooltip>
                                 </TooltipProvider>
                               </div>
-                              <select
+                              <Select
                                 value={contribMode}
                                 onChange={(e) => handleUpdateContribution(accId, { contributionMode: e.target.value })}
-                                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:ring-1 focus:ring-primary font-medium"
+                                className="h-[38px] text-xs font-medium"
                               >
                                 <option value="none">No Contribution</option>
                                 <option value="percentage">% of Salary</option>
                                 <option value="fixed_amount">Fixed $ Amount / Year</option>
                                 <option value="maximize">Maximize IRS Limit</option>
-                              </select>
+                              </Select>
                             </div>
 
                             {(contribMode === 'percentage' || contribMode === 'fixed_amount') && (
@@ -819,14 +820,14 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                                     </Tooltip>
                                   </TooltipProvider>
                                 </div>
-                                <select
+                                <Select
                                   value={acc.contributionSalarySource || (safeString(acc.owner) === 'spouse' ? 'spouse' : 'primary')}
                                   onChange={(e) => handleUpdateContribution(accId, { contributionSalarySource: e.target.value })}
-                                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:ring-1 focus:ring-primary font-medium"
+                                  className="h-[38px] text-xs font-medium"
                                 >
                                   <option value="primary">Primary Salary ({formatCurrency(primarySalary)})</option>
                                   <option value="spouse">{plan.spouseName || 'Spouse'} Salary ({formatCurrency(spouseSalary)})</option>
-                                </select>
+                                </Select>
                               </div>
                             )}
                           </div>
@@ -1456,42 +1457,42 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-slate-300">Category Type</label>
-                    <select
+                    <Select
                       value={incType}
                       onChange={(e) => setIncType(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="pension">Pension / Guaranteed Annuity</option>
                       <option value="passive">Passive / Rental / Business Income</option>
                       <option value="salary">Side Job / Other Pre-Retirement Wages</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-300">Owner</label>
-                    <select
+                    <Select
                       value={incOwner}
                       onChange={(e) => setIncOwner(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="primary">Primary</option>
                       <option value="spouse">{plan.spouseName || 'Spouse / Partner'}</option>
                       <option value="joint">Joint</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-slate-300">Start Condition</label>
-                    <select
+                    <Select
                       value={incStart}
                       onChange={(e) => setIncStart(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="now">Immediately (Now)</option>
                       <option value="retirement">At Retirement</option>
                       <option value="age">At Specific Age</option>
                       <option value="year">At Specific Year</option>
-                    </select>
+                    </Select>
                     {(incStart === 'age' || incStart === 'year') && (
                       <input
                         type="number"
@@ -1504,17 +1505,17 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-300">End Condition</label>
-                    <select
+                    <Select
                       value={incEnd}
                       onChange={(e) => setIncEnd(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="end_of_plan">End of Plan (Lifetime)</option>
                       <option value="after_n_years">After N Years (Duration)</option>
                       <option value="retirement">Until Retirement</option>
                       <option value="age">At Specific Age</option>
                       <option value="year">At Specific Year</option>
-                    </select>
+                    </Select>
                     {(incEnd === 'age' || incEnd === 'year' || incEnd === 'after_n_years') && (
                       <input
                         type="number"
@@ -1585,43 +1586,43 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-slate-300">Category</label>
-                    <select
+                    <Select
                       value={expType}
                       onChange={(e) => setExpType(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="living_expense">General Living Expense</option>
                       <option value="healthcare">Healthcare & Insurance</option>
                       <option value="child_related">Education & Childcare</option>
                       <option value="lump_sum">Lump Sum Discretionary</option>
-                    </select>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-300">Owner</label>
-                    <select
+                    <Select
                       value={expOwner}
                       onChange={(e) => setExpOwner(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="primary">Primary</option>
                       <option value="spouse">{plan.spouseName || 'Spouse / Partner'}</option>
                       <option value="joint">Joint / Shared</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-slate-300">Start Condition</label>
-                    <select
+                    <Select
                       value={expStart}
                       onChange={(e) => setExpStart(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="now">Immediately (Now)</option>
                       <option value="retirement">At Retirement</option>
                       <option value="age">At Specific Age</option>
                       <option value="year">At Specific Year</option>
-                    </select>
+                    </Select>
                     {(expStart === 'age' || expStart === 'year') && (
                       <input
                         type="number"
@@ -1634,17 +1635,17 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-300">End Condition</label>
-                    <select
+                    <Select
                       value={expEnd}
                       onChange={(e) => setExpEnd(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="end_of_plan">End of Plan (Lifetime)</option>
                       <option value="after_n_years">After N Years (Duration)</option>
                       <option value="retirement">Until Retirement</option>
                       <option value="age">At Specific Age</option>
                       <option value="year">At Specific Year</option>
-                    </select>
+                    </Select>
                     {(expEnd === 'age' || expEnd === 'year' || expEnd === 'after_n_years') && (
                       <input
                         type="number"
@@ -1736,15 +1737,15 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
                 {plan.hasSpouse && (
                   <div>
                     <label className="text-xs font-semibold text-slate-300">Owner</label>
-                    <select
+                    <Select
                       value={liabOwner}
                       onChange={(e) => setLiabOwner(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/50 mt-1"
+                      className="rounded-xl border-slate-700 bg-slate-800 px-3 text-xs"
                     >
                       <option value="primary">Primary</option>
                       <option value="spouse">{plan.spouseName || 'Spouse / Partner'}</option>
                       <option value="joint">Joint / Shared</option>
-                    </select>
+                    </Select>
                   </div>
                 )}
                 <div className="flex justify-end gap-2 pt-2">
