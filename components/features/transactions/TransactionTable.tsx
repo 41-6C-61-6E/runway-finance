@@ -55,6 +55,7 @@ import {
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ListRow } from "@/components/ui/list-row";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { IconButton } from "@/components/ui/icon-button";
 
 
 type Transaction = {
@@ -981,7 +982,7 @@ export default function TransactionTable({
             type="checkbox"
             checked={table.getIsAllRowsSelected()}
             onChange={table.getToggleAllRowsSelectedHandler()}
-            className="rounded border-border bg-background text-primary focus:ring-ring"
+            className="-m-1 p-1 rounded border-border bg-background text-primary focus:ring-ring"
           />
         ),
         cell: ({ row }) => {
@@ -993,7 +994,7 @@ export default function TransactionTable({
               checked={row.getIsSelected()}
               onChange={row.getToggleSelectedHandler()}
               onClick={(e) => e.stopPropagation()}
-              className="rounded border-border bg-background text-primary focus:ring-ring"
+              className="-m-1 p-1 rounded border-border bg-background text-primary focus:ring-ring"
             />
           );
         },
@@ -1115,7 +1116,8 @@ export default function TransactionTable({
                 )}
               </div>
               {!tx.isSplitChild && (
-                <button
+                <IconButton
+                  size="sm" label="Search on Google"
                   onClick={(e) => {
                     e.stopPropagation();
                     window.open(
@@ -1124,11 +1126,10 @@ export default function TransactionTable({
                       "noopener,noreferrer",
                     );
                   }}
-                  className="opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1.5"
-                  title="Search on Google"
+                  className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all -m-0.5 p-0.5 ml-1.5 flex-shrink-0 text-muted-foreground/60"
                 >
                   <Search className="h-3.5 w-3.5" />
-                </button>
+                </IconButton>
               )}
             </div>
           );
@@ -1367,7 +1368,7 @@ export default function TransactionTable({
                               onChange={(e) =>
                                 setNewCategoryIsIncome(e.target.checked)
                               }
-                              className="rounded border-border text-primary focus:ring-ring"
+                              className="-m-1 p-1 rounded border-border text-primary focus:ring-ring"
                               onClick={(e) => e.stopPropagation()}
                             />
                             <label
@@ -1877,7 +1878,8 @@ export default function TransactionTable({
                           );
                         })()}
                         {!(tx as any).isSplitChild && (
-                          <button
+                          <IconButton
+                            size="sm" label="Search on Google"
                             onClick={(e) => {
                               e.stopPropagation();
                               const searchQuery =
@@ -1890,11 +1892,10 @@ export default function TransactionTable({
                                 "noopener,noreferrer",
                               );
                             }}
-                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:text-primary transition-all p-1 -m-1 rounded-md text-muted-foreground/60 hover:bg-muted flex-shrink-0 ml-1 shrink-0"
-                            title="Search on Google"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all -m-0.5 p-0.5 ml-1 shrink-0 text-muted-foreground/60"
                           >
                             <Search className="h-3.5 w-3.5" />
-                          </button>
+                          </IconButton>
                         )}
                         {tx.splits && tx.splits.length > 0 && (
                           <Tooltip>
@@ -2066,7 +2067,7 @@ export default function TransactionTable({
                                           id={`compact-new-cat-income-${tx.id}`}
                                           checked={newCategoryIsIncome}
                                           onChange={(e) => setNewCategoryIsIncome(e.target.checked)}
-                                          className="rounded border-border text-primary focus:ring-ring"
+                                          className="-m-1 p-1 rounded border-border text-primary focus:ring-ring"
                                           onClick={(e) => e.stopPropagation()}
                                         />
                                         <label htmlFor={`compact-new-cat-income-${tx.id}`} className="text-micro font-medium text-muted-foreground">Income</label>

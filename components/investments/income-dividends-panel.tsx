@@ -33,7 +33,6 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { yearMonthOf, addMonthsClamped } from '@/lib/utils/investment-flows';
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import {
   INCOME_TIMEFRAMES,
   useInvestmentIncomeData,
@@ -43,6 +42,7 @@ import {
   type ClassifiedTransaction,
 } from '@/lib/hooks/use-investment-income';
 import { buildTransactionsDeepLink } from '@/components/investments/recent-activity';
+import { IconTip } from '@/components/ui/icon-tip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 /* ── Series definitions ─────────────────────────────────────────────────── */
@@ -252,18 +252,9 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
     <div className="flex items-center gap-2">
       <CircleDollarSign className="w-4 h-4 text-primary shrink-0" />
       <span>Capital Flow</span>
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label="How is this breakdown calculated?"
-              className="-m-[15px] p-[15px] text-muted-foreground/60 hover:text-foreground transition-colors rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <Info className="w-3.5 h-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" align="start" className="max-w-xs p-3 space-y-2 text-xs text-left leading-relaxed">
+      <IconTip
+        content={
+          <div className="max-w-xs space-y-2 text-left leading-relaxed">
             <div className="font-semibold text-foreground">
               Calendar-month capital breakdown · {timeframeLabel(timeframe)}
             </div>
@@ -277,9 +268,12 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
             <p className="text-muted-foreground">
               Click any bar for a month-by-month detail. Hover for a quick breakdown.
             </p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+          </div>
+        }
+        side="bottom"
+        align="start"
+        aria-label="How is this breakdown calculated?"
+      />
     </div>
   );
 

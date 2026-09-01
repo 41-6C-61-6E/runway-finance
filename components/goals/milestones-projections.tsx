@@ -17,6 +17,7 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, PiggyBank, Loader2, Check } from 'lucide-react';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { cn } from '@/lib/utils';
+import { IconButton } from '@/components/ui/icon-button';
 import { formatCurrency } from '@/lib/utils/format';
 import { useGoalInflow } from './goal-inflow-context';
 
@@ -457,13 +458,13 @@ export function MilestonesProjections() {
                     </button>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button
+                    <IconButton
+                      size="sm" variant="outline" label="Decrease inflow by $500"
+                      className="h-6 w-6 p-0 rounded-md border-border/50 hover:bg-muted hover:text-foreground"
                       onClick={() => adjustInflowForAccount(acct.accountId, -500)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border/50"
-                      title="Decrease by $500"
                     >
                       <Minus className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -483,13 +484,13 @@ export function MilestonesProjections() {
                       }}
                       className="w-28 px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm font-semibold text-center tabular-nums"
                     />
-                    <button
+                    <IconButton
+                      size="sm" variant="outline" label="Increase inflow by $500"
+                      className="h-6 w-6 p-0 rounded-md border-border/50 hover:bg-muted hover:text-foreground"
                       onClick={() => adjustInflowForAccount(acct.accountId, 500)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border/50"
-                      title="Increase by $500"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                     {isSaved && (
                       <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-500 ml-1">
                         <Check className="w-3 h-3" />

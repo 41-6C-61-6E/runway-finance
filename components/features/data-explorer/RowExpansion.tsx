@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { Copy, Check, ExternalLink, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import JsonViewer from './JsonViewer';
+import { IconButton } from '@/components/ui/icon-button';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -218,20 +219,20 @@ function CellValue({
     return (
       <div className="flex items-center gap-1.5 group">
         <code className="text-primary font-mono text-[11px]">{String(value)}</code>
-        <button
+        <IconButton
+          size="sm" label="View related record"
+          className="-m-0.5 p-0.5 text-muted-foreground/50 hover:bg-primary/10 hover:text-primary/90 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={handleNavigate}
-          className="p-0.5 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"
-          title="View related record"
         >
           <ExternalLink className="h-3 w-3" />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
+          size="sm" label="Copy value"
+          className="-m-0.5 p-0.5 text-muted-foreground/50 hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={() => handleCopy(String(value))}
-          className="p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Copy value"
-        >
+          >
           {copied ? <Check className="h-3 w-3 text-chart-1" /> : <Copy className="h-3 w-3" />}
-        </button>
+        </IconButton>
       </div>
     );
   }
@@ -245,13 +246,13 @@ function CellValue({
   return (
     <div className="flex items-center gap-1.5 group">
       <span className={`font-mono text-[11px] ${type === 'number' ? 'tabular-nums' : ''}`}>{display}</span>
-      <button
+      <IconButton
+        size="sm" label="Copy value"
+        className="-m-0.5 p-0.5 text-muted-foreground/50 hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
         onClick={() => handleCopy(String(value))}
-        className="p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
-        title="Copy value"
-      >
+        >
         {copied ? <Check className="h-3 w-3 text-chart-1" /> : <Copy className="h-3 w-3" />}
-      </button>
+      </IconButton>
     </div>
   );
 }

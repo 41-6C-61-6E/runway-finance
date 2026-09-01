@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { CheckCircle2, Target, AlertCircle, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { ListRow } from '@/components/ui/list-row';
+import { IconButton } from '@/components/ui/icon-button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface Goal {
@@ -192,22 +193,32 @@ export function GoalCard({
               <GripVertical className="w-4 h-4" />
             </div>
             <div className="flex flex-col gap-0.5">
-              <button
-                onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }}
-                disabled={isFirst}
-                className="-m-[15px] p-[15px] rounded hover:text-foreground hover:bg-background disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                title="Move up"
-              >
-                <ArrowUp className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }}
-                disabled={isLast}
-                className="-m-[15px] p-[15px] rounded hover:text-foreground hover:bg-background disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                title="Move down"
-              >
-                <ArrowDown className="w-3.5 h-3.5" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <IconButton
+                    size="sm" label="Move goal up"
+                    className="-m-0.5 p-0.5 hover:bg-background hover:text-foreground disabled:opacity-30"
+                    disabled={isFirst}
+                    onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }}
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </IconButton>
+                </TooltipTrigger>
+                <TooltipContent side="right">Move up</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <IconButton
+                    size="sm" label="Move goal down"
+                    className="-m-0.5 p-0.5 hover:bg-background hover:text-foreground disabled:opacity-30"
+                    disabled={isLast}
+                    onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }}
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </IconButton>
+                </TooltipTrigger>
+                <TooltipContent side="right">Move down</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         )}

@@ -8,6 +8,7 @@ import { BudgetFormDialog } from './budget-form-dialog';
 import { AutoBudgetDialog } from './auto-budget-dialog';
 import { BudgetExclusionsDialog } from './budget-exclusions-dialog';
 import { FeatureSettingsMenu } from '@/components/ui/feature-settings-menu';
+import { IconButton } from '@/components/ui/icon-button';
 import { BudgetItemTransactionsIcon, getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
 import { isEnvelopeRow, envelopeExplainText, ENVELOPE_STATUS_META, nativePeriodLabel, type EnvelopeBudgetRow } from '@/lib/utils/budget-envelope';
@@ -665,12 +666,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       )}
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => setDeleteBudget(b)} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground hover:text-destructive">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                      <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                     </div>
                   </div>
                   {renderMobileProgress(b, true)}
@@ -738,12 +735,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       )}
                     </div>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => setDeleteBudget(b)} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground hover:text-destructive">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                      <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                     </div>
                   </div>
 
@@ -922,12 +915,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                           )}
                           <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                              <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground">
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => setDeleteBudget(b)} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground hover:text-destructive">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                              <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                             </div>
                           </td>
                         </tr>
@@ -1036,12 +1025,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             )}
                             <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                                <button onClick={() => { setEditBudget(b); setShowForm(true); }} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground">
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button onClick={() => setDeleteBudget(b)} className="-m-[15px] p-[15px] rounded hover:bg-accent text-muted-foreground hover:text-destructive">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                                <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                               </div>
                             </td>
                           </tr>

@@ -9,6 +9,7 @@ import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { cn } from '@/lib/utils';
+import { IconButton } from '@/components/ui/icon-button';
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
   'single-family': 'Single Family',
@@ -205,14 +206,13 @@ export function PropertyCard({
         actions={
           <div className="text-right flex items-center gap-2">
             {!isCollapsed && onEditProperty && (
-              <button
+              <IconButton
+                size="sm" label="Edit property details"
+                className="p-1 -m-0.5 text-muted-foreground"
                 onClick={onEditProperty}
-                title="Edit property details"
-                className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                type="button"
               >
                 <Pencil className="w-3.5 h-3.5" />
-              </button>
+              </IconButton>
             )}
             {editingValue ? (
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -223,20 +223,20 @@ export function PropertyCard({
                   className="w-24 px-1.5 py-0.5 text-xs bg-background border border-input rounded text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-primary"
                   autoFocus
                 />
-                <button
+                <IconButton
+                  size="sm" label="Save value"
+                  className="p-0.5 -m-0.5 text-emerald-600 dark:text-emerald-400"
                   onClick={handleSaveValue}
-                  className="p-0.5 rounded hover:bg-muted text-emerald-600 dark:text-emerald-400"
-                  type="button"
                 >
                   <BadgeCheck className="w-3.5 h-3.5" />
-                </button>
-                <button
+                </IconButton>
+                <IconButton
+                  size="sm" label="Cancel edit"
+                  className="p-0.5 -m-0.5 text-destructive"
                   onClick={() => setEditingValue(false)}
-                  className="p-0.5 rounded hover:bg-muted text-destructive"
-                  type="button"
                 >
                   <X className="w-3.5 h-3.5" />
-                </button>
+                </IconButton>
               </div>
             ) : (
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -244,17 +244,16 @@ export function PropertyCard({
                   {formatCurrency(property.value)}
                 </span>
                 {!isCollapsed && (
-                  <button
+                  <IconButton
+                    size="sm" label="Override estimated value"
+                    className="p-0.5 -m-0.5 text-muted-foreground"
                     onClick={() => {
                       setEditingValue(true);
                       setNewValue(String(property.value));
                     }}
-                    className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors cursor-pointer"
-                    title="Override estimated value"
-                    type="button"
                   >
                     <Pencil className="w-3 h-3" />
-                  </button>
+                  </IconButton>
                 )}
               </div>
             )}
@@ -556,23 +555,21 @@ export function PropertyCard({
                             </div>
                             <div className="text-right flex-shrink-0 ml-3 flex items-center gap-1.5">
                               {onEditMortgage && (
-                                <button
+                                <IconButton
+                                  size="sm" label="Edit attributes"
+                                  className="p-1 -m-0.5 text-muted-foreground/40"
                                   onClick={() => onEditMortgage(m)}
-                                  className="p-1 rounded hover:bg-muted text-muted-foreground/40 hover:text-foreground transition-colors cursor-pointer"
-                                  title="Edit attributes"
-                                  type="button"
                                 >
                                   <Pencil className="w-3 h-3" />
-                                </button>
+                                </IconButton>
                               )}
-                              <button
+                              <IconButton
+                                size="sm" label="Unlink mortgage"
+                                className="p-1 -m-0.5 text-muted-foreground/40 hover:text-destructive/80"
                                 onClick={() => onUnlinkMortgage(m.id)}
-                                className="p-1 rounded hover:bg-muted text-muted-foreground/40 hover:text-destructive transition-colors cursor-pointer"
-                                title="Unlink mortgage"
-                                type="button"
                               >
                                 <X className="w-3.5 h-3.5" />
-                              </button>
+                              </IconButton>
                               <span className="font-mono text-muted-foreground blur-number ml-1">$0.00</span>
                             </div>
                           </div>

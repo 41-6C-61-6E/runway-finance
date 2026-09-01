@@ -7,14 +7,14 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
-  Info,
   Landmark,
   RefreshCw,
   Download,
   X,
   Check,
 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { IconTip } from '@/components/ui/icon-tip';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 import { getDisplayTicker } from '@/lib/types/investments';
 
@@ -749,16 +749,11 @@ export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding
                         <div className="flex items-center justify-end gap-1 text-muted-foreground/40">
                           <span>—</span>
                           <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button className="focus:outline-none" onClick={(e) => e.stopPropagation()}>
-                                  <Info className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-foreground cursor-pointer" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="left" className="max-w-[200px] text-xs font-sans">
-                                Cost basis is not reported by your brokerage for this asset.
-                              </TooltipContent>
-                            </Tooltip>
+                            <IconTip
+                              content="Cost basis is not reported by your brokerage for this asset."
+                              side="left"
+                              size={14}
+                            />
                           </TooltipProvider>
                         </div>
                       )}

@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, X, Plus, Filter, RotateCcw, Settings2, EyeOff, Eye } from 'lucide-react';
 import DataExport from './DataExport';
+import { IconButton } from '@/components/ui/icon-button';
 
 type ColumnMeta = {
   field: string;
@@ -130,12 +131,13 @@ export default function DataToolbar({
             className="w-full pl-8 pr-8 py-1.5 text-xs bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
           {search && (
-            <button
+            <IconButton
+              size="sm" label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 -m-0.5 p-0.5 text-muted-foreground"
               onClick={() => onSearchChange('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground"
             >
               <X className="h-3 w-3" />
-            </button>
+            </IconButton>
           )}
         </div>
 

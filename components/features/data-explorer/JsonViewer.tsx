@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
+import { IconButton } from '@/components/ui/icon-button';
 
 interface JsonViewerProps {
   data: unknown;
@@ -90,13 +91,13 @@ export default function JsonViewer({ data, defaultExpanded = false }: JsonViewer
 
   return (
     <div className="relative group">
-      <button
+      <IconButton
+        size="sm" label="Copy JSON"
+        className="absolute top-1 right-1 -m-0.5 p-1 text-muted-foreground hover:bg-muted hover:text-foreground/90 opacity-0 group-hover:opacity-100 transition-opacity"
         onClick={handleCopy}
-        className="absolute top-1 right-1 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity"
-        title="Copy JSON"
       >
         {copied ? <Check className="h-3 w-3 text-chart-1" /> : <Copy className="h-3 w-3" />}
-      </button>
+      </IconButton>
       <div className="bg-muted/20 rounded-md p-2 font-mono text-xs overflow-x-auto max-h-96 overflow-y-auto">
         <JsonNode value={data} depth={0} defaultExpanded={defaultExpanded} />
       </div>
