@@ -311,7 +311,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
             <MessageSquare className="w-5 h-5" />
             {openIssues.length > 0 && (
               <span
-                className={`absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold leading-none ${
+                className={`absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-micro font-bold leading-none ${
                   hasOpenBugs
                     ? 'bg-destructive text-destructive-foreground'
                     : 'bg-primary text-primary-foreground'

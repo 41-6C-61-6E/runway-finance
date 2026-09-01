@@ -230,7 +230,7 @@ export function RecentActivity({ transactions, startDate, endDate, value, onValu
                       >
                         {/* Type icon pill */}
                         <div
-                          className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wide ${typeConfig.color} ${typeConfig.bg}`}
+                          className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded border text-micro font-bold uppercase tracking-wide ${typeConfig.color} ${typeConfig.bg}`}
                           title={`${typeConfig.label}${series ? ` · shown as “${series.label}” in the chart` : ' · internal activity, not shown in the chart'}`}
                         >
                           <TypeIcon className="w-2.5 h-2.5" />
@@ -244,7 +244,7 @@ export function RecentActivity({ transactions, startDate, endDate, value, onValu
                               {tx.payee || tx.description || amountLabel(tx)}
                             </span>
                             {tx.pending && (
-                              <span className="flex items-center gap-0.5 px-1 py-0.5 text-[8px] font-bold rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none shrink-0">
+                              <span className="flex items-center gap-0.5 px-1 py-0.5 text-micro font-bold rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none shrink-0">
                                 <Clock className="w-2.5 h-2.5" /> Pending
                               </span>
                             )}

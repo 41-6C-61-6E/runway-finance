@@ -560,12 +560,12 @@ Please perform a detailed, multi-dimensional review of this plan:
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span>Age {y.primaryAge} ({y.year})</span>
                                   {isRetire && (
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30 print:text-violet-700">
+                                    <span className="px-1.5 py-0.5 rounded text-micro font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30 print:text-violet-700">
                                       RETIRE
                                     </span>
                                   )}
                                   {isCrossover && !isRetire && (
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-500/20 text-orange-500 border border-orange-500/30 print:text-orange-700">
+                                    <span className="px-1.5 py-0.5 rounded text-micro font-bold bg-orange-500/20 text-orange-500 border border-orange-500/30 print:text-orange-700">
                                       FIRE CROSSOVER
                                     </span>
                                   )}

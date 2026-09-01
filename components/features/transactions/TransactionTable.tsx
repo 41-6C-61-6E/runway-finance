@@ -1088,7 +1088,7 @@ export default function TransactionTable({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span
-                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-micro font-semibold rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
                           aria-label={`Recurring transaction: ${match.name}`}
                         >
                           <Repeat className="w-2.5 h-2.5" />
@@ -1104,7 +1104,7 @@ export default function TransactionTable({
                 {tx.splits && tx.splits.length > 0 && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0 cursor-help">
+                      <span className="px-1 py-0.2 text-micro font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0 cursor-help">
                         Split
                       </span>
                     </TooltipTrigger>
@@ -1215,7 +1215,7 @@ export default function TransactionTable({
           }
           return (
             <div className="flex items-center min-w-0 max-w-full">
-              <span className={`text-[9px] font-semibold px-1 py-0.2 rounded border uppercase tracking-tight flex-shrink-0 ${groupBadgeStyles[groupKey] || 'bg-muted text-muted-foreground'}`}>
+              <span className={`text-micro font-semibold px-1 py-0.2 rounded border uppercase tracking-tight flex-shrink-0 ${groupBadgeStyles[groupKey] || 'bg-muted text-muted-foreground'}`}>
                 {groupKey || tx.accountType}
               </span>
             </div>
@@ -1307,7 +1307,7 @@ export default function TransactionTable({
                           New Category
                         </div>
                         <div>
-                          <label className="block text-[9px] font-medium text-muted-foreground mb-0.5">
+                          <label className="block text-micro font-medium text-muted-foreground mb-0.5">
                             Name
                           </label>
                           <input
@@ -1321,7 +1321,7 @@ export default function TransactionTable({
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-medium text-muted-foreground mb-0.5">
+                          <label className="block text-micro font-medium text-muted-foreground mb-0.5">
                             Parent Category
                           </label>
                           <select
@@ -1354,7 +1354,7 @@ export default function TransactionTable({
                               className="w-5 h-5 rounded cursor-pointer border border-input"
                               onClick={(e) => e.stopPropagation()}
                             />
-                            <span className="text-[9px] font-mono text-muted-foreground">
+                            <span className="text-micro font-mono text-muted-foreground">
                               {newCategoryColor}
                             </span>
                           </div>
@@ -1372,7 +1372,7 @@ export default function TransactionTable({
                             />
                             <label
                               htmlFor={`table-new-category-income-${tx.id}`}
-                              className="text-[9px] font-medium text-muted-foreground"
+                              className="text-micro font-medium text-muted-foreground"
                             >
                               Income
                             </label>
@@ -1863,11 +1863,11 @@ export default function TransactionTable({
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span
-                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-semibold rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-micro font-semibold rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
                                   aria-label={`Recurring: ${match.name}`}
                                 >
                                   <Repeat className="w-2.5 h-2.5" />
-                                  <span className="capitalize text-[8px]">{match.frequency}</span>
+                                  <span className="capitalize text-micro">{match.frequency}</span>
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="text-xs">
@@ -1899,7 +1899,7 @@ export default function TransactionTable({
                         {tx.splits && tx.splits.length > 0 && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="px-1 py-0.2 text-[8px] font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0 cursor-help">
+                              <span className="px-1 py-0.2 text-micro font-extrabold rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider select-none flex-shrink-0 cursor-help">
                                 Split
                               </span>
                             </TooltipTrigger>
@@ -2021,7 +2021,7 @@ export default function TransactionTable({
                                       New Category
                                     </div>
                                     <div>
-                                      <label className="block text-[9px] font-medium text-muted-foreground mb-0.5">
+                                      <label className="block text-micro font-medium text-muted-foreground mb-0.5">
                                         Name
                                       </label>
                                       <input
@@ -2034,7 +2034,7 @@ export default function TransactionTable({
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-[9px] font-medium text-muted-foreground mb-0.5">
+                                      <label className="block text-micro font-medium text-muted-foreground mb-0.5">
                                         Parent Category
                                       </label>
                                       <select
@@ -2058,7 +2058,7 @@ export default function TransactionTable({
                                           className="w-5 h-5 rounded cursor-pointer border border-input"
                                           onClick={(e) => e.stopPropagation()}
                                         />
-                                        <span className="text-[9px] font-mono text-muted-foreground">{newCategoryColor}</span>
+                                        <span className="text-micro font-mono text-muted-foreground">{newCategoryColor}</span>
                                       </div>
                                       <div className="flex items-center gap-1">
                                         <input
@@ -2069,7 +2069,7 @@ export default function TransactionTable({
                                           className="rounded border-border text-primary focus:ring-ring"
                                           onClick={(e) => e.stopPropagation()}
                                         />
-                                        <label htmlFor={`compact-new-cat-income-${tx.id}`} className="text-[9px] font-medium text-muted-foreground">Income</label>
+                                        <label htmlFor={`compact-new-cat-income-${tx.id}`} className="text-micro font-medium text-muted-foreground">Income</label>
                                       </div>
                                     </div>
                                     <div className="flex gap-2 pt-2 border-t border-border/50">

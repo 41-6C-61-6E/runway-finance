@@ -77,7 +77,7 @@ export default function AccountDetailPanel({
               {account.isHidden && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="text-[9px] sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded cursor-help shrink-0">Hidden</span>
+                    <span className="text-micro sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded cursor-help shrink-0">Hidden</span>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">
                     This account is hidden from lists and summaries
@@ -87,7 +87,7 @@ export default function AccountDetailPanel({
               {account.isExcludedFromNetWorth && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="text-[9px] sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded cursor-help shrink-0">Excluded</span>
+                    <span className="text-micro sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded cursor-help shrink-0">Excluded</span>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">
                     Excluded from Net Worth totals

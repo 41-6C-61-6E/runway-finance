@@ -317,7 +317,7 @@ export function HoldingDetailSheet({
                     <span className="px-2.5 py-1 font-mono text-sm font-bold rounded-lg bg-primary/10 text-primary border border-primary/20">
                       {ticker}
                       {holding.tickerOverride && (
-                        <span className="ml-1.5 align-middle text-[9px] font-sans font-semibold uppercase tracking-wider text-primary/70">
+                        <span className="ml-1.5 align-middle text-micro font-sans font-semibold uppercase tracking-wider text-primary/70">
                           custom
                         </span>
                       )}
@@ -682,7 +682,7 @@ function TickerEditSection({
             <span className="text-muted-foreground">Ticker:</span>
             <span className="font-mono font-semibold text-foreground">{effectiveTicker}</span>
             {hasCustom && (
-              <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-semibold uppercase tracking-wider">
+              <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-micro font-semibold uppercase tracking-wider">
                 custom
               </span>
             )}

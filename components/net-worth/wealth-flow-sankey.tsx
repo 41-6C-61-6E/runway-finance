@@ -428,7 +428,7 @@ function DetailModal({
               </h4>
               <div className="border border-border/40 rounded-xl overflow-hidden">
                 <table className="w-full text-[11px] text-left border-collapse">
-                  <thead className="bg-muted/30 text-muted-foreground uppercase tracking-wider text-[9px] font-semibold border-b border-border/40">
+                  <thead className="bg-muted/30 text-muted-foreground uppercase tracking-wider text-micro font-semibold border-b border-border/40">
                     <tr>
                       <th className="p-2.5">Account</th>
                       <th className="p-2.5 text-right">Start</th>
@@ -1219,7 +1219,7 @@ function DriverLedgerSection({
           <span className="font-bold text-muted-foreground/60">{sign}</span>
           {label}
           {accounts && accounts.length > 0 && (
-            <span className="text-[9px] text-muted-foreground/60 font-normal">
+            <span className="text-[11px] text-muted-foreground/60 font-normal">
               ({accounts.length} {accounts.length === 1 ? 'account' : 'accounts'})
             </span>
           )}
@@ -1233,7 +1233,7 @@ function DriverLedgerSection({
         <div className="pl-4 ml-2 space-y-0.5 pb-1">
           <table className="w-full text-[10px] text-left border-collapse font-mono">
             <thead>
-              <tr className="text-[8px] uppercase tracking-wider text-muted-foreground/60">
+              <tr className="text-micro uppercase tracking-wider text-muted-foreground/60">
                 <th className="py-0.5 pr-2 font-semibold">Account</th>
                 <th className="py-0.5 text-right pr-2 font-semibold">Start</th>
                 <th className="py-0.5 text-right pr-2 font-semibold">End</th>

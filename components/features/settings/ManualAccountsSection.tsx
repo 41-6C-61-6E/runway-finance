@@ -1105,7 +1105,7 @@ export default function ManualAccountsSection() {
                           {account.tags.map((tag) => (
                             <span
                               key={tag.id}
-                              className="px-1.5 py-0.2 rounded-full text-[8px] font-medium border shrink-0"
+                              className="px-1.5 py-0.2 rounded-full text-micro font-medium border shrink-0"
                               style={{
                                 backgroundColor: `${tag.color}15`,
                                 color: tag.color,

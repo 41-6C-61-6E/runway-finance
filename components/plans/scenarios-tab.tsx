@@ -667,7 +667,7 @@ function ScenarioStrategyTooltip({ active, payload, activeMethod, activeRoth }: 
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
                   <span className="truncate">{entry.name}</span>
                   {isCurrentActive && (
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-primary text-primary-foreground font-sans font-bold uppercase shrink-0">
+                    <span className="text-micro px-1 py-0.2 rounded bg-primary text-primary-foreground font-sans font-bold uppercase shrink-0">
                       Active
                     </span>
                   )}

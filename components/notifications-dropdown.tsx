@@ -380,7 +380,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
           >
             <Bell className={`w-5 h-5 ${shouldWiggle ? 'animate-bounce' : ''}`} />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold leading-none">
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-micro font-bold leading-none">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
@@ -504,7 +504,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
                       <p className={`text-xs truncate ${!n.isRead ? 'font-semibold text-foreground' : 'text-foreground/90'}`}>
                         {n.title}
                       </p>
-                      <span className="text-[9px] text-muted-foreground whitespace-nowrap flex-shrink-0 mt-0.5">
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0 mt-0.5">
                         {formatTimeAgo(n.createdAt)}
                       </span>
                     </div>
@@ -512,7 +512,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
                       {n.body}
                     </p>
                     {n.urlPath && n.urlPath !== '/' && (
-                      <span className="inline-flex items-center gap-0.5 text-[9px] text-primary mt-1.5 font-medium hover:underline">
+                      <span className="inline-flex items-center gap-0.5 text-[11px] text-primary mt-1.5 font-medium hover:underline">
                         View
                         <ExternalLink className="w-2 h-2" />
                       </span>

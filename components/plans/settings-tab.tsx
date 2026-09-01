@@ -1419,7 +1419,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                                   <div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-bold text-foreground">{item.accountName}</span>
-                                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                                      <span className={`text-micro font-semibold px-1.5 py-0.5 rounded ${
                                         item.portionType === 'roth'
                                           ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                           : item.portionType === 'traditional'
@@ -1433,7 +1433,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
                                         {item.portionLabel}
                                       </span>
                                       {item.isSplit && (
-                                        <span className="text-[9px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                        <span className="text-micro font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                                           Split: {100 - item.rothPercentage}% Pre-Tax / {item.rothPercentage}% Roth
                                         </span>
                                       )}

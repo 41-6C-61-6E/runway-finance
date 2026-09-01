@@ -1294,7 +1294,7 @@ export default function AutomaticAccountsSection({
                               e.stopPropagation();
                               onOpenAccountDrawer(account);
                             }}
-                            className="px-2 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors whitespace-nowrap"
+                            className="px-2 py-0.5 sm:py-1 text-micro sm:text-[10px] font-medium text-muted-foreground hover:text-foreground border border-border hover:bg-muted rounded-lg transition-colors whitespace-nowrap"
                           >
                             Edit
                           </button>

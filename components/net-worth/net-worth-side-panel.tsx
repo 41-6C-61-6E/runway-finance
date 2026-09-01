@@ -401,7 +401,7 @@ export function NetWorthSidePanel() {
                   <TooltipRow label="Assets" value={formatCurrency(totals.totalAssets)} color="var(--color-chart-1)" />
                   <TooltipRow label="Ratio" value={`${debtPct.toFixed(1)}%`} color="var(--color-primary)" />
                   <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
-                    <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</div>
+                    <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</div>
                     <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />Excellent: &lt;35%</span><span>Healthy</span></div>
                     <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />Good: 35% - 45%</span><span>Moderate</span></div>
                     <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500" />Fair: 45% - 55%</span><span>Elevated</span></div>
@@ -447,7 +447,7 @@ export function NetWorthSidePanel() {
                     <TooltipRow label="Liquid" value={`${formatCurrency(liquidity.liquid)} (${liquidity.liquidPct.toFixed(1)}%)`} color="var(--color-chart-2)" />
                     <TooltipRow label="Illiquid" value={`${formatCurrency(liquidity.illiquid)} (${liquidity.illiquidPct.toFixed(1)}%)`} color="var(--color-chart-4)" />
                     <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
-                      <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Classification</div>
+                      <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Classification</div>
                       <div className="text-[10px] text-muted-foreground">Liquid: Checking, savings, brokerage, crypto, metals</div>
                       <div className="text-[10px] text-muted-foreground">Illiquid: Retirement, real estate, vehicles, HSA, 529</div>
                     </div>

@@ -701,7 +701,7 @@ export default function AccountHistoryChart({
 
         {activeAssets.length > 0 && (
           <div className="mt-2 border-t border-border/40 pt-1.5">
-            <div className="text-[9px] font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Assets</div>
+            <div className="text-micro font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Assets</div>
             {activeAssets.map((key) => {
               const info = seriesInfoMap.get(key);
               return (
@@ -718,7 +718,7 @@ export default function AccountHistoryChart({
 
         {activeLiabilities.length > 0 && (
           <div className="mt-2 border-t border-border/40 pt-1.5">
-            <div className="text-[9px] font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Liabilities</div>
+            <div className="text-micro font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Liabilities</div>
             {activeLiabilities.map((key) => {
               const info = seriesInfoMap.get(key);
               return (

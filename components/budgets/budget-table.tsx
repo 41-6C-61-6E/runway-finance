@@ -384,7 +384,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
         title={`Averaged from ${formatCurrency(b.nativeAmount ?? 0)} per ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} — not a separate ${periodType === 'quarterly' ? 'quarterly' : 'monthly'} budget`}
       >
         {formatCurrency(b.budgeted)}
-        <span className="text-[9px] font-sans text-muted-foreground/70 ml-0.5">avg</span>
+        <span className="text-[11px] font-sans text-muted-foreground/70 ml-0.5">avg</span>
       </span>
     );
   };

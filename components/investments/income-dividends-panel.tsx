@@ -586,11 +586,11 @@ function SummaryTile({
     >
       <div className="flex items-center gap-1.5 mb-1 min-w-0">
         <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
-        <span className="text-[9px] font-semibold text-muted-foreground group-hover:text-foreground uppercase tracking-wide truncate" title={label}>
+        <span className="text-micro font-semibold text-muted-foreground group-hover:text-foreground uppercase tracking-wide truncate" title={label}>
           {label}
         </span>
         {onFocusActivity && (
-          <span className="ml-auto text-[9px] font-semibold text-muted-foreground/0 group-hover:text-primary transition-colors">
+          <span className="ml-auto text-[11px] font-semibold text-muted-foreground/0 group-hover:text-primary transition-colors">
             Filter
           </span>
         )}

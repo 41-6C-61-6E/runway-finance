@@ -62,7 +62,7 @@ function getStatusBadge(status: string) {
     case 'completed':
       return (
         <span 
-          className="goal-pill px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0"
+          className="goal-pill px-1.5 py-0.5 rounded text-micro font-bold uppercase tracking-wider shrink-0"
           style={{ '--goal-color': 'var(--status-positive)' } as React.CSSProperties}
         >
           Done
@@ -70,14 +70,14 @@ function getStatusBadge(status: string) {
       );
     case 'paused':
       return (
-        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-muted text-muted-foreground border border-border/50 uppercase tracking-wider shrink-0">
+        <span className="px-1.5 py-0.5 rounded text-micro font-bold bg-muted text-muted-foreground border border-border/50 uppercase tracking-wider shrink-0">
           Paused
         </span>
       );
     case 'pending':
       return (
         <span 
-          className="goal-pill px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0"
+          className="goal-pill px-1.5 py-0.5 rounded text-micro font-bold uppercase tracking-wider shrink-0"
           style={{ '--goal-color': 'var(--chart-2)' } as React.CSSProperties}
         >
           Pending
@@ -86,7 +86,7 @@ function getStatusBadge(status: string) {
     default:
       return (
         <span 
-          className="goal-pill px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0"
+          className="goal-pill px-1.5 py-0.5 rounded text-micro font-bold uppercase tracking-wider shrink-0"
           style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
         >
           Active
@@ -240,7 +240,7 @@ export function GoalCard({
                 {getStatusBadge(goal.status)}
                 {goal.isUnderfunded && goal.status === 'active' && (
                   <span 
-                    className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider shrink-0"
+                    className="px-1.5 py-0.5 rounded text-micro font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider shrink-0"
                     title="Underfunded: allocated less than desired due to priority ordering or account balance limits"
                   >
                     Underfunded
@@ -268,7 +268,7 @@ export function GoalCard({
                     {goal.tags.map((tag) => (
                       <span
                         key={tag.id}
-                        className="px-1.5 py-0.5 rounded-full text-[9px] font-medium border"
+                        className="px-1.5 py-0.5 rounded-full text-micro font-medium border"
                         style={{
                           backgroundColor: `${tag.color}15`,
                           color: tag.color,
