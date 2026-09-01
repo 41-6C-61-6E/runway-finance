@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
@@ -176,9 +177,9 @@ export function FireProjectionsSidePanel({
                   <span className="text-2xl font-extrabold text-foreground font-mono blur-number">
                     {fireProgress.toFixed(0)}%
                   </span>
-                  <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                  <SectionHeading label>
                     FIRE Goal
-                  </span>
+                  </SectionHeading>
                 </div>
               </div>
 

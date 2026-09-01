@@ -16,6 +16,7 @@ import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown,
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -484,7 +485,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <div className="p-3 sm:p-5 pb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
+          <SectionHeading>Budget Items</SectionHeading>
         </div>
         <div className="p-3 sm:p-5 text-muted-foreground text-sm">Loading...</div>
       </div>
@@ -494,7 +495,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   if (error) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm p-3 sm:p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Budget Items</h3>
+        <SectionHeading className="mb-3">Budget Items</SectionHeading>
         <ChartEmptyState variant="error" error={error} />
       </div>
     );
@@ -505,7 +506,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <div className="p-3 sm:p-5 pb-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-foreground">Budget Items</h3>
+            <SectionHeading>Budget Items</SectionHeading>
             <TooltipProvider delayDuration={150}>
               <Tooltip>
                 <TooltipTrigger asChild>

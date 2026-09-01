@@ -30,6 +30,7 @@ import {
   IRS_UNIFORM_LIFETIME_TABLE,
   HISTORICAL_RETURNS_DATA,
 } from '@/lib/constants/retirement-defaults';
+import { SectionHeading } from '@/components/ui/section-heading';
 
 interface EngineRulesViewProps {
   rules: any;
@@ -486,9 +487,9 @@ export function EngineRulesView({
           ].map((item, idx) => (
             <div key={idx} className={`p-3.5 rounded-xl border transition-all ${item.color} space-y-1`}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <SectionHeading label>
                   {item.step}
-                </span>
+                </SectionHeading>
                 <span className="text-[10px] font-bold text-foreground bg-background px-1.5 py-0.5 rounded border">
                   Step {idx + 1}
                 </span>

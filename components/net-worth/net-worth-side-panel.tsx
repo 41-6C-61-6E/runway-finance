@@ -402,11 +402,11 @@ export function NetWorthSidePanel() {
                   <TooltipRow label="Ratio" value={formatPlainPercent(debtPct)} color="var(--color-primary)" />
                   <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
                     <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</div>
-                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />Excellent: &lt;35%</span><span>Healthy</span></div>
-                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />Good: 35% - 45%</span><span>Moderate</span></div>
-                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500" />Fair: 45% - 55%</span><span>Elevated</span></div>
-                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500" />Poor: 55% - 75%</span><span>High Risk</span></div>
-                    <div className="flex justify-between gap-4 text-[10px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" />Critical: &gt;75%</span><span>Very High</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />Excellent: &lt;35%</span><span>Healthy</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />Good: 35% - 45%</span><span>Moderate</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500" />Fair: 45% - 55%</span><span>Elevated</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500" />Poor: 55% - 75%</span><span>High Risk</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" />Critical: &gt;75%</span><span>Very High</span></div>
                   </div>
                 </>
               }
@@ -448,8 +448,8 @@ export function NetWorthSidePanel() {
                     <TooltipRow label="Illiquid" value={`${formatCurrency(liquidity.illiquid)} (${formatPlainPercent(liquidity.illiquidPct)})`} color="var(--color-chart-4)" />
                     <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
                       <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Classification</div>
-                      <div className="text-[10px] text-muted-foreground">Liquid: Checking, savings, brokerage, crypto, metals</div>
-                      <div className="text-[10px] text-muted-foreground">Illiquid: Retirement, real estate, vehicles, HSA, 529</div>
+                      <div className="text-[11px] text-muted-foreground">Liquid: Checking, savings, brokerage, crypto, metals</div>
+                      <div className="text-[11px] text-muted-foreground">Illiquid: Retirement, real estate, vehicles, HSA, 529</div>
                     </div>
                   </>
                 }
