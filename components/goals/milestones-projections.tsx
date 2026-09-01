@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { IconButton } from '@/components/ui/icon-button';
 import { formatCurrency } from '@/lib/utils/format';
 import { useGoalInflow } from './goal-inflow-context';
+import { Select } from '@/components/ui/select';
 
 interface GoalProjection {
   goalId: string;
@@ -413,16 +414,16 @@ export function MilestonesProjections() {
           {/* Account Selector */}
           {data.accounts.length > 1 && (
             <div className="flex items-center gap-3">
-              <select
+              <Select
+                className="h-8 text-xs font-medium border-border"
                 value={selectedAccountId}
                 onChange={(e) => setSelectedAccountId(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-medium"
               >
                 <option value="all">All Linked Accounts</option>
                 {data.accounts.map((a) => (
                   <option key={a.accountId} value={a.accountId}>{a.accountName}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
 

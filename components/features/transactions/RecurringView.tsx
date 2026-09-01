@@ -33,6 +33,7 @@ import { MarkAsRecurringModal } from './MarkAsRecurringModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { formatCurrency } from '@/lib/utils/format';
 import { toast } from 'sonner';
+import { Select } from '@/components/ui/select';
 
 interface RecurringViewProps {
   onSelectTransaction?: (txId: string) => void;
@@ -488,15 +489,15 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
                 <ArrowUpDown className="w-3 h-3" />
                 Sort By
               </span>
-              <select
+              <Select
+                className="h-8 rounded-xl text-xs px-2.5"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-2.5 py-1.5 bg-background border border-input rounded-xl text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="amount">Highest Amount</option>
                 <option value="nextDate">Next Due Date</option>
                 <option value="name">Merchant Name</option>
-              </select>
+              </Select>
             </div>
           </div>
         </CollapsibleFilterPanel>

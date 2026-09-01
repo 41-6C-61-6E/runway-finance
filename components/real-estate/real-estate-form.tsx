@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 
 export interface RealEstateFormMeta {
   address?: string;
@@ -90,15 +91,15 @@ export function RealEstateFormFields({
       {/* Valuation Method */}
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Valuation Method</label>
-        <select
+        <Select
+          className="rounded-md"
           value={meta.valuationMethod || 'manual'}
           onChange={(e) => onChange({ ...meta, valuationMethod: e.target.value })}
-          className="w-full h-10 px-3 text-sm bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="manual">Manual (Use balance/snapshot entries)</option>
           <option value="redfin">Automated Redfin Estimates</option>
           <option value="hpi">FHFA Housing Price Index (HPI) Growth</option>
-        </select>
+        </Select>
       </div>
 
       {/* Beds, Baths, Sq Ft */}
@@ -177,10 +178,10 @@ export function RealEstateFormFields({
       {availableMortgages.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">Linked Mortgage</label>
-          <select
+          <Select
+            className="rounded-md"
             value={meta.linkedMortgageId || ''}
             onChange={(e) => onChange({ ...meta, linkedMortgageId: e.target.value })}
-            className="w-full h-10 px-3 text-sm bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">None / Unlinked</option>
             {availableMortgages.map((m) => (
@@ -188,7 +189,7 @@ export function RealEstateFormFields({
                 {m.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
@@ -196,16 +197,16 @@ export function RealEstateFormFields({
       {showSyncFrequency && (
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">Sync Frequency</label>
-          <select
+          <Select
+            className="rounded-md"
             value={meta.syncFrequency || 'monthly'}
             onChange={(e) => onChange({ ...meta, syncFrequency: e.target.value })}
-            className="w-full h-10 px-3 text-sm bg-background border border-input rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
             <option value="manual">Manual Only</option>
-          </select>
+          </Select>
         </div>
       )}
     </div>

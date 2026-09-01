@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatCompactEstimate, formatRedfinSuccessMessage } from './estimate-helpers';
 import { RealEstateFormFields, extractZipCodeFromAddress } from './real-estate-form';
+import { Select } from '@/components/ui/select';
 
 const PROPERTY_TYPES = [
   { value: 'single-family', label: 'Single Family Home' },
@@ -403,16 +404,15 @@ export function PropertyCards() {
           {availableMortgages.length === 0 ? (
             <p className="text-xs text-muted-foreground">No unlinked mortgage accounts available.</p>
           ) : (
-            <select
+            <Select
               value={selectedMortgageId}
               onChange={(e) => setSelectedMortgageId(e.target.value)}
-              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm"
             >
               <option value="">Select a mortgage...</option>
               {availableMortgages.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
-            </select>
+            </Select>
           )}
           <DialogFooter className="flex-row justify-end gap-2">
             <button
@@ -494,16 +494,15 @@ export function PropertyCards() {
             )}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Property Type</label>
-              <select
+              <Select
                 value={propertyEditMeta.propertyType || ''}
                 onChange={(e) => setPropertyEditMeta((m) => ({ ...m, propertyType: e.target.value }))}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Select property type...</option>
                 {PROPERTY_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <RealEstateFormFields
               meta={propertyEditMeta}

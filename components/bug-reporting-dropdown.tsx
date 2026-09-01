@@ -17,6 +17,7 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { glassIconButton, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
+import { Select } from '@/components/ui/select';
 
 interface Issue {
   id: string;
@@ -512,10 +513,10 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                               <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-1">
                                 {/* Status Badge Dropdown */}
                                 <div className="relative flex items-center">
-                                  <select
+                                  <Select
+                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded border cursor-pointer transition-all ${getStatusStyles(issue.status)}`}
                                     value={issue.status}
                                     onChange={(e) => updateStatusMutation.mutate({ id: issue.id, status: e.target.value })}
-                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded border cursor-pointer focus:outline-none appearance-none pr-5 relative transition-all ${getStatusStyles(issue.status)}`}
                                     aria-label="Change issue status"
                                   >
                                     {(issue.type === 'bug' ? statuses.bug : statuses.feature).map((st) => (
@@ -523,7 +524,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                                         {statusLabels[st] ?? st}
                                       </option>
                                     ))}
-                                  </select>
+                                  </Select>
                                   <ChevronDown className="w-3 h-3 text-current absolute right-1.5 pointer-events-none" />
                                 </div>
 

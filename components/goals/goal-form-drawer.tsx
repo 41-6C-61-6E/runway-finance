@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, Search, Sparkles } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 
 interface GoalFormData {
   name: string;
@@ -297,16 +298,15 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
           {/* Type */}
           <div className="space-y-1.5">
             <Label htmlFor="goal-type">Type</Label>
-            <select
+            <Select
               id="goal-type"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
             >
               {goalTypes.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Target Amount */}
@@ -553,26 +553,24 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
           {/* Status */}
           <div className="space-y-1.5">
             <Label htmlFor="goal-status">Status</Label>
-            <select
+            <Select
               id="goal-status"
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
             >
               {statuses.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Linked Account */}
           <div className="space-y-1.5">
             <Label htmlFor="goal-account">Linked Account (optional)</Label>
-            <select
+            <Select
               id="goal-account"
               value={form.linkedAccountId}
               onChange={(e) => setForm({ ...form, linkedAccountId: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm"
             >
               <option value="">None</option>
               {accounts.map((a) => (
@@ -580,7 +578,7 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
                   {a.name} ({a.type}) — {parseFloat(a.balance).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Shared Account Warning */}

@@ -205,6 +205,7 @@ function SortableHeader({
 }
 
 import { useUserSettings } from "@/components/user-settings-provider";
+import { Select } from '@/components/ui/select';
 
 export default function TransactionTable({
   filters,
@@ -1325,12 +1326,12 @@ export default function TransactionTable({
                           <label className="block text-micro font-medium text-muted-foreground mb-0.5">
                             Parent Category
                           </label>
-                          <select
+                          <Select
+                            className="h-9 text-[11px] rounded px-2"
                             value={newCategoryParentId || ""}
                             onChange={(e) =>
                               setNewCategoryParentId(e.target.value || null)
                             }
-                            className="w-full px-2 py-1 bg-background border border-input rounded text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <option value="">None (top-level)</option>
@@ -1341,7 +1342,7 @@ export default function TransactionTable({
                                   {p.name}
                                 </option>
                               ))}
-                          </select>
+                          </Select>
                         </div>
 
                         <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -2038,17 +2039,17 @@ export default function TransactionTable({
                                       <label className="block text-micro font-medium text-muted-foreground mb-0.5">
                                         Parent Category
                                       </label>
-                                      <select
+                                      <Select
+                                        className="h-9 text-[11px] rounded px-2"
                                         value={newCategoryParentId || ""}
                                         onChange={(e) => setNewCategoryParentId(e.target.value || null)}
-                                        className="w-full px-2 py-1 bg-background border border-input rounded text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         <option value="">None (top-level)</option>
                                         {categories.filter((c) => !c.parentId).map((p) => (
                                           <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
-                                      </select>
+                                      </Select>
                                     </div>
                                     <div className="flex items-center justify-between gap-2 pt-0.5">
                                       <div className="flex items-center gap-1">

@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, X, Plus, Filter, RotateCcw, Settings2, EyeOff, Eye } from 'lucide-react';
 import DataExport from './DataExport';
 import { IconButton } from '@/components/ui/icon-button';
+import { Select } from '@/components/ui/select';
 
 type ColumnMeta = {
   field: string;
@@ -170,27 +171,27 @@ export default function DataToolbar({
             <div className="absolute left-0 top-full mt-1 w-72 bg-card border border-border rounded-lg shadow-xl z-50 p-3 space-y-3">
               <div>
                 <label className="block text-[10px] font-medium text-muted-foreground mb-1">Column</label>
-                <select
+                <Select
+                  className="h-9 text-xs"
                   value={newFilter.field}
                   onChange={(e) => setNewFilter({ ...newFilter, field: e.target.value })}
-                  className="w-full px-2 py-1.5 text-xs bg-background border border-input rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   {columns.map((c) => (
                     <option key={c.field} value={c.field}>{c.label}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="block text-[10px] font-medium text-muted-foreground mb-1">Operator</label>
-                <select
+                <Select
+                  className="h-9 text-xs"
                   value={newFilter.op}
                   onChange={(e) => setNewFilter({ ...newFilter, op: e.target.value })}
-                  className="w-full px-2 py-1.5 text-xs bg-background border border-input rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   {Object.entries(OPERATORS).map(([key, op]) => (
                     <option key={key} value={key}>{op.label}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               {selectedOp.needsValue && (
                 <div>

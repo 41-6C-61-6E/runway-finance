@@ -10,6 +10,7 @@ import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import { AlertTriangle, AlertCircle, RefreshCw, BellOff, Bell, Loader2 } from 'lucide-react';
 import { isRealEstateType, parseAccountMetadata } from '@/lib/constants/account-types';
+import { Select } from '@/components/ui/select';
 
 type Account = {
   id: string;
@@ -465,16 +466,15 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     return (
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Linked Property (optional)</label>
-        <select
+        <Select
           value={mortgageMeta.linkedPropertyId || ''}
           onChange={(e) => setMortgageMeta({ ...mortgageMeta, linkedPropertyId: e.target.value })}
-          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">None</option>
           {available.map((re) => (
             <option key={re.id} value={re.id}>{re.name}</option>
           ))}
-        </select>
+        </Select>
       </div>
     );
   };
@@ -604,27 +604,25 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Group</label>
-                <select
+                <Select
                   value={majorType}
                   onChange={(e) => handleMajorTypeChange(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {MAJOR_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Type</label>
-                <select
+                <Select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {SUB_TYPE_OPTIONS[majorType]?.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 

@@ -8,6 +8,7 @@ import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { CategoryCombobox } from '@/components/budgets/category-combobox';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
 import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2, Clock, BarChart3, Layers, Pencil, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 
 type AiProposal = {
   id: string;
@@ -93,13 +94,14 @@ function ProposalCard({
             className="accent-primary"
           />
         ) : (
-          <select
+          <Select
+            className="text-xs font-mono rounded"
+            wrapperClassName="flex-1"
             value={editPayload[field] ?? ''}
             onChange={(e) => onEditField(field, e.target.value)}
-            className="flex-1 px-2 py-1 bg-background border border-input rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
           >
             {options?.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
+          </Select>
         )}
       </div>
     );

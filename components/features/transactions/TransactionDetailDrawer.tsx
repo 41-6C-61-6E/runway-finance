@@ -72,6 +72,7 @@ interface TransactionDetailDrawerProps {
 }
 
 import { useUserSettings } from '@/components/user-settings-provider';
+import { Select } from '@/components/ui/select';
 
 export default function TransactionDetailDrawer({ transaction, open, onClose, onSuccess, mode }: TransactionDetailDrawerProps) {
   const settingsContext = useUserSettings();
@@ -504,16 +505,15 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
           {mode === 'create' && (
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Account</label>
-              <select
+              <Select
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Select an account</option>
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
 
@@ -733,10 +733,10 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                       </div>
                       <div>
                         <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">Category</label>
-                        <select
+                        <Select
+                          className="h-9 text-xs rounded px-2"
                           value={row.categoryId || ''}
                           onChange={(e) => updateSplitRow(idx, 'categoryId', e.target.value || null)}
-                          className="w-full px-2 py-1.5 bg-background border border-input rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                         >
                           <option value="">Uncategorized</option>
                           {parents.map((p) => (
@@ -749,7 +749,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                               ))}
                             </optgroup>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                     </div>
 
@@ -901,16 +901,16 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
                 <div>
                   <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">Parent Category</label>
-                  <select
+                  <Select
+                    className="h-9 text-xs rounded px-2"
                     value={newCategoryParentId || ''}
                     onChange={(e) => setNewCategoryParentId(e.target.value || null)}
-                    className="w-full px-2 py-1 bg-background border border-input rounded text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="">None (top-level)</option>
                     {categories.filter((c) => !c.parentId).map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

@@ -20,6 +20,7 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/select';
 
 type SortField = 'category' | 'budgeted' | 'actual' | 'variance' | 'progress' | 'account';
 type SortDirection = 'asc' | 'desc';
@@ -538,14 +539,14 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
           </div>
           <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap shrink-0">
             {isMobile && budgets.length > 0 && (
-              <select
+              <Select
+                className="h-8 text-xs bg-muted/50 border-border px-2"
                 value={`${sortField}-${sortDirection}`}
                 onChange={(e) => {
                   const [field, dir] = e.target.value.split('-') as [SortField, SortDirection];
                   setSortField(field);
                   setSortDirection(dir);
                 }}
-                className="text-xs bg-muted/50 border border-border rounded-lg px-2 py-1 text-foreground focus:outline-none focus:border-primary h-8"
               >
                 <option value="budgeted-desc">Budgeted (High-Low)</option>
                 <option value="budgeted-asc">Budgeted (Low-High)</option>
@@ -557,7 +558,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                 <option value="variance-asc">Variance (Low-High)</option>
                 <option value="progress-desc">Progress (High-Low)</option>
                 <option value="progress-asc">Progress (Low-High)</option>
-              </select>
+              </Select>
             )}
             <TooltipProvider delayDuration={150}>
               <Tooltip>

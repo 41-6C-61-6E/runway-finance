@@ -44,6 +44,7 @@ import {
 import type { RecurringItem } from './RecurringCard';
 import type { FrequencyType } from '@/lib/services/recurring-detection';
 import { toast } from 'sonner';
+import { Select } from '@/components/ui/select';
 
 interface HistoryTx {
   id: string;
@@ -365,10 +366,10 @@ export default function RecurringDetailDrawer({
                 <label className="block text-xs font-semibold text-foreground mb-1">
                   Frequency
                 </label>
-                <select
+                <Select
+                  className="rounded-xl"
                   value={frequency}
                   onChange={(e) => setFrequency(e.target.value as FrequencyType)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="weekly">Weekly</option>
                   <option value="biweekly">Bi-weekly</option>
@@ -376,7 +377,7 @@ export default function RecurringDetailDrawer({
                   <option value="quarterly">Quarterly</option>
                   <option value="semi_annual">Semi-annual</option>
                   <option value="annual">Annual</option>
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -384,10 +385,10 @@ export default function RecurringDetailDrawer({
               <label className="block text-xs font-semibold text-foreground mb-1">
                 Category
               </label>
-              <select
+              <Select
+                className="rounded-xl"
                 value={categoryId || ''}
                 onChange={(e) => setCategoryId(e.target.value || null)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Uncategorized</option>
                 {categories.map((cat) => (
@@ -395,7 +396,7 @@ export default function RecurringDetailDrawer({
                     {cat.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {item.accountId && (

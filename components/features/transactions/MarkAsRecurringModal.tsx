@@ -26,6 +26,7 @@ import {
 import { formatCurrency } from '@/lib/utils/format';
 import { toast } from 'sonner';
 import { normalizeMerchantName, type FrequencyType } from '@/lib/utils/recurring';
+import { Select } from '@/components/ui/select';
 
 export interface MarkAsRecurringModalProps {
   open: boolean;
@@ -623,10 +624,10 @@ export function MarkAsRecurringModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground">Category</label>
-              <select
+              <Select
+                className="h-9 rounded-xl text-xs px-2.5"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full h-9 px-2.5 bg-background border border-input rounded-xl text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">(No Category)</option>
                 {categories.map((c) => (
@@ -634,15 +635,15 @@ export function MarkAsRecurringModal({
                     {c.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground">Account Filter</label>
-              <select
+              <Select
+                className="h-9 rounded-xl text-xs px-2.5"
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
-                className="w-full h-9 px-2.5 bg-background border border-input rounded-xl text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Any Account</option>
                 {accountsList.map((a) => (
@@ -650,7 +651,7 @@ export function MarkAsRecurringModal({
                     {a.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 

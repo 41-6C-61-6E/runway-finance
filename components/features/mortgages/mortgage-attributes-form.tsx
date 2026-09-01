@@ -2,6 +2,7 @@
 
 import { Dispatch, SetStateAction } from 'react';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 
 interface MortgageAttributesMeta {
   originalLoanAmount?: string;
@@ -38,15 +39,14 @@ export function MortgageAttributesForm({
     <>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">Mortgage Status</label>
-        <select
+        <Select
           value={status}
           onChange={(e) => onChange({ ...meta, mortgageStatus: e.target.value })}
-          className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="active">Active</option>
           <option value="paid_off">Paid Off</option>
           <option value="refinanced">Refinanced</option>
-        </select>
+        </Select>
       </div>
 
       {status === 'paid_off' && (
@@ -88,16 +88,15 @@ export function MortgageAttributesForm({
           {allMortgages.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Refinanced By Loan</label>
-              <select
+              <Select
                 value={meta.refinancedByLoanId || ''}
                 onChange={(e) => onChange({ ...meta, refinancedByLoanId: e.target.value })}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Select refinancing mortgage...</option>
                 {allMortgages.map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
         </>

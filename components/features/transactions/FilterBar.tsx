@@ -26,6 +26,7 @@ type FilterState = {
 };
 
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import { Select } from '@/components/ui/select';
 
 export interface TransactionPreset {
   id: string;
@@ -648,10 +649,10 @@ export default function FilterBar({
         <div className="flex flex-wrap gap-2 items-start">
           {/* Date Preset Selector */}
           <div className="relative z-30">
-            <select
+            <Select
+              className="h-9 text-xs font-medium bg-muted/50"
               value={datePreset}
               onChange={(e) => applyDatePreset(e.target.value)}
-              className="px-3 py-2 bg-muted/50 border border-input rounded-lg text-foreground text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer hover:bg-muted hover:border-border transition-all"
             >
               <option value="all">All Time</option>
               <option value="this-month">This Month</option>
@@ -660,7 +661,7 @@ export default function FilterBar({
               <option value="last-6m">Last 6 Months</option>
               <option value="this-year">This Year</option>
               <option value="custom">Custom Range</option>
-            </select>
+            </Select>
           </div>
           {/* Account Types - Grouped */}
           <div className="relative z-30" ref={accountTypesRef}>

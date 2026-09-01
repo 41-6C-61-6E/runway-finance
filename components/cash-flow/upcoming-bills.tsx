@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import type { UpcomingBill } from '@/lib/services/recurring-detection';
 import { formatFrequencyLabel } from '@/components/features/transactions/RecurringCard';
 import { BillCalendarGrid } from '@/components/cash-flow/bill-calendar-grid';
+import { Select } from '@/components/ui/select';
 
 const CENTS: Intl.NumberFormatOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
@@ -287,17 +288,17 @@ export function UpcomingBills() {
                     <CalendarClock className="w-3 h-3" />
                     Horizon
                   </span>
-                  <select
+                  <Select
+                    className="h-8 rounded-xl text-xs font-medium"
                     value={daysHorizon}
                     onChange={(e) => setDaysHorizon(Number(e.target.value))}
-                    className="px-3 py-1.5 bg-background border border-input rounded-xl text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
                     <option value={7}>Next 7 days</option>
                     <option value={14}>Next 14 days</option>
                     <option value={30}>Next 30 days</option>
                     <option value={60}>Next 60 days</option>
                     <option value={90}>Next 90 days</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
             </CollapsibleFilterPanel>

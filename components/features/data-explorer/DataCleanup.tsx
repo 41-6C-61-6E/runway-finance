@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Trash2, GitMerge, AlertCircle, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { AsyncCard } from '@/components/ui/async-card';
+import { Select } from '@/components/ui/select';
 
 type Transaction = {
   id: string;
@@ -317,10 +318,10 @@ export default function DataCleanup() {
       <div className="p-4 bg-card border border-border rounded-xl flex flex-wrap items-end gap-4 shadow-sm">
         <div className="space-y-1.5 flex-1 min-w-[200px]">
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Account</label>
-          <select
+          <Select
+            className="h-9"
             value={accountId}
             onChange={(e) => setAccountId(e.target.value)}
-            className="w-full h-9 px-3 bg-background border border-input rounded-lg text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
           >
             <option value="">All Accounts</option>
             {accountsList.map((acc) => (
@@ -328,7 +329,7 @@ export default function DataCleanup() {
                 {acc.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div className="space-y-1.5 min-w-[150px]">

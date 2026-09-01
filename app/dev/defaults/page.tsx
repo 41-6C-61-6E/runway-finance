@@ -6,6 +6,7 @@ import { Settings, RotateCcw, Save, Check, X } from 'lucide-react';
 import { DEFAULTS, SETTING_DEFINITIONS, API_KEY_FIELD_KEYS, API_KEY_DEFAULTS } from '@/config/defaults';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
+import { Select } from '@/components/ui/select';
 
 type SettingsState = Record<string, unknown>;
 type DirtyMap = Record<string, true>;
@@ -220,15 +221,15 @@ export default function DevDefaultsPage() {
     const options = STRING_OPTIONS[def.key];
     if (options) {
       return (
-        <select
+        <Select
+          className="rounded text-xs font-mono p-2"
           value={(value as string) ?? ''}
           onChange={(e) => updateValue(def.key, e.target.value)}
-          className="w-full bg-background border border-input rounded text-foreground text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring p-2"
         >
           {options.map((opt) => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
-        </select>
+        </Select>
       );
     }
 

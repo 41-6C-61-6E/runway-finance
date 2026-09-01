@@ -21,6 +21,7 @@ import {
 import RowExpansion from './RowExpansion';
 import { TableScroll } from '@/components/ui/table-scroll';
 import { PageLoading } from '@/components/ui/page-loading';
+import { Select } from '@/components/ui/select';
 
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
@@ -383,16 +384,16 @@ export default function DataTable({
               <span className="text-xs text-muted-foreground">
                 {offset + 1}–{Math.min(offset + limit, total)} of {total}
               </span>
-              <select
+              <Select
+                className="h-8 text-xs bg-muted border-border rounded px-2"
                 value={limit}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="px-2 py-1 text-xs bg-muted border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value={25}>25 / page</option>
                 <option value={50}>50 / page</option>
                 <option value={100}>100 / page</option>
                 <option value={500}>500 / page</option>
-              </select>
+              </Select>
             </div>
             {totalPages > 1 && (
               <div className="flex gap-1.5">

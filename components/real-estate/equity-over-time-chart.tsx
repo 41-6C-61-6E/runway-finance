@@ -27,6 +27,7 @@ import { TrendingUp } from 'lucide-react';
 import { getMonthRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
+import { Select } from '@/components/ui/select';
 
 interface PropertySnapshot {
   date: string;
@@ -559,10 +560,10 @@ export function EquityOverTimeChart() {
               {properties.length > 1 && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Property</span>
-                  <select
+                  <Select
+                    className="h-8 bg-card text-xs font-medium border-border"
                     value={selectedPropertyId}
                     onChange={(e) => setSelectedPropertyId(e.target.value)}
-                    className="bg-card text-foreground hover:bg-muted text-xs font-medium px-3 py-1.5 rounded-lg border border-border focus:ring-1 focus:ring-primary focus:border-primary outline-none cursor-pointer transition-colors"
                   >
                     <option value="all">All Properties</option>
                     {properties.map((p) => (
@@ -570,7 +571,7 @@ export function EquityOverTimeChart() {
                         {p.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )}
               <div className="flex items-center">

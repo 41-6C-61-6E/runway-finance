@@ -10,6 +10,7 @@ import type { RecurringItem } from './RecurringCard';
 import { formatCurrency } from '@/lib/utils/format';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/select';
 
 interface SubscriptionTrackerProps {
   items: RecurringItem[];
@@ -226,15 +227,15 @@ export function SubscriptionTracker({ items, loading = false }: SubscriptionTrac
         </div>
         <div className="flex items-center gap-1.5">
           <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
-          <select
+          <Select
+            className="h-8 rounded-xl text-xs px-2.5"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortKey)}
-            className="px-2.5 py-1.5 bg-background border border-input rounded-xl text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="amount">Highest Amount</option>
             <option value="nextDate">Next Due Date</option>
             <option value="name">Merchant Name</option>
-          </select>
+          </Select>
         </div>
       </div>
 
