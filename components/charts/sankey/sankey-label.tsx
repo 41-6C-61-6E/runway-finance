@@ -239,3 +239,38 @@ const SankeyLabel = React.forwardRef<SVGGElement, SankeyLabelProps>(function San
 });
 
 export { SankeyLabel };
+
+/**
+ * Available width for a node's label column, in the SVG's own coordinate
+ * space (node `x` already includes margin.left).
+ *
+ * Roots (no incoming links) sit in the first column and their label column
+ * is the reserved left margin: the whole gap from the canvas edge to the
+ * node, i.e. `x - 8`.
+ * Everything else labels to the right and gets the gap up to the NEXT
+ * column's left edge — or the canvas's right edge when it is the rightmost
+ * column, which is exactly the reserved right margin. This replaces the
+ * hardcoded character budget: a label's size is now a function of the real
+ * available pixels.
+ */
+export function computeLabelGutter(
+  x: number,
+  nodeWidth: number,
+  isLeftSide: boolean,
+  columnLeftXs: number[] | null | undefined,
+  chartWidth: number,
+): number {
+  if (typeof x !== 'number' || !Number.isFinite(x)) return 0;
+  if (isLeftSide) return Math.max(0, x - 8);
+  let rightLimit = chartWidth > 0 ? chartWidth : 0;
+  if (columnLeftXs && columnLeftXs.length) {
+    const lefts = [...columnLeftXs].sort((a, b) => a - b);
+    for (const left of lefts) {
+      if (left > x + 1) {
+        rightLimit = Math.min(rightLimit, left);
+        break;
+      }
+    }
+  }
+  return Math.max(0, rightLimit - (x + nodeWidth) - 8);
+}

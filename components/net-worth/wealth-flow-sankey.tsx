@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ResponsiveContainer, Sankey, Tooltip } from 'recharts';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
+import { SankeyLabel, computeLabelGutter } from '@/components/charts/sankey/sankey-label';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
@@ -62,7 +63,8 @@ function sanitizeRestProps(props: Record<string, any>): Record<string, any> {
 const SankeyCustomNode = ({
   x, y, width, height, payload,
   onClick, hoveredNode, setHoveredNode,
-  showPercentages, isMobile, ...restProps
+  showPercentages, isMobile,
+  margin, chartWidth, columnLeftXs, ...restProps
 }: any) => {
   if (typeof x !== 'number' || Number.isNaN(x) || typeof y !== 'number' || Number.isNaN(y)) {
     return null;
@@ -70,9 +72,10 @@ const SankeyCustomNode = ({
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
-  const rawLabel = payload.label ?? payload.name ?? '';
-  const maxLabelLen = isMobile ? 10 : 24;
-  const label = rawLabel.length > maxLabelLen ? `${rawLabel.slice(0, maxLabelLen)}..` : rawLabel;
+  // R-2: measured truncation budget — SankeyLabel measures and truncates
+  // against the column gutter instead of a fixed character slice.
+  const label = payload.label ?? payload.name ?? '';
+  const labelMaxW = computeLabelGutter(x, width, isRightSide, columnLeftXs, chartWidth ?? 0);
 
   const nodeType = payload.type as string | undefined;
   const isIncrease = nodeType === 'increase';
@@ -81,7 +84,7 @@ const SankeyCustomNode = ({
 
   const signPrefix = isIncrease ? '+' : (isDecrease ? '-' : '');
   const valueLabel = showPercentages && payload.percentage !== undefined
-    ? `${signPrefix}${payload.percentage.toFixed(1)}%`
+    ? `${signPrefix}${formatPlainPercent(payload.percentage)}`
     : payload.value !== undefined ? `${signPrefix}${formatCurrency(payload.value)}` : '';
 
   const hubVisualImbalance = payload.visualImbalance as number | undefined;
@@ -93,6 +96,11 @@ const SankeyCustomNode = ({
   const hubDeltaHeight = Math.max(0, height * hubDeltaRatio);
   const hubDeltaY = y + height - hubDeltaHeight;
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
+  // R-2: anchor the hub badge to the chart's reserved right-margin column.
+  const hasChartWidth = typeof chartWidth === 'number' && chartWidth > 0;
+  const mRight = margin?.right ?? 140;
+  const hubBadgeX = hasChartWidth ? chartWidth - mRight + 8 : 0;
+  const hubBadgeW = hasChartWidth ? Math.max(0, Math.min(400, mRight - 16)) : 0;
 
   const safeProps = sanitizeRestProps(restProps);
 
@@ -132,67 +140,67 @@ const SankeyCustomNode = ({
               fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
-          <foreignObject
-            x={x + width + 4}
-            y={hubDeltaCenterY - 30}
-            width={Math.min(400, (window.innerWidth || 400) - (x + width) - 12)}
-            height={58}
-            pointerEvents="none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          >
-            <div style={{
-              display: 'block', width: '100%', boxSizing: 'border-box',
-              background: 'var(--background)',
-              border: '1px solid var(--border)',
-              borderRadius: '6px', padding: '4px 10px',
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.4 }}>
-                {payload.label}
-              </div>
-              {hubVisualImbalance !== undefined && (
-                <div className="blur-number" style={{
-                  fontSize: isMobile ? 13 : 17, fontWeight: 800, whiteSpace: 'nowrap',
-                  color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
-                  lineHeight: 1.3,
-                }}>
-                  {hubVisualImbalance >= 0 ? '+' : ''}{formatCurrency(hubVisualImbalance)}
+          {/* R-2: hub total rides in the reserved right-margin column — the
+              foreignObject is clamped to that space instead of running to the
+              viewport edge, with a 1px leader from the node's delta band. */}
+          {hasChartWidth && (
+            <>
+              <line
+                x1={x + width + 1}
+                y1={hubDeltaCenterY}
+                x2={chartWidth - mRight + 6}
+                y2={hubDeltaCenterY}
+                stroke="var(--border)"
+                strokeWidth={1}
+                pointerEvents="none"
+                opacity={isDimmed ? 0.3 : 0.9}
+              />
+              <foreignObject
+                x={hubBadgeX}
+                y={Math.max(2, hubDeltaCenterY - 29)}
+                width={hubBadgeW}
+                height={58}
+                pointerEvents="none"
+                style={{ opacity: isDimmed ? 0.3 : 1 }}
+              >
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  height: '100%'}}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.4 }}>
+                    {payload.label}
+                  </div>
+                  {hubVisualImbalance !== undefined && (
+                    <div className="blur-number" style={{
+                      fontSize: isMobile ? 13 : 17, fontWeight: 800, whiteSpace: 'nowrap',
+                      color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
+                      lineHeight: 1.3,
+                    }}>
+                      {hubVisualImbalance >= 0 ? '+' : ''}{formatCurrency(hubVisualImbalance)}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </foreignObject>
+              </foreignObject>
+            </>
+          )}
         </>
       )}
 
       {!isHub && (
-        <>
-          <text
-            x={isRightSide ? x - 8 : x + width + 8}
-            y={y + height / 2 - (valueLabel ? 4 : 0)}
-            textAnchor={isRightSide ? 'end' : 'start'}
-            dominantBaseline="central"
-            fontSize={10}
-            fontWeight={600}
-            fill="currentColor"
-            className="fill-foreground select-none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          >
-            {label}
-          </text>
-          {valueLabel && (
-            <text
-              x={isRightSide ? x - 8 : x + width + 8}
-              y={y + height / 2 + 5}
-              textAnchor={isRightSide ? 'end' : 'start'}
-              dominantBaseline="central"
-              fontSize={9}
-              fill="currentColor"
-              className="fill-muted-foreground select-none blur-number"
-              style={{ opacity: isDimmed ? 0.3 : 0.75 }}
-            >
-              {valueLabel}
-            </text>
-          )}
-        </>
+        // R-2: measured SankeyLabel — truncation budget comes from the column
+        // gutter, so long names shrink instead of overflowing into the next
+        // depth column.
+        <SankeyLabel
+          text={label}
+          x={isRightSide ? x - 8 : x + width + 8}
+          y={y + height / 2}
+          maxW={labelMaxW}
+          anchor={isRightSide ? 'end' : 'start'}
+          value={valueLabel || undefined}
+          opacity={isDimmed ? 0.3 : 1}
+        />
       )}
     </g>
   );
@@ -483,6 +491,9 @@ export function WealthFlowSankey() {
   const [accountSearch, setAccountSearch] = useState('');
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
+  // R-2: measured sankey canvas width (svg coordinates), set by
+  // ResponsiveContainer's onResize; 0 until the first layout pass.
+  const [chartWidth, setChartWidth] = useState(0);
   const [chartMounted, setChartMounted] = useState(false);
   const [selectedNodeDetails, setSelectedNodeDetails] = useState<WealthFlowNode | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -666,6 +677,20 @@ export function WealthFlowSankey() {
 
   const nodePadding = isMobile ? 14 : 26;
 
+  const sankeyNodeWidth = 12;
+
+  // R-2: svg-space left edge of every depth column (recharts `x = node.x +
+  // margin.left` where `node.x = depth * childWidth`) so node labels can be
+  // measured against the gap to the next column.
+  const columnLeftXs = useMemo(() => {
+    if (chartWidth <= 0 || !columnMetrics) return null;
+    const contentW = chartWidth - margin.left - margin.right;
+    if (contentW <= 0) return null;
+    const maxDepth = Math.max(1, columnMetrics.metrics.length - 1);
+    const childWidth = (contentW - sankeyNodeWidth) / maxDepth;
+    return Array.from({ length: maxDepth + 1 }, (_, d) => margin.left + d * childWidth);
+  }, [chartWidth, margin, columnMetrics, sankeyNodeWidth]);
+
   const chartHeight = useMemo(() => {
     if (!columnMetrics || columnMetrics.metrics.length === 0) return 520;
     const maxNodes = Math.max(...columnMetrics.metrics.map((m) => m.count));
@@ -685,9 +710,12 @@ export function WealthFlowSankey() {
         setHoveredNode={setHoveredNode}
         showPercentages={showPercentages}
         isMobile={isMobile}
+        margin={margin}
+        chartWidth={chartWidth}
+        columnLeftXs={columnLeftXs}
       />
     ),
-    [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile]
+    [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile, margin, chartWidth, columnLeftXs]
   );
 
   const sankeyLink = useMemo(
@@ -1044,12 +1072,17 @@ export function WealthFlowSankey() {
               ) : (
                 <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full min-w-0">
                   {chartMounted && chartHeight > 0 && (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <ResponsiveContainer
+                      width="100%"
+                      height="100%"
+                      minWidth={0}
+                      onResize={(w: number) => setChartWidth((prev) => (prev === w ? prev : w))}
+                    >
                       <Sankey
                         data={processedData}
                         node={sankeyNode}
                         link={sankeyLink}
-                        nodeWidth={12}
+                        nodeWidth={sankeyNodeWidth}
                         nodePadding={nodePadding}
                         margin={margin}
                         sort={false}

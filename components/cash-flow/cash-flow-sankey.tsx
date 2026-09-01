@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ResponsiveContainer, Sankey, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
+import { formatPlainPercent } from '@/lib/utils/format';
+import { SankeyLabel, computeLabelGutter } from '@/components/charts/sankey/sankey-label';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
@@ -459,6 +461,8 @@ const SankeyCustomNode = ({
   columnMetrics,
   columnOffsets,
   margin,
+  chartWidth,
+  columnLeftXs,
   usableHeight,
   // Discarded Recharts internal props to prevent DOM warnings:
   depth,
@@ -475,13 +479,15 @@ const SankeyCustomNode = ({
 
   const rawLabel = payload.label ?? payload.name ?? '';
   const isMobileSize = isMobile;
-  const maxLabelLen = isMobileSize ? 8 : 22;
-  let label = rawLabel.length > maxLabelLen ? `${rawLabel.slice(0, maxLabelLen)}..` : rawLabel;
+  // R-2: measured truncation budget — SankeyLabel measures and truncates
+  // against the gutter instead of a fixed character slice.
+  let label = rawLabel;
+  const labelMaxW = computeLabelGutter(x, width, isRightSide, columnLeftXs, chartWidth ?? 0);
 
   const valueLabel = payload.isHub
     ? formatCurrency(payload.netChange)
     : showPercentages && payload.percentage !== undefined
-      ? `${payload.percentage.toFixed(1)}%`
+      ? formatPlainPercent(payload.percentage)
       : payload.value !== undefined
         ? formatCurrency(payload.value)
         : '';
@@ -508,6 +514,11 @@ const SankeyCustomNode = ({
 
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
   const hubLabelCenterY = hubDeltaCenterY;
+  // R-2: anchor the hub badge to the chart's reserved right-margin column.
+  const hasChartWidth = typeof chartWidth === 'number' && chartWidth > 0;
+  const mRight = margin?.right ?? 140;
+  const hubBadgeX = hasChartWidth ? chartWidth - mRight + 8 : 0;
+  const hubBadgeW = hasChartWidth ? Math.max(0, Math.min(400, mRight - 16)) : 0;
 
   // Suppress redundant leaf labels if the leaf has the same name as its parent
   const isLeaf = colIndex === 0 || colIndex === 4;
@@ -562,75 +573,70 @@ const SankeyCustomNode = ({
               fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
-          {/* Background box for readability */}
-          <foreignObject
-            x={x + width + 4}
-            y={hubLabelCenterY - 30}
-            width={Math.min(400, (typeof window !== 'undefined' ? window.innerWidth : 400) - (x + width) - 12)}
-            height={58}
-            pointerEvents="none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          >
-            <div style={{
-              display: 'block',
-              width: '100%',
-              boxSizing: 'border-box',
-              background: 'var(--background)',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              padding: '4px 10px',
-            }}>
-              <div style={{
-                fontSize: 10,
-                fontWeight: 600,
-                lineHeight: 1.4,
-              }}>
-                {payload.label}
-              </div>
-              <div className="blur-number" style={{
-                fontSize: isMobileSize ? 13 : 17,
-                fontWeight: 800,
-                color: isNetSurplus ? '#10b981' : '#ef4444',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-              }}>
-                {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
-              </div>
-            </div>
-          </foreignObject>
-        </>
-      ) : (
-        <>
-          {/* Name label */}
-          <text
-            x={isRightSide ? x - 8 : x + width + 8}
-            y={shiftedY + height / 2 - (valueLabel ? 4 : 0)}
-            textAnchor={isRightSide ? 'end' : 'start'}
-            dominantBaseline="central"
-            fontSize={10}
-            fontWeight={600}
-            fill="currentColor"
-            className="fill-foreground select-none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          >
-            {label}
-          </text>
-          {/* Value / percentage sub-label */}
-          {valueLabel && (
-            <text
-              x={isRightSide ? x - 8 : x + width + 8}
-              y={shiftedY + height / 2 + 5}
-              textAnchor={isRightSide ? 'end' : 'start'}
-              dominantBaseline="central"
-              fontSize={9}
-              fill="currentColor"
-              className="fill-muted-foreground select-none blur-number"
-              style={{ opacity: isDimmed ? 0.3 : 0.75 }}
-            >
-              {valueLabel}
-            </text>
+          {/* R-2: hub total rides in the reserved right-margin column — the
+              foreignObject is clamped to that space instead of running to the
+              viewport edge, with a 1px leader from the node's delta band. */}
+          {hasChartWidth && (
+            <>
+              <line
+                x1={x + width + 1}
+                y1={hubLabelCenterY}
+                x2={chartWidth - mRight + 6}
+                y2={hubLabelCenterY}
+                stroke="var(--border)"
+                strokeWidth={1}
+                pointerEvents="none"
+                opacity={isDimmed ? 0.3 : 0.9}
+              />
+              <foreignObject
+                x={hubBadgeX}
+                y={Math.max(2, hubLabelCenterY - 29)}
+                width={hubBadgeW}
+                height={58}
+                pointerEvents="none"
+                style={{ opacity: isDimmed ? 0.3 : 1 }}
+              >
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  height: '100%'}}
+                >
+                  <div style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    lineHeight: 1.4,
+                  }}>
+                    {payload.label}
+                  </div>
+                <div className="blur-number" style={{
+                  fontSize: isMobileSize ? 13 : 17,
+                  fontWeight: 800,
+                  color: isNetSurplus ? '#10b981' : '#ef4444',
+                  lineHeight: 1.3,
+                  whiteSpace: 'nowrap',
+                }}>
+                  {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
+                </div>
+
+                </div>
+              </foreignObject>
+            </>
           )}
         </>
+      ) : (
+        // R-2: measured SankeyLabel — truncation budget comes from the column
+        // gutter, so long category names shrink instead of overflowing into
+        // the next depth column.
+        <SankeyLabel
+          text={label}
+          x={isRightSide ? x - 8 : x + width + 8}
+          y={shiftedY + height / 2}
+          maxW={labelMaxW}
+          anchor={isRightSide ? 'end' : 'start'}
+          value={valueLabel || undefined}
+          opacity={isDimmed ? 0.3 : 1}
+        />
       )}
     </g>
   );
@@ -639,7 +645,7 @@ const SankeyCustomNode = ({
 // ── Custom link ────────────────────────────────────────────────────────────────
 // Recharts Sankey passes: sourceX, sourceY, targetX, targetY, linkWidth,
 // payload (with source/target node objects), index.
-// sy / ty / dy are NOT passed — those are Nivo-specific props that caused the
+// sy / ty / dy are NOT passed — those are Nivo-specific props that caused the 
 // links to render NaN paths in the original implementation.
 const SankeyCustomLink = ({
   sourceX,
@@ -765,6 +771,9 @@ export function CashFlowSankey() {
   const [accountSearch, setAccountSearch] = useState('');
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
+  // R-2: measured sankey canvas width (svg coordinates), set by
+  // ResponsiveContainer onResize; 0 until the first layout pass.
+  const [chartWidth, setChartWidth] = useState(0);
   const accountFilterRef = useRef<HTMLDivElement>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
@@ -983,6 +992,8 @@ export function CashFlowSankey() {
     ? (showParents ? 12 : 16)
     : (showParents ? 20 : 28);
 
+  const sankeyNodeWidth = isMobile ? 12 : (showParents ? 20 : 24);
+
   const chartHeight = useMemo(() => {
     if (!columnMetrics || columnMetrics.metrics.length === 0) {
       return showParents ? 620 : 460;
@@ -1024,6 +1035,19 @@ export function CashFlowSankey() {
     });
   }, [columnMetrics, scale, usableHeight, nodePadding]);
 
+  // R-2: svg-space left edge of every depth column (recharts `x = node.x +
+  // margin.left` where `node.x = depth * childWidth`, so column d starts at
+  // `margin.left + d * childWidth`) so node labels can be measured against
+  // the gap to the next column instead of a character budget.
+  const columnLeftXs = useMemo(() => {
+    if (chartWidth <= 0 || !columnMetrics) return null;
+    const contentW = chartWidth - margin.left - margin.right;
+    const maxDepth = Math.max(1, columnMetrics.metrics.length - 1);
+    if (contentW <= 0) return null;
+    const childWidth = (contentW - sankeyNodeWidth) / maxDepth;
+    return Array.from({ length: maxDepth + 1 }, (_, d) => margin.left + d * childWidth);
+  }, [chartWidth, margin, columnMetrics, sankeyNodeWidth]);
+
   // Stabilize Sankey child elements to avoid recomputing layout on every render
   // NOTE: must be before early returns to maintain consistent hook order
   const sankeyNode = useMemo(() => (
@@ -1038,8 +1062,10 @@ export function CashFlowSankey() {
       columnOffsets={columnOffsets}
       margin={margin}
       usableHeight={usableHeight}
+      chartWidth={chartWidth}
+      columnLeftXs={columnLeftXs}
     />
-  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile, processedData.nodes, columnMetrics, columnOffsets, margin, usableHeight]);
+  ), [handleNodeClick, hoveredNode, setHoveredNode, showPercentages, themeVersion, isMobile, processedData.nodes, columnMetrics, columnOffsets, margin, usableHeight, chartWidth, columnLeftXs]);
 
   const sankeyLink = useMemo(() => (
     <SankeyCustomLink
@@ -1341,14 +1367,19 @@ export function CashFlowSankey() {
                     <ChartEmptyState variant="error" error={error} />
                   </div>
                 ) : processedData.nodes.length > 0 && processedData.links.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    initialDimension={{ width: 100, height: 100 }}
+                    onResize={(w: number) => setChartWidth((prev) => (prev === w ? prev : w))}
+                  >
                     <Sankey
                       data={processedData}
                       node={sankeyNode}
                       link={sankeyLink}
                       iterations={0}
                       nodePadding={nodePadding}
-                      nodeWidth={isMobile ? 12 : (showParents ? 20 : 24)}
+                      nodeWidth={sankeyNodeWidth}
                       margin={margin}
                       align="left"
                     >

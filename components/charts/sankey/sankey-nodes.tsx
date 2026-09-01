@@ -3,6 +3,7 @@
 import React from 'react';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { sanitizeRestProps } from './sankey-links';
+import { SankeyLabel, computeLabelGutter } from './sankey-label';
 
 export interface SankeyNodeProps {
   x: number;
@@ -18,6 +19,9 @@ export interface SankeyNodeProps {
   nodes?: any[];
   columnMetrics?: any;
   columnOffsets?: number[];
+  margin?: { top?: number; right?: number; bottom?: number; left?: number };
+  chartWidth?: number;
+  columnLeftXs?: number[];
   [key: string]: any;
 }
 
@@ -35,6 +39,9 @@ export function SankeyCustomNode({
   nodes,
   columnMetrics,
   columnOffsets,
+  margin,
+  chartWidth,
+  columnLeftXs,
   ...restProps
 }: SankeyNodeProps) {
   if (
@@ -52,10 +59,10 @@ export function SankeyCustomNode({
     hoveredNode !== undefined &&
     hoveredNode !== payload.id;
 
-  const rawLabel = payload.label ?? payload.name ?? '';
-  const maxLabelLen = isMobile ? 10 : 22;
-  let label =
-    rawLabel.length > maxLabelLen ? `${rawLabel.slice(0, maxLabelLen)}..` : rawLabel;
+  // R-2: labels are full-size and get wrapped/ellipsized by SankeyLabel
+  // against this node's measured gutter width, not a character clip.
+  let label = String(payload.label ?? payload.name ?? '');
+  const labelMaxW = computeLabelGutter(x, width, isRightSide, columnLeftXs, chartWidth ?? 0);
 
   // Apply optional column offset for vertical centering
   let shiftedY = y;
@@ -70,7 +77,7 @@ export function SankeyCustomNode({
       const parentCol = colIndex === 0 ? 1 : 3;
       const hasSameNamedParent = nodes.some((n: any, idx: number) => {
         const col = columnMetrics?.columns?.[idx];
-        return col === parentCol && (n.label === rawLabel || n.name === rawLabel);
+        return col === parentCol && (n.label === label || n.name === label);
       });
       if (hasSameNamedParent) {
         label = '';
@@ -107,6 +114,12 @@ export function SankeyCustomNode({
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
 
   const safeProps = sanitizeRestProps(restProps);
+  // R-2: the hub total lives in the reserved right-margin column (with a 1px
+  // leader to the delta strip) instead of a panel floating over the flow band.
+  const hasChartWidth = typeof chartWidth === 'number' && chartWidth > 0;
+  const mRight = margin?.right ?? 140;
+  const hubBadgeX = hasChartWidth ? chartWidth - mRight + 8 : 0;
+  const hubBadgeW = Math.max(0, Math.min(400, mRight - 16));
 
   return (
     <g
@@ -150,49 +163,62 @@ export function SankeyCustomNode({
               fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
-          <foreignObject
-            x={x + width + 4}
-            y={hubDeltaCenterY - 24}
-            width={400}
-            height={50}
-            pointerEvents="none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          >
-            <div
-              style={{
-                display: 'inline-block',
-                width: 'fit-content',
-                background: 'var(--background)',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                padding: '4px 10px',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: isMobile ? 8 : 10,
-                  fontWeight: 600,
-                  lineHeight: 1.4,
-                }}
-              >
-                {payload.label || payload.name}
-              </div>
-              {hubVisualImbalance !== undefined && (
-                <div
-                  className="blur-number"
-                  style={{
-                    fontSize: isMobile ? 13 : 17,
-                    fontWeight: 800,
-                    color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
-                    lineHeight: 1.3,
-                  }}
+            {hasChartWidth && (
+              <>
+                <line
+                  x1={x + width + 1}
+                  y1={hubDeltaCenterY}
+                  x2={chartWidth - mRight + 6}
+                  y2={hubDeltaCenterY}
+                  stroke="var(--border)"
+                  strokeWidth={1}
+                  pointerEvents="none"
+                  opacity={isDimmed ? 0.3 : 0.9}
+                />
+                <foreignObject
+                  x={hubBadgeX}
+                  y={Math.max(2, hubDeltaCenterY - 29)}
+                  width={hubBadgeW}
+                  height={58}
+                  pointerEvents="none"
+                  style={{ opacity: isDimmed ? 0.3 : 1 }}
                 >
-                  {hubVisualImbalance >= 0 ? '+' : ''}
-                  {formatCurrency(hubVisualImbalance)}
-                </div>
-              )}
-            </div>
-          </foreignObject>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      gap: 2,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {payload.label || payload.name}
+                    </div>
+                    {hubVisualImbalance !== undefined && (
+                      <div
+                        className="blur-number"
+                        style={{
+                          fontSize: isMobile ? 13 : 17,
+                          fontWeight: 800,
+                          color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
+                          lineHeight: 1.2,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {hubVisualImbalance >= 0 ? '+' : ''}
+                        {formatCurrency(hubVisualImbalance)}
+                      </div>
+                    )}
+                  </div>
+                </foreignObject>
+              </>
+            )}
         </>
       )}
 
