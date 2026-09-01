@@ -11,9 +11,8 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { GitMerge, ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { Switch } from '@/components/ui/switch';
@@ -98,10 +97,10 @@ function vibrantColor(hex: string, isIncome: boolean): string {
   const g = (num >> 8) & 0xff;
   const b = num & 0xff;
   const [h] = rgbToHsl(r, g, b);
-  
+
   const theme = getThemeType();
   let s: number, l: number;
-  
+
   if (theme === 'light') {
     s = 0.55;
     l = 0.55;
@@ -112,7 +111,7 @@ function vibrantColor(hex: string, isIncome: boolean): string {
     s = 0.5;
     l = 0.58;
   }
-  
+
   const [pr, pg, pb] = hslToRgb(h, s, l);
   return `#${((pr << 16) | (pg << 8) | pb).toString(16).padStart(6, '0')}`;
 }
@@ -742,7 +741,7 @@ const SankeyCustomLink = ({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export function CashFlowSankey() {
-  const isCollapsed = false;
+
   const [showFilters, setShowFilters] = useState(false);
   const router = useRouter();
   const {
@@ -1151,18 +1150,7 @@ export function CashFlowSankey() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <GitMerge className="w-4 h-4 text-primary shrink-0" />
-            <span>Cash Flow</span>
-            <span className="font-normal text-muted-foreground text-xs"> for {windowLabel}</span>
-          </div>
-        }
-      />
 
-      {!isCollapsed && (
         <>
           <CollapsibleFilterPanel
             isOpen={showFilters}
@@ -1398,7 +1386,7 @@ export function CashFlowSankey() {
             </div>
           </div>
         </>
-      )}
+
     </div>
   );
 }

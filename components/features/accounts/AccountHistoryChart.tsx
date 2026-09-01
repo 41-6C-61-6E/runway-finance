@@ -14,9 +14,8 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { Activity } from 'lucide-react';
+
 import { Card, CardContent } from '@/components/ui/card';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { ChartTypeSelector } from '@/components/charts/chart-type-selector';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
@@ -116,7 +115,7 @@ export default function AccountHistoryChart({
 
   const [chartType, setChartType] = usePersistentState<ChartType>('finance:accounts:chartType', 'line');
   const [groupMode, setGroupMode] = usePersistentState<GroupingMode>('finance:accounts:groupMode', 'type');
-  const isCollapsed = false;
+
   const [showHistoryFilters, setShowHistoryFilters] = useState(false);
 
   // Viewport pan/zoom state
@@ -183,19 +182,19 @@ export default function AccountHistoryChart({
     if (preset.timeframe !== timeframe) return false;
     if (preset.chartType !== chartType) return false;
     if (preset.groupMode !== groupMode) return false;
-    
+
     const presetGroups = preset.selectedGroups || [];
     if (presetGroups.length !== selectedGroups.size) return false;
     for (const g of presetGroups) {
       if (!selectedGroups.has(g)) return false;
     }
-    
+
     const presetTypes = preset.selectedTypes || [];
     if (presetTypes.length !== selectedTypes.size) return false;
     for (const t of presetTypes) {
       if (!selectedTypes.has(t)) return false;
     }
-    
+
     const presetAccounts = preset.selectedAccounts || [];
     if (presetAccounts.length !== selectedAccounts.size) return false;
     for (const a of presetAccounts) {
@@ -739,16 +738,7 @@ export default function AccountHistoryChart({
 
   return (
     <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-primary shrink-0" />
-            <span>Balance History</span>
-          </div>
-        }
-      />
-      {!isCollapsed && (
+
         <>
           <CollapsibleFilterPanel
             isOpen={showHistoryFilters}
@@ -1310,7 +1300,7 @@ export default function AccountHistoryChart({
                           />
                           <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
                           <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} wrapperStyle={{ zIndex: 50 }} />
-                          
+
                           {activeAssets.map((key) => {
                             const info = seriesInfoMap.get(key);
                             return (
@@ -1382,7 +1372,7 @@ export default function AccountHistoryChart({
                           />
                           <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
                           <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />
-                          
+
                           {activeAssets.map((key) => {
                             const info = seriesInfoMap.get(key);
                             return (
@@ -1468,7 +1458,7 @@ export default function AccountHistoryChart({
                         </div>
                       </div>
                     )}
-                    
+
                     {activeLiabilities.length > 0 && (
                       <div>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
@@ -1510,7 +1500,7 @@ export default function AccountHistoryChart({
             </div>
           </CardContent>
         </>
-      )}
+
     </Card>
   );
 }

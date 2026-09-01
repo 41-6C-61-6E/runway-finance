@@ -25,7 +25,6 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { Switch } from '@/components/ui/switch';
@@ -154,7 +153,7 @@ export function IncomeExpenseChart() {
     showWindowNav,
   } = useDateWindow('finance:income-expense:timeframe', 'finance:income-expense:windowEnd', '1y');
   const [chartType, setChartType] = useState<ChartType>('bar');
-  const isCollapsed = false;
+
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -406,16 +405,7 @@ export function IncomeExpenseChart() {
   if (isLoading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Income & Savings Rate</span>
-            </div>
-          }
-        />
-        {!isCollapsed && <LoadingSpinner category="chart" className="h-[320px] m-5" />}
+        <LoadingSpinner category="chart" className="h-[320px] m-5" />
       </div>
     );
   }
@@ -423,20 +413,11 @@ export function IncomeExpenseChart() {
   if (error) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Income & Savings Rate</span>
-            </div>
-          }
-        />
-        {!isCollapsed && (
+
           <div className="p-5">
             <ChartEmptyState variant="error" error={error} />
           </div>
-        )}
+
       </div>
     );
   }
@@ -444,20 +425,11 @@ export function IncomeExpenseChart() {
   if (data.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-              <span>Net Income & Savings Rate</span>
-            </div>
-          }
-        />
-        {!isCollapsed && (
+
           <div className="p-5">
             <ChartEmptyState variant="nodata" description="Income and expense data will appear once you sync your accounts" />
           </div>
-        )}
+
       </div>
     );
   }
@@ -469,16 +441,7 @@ export function IncomeExpenseChart() {
           {srSummary}
         </div>
       )}
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <ArrowRightLeft className="w-4 h-4 text-primary shrink-0" />
-            <span>Net Income & Savings Rate</span>
-          </div>
-        }
-      />
-      {!isCollapsed && (
+
         <>
           <CollapsibleFilterPanel
             isOpen={showFilters}
@@ -1083,7 +1046,6 @@ export function IncomeExpenseChart() {
             </div>
           </div>
         </>
-      )}
 
       {/* ── Cash Flow Breakdown Popup Modal ── */}
       {selectedCashFlowPoint && (

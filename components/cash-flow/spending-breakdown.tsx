@@ -15,10 +15,9 @@ import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { getMonthRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
-import { Filter, ChevronDown, ChevronUp, PieChart as PieIcon } from 'lucide-react';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
+
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { SegPill } from '@/components/ui/seg-pill';
 
 interface CategoryData {
@@ -36,21 +35,17 @@ interface CategoryData {
   isDiscretionary?: boolean;
 }
 
-
-
 const CHART_COLORS = [
   'var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)',
   'var(--color-chart-4)', 'var(--color-chart-5)', 'var(--color-chart-synthetic)',
 ];
-
-
 
 type BreakdownView = 'donut' | 'treemap' | 'bar';
 
 export function SpendingBreakdown() {
   const router = useRouter();
   const { privacyMode } = usePrivacyMode();
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('spendingBreakdown');
+
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -62,7 +57,7 @@ export function SpendingBreakdown() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
   const {
     timeframe, setTimeframe,
     windowEnd, setWindowEnd,
@@ -207,17 +202,7 @@ export function SpendingBreakdown() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <PieIcon className="w-4 h-4 text-primary shrink-0" />
-              <span>Breakdown</span>
-            </div>
-          }
-        />
-        {!isCollapsed && <LoadingSpinner category="chart" className="h-[380px]" />}
+        <LoadingSpinner category="chart" className="h-[380px]" />
       </div>
     );
   }
@@ -225,21 +210,11 @@ export function SpendingBreakdown() {
   if (error) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <PieIcon className="w-4 h-4 text-primary shrink-0" />
-              <span>Breakdown</span>
-            </div>
-          }
-        />
-        {!isCollapsed && (
+
           <div className="p-5">
             <ChartEmptyState variant="error" error={error} />
           </div>
-        )}
+
       </div>
     );
   }
@@ -251,16 +226,6 @@ export function SpendingBreakdown() {
           {srSummary}
         </div>
       )}
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <PieIcon className="w-4 h-4 text-primary shrink-0" />
-            <span>Breakdown</span>
-          </div>
-        }
-      />
 
       <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2">
         <SegPill<BreakdownView>
@@ -292,7 +257,7 @@ export function SpendingBreakdown() {
       </div>
 
       {/* ── Card Content Grid ── */}
-      {!isCollapsed && (
+
         <>
           {showFilters && (
             <div className="mx-3 sm:mx-5 mb-1 p-4 bg-background/50 border border-border/40 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200">
@@ -316,7 +281,7 @@ export function SpendingBreakdown() {
                     ? Math.max(...pieData.map(d => Math.min(isMobile ? 10 : 20, d.id.length)))
                     : 0;
                   const dynamicLeft = Math.max(isMobile ? 65 : 80, maxLabelLen * (isMobile ? 6 : 7) + 12);
-                  
+
                   return (
                     <div className="overflow-x-auto overflow-y-hidden h-full w-full scroll-contain-x">
                       <div className="min-w-max h-full">
@@ -487,7 +452,7 @@ export function SpendingBreakdown() {
           </div>
         </div>
         </>
-      )}
+
     </div>
   );
 }

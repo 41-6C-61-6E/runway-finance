@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+
 import {
   Area,
   XAxis,
@@ -22,11 +22,10 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { TimeRangeFilter } from '@/components/charts/chart-filters';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
-import { Landmark, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { getMonthRange } from '@/lib/utils/date-window';
 
@@ -110,7 +109,7 @@ export function CashVsCreditCard() {
     showWindowNav,
     dateRange,
   } = useDateWindow('finance:cash-vs-credit:timeframe', 'finance:cash-vs-credit:windowEnd', '1y');
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('cashVsCredit');
+
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -254,17 +253,7 @@ export function CashVsCreditCard() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Landmark className="w-4 h-4 text-primary shrink-0" />
-              <span>Cash vs Credit</span>
-            </div>
-          }
-        />
-        {!isCollapsed && <LoadingSpinner category="chart" className="h-[320px] m-5" />}
+        <LoadingSpinner category="chart" className="h-[320px] m-5" />
       </div>
     );
   }
@@ -272,21 +261,11 @@ export function CashVsCreditCard() {
   if (error) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Landmark className="w-4 h-4 text-primary shrink-0" />
-              <span>Cash vs Credit</span>
-            </div>
-          }
-        />
-        {!isCollapsed && (
+
           <div className="p-5">
             <ChartEmptyState variant="error" error={error} />
           </div>
-        )}
+
       </div>
     );
   }
@@ -296,21 +275,11 @@ export function CashVsCreditCard() {
   if (hasNoData) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <Landmark className="w-4 h-4 text-primary shrink-0" />
-              <span>Cash vs Credit</span>
-            </div>
-          }
-        />
-        {!isCollapsed && (
+
           <div className="p-5">
             <ChartEmptyState variant="nodata" description="Connect checking, savings, or credit card accounts to see your cash vs credit overview" />
           </div>
-        )}
+
       </div>
     );
   }
@@ -319,17 +288,7 @@ export function CashVsCreditCard() {
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm">
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <Landmark className="w-4 h-4 text-primary shrink-0" />
-            <span>Cash vs Credit</span>
-          </div>
-        }
-      />
-      {!isCollapsed && (
+
         <>
           <CollapsibleFilterPanel
             isOpen={showFilters}
@@ -509,7 +468,7 @@ export function CashVsCreditCard() {
             )}
           </div>
         </>
-      )}
+
     </div>
   );
 }

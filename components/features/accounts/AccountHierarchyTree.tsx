@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { 
   ChevronRight, 
   ChevronDown, 
-  Landmark, 
+
   Plus, 
   AlertCircle, 
   AlertTriangle,
@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -55,7 +54,7 @@ export default function AccountHierarchyTree({
   targetAccountId,
 }: AccountHierarchyTreeProps) {
   const { hideSubheadings } = useAccountSubheadings();
-  const hierarchyCollapsed = false;
+
   const [showHierarchyFilters, setShowHierarchyFilters] = useState(false);
   const [hierarchyTimeframe, setHierarchyTimeframe] = usePersistentState<TimeRange>('finance:accounts:hierarchyTimeframe', '1m');
 
@@ -181,7 +180,7 @@ export default function AccountHierarchyTree({
 
       const foundStart = historyData.findIndex((d) => d.date >= startStr);
       if (foundStart !== -1) startIdx = foundStart;
-      
+
       let foundEnd = historyData.length - 1;
       for (let i = historyData.length - 1; i >= 0; i--) {
         if (historyData[i].date <= endStr) {
@@ -382,16 +381,7 @@ export default function AccountHierarchyTree({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
       <Card className="@container lg:col-span-5 bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
-      <CollapsibleCardHeader
-        isCollapsed={hierarchyCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <Landmark className="w-4 h-4 text-primary shrink-0" />
-            <span>Accounts</span>
-          </div>
-        }
-      />
-      {!hierarchyCollapsed && (
+
         <>
           {accountsLoading ? (
             <CardContent className="p-2 sm:p-5">
@@ -791,7 +781,7 @@ export default function AccountHierarchyTree({
                 {sortedGroups.map((group) => {
                   const subMap = treeHierarchy.get(group);
                   if (!subMap) return null;
-                  
+
                   const groupAccounts: Account[] = [];
                   subMap.forEach((accs) => groupAccounts.push(...accs));
                   const groupStats = getTrendStats(groupAccounts);
@@ -1326,7 +1316,7 @@ export default function AccountHierarchyTree({
             </>
           )}
         </>
-      )}
+
       </Card>
 
       {/* Desktop side panel: selected group or account detail (2/3 width) */}
