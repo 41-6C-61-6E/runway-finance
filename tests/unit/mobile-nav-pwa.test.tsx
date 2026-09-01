@@ -22,6 +22,9 @@ describe('MobileNav PWA & Accessibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // jsdom defaults to 1024px (>= the md breakpoint) where the bottom bar
+    // is hidden in favor of the desktop sidebar. Mock a typical phone width.
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 390 });
     queryClient = new QueryClient();
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

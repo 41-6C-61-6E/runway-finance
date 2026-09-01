@@ -146,12 +146,17 @@ export function MobileNav() {
   // How many page buttons the bottom bar can fit at the current viewport width:
   // the bar spans `viewport - 32px` (16px margin per side) capped at max-w-lg
   // (512px), minus 12px horizontal padding per side and a 1px border.
-  // Every button (including the hamburger) is at least min-w-11 (44px) wide.
-  // One slot is always reserved for the hamburger; the floor of 3 slots keeps
-  // the bar from regressing below the old fixed layout on narrow phones.
-  // gap-2 (8px) between buttons is factored into both the width math and
-  // the edit grid below.
+  //
+  // Every button (page buttons and the hamburger) has a min-w-11 (44px)
+  // minimum. The rendered row is N page buttons + the hamburger, i.e.
+  // N + 1 buttons, which fits while (N+1) × 44 + N × gap ≤ contentWidth.
+  // We take the largest such N (floor of 3) so the row can never overflow
+  // and the hamburger always keeps its slot. The buttons are flex-1 (see
+  // the nav below), so they share the leftover space equally and the
+  // spacing redistributes automatically whenever items are added or
+  // removed — nothing ever gets clipped.
   const HOME_BAR_ITEM_GAP_PX = 8;
+  const HOME_BUTTON_MIN_WIDTH_PX = 44;
   const MD_BREAKPOINT_PX = 768;
   const [homeNavSlotCount, setHomeNavSlotCount] = useState(3);
   useEffect(() => {
@@ -165,11 +170,15 @@ export function MobileNav() {
       }
       const barWidth = Math.max(240, Math.min(window.innerWidth - 32, 512));
       const contentWidth = barWidth - 24 - 2;
-      // n buttons need n × 44px plus n−1 gaps (the hamburger is one of the
-      // n), so solve n·44 + (n−1)·gap ≤ contentWidth.
-      setHomeNavSlotCount(
-        Math.max(3, Math.floor((contentWidth + HOME_BAR_ITEM_GAP_PX) / (44 + HOME_BAR_ITEM_GAP_PX)))
+      // The rendered row is N page buttons PLUS the hamburger, so the total
+      // is N + 1 buttons — solve (N+1) × 44 + N × gap ≤ contentWidth for N.
+      const totalButtons = Math.floor(
+        (contentWidth + HOME_BAR_ITEM_GAP_PX) /
+          (HOME_BUTTON_MIN_WIDTH_PX + HOME_BAR_ITEM_GAP_PX)
       );
+      // Floor of 3 page buttons keeps the bar from regressing below the old
+      // fixed layout on narrow phones (3 + hamburger fits the 240px min bar).
+      setHomeNavSlotCount(Math.max(3, totalButtons - 1));
     };
     computeHomeNavSlots();
     window.addEventListener('resize', computeHomeNavSlots);
@@ -568,7 +577,7 @@ export function MobileNav() {
 
       {/* Main Single-Row Floating Bottom Navigation Bar */}
       <nav
-          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center justify-around gap-2 md:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
+          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center gap-2 md:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
         }}
@@ -583,7 +592,7 @@ export function MobileNav() {
               href={item.href}
               aria-label={item.label}
               onClick={() => setPendingHref(item.href)}
-                className={`flex flex-col items-center justify-center p-2.5 min-w-11 min-h-11 group ${glassItemBase} ${
+                className={`flex flex-1 flex-col items-center justify-center p-2.5 min-w-11 min-h-11 group transition-all duration-300 ${glassItemBase} ${
                   active ? glassItemActive : glassItemInactive
                 }`}
             >
@@ -597,7 +606,7 @@ export function MobileNav() {
           type="button"
           aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
           onClick={() => setIsOpen(!isOpen)}
-            className={`flex flex-col items-center justify-center p-2.5 min-w-11 min-h-11 group ${glassItemBase} ${
+            className={`flex flex-1 flex-col items-center justify-center p-2.5 min-w-11 min-h-11 group transition-all duration-300 ${glassItemBase} ${
               isOpen ? glassItemActive : glassItemInactive
             }`}
         >
