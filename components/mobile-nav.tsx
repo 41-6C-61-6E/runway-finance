@@ -149,12 +149,27 @@ export function MobileNav() {
   // Every button (including the hamburger) is at least min-w-11 (44px) wide.
   // One slot is always reserved for the hamburger; the floor of 3 slots keeps
   // the bar from regressing below the old fixed layout on narrow phones.
+  // gap-2 (8px) between buttons is factored into both the width math and
+  // the edit grid below.
+  const HOME_BAR_ITEM_GAP_PX = 8;
+  const MD_BREAKPOINT_PX = 768;
   const [homeNavSlotCount, setHomeNavSlotCount] = useState(3);
   useEffect(() => {
+    // md (768px) matches the desktop sidebar breakpoint (hidden md:flex):
+    // at md and wider the left sidebar owns navigation and the bottom bar
+    // is hidden, so no slots are computed there.
     const computeHomeNavSlots = () => {
+      if (window.innerWidth >= MD_BREAKPOINT_PX) {
+        setHomeNavSlotCount(0);
+        return;
+      }
       const barWidth = Math.max(240, Math.min(window.innerWidth - 32, 512));
       const contentWidth = barWidth - 24 - 2;
-      setHomeNavSlotCount(Math.max(3, Math.floor(contentWidth / 44) - 1));
+      // n buttons need n × 44px plus n−1 gaps (the hamburger is one of the
+      // n), so solve n·44 + (n−1)·gap ≤ contentWidth.
+      setHomeNavSlotCount(
+        Math.max(3, Math.floor((contentWidth + HOME_BAR_ITEM_GAP_PX) / (44 + HOME_BAR_ITEM_GAP_PX)))
+      );
     };
     computeHomeNavSlots();
     window.addEventListener('resize', computeHomeNavSlots);
@@ -283,6 +298,7 @@ export function MobileNav() {
   // Limit the bar to the number of slots that fit at the current width
   // (extra saved items stay in localStorage and reappear at wider sizes).
   activeHomeNavItems = activeHomeNavItems.slice(0, homeNavSlotCount);
+  if (homeNavSlotCount === 0) activeHomeNavItems = [];
 
   // Pages used to auto-fill the bar (dev-mode and preview pages are
   // never added to the home bar automatically).
@@ -305,6 +321,15 @@ export function MobileNav() {
             .filter((item) => isItemVisible(item)),
         ].slice(0, homeNavSlotCount);
 
+  // What "Edit Layout" manages: every saved home item, capped to what the
+  // widest phone can show. Extra defaults used to auto-fill the bar at some
+  // widths are intentionally not listed here — they are implicit and can be
+  // removed live from the bar itself.
+  const HOME_BAR_MAX_ITEMS = 10;
+  const homeNavEditItems = homeItemIds
+    .map((id) => ALL_NAV_ITEMS.find((item) => item.id === id))
+    .filter((item): item is NavItem => !!item)
+    .slice(0, HOME_BAR_MAX_ITEMS);
   // Pointer event handlers for custom drag and drop
   const handleItemPointerMove = (e: React.PointerEvent) => {
     if (!isEditing) {
@@ -411,7 +436,7 @@ export function MobileNav() {
       }
 
       if (hoveredSlotIndex !== null) {
-        const currentHomeIds = shownHomeNavItems.map(item => item.id);
+        const currentHomeIds = homeNavEditItems.map(item => item.id);
         const oldIndex = currentHomeIds.indexOf(draggedItem.id);
         
         let newIds = [...currentHomeIds];
@@ -460,7 +485,7 @@ export function MobileNav() {
       window.removeEventListener('touchend', handleDrop);
       window.removeEventListener('touchcancel', handleDrop);
     };
-  }, [draggedItem, hoveredSlotIndex, shownHomeNavItems, homeNavSlotCount]);
+  }, [draggedItem, hoveredSlotIndex, homeItemIds, homeNavSlotCount]);
 
   const handleItemClick = (e: React.MouseEvent) => {
     if (isEditing) {
@@ -470,9 +495,9 @@ export function MobileNav() {
   };
 
   const handleRemoveSlot = (indexToRemove: number) => {
-    const item = shownHomeNavItems[indexToRemove];
-    if (!item || shownHomeNavItems.length <= 1) return; // Keep at least 1 item
-    const newIds = shownHomeNavItems
+    const item = homeNavEditItems[indexToRemove];
+    if (!item || homeNavEditItems.length <= 1) return; // Keep at least 1 item
+    const newIds = homeNavEditItems
       .filter((_, idx) => idx !== indexToRemove)
       .map(navItem => navItem.id);
     updateHomeItems(newIds);
@@ -514,7 +539,7 @@ export function MobileNav() {
       {/* Decoupled Floating Sub-Navigation Capsule (View & Swipe Control) */}
       {hasSubNav && !isOpen && (
         <div
-          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none lg:hidden transition-all duration-300 ${
+          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden transition-all duration-300 ${
             isScrollingDown ? 'opacity-55 hover:opacity-100 scale-95' : 'opacity-100 scale-100'
           }`}
           style={{
@@ -543,7 +568,7 @@ export function MobileNav() {
 
       {/* Main Single-Row Floating Bottom Navigation Bar */}
       <nav
-          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center justify-around lg:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
+          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center justify-around gap-2 md:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
         }}
@@ -627,8 +652,8 @@ export function MobileNav() {
                 Home (Bottom Nav)
               </div>
             </div>
-            <div className="grid grid-cols-4 gap-y-3 gap-x-2 mb-4 border border-sidebar-border/20 bg-sidebar-foreground/3 rounded-3xl p-3">
-              {shownHomeNavItems.map((item, index) => {
+            <div className="flex items-start justify-around gap-2 mb-4 border border-sidebar-border/20 bg-sidebar-foreground/3 rounded-3xl p-3">
+              {homeNavEditItems.map((item, index) => {
                 const isHoveredSlot = hoveredSlotIndex === index;
                 const Icon = item.icon;
                 const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
@@ -638,7 +663,7 @@ export function MobileNav() {
                   <div
                     key={`home-slot-${index}`}
                     data-slot-index={index}
-                    className={`relative flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-200 ${
+                    className={`relative flex flex-col items-center gap-1.5 p-2 min-w-11 rounded-xl transition-all duration-200 ${
                       isHoveredSlot
                         ? 'bg-primary/10 border border-primary/30 scale-105 shadow-[0_0_8px_rgba(var(--primary-rgb),0.15)]'
                         : 'border border-transparent'
@@ -653,7 +678,7 @@ export function MobileNav() {
                       onPointerUp={handleItemPointerUp}
                       onPointerCancel={handleItemPointerCancel}
                       onClick={handleItemClick}
-                      className={`p-3 rounded-2xl relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
+                      className={`p-2.5 min-w-11 min-h-11 rounded-full flex items-center justify-center relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
                         active 
                           ? 'bg-primary/20 text-primary' 
                           : 'bg-sidebar-foreground/8 text-sidebar-foreground/65'

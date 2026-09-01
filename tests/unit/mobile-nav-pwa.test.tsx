@@ -56,7 +56,7 @@ describe('MobileNav PWA & Accessibility', () => {
   it('persists and restores custom home navigation items with fewer than 4 items', () => {
     localStorage.setItem('mobile-home-nav-items', JSON.stringify(['net-worth', 'transactions']));
 
-    const { getByLabelText, queryByLabelText } = render(
+    const { getByLabelText, container } = render(
       <QueryClientProvider client={queryClient}>
         <MobileSubNavProvider>
           <MobileNav />
@@ -66,6 +66,13 @@ describe('MobileNav PWA & Accessibility', () => {
 
     expect(getByLabelText('Net Worth')).not.toBeNull();
     expect(getByLabelText('Transactions')).not.toBeNull();
-    expect(queryByLabelText('Spending')).toBeNull();
+
+    // The bar now auto-fills empty slots with default pages, but the user's
+    // saved items keep their persisted order and still lead the bar.
+    const barLinks = Array.from(container.querySelectorAll('nav a')).map((a) => a.getAttribute('aria-label'));
+    expect(barLinks[0]).toBe('Net Worth');
+    expect(barLinks[1]).toBe('Transactions');
+    // The offline preview page is never auto-filled into the home bar.
+    expect(barLinks).not.toContain('Offline mode (preview)');
   });
 });
