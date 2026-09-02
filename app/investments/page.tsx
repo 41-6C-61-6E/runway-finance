@@ -10,6 +10,8 @@ import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 const INVESTMENT_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'holdings', label: 'Holdings' },
+  { id: 'allocation', label: 'Allocation' },
+  { id: 'rebalance', label: 'Rebalance' },
   { id: 'income', label: 'Activity' },
 ];
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
@@ -29,6 +31,8 @@ import { getDisplayTicker } from '@/lib/types/investments';
 import { useInvestmentIncomeData, type IncomeTimeframeValue, type IncomeResponse } from '@/lib/hooks/use-investment-income';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
+type InvestmentTabId = (typeof INVESTMENT_TABS)[number]['id'];
+
 interface InvestmentsData {
   accounts: any[];
   holdings: any[];
@@ -44,7 +48,7 @@ interface InvestmentsData {
 
 export default function InvestmentsPage() {
   const { isVisible } = useChartVisibility();
-  const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'income'>('overview');
+  const [activeTab, setActiveTab] = useState<InvestmentTabId>('overview');
   const [selectedHolding, setSelectedHolding] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   // CF-17: persist the Activity timeframe like every other chart selection —
@@ -225,13 +229,13 @@ export default function InvestmentsPage() {
             <MobileTabSwipeContainer
               tabs={INVESTMENT_TABS}
               activeTabId={activeTab}
-                  onTabChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
+                  onTabChange={(tabId) => setActiveTab(tabId as InvestmentTabId)}
             >
               <div className="hidden md:block mb-3 sm:mb-3.5">
                 <AppTabs
                   tabs={INVESTMENT_TABS}
                   activeTab={activeTab}
-                  onChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
+                  onChange={(tabId) => setActiveTab(tabId as InvestmentTabId)}
                   variant="underline"
                 />
               </div>
@@ -242,7 +246,7 @@ export default function InvestmentsPage() {
                   {(isVisible('performanceChart') || isVisible('taxBreakdown')) && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
                       {isVisible('performanceChart') && (
-                        <div className="lg:col-span-2">
+                        <div className={isVisible('taxBreakdown') ? 'lg:col-span-2' : 'lg:col-span-3'}>
                           <PerformanceChart />
                         </div>
                       )}
@@ -253,11 +257,23 @@ export default function InvestmentsPage() {
                       )}
                     </div>
                   )}
+                </div>
+              )}
 
+              {/* ── Allocation Tab Content ── */}
+              {activeTab === 'allocation' && (
+                <div className="space-y-5 sm:space-y-6">
                   {isVisible('holdingsAllocationChart') && (
-                    <div>
-                      <HoldingsAllocation holdings={data.holdings} accounts={data.accounts} />
-                    </div>
+                    <HoldingsAllocation mode="allocation" holdings={data.holdings} accounts={data.accounts} />
+                  )}
+                </div>
+              )}
+
+              {/* ── Rebalance Tab Content ── */}
+              {activeTab === 'rebalance' && (
+                <div className="space-y-5 sm:space-y-6">
+                  {isVisible('rebalanceAssist') && (
+                    <HoldingsAllocation mode="rebalance" holdings={data.holdings} accounts={data.accounts} />
                   )}
                 </div>
               )}

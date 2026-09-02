@@ -41,6 +41,11 @@ interface Account {
 interface HoldingsAllocationProps {
   holdings: Holding[];
   accounts: Account[];
+  /**
+   * When set, this view is forced and the internal Allocation/Rebalance
+   * sub-tabs are hidden (used when each is exposed as its own main page tab).
+   */
+  mode?: ViewMode;
 }
 
 type GroupByOption = 'security' | 'account' | 'taxCategory' | 'assetClass';
@@ -168,9 +173,10 @@ const PRESET_MODELS: Record<string, { label: string; targets: Record<string, num
   },
 };
 
-export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationProps) {
+export function HoldingsAllocation({ holdings, accounts, mode }: HoldingsAllocationProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('holdingsAllocationChart');
-  const [viewMode, setViewMode] = useState<ViewMode>('allocation');
+  const [internalViewMode, setInternalViewMode] = useState<ViewMode>('allocation');
+  const viewMode: ViewMode = mode ?? internalViewMode;
   const [groupBy, setGroupBy] = useState<GroupByOption>('security');
   const [showAll, setShowAll] = useState(false);
   const [activeModel, setActiveModel] = useState<string>('three-fund');
@@ -341,7 +347,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
         title={
           <div className="flex items-center gap-2">
             <PieIcon className="w-4 h-4 text-primary shrink-0" />
-            <span>Asset Allocation</span>
+            <span>{mode === 'rebalance' ? 'Rebalancing Assistant' : 'Asset Allocation'}</span>
           </div>
         }
       />
@@ -349,6 +355,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       {!isCollapsed && (
         <div className="flex-1 flex flex-col">
           {/* Primary View Navigation: Allocation vs Rebalance */}
+          {!mode && (
           <div className="px-4 sm:px-5">
             <AppTabs
               tabs={[
@@ -356,12 +363,13 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
                 { id: 'rebalance', label: 'Rebalance' },
               ]}
               activeTab={viewMode}
-              onChange={(tabId) => setViewMode(tabId as ViewMode)}
+              onChange={(tabId) => setInternalViewMode(tabId as ViewMode)}
               variant="underline"
               size="sm"
               aria-label="Asset allocation view"
             />
           </div>
+          )}
 
           <div className="flex-1 flex flex-col p-4 sm:p-5">
             {viewMode === 'allocation' ? (
