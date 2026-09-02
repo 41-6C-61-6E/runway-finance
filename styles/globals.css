@@ -41,6 +41,46 @@ html.text-size-lg {
   font-size: 18px;
 }
 
+/* Compact Mode (Settings → General) — applied on <html> by
+   user-settings-provider.tsx. Tightens main-content horizontal padding and
+   vertical gaps one step (px-4→3, sm:px-6→4, lg:px-8→6; space-y-5/6→one step
+   down; gap-6→4) without touching the sidebar (its margin lives on its own
+   wrapper, so `--sidebar-margin-left` is unaffected). Only active while the
+   `compact-layout` flag is present; pages render identically otherwise.
+   Scoped to the `PageContent` wrapper (`.page-content`) so only main
+   content — never nav, sidebars, or dialogs — is affected. */
+.compact-layout .page-content.px-4 {
+  padding-inline: calc(var(--spacing) * 3);
+}
+.compact-layout .page-content .gap-6 {
+  gap: calc(var(--spacing) * 4);
+}
+/* Tailwind v4 `space-y-*` sets margin-block-end on `> :not(:last-child)`;
+   override the end margin so the tighter gap wins on specificity. */
+.compact-layout .page-content .space-y-5 > :not(:last-child),
+.compact-layout .page-content .space-y-6 > :not(:last-child) {
+  margin-block-end: calc(var(--spacing) * 4);
+}
+@media (min-width: 640px) {
+  .compact-layout .page-content.sm\:px-6 {
+    padding-inline: calc(var(--spacing) * 4);
+  }
+  .compact-layout .page-content .sm\:gap-6 {
+    gap: calc(var(--spacing) * 4);
+  }
+  .compact-layout .page-content .sm\:space-y-6 > :not(:last-child) {
+    margin-block-end: calc(var(--spacing) * 5);
+  }
+}
+@media (min-width: 1024px) {
+  .compact-layout .page-content.lg\:px-8 {
+    padding-inline: calc(var(--spacing) * 6);
+  }
+  .compact-layout .page-content .lg\:gap-6 {
+    gap: calc(var(--spacing) * 4);
+  }
+}
+
 /* Prevent iOS Safari from zooming in when tapping inputs/selects */
 @supports (-webkit-touch-callout: none) {
   @media screen and (max-width: 768px) {

@@ -19,6 +19,12 @@ type UserSettingsContextType = {
   updateSetting: (key: string, value: any) => Promise<void>;
   loading: boolean;
   refreshSettings: () => Promise<void>;
+  /**
+   * Compact layout toggle (Settings → General). When true, main-content
+   * horizontal padding and vertical gaps are tightened one step (scoped CSS
+   * under `.compact-layout`). Mirrored on `<html>` as the same class.
+   */
+  compactMode: boolean;
 };
 
 const UserSettingsContext = createContext<UserSettingsContextType | null>(null);
@@ -47,6 +53,22 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('finance-text-size', textSize);
     } catch {}
   }, [settings.textSize]);
+
+  /** True when the user has enabled Compact Mode in Settings → General. */
+  const compactMode = settings?.compactMode === true;
+
+  // Apply the compact layout flag to <html> so scoped CSS (styles/globals.css,
+  // `.compact-layout`) can tighten main-content padding. Mirrors the existing
+  // text-size class pattern; the sidebar is unaffected (its margin lives on a
+  // separate wrapper in authenticated-layout.tsx).
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (compactMode) {
+      document.documentElement.classList.add('compact-layout');
+    } else {
+      document.documentElement.classList.remove('compact-layout');
+    }
+  }, [compactMode]);
 
   // Cross-tab sync: when another tab changes a setting, refresh this tab's cache.
   // BroadcastChannel only delivers to OTHER contexts, so we never echo our own writes.
@@ -114,8 +136,8 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const value = useMemo(
-    () => ({ settings, updateSetting, loading, refreshSettings }),
-    [settings, updateSetting, loading, refreshSettings],
+    () => ({ settings, updateSetting, loading, refreshSettings, compactMode }),
+    [settings, updateSetting, loading, refreshSettings, compactMode],
   );
 
   return (

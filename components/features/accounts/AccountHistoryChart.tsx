@@ -83,6 +83,64 @@ const getTimeframeIndices = (data: any[], range: TimeRange): [number, number] =>
   return [startIdx, lastIdx];
 };
 
+// ── Top-N + "Other" aggregation ────────────────────────────────────────────
+// Once more than TOP_N series are selected, the N largest (by average absolute
+// value over the visible window) render as their own layers and every hidden
+// series is folded into a single muted `OTHER_KEY` layer holding the exact
+// sum of the hidden rows (the stacked total area is unchanged). Expanding
+// "Other" restores the individual series.
+export const TOP_N = 6;
+export const OTHER_KEY = 'other-aggregate';
+const OTHER_COLOR = 'var(--muted-foreground)';
+/**
+ * Pick the TOP_N series keys (of `keys`) with the highest average absolute
+ * value in `rows`. Ties break alphabetically so the pick — and therefore the
+ * stable color assignment — is deterministic across renders/panning.
+ */
+export const pickTopSeries = (keys: string[], rows: Array<Record<string, any>>) => {
+  const avgs = new Map<string, number>();
+  for (const key of keys) {
+    let sum = 0;
+    let count = 0;
+    for (const row of rows) {
+      const v = row[key];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        sum += Math.abs(v);
+        count += 1;
+      }
+    }
+    avgs.set(key, count > 0 ? sum / count : 0);
+  }
+  return [...keys]
+    .sort(
+      (a, b) =>
+        avgs.get(b)! - avgs.get(a)! || a.localeCompare(b)
+    )
+    .slice(0, TOP_N);
+};
+
+/**
+ * Merge the rows of the hidden keys into a single aggregated row value so the
+ * collapsed "Other" layer is the exact sum of the hidden series (signs are
+ * preserved, so the stacked total area is unchanged).
+ */
+export const buildAggregatedValues = (
+  rows: Array<Record<string, any>>,
+  hiddenKeys: string[]
+): Array<{ value: number | undefined; hasData: boolean }> =>
+  rows.map((row: any) => {
+    let acc = 0;
+    let hasData = false;
+    for (const key of hiddenKeys) {
+      const v = row[key];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        acc += v;
+        hasData = true;
+      }
+    }
+    return { value: hasData ? acc : undefined, hasData };
+  });
+
 interface AccountHistoryChartProps {
   filteredAllAccounts: Account[];
   allTags: TagItem[];
@@ -135,6 +193,9 @@ export default function AccountHistoryChart({
   const [selectedTypes, setSelectedTypes] = usePersistentState<Set<string>>('finance:accounts:selectedTypes', new Set(), setOptions);
   const [selectedAccounts, setSelectedAccounts] = usePersistentState<Set<string>>('finance:accounts:selectedAccounts', new Set(), setOptions);
   const [selectedTags, setSelectedTags] = usePersistentState<Set<string>>('finance:accounts:selectedTags', new Set(), setOptions);
+  // When true, the collapsed "Other (N)" layer is expanded so every hidden
+  // series renders as its own layer again (click the Other layer/legend/chip).
+  const [otherExpanded, setOtherExpanded] = usePersistentState<boolean>('finance:accounts:otherExpanded', false);
 
   // Quick view presets
   const [customPresets, setCustomPresets] = usePersistentState<ChartPreset[]>('finance:accounts:customPresets', []);
@@ -350,9 +411,9 @@ export default function AccountHistoryChart({
     return map;
   }, [uniqueSeriesKeys, groupMode, reportableAccounts, isAssetSeries]);
 
-  const { rechartsData, activeAssets, activeLiabilities } = useMemo(() => {
+  const { rechartsData, visibleAssets, visibleLiabilities, otherCount, totalHiddenCount, otherHiddenKeys } = useMemo(() => {
     if (historyData.length === 0) {
-      return { rechartsData: [], activeAssets: [], activeLiabilities: [] };
+      return { rechartsData: [], visibleAssets: [], visibleLiabilities: [], otherCount: 0, totalHiddenCount: 0, otherHiddenKeys: [] };
     }
 
     const seriesAccountsMap = new Map<string, Account[]>();
@@ -404,15 +465,29 @@ export default function AccountHistoryChart({
       return point;
     });
 
-    const activeKeys = Array.from(seriesAccountsMap.keys());
-    const activeAssets = activeKeys.filter((k) => isAssetSeries(k)).sort((a, b) => {
-      const latestPoint = processedPoints[processedPoints.length - 1] || {};
-      return (latestPoint[b] || 0) - (latestPoint[a] || 0);
-    });
-    const activeLiabilities = activeKeys.filter((k) => !isAssetSeries(k)).sort((a, b) => {
-      const latestPoint = processedPoints[processedPoints.length - 1] || {};
-      return (latestPoint[b] || 0) - (latestPoint[a] || 0);
-    });
+    // Stable layer order: by series index (assets alphabetical, then
+    // liabilities alphabetical) — never by value — so colors/layers are
+    // immutable across hover/pan/period changes.
+    const activeAssets = Array.from(seriesAccountsMap.keys())
+      .filter((k) => isAssetSeries(k))
+      .sort((a, b) => a.localeCompare(b));
+    const activeLiabilities = Array.from(seriesAccountsMap.keys())
+      .filter((k) => !isAssetSeries(k))
+      .sort((a, b) => a.localeCompare(b));
+    const allActiveKeys = [...activeAssets, ...activeLiabilities];
+
+    // Top-N by average |value| over the window + single muted "Other" layer
+    // holding the exact per-point sum of the hidden series (signs preserved,
+    // so the stacked total area is unchanged when collapsed).
+    const topAlways = pickTopSeries(allActiveKeys, processedPoints).slice(0, TOP_N);
+    // When the user has expanded "Other", every series renders as its own
+    // layer again (hiddenKeys is empty, so no folded Other value is written).
+    const hiddenKeys = otherExpanded
+      ? []
+      : allActiveKeys.filter((k) => !topAlways.includes(k));
+    // The set that would be hidden in the collapsed view — drives the
+    // expand/collapse affordances even while expanded.
+    const collapsedHiddenKeys = allActiveKeys.filter((k) => !topAlways.includes(k));
 
     const rechartsDataRaw = processedPoints.map((d) => {
       const row: Record<string, any> = {
@@ -421,7 +496,7 @@ export default function AccountHistoryChart({
         totalAssets: d.totalAssets,
         totalLiabilities: -d.totalLiabilities,
       };
-      selectedSeriesKeys.forEach((k) => {
+      allActiveKeys.forEach((k) => {
         const val = d[k];
         if (val !== undefined) {
           row[k] = isAssetSeries(k) ? val : -val;
@@ -455,6 +530,20 @@ export default function AccountHistoryChart({
       }
     });
 
+    // Fold the hidden series into ONE aggregated "Other" row value per point:
+    // the exact sum of the hidden series (signs preserved). Only done when
+      // collapsed and there is more than TOP_N series — the default 17-account
+      // view then shows exactly 6 + Other (the stacked area is unchanged).
+      if (hiddenKeys.length > 0) {
+      const aggregates = buildAggregatedValues(rechartsDataRaw, hiddenKeys);
+      rechartsDataRaw.forEach((row, i) => {
+        const agg = aggregates[i];
+        if (agg.hasData) {
+          row[OTHER_KEY] = agg.value;
+        }
+      });
+    }
+
     let startIdx = 0;
     const firstDataIdx = rechartsDataRaw.findIndex((d) => d._hasData);
     if (firstDataIdx !== -1) {
@@ -462,12 +551,33 @@ export default function AccountHistoryChart({
     }
     const rechartsData = rechartsDataRaw.slice(startIdx);
 
+      // What actually renders as its own layer / legend row: the whole (stable)
+      // set when expanded, or just the top-N members when collapsed. `otherCount`
+      // is the number of series folded into the muted "Other" layer (0 when
+      // expanded, or when there were never more than TOP_N series).
+      const visibleAssets = otherExpanded
+        ? activeAssets
+        : activeAssets.filter((k) => topAlways.includes(k));
+      const visibleLiabilities = otherExpanded
+        ? activeLiabilities
+        : activeLiabilities.filter((k) => topAlways.includes(k));
+      // Hidden series folded into "Other" in the CURRENT view (0 when expanded)
+      // and the total the collapsed view would hide (stable, drives the legend
+      // "Other" row and the panel chip in both states).
+      const otherCount = otherExpanded ? 0 : collapsedHiddenKeys.length;
+      const totalHiddenCount = collapsedHiddenKeys.length;
+
     return {
       rechartsData,
-      activeAssets,
-      activeLiabilities,
+        visibleAssets,
+        visibleLiabilities,
+        otherCount,
+        totalHiddenCount,
+      // Stable (collapsed-view) hidden set, split by sign here so the
+      // tooltip can total "Other" per Assets/Liabilities block.
+      otherHiddenKeys: collapsedHiddenKeys,
     };
-  }, [historyData, reportableAccounts, groupMode, selectedSeriesKeys, isAssetSeries]);
+  }, [historyData, reportableAccounts, groupMode, selectedSeriesKeys, isAssetSeries, otherExpanded]);
 
   const [defaultStart, defaultEnd] = useMemo(() => {
     if (rechartsData.length === 0) return [0, 0];
@@ -485,6 +595,17 @@ export default function AccountHistoryChart({
 
   const currentViewStart = viewStart ?? defaultStart;
   const currentViewEnd = viewEnd ?? defaultEnd;
+
+  // Stable (collapsed-view) hidden split by sign — drives the tooltip's
+  // per-block "Other" rows and the legend/count affordances.
+  const collapsedHiddenAssets = useMemo(
+    () => otherHiddenKeys.filter((k) => isAssetSeries(k)),
+    [otherHiddenKeys, isAssetSeries]
+  );
+  const collapsedHiddenLiabilities = useMemo(
+    () => otherHiddenKeys.filter((k) => !isAssetSeries(k)),
+    [otherHiddenKeys, isAssetSeries]
+  );
 
   const [windowWidth, setWindowWidth] = useState<number>(1200);
 
@@ -549,6 +670,7 @@ export default function AccountHistoryChart({
       selectedSeriesKeys.forEach((k) => {
         if (d[k] !== undefined) vals.push(d[k]);
       });
+      if (d[OTHER_KEY] !== undefined) vals.push(d[OTHER_KEY]);
       return vals;
     });
 
@@ -686,9 +808,27 @@ export default function AccountHistoryChart({
       year: '2-digit',
     });
 
-    const activeKeys = Array.from(selectedSeriesKeys);
-    const activeAssets = activeKeys.filter((k) => isAssetSeries(k) && Math.abs(point[k] || 0) > 0);
-    const activeLiabilities = activeKeys.filter((k) => !isAssetSeries(k) && Math.abs(point[k] || 0) > 0);
+    // Mirror the on-chart layering: the top-N series as own rows, plus one
+    // aggregated "Other (n)" row per sign when the view is collapsed.
+    const otherAssets = (hiddenAssetKeys: string[], negate: boolean) => {
+      let sum = 0;
+      let hasData = false;
+      for (const key of hiddenAssetKeys) {
+        const v = point[key];
+        if (typeof v === 'number' && Number.isFinite(v) && v !== 0) {
+          sum += v;
+          hasData = true;
+        }
+      }
+      return hasData ? Math.abs(negate ? -sum : sum) : 0;
+    };
+
+    const displayAssets = visibleAssets.filter((k) => Math.abs(point[k] || 0) > 0);
+    const displayLiabilities = visibleLiabilities.filter((k) => Math.abs(point[k] || 0) > 0);
+    const hiddenAssetKeys = collapsedHiddenAssets.length > 0 ? collapsedHiddenAssets : [];
+    const hiddenLiabilityKeys = collapsedHiddenLiabilities.length > 0 ? collapsedHiddenLiabilities : [];
+    const otherAssetValue = otherCount > 0 ? otherAssets(hiddenAssetKeys, false) : 0;
+    const otherLiabilityValue = otherCount > 0 ? otherAssets(hiddenLiabilityKeys, true) : 0;
 
     return (
       <ChartTooltip>
@@ -699,10 +839,10 @@ export default function AccountHistoryChart({
           color="var(--color-primary)"
         />
 
-        {activeAssets.length > 0 && (
+        {(displayAssets.length > 0 || otherAssetValue > 0) && (
           <div className="mt-2 border-t border-border/40 pt-1.5">
             <div className="text-micro font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Assets</div>
-            {activeAssets.map((key) => {
+            {displayAssets.map((key) => {
               const info = seriesInfoMap.get(key);
               return (
                 <TooltipRow
@@ -713,13 +853,20 @@ export default function AccountHistoryChart({
                 />
               );
             })}
+            {otherCount > 0 && otherAssetValue > 0 && (
+              <TooltipRow
+                label={`Other (${collapsedHiddenAssets.length})`}
+                value={formatCurrency(otherAssetValue)}
+                color={OTHER_COLOR}
+              />
+            )}
           </div>
         )}
 
-        {activeLiabilities.length > 0 && (
+        {(displayLiabilities.length > 0 || otherLiabilityValue > 0) && (
           <div className="mt-2 border-t border-border/40 pt-1.5">
             <div className="text-micro font-semibold text-muted-foreground uppercase mb-1 tracking-wider">Liabilities</div>
-            {activeLiabilities.map((key) => {
+            {displayLiabilities.map((key) => {
               const info = seriesInfoMap.get(key);
               return (
                 <TooltipRow
@@ -730,11 +877,18 @@ export default function AccountHistoryChart({
                 />
               );
             })}
+            {otherCount > 0 && otherLiabilityValue > 0 && (
+              <TooltipRow
+                label={`Other (${collapsedHiddenLiabilities.length})`}
+                value={formatCurrency(otherLiabilityValue)}
+                color={OTHER_COLOR}
+              />
+            )}
           </div>
         )}
       </ChartTooltip>
     );
-  }, [selectedSeriesKeys, isAssetSeries, seriesInfoMap]);
+  }, [visibleAssets, visibleLiabilities, otherCount, collapsedHiddenAssets, collapsedHiddenLiabilities, seriesInfoMap]);
 
   return (
     <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
@@ -758,6 +912,16 @@ export default function AccountHistoryChart({
                   <span className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                     FILTERED
                   </span>
+                )}
+                {totalHiddenCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setOtherExpanded((v) => !v)}
+                    title={otherCount > 0 ? `Expand ${totalHiddenCount} series folded into "Other"` : 'Collapse back into "Other"'}
+                    className="bg-muted/60 text-muted-foreground border border-border/40 hover:text-foreground hover:bg-muted px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors"
+                  >
+                    {otherCount > 0 ? `OTHER (${totalHiddenCount}) ⊕` : 'COLLAPSE ⊖'}
+                  </button>
                 )}
               </div>
             }
@@ -1215,6 +1379,28 @@ export default function AccountHistoryChart({
                         </div>
                       </div>
                     )}
+
+                    {totalHiddenCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setOtherExpanded((v) => !v)}
+                        title={otherCount > 0 ? 'Click to expand the aggregated series' : 'Click to collapse back into "Other"'}
+                        className={`flex items-center gap-2 text-xs transition-colors w-full text-left ${otherCount > 0 ? 'text-foreground/70 hover:text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: OTHER_COLOR, opacity: otherCount > 0 ? 1 : 0.45 }}
+                        />
+                        <span className="truncate">
+                          Other ({totalHiddenCount})
+                        </span>
+                        <span className="ml-auto text-[10px] text-muted-foreground flex-shrink-0">
+                          {otherCount > 0
+                            ? `+${totalHiddenCount} · click to expand`
+                            : 'click to collapse'}
+                        </span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Reset/Clear button */}
@@ -1301,7 +1487,7 @@ export default function AccountHistoryChart({
                           <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
                           <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-border)', opacity: 0.15 }} wrapperStyle={{ zIndex: 50 }} />
 
-                          {activeAssets.map((key) => {
+                          {visibleAssets.map((key) => {
                             const info = seriesInfoMap.get(key);
                             return (
                               <Bar
@@ -1315,7 +1501,7 @@ export default function AccountHistoryChart({
                             );
                           })}
 
-                          {activeLiabilities.map((key) => {
+                          {visibleLiabilities.map((key) => {
                             const info = seriesInfoMap.get(key);
                             return (
                               <Bar
@@ -1328,6 +1514,18 @@ export default function AccountHistoryChart({
                               />
                             );
                           })}
+
+                          {otherCount > 0 && (
+                            <Bar
+                              dataKey={OTHER_KEY}
+                              stackId="stack"
+                              fill={OTHER_COLOR}
+                              radius={[0, 0, 0, 0]}
+                              maxBarSize={32}
+                              cursor="pointer"
+                              onClick={() => setOtherExpanded(true)}
+                            />
+                          )}
                         </BarChart>
                       ) : (
                         <ComposedChart
@@ -1336,9 +1534,9 @@ export default function AccountHistoryChart({
                           margin={{ top: 15, right: 20, left: 10, bottom: 5 }}
                         >
                           <defs>
-                            {[...activeAssets, ...activeLiabilities].map((key) => {
+                            {[...visibleAssets, ...visibleLiabilities].map((key) => {
                               const info = seriesInfoMap.get(key);
-                              const color = info?.color || (activeAssets.includes(key) ? 'var(--color-chart-1)' : 'var(--color-destructive)');
+                              const color = info?.color || (visibleAssets.includes(key) ? 'var(--color-chart-1)' : 'var(--color-destructive)');
                               const id = `gradient-${key.replace(/[^a-zA-Z0-9]/g, '-')}`;
                               return (
                                 <linearGradient key={key} id={id} x1="0" y1="0" x2="0" y2="1">
@@ -1347,6 +1545,12 @@ export default function AccountHistoryChart({
                                 </linearGradient>
                               );
                             })}
+                            {otherCount > 0 && (
+                              <linearGradient key="__other" id={`gradient-${OTHER_KEY}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor={OTHER_COLOR} stopOpacity={0.35} />
+                                <stop offset="95%" stopColor={OTHER_COLOR} stopOpacity={0.06} />
+                              </linearGradient>
+                            )}
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                           <XAxis
@@ -1373,7 +1577,7 @@ export default function AccountHistoryChart({
                           <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
                           <RechartsTooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-ring)', strokeWidth: 1, strokeDasharray: '2 2' }} />
 
-                          {activeAssets.map((key) => {
+                          {visibleAssets.map((key) => {
                             const info = seriesInfoMap.get(key);
                             return (
                               <Area
@@ -1389,7 +1593,7 @@ export default function AccountHistoryChart({
                             );
                           })}
 
-                          {activeLiabilities.map((key) => {
+                          {visibleLiabilities.map((key) => {
                             const info = seriesInfoMap.get(key);
                             return (
                               <Area
@@ -1404,6 +1608,20 @@ export default function AccountHistoryChart({
                               />
                             );
                           })}
+
+                          {otherCount > 0 && (
+                            <Area
+                              type="monotone"
+                              dataKey={OTHER_KEY}
+                              stackId="stack"
+                              stroke={OTHER_COLOR}
+                              strokeWidth={2}
+                              fill={`url(#gradient-${OTHER_KEY})`}
+                              dot={false}
+                              cursor="pointer"
+                              onClick={() => setOtherExpanded(true)}
+                            />
+                          )}
                         </ComposedChart>
                       )}
                     </ResponsiveContainer>
@@ -1423,13 +1641,13 @@ export default function AccountHistoryChart({
 
                   {/* Legend Column */}
                   <div className="w-full md:w-56 flex-shrink-0 flex flex-col justify-start border-t md:border-t-0 md:border-l border-border/20 pt-3 md:pt-0 md:pl-4 overflow-y-auto max-h-[120px] md:max-h-full gap-3">
-                    {activeAssets.length > 0 && (
+                    {visibleAssets.length > 0 && (
                       <div>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
-                          Assets ({activeAssets.length})
+                          Assets ({visibleAssets.length})
                         </span>
                         <div className="space-y-1.5">
-                          {activeAssets.map((key) => {
+                          {visibleAssets.map((key) => {
                             const info = seriesInfoMap.get(key);
                             return (
                               <div key={key} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors">
@@ -1459,13 +1677,13 @@ export default function AccountHistoryChart({
                       </div>
                     )}
 
-                    {activeLiabilities.length > 0 && (
+                    {visibleLiabilities.length > 0 && (
                       <div>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
-                          Liabilities ({activeLiabilities.length})
+                          Liabilities ({visibleLiabilities.length})
                         </span>
                         <div className="space-y-1.5">
-                          {activeLiabilities.map((key) => {
+                          {visibleLiabilities.map((key) => {
                             const info = seriesInfoMap.get(key);
                             return (
                               <div key={key} className="flex items-center gap-2 text-xs text-foreground/80 hover:text-foreground transition-colors">
