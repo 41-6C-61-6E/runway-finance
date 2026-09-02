@@ -157,7 +157,7 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
   const txs = txData?.data || [];
 
   return (
-    <div className={cn('py-4 px-0 transition-all duration-300 !border-none [&+div]:!border-t-0', className)}>
+    <div className={cn('transition-all duration-300', className)}>
       <ChartTimeframeBar
         value={hierarchyTimeframe}
         onChange={(v) => onHierarchyTimeframeChange?.(v)}
@@ -173,117 +173,118 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
             timeframe={timeframe}
           />
         ) : undefined}
-        className="mb-3 rounded-xl border border-border/20"
+        className="bg-card/30 border-0"
       />
-      <div className="grid grid-cols-1 gap-5 sm:gap-6 px-2 sm:px-4">
-        {/* Balance History Mini-Chart */}
-        <div className="flex flex-col space-y-3">
-
-          <div className="flex-1 min-h-[140px] w-full relative bg-card/40 rounded-xl border border-border/20 p-2 overflow-hidden flex items-center justify-center">
-            {visibleMiniData.length === 0 ? (
-              <span className="text-[10px] sm:text-xs text-muted-foreground/60 italic">No data for this time period</span>
-            ) : visibleMiniData.length < 2 ? (
-              <span className="text-[10px] sm:text-xs text-muted-foreground/60 italic">Insufficient historical data for this account</span>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                <AreaChart data={visibleMiniData} margin={{ top: 15, right: 5, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id={`gradient-mini-${accountId}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
-                      <stop offset="95%" stopColor={chartColor} stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.25} />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
-                    ticks={miniTicks}
-                    tickFormatter={(d) => formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' })}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
-                    domain={[minVal, maxVal]}
-                    ticks={miniYTicks}
-                    tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
-                  />
-                  <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} wrapperStyle={{ zIndex: 50 }} />
-                  <Area
-                    type="monotone"
-                    dataKey="balance"
-                    stroke={chartColor}
-                    strokeWidth={1.5}
-                    fill={`url(#gradient-mini-${accountId})`}
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
+      <div className="px-2 sm:px-3 pb-4 sm:pb-5 space-y-5">
+        {/* Balance History Chart — same box style as GroupDetailPanel combined chart */}
+        <div className="rounded-2xl border border-sidebar-border bg-card/50 shadow-sm overflow-hidden">
+          <div className="p-3 sm:p-4">
+            <div className="h-[240px] w-full relative overflow-hidden flex items-center justify-center">
+              {visibleMiniData.length === 0 ? (
+                <span className="text-[10px] sm:text-xs text-muted-foreground/60 italic">No data for this time period</span>
+              ) : visibleMiniData.length < 2 ? (
+                <span className="text-[10px] sm:text-xs text-muted-foreground/60 italic">Insufficient historical data for this account</span>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                  <AreaChart data={visibleMiniData} margin={{ top: 15, right: 5, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id={`gradient-mini-${accountId}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={chartColor} stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.25} />
+                    <XAxis
+                      dataKey="date"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                      ticks={miniTicks}
+                      tickFormatter={(d) => formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' })}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                      domain={[minVal, maxVal]}
+                      ticks={miniYTicks}
+                      tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
+                    />
+                    <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} wrapperStyle={{ zIndex: 50 }} />
+                    <Area
+                      type="monotone"
+                      dataKey="balance"
+                      stroke={chartColor}
+                      strokeWidth={1.5}
+                      fill={`url(#gradient-mini-${accountId})`}
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Recent Transactions */}
-        <div className="flex flex-col space-y-3">
-          <div className="flex items-center justify-between">
-            <Link
-              href={`/transactions?accountId=${accountId}`}
-              className="text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer"
-            >
-              <Receipt className="w-3.5 h-3.5" />
-              <span>See all</span>
-              <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </div>
-
-          <div className="flex-1 flex flex-col justify-center min-h-[140px]">
-            {isLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-              </div>
-            ) : error || !txData ? (
-              <div className="text-[10px] sm:text-xs text-destructive text-center py-4 bg-card/25 rounded-lg border border-border/20">
-                Failed to load transactions.
-              </div>
-            ) : txs.length === 0 ? (
-              <div className="text-[10px] sm:text-xs text-muted-foreground/60 italic text-center py-8 bg-card/25 rounded-lg border border-border/20">
-                No recent activity found.
-              </div>
-            ) : (
-              <div className="divide-y divide-border/20 border border-border/30 rounded-lg overflow-hidden bg-card/40">
-                {txs.map((tx: any) => {
-                  const { text } = formatTransactionAmount(tx.amount);
-                  return (
-                    <div key={tx.id} className="py-2 flex items-center justify-between text-xs hover:bg-muted/30 px-3 transition-colors">
-                      <div className="min-w-0 flex-1 pr-4">
-                        <p className="font-medium text-foreground truncate text-xs sm:text-sm">{tx.payee || tx.description || 'Unidentified Transaction'}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[11px] text-muted-foreground">{formatDate(tx.date)}</span>
-                          {tx.category && (
-                            <span 
-                              className="px-1.5 py-0.2 text-micro rounded-full font-medium"
-                              style={{ 
-                                backgroundColor: `${tx.category.color}15`, 
-                                color: tx.category.color 
-                              }}
-                            >
-                              {tx.category.name}
-                            </span>
-                          )}
+        {/* Recent Transactions — same box style as GroupDetailPanel composition */}
+        <div className="rounded-2xl border border-sidebar-border bg-card/50 shadow-sm overflow-hidden">
+          <div className="p-3 sm:p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent activity</h3>
+              <Link
+                href={`/transactions?accountId=${accountId}`}
+                className="text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer"
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>See all</span>
+                <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+            <div className="flex-1 flex flex-col justify-center min-h-[140px]">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                </div>
+              ) : error || !txData ? (
+                <div className="text-[10px] sm:text-xs text-destructive text-center py-4 bg-card/25 rounded-lg border border-border/20">
+                  Failed to load transactions.
+                </div>
+              ) : txs.length === 0 ? (
+                <div className="text-[10px] sm:text-xs text-muted-foreground/60 italic text-center py-8 bg-card/25 rounded-lg border border-border/20">
+                  No recent activity found.
+                </div>
+              ) : (
+                <div className="divide-y divide-border/20 border border-border/30 rounded-lg overflow-hidden bg-card/40">
+                  {txs.map((tx: any) => {
+                    const { text } = formatTransactionAmount(tx.amount);
+                    return (
+                      <div key={tx.id} className="py-2 flex items-center justify-between text-xs hover:bg-muted/30 px-3 transition-colors">
+                        <div className="min-w-0 flex-1 pr-4">
+                          <p className="font-medium text-foreground truncate text-xs sm:text-sm">{tx.payee || tx.description || 'Unidentified Transaction'}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[11px] text-muted-foreground">{formatDate(tx.date)}</span>
+                            {tx.category && (
+                              <span
+                                className="px-1.5 py-0.2 text-micro rounded-full font-medium"
+                                style={{
+                                  backgroundColor: `${tx.category.color}15`,
+                                  color: tx.category.color,
+                                }}
+                              >
+                                {tx.category.name}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        <span className="font-mono text-xs sm:text-sm font-semibold text-foreground blur-number">{text}</span>
                       </div>
-                      <span className="font-mono text-xs sm:text-sm font-semibold text-foreground blur-number">
-                        {text}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

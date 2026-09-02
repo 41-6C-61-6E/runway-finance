@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { X, MousePointerClick, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
-import { formatCurrency, formatPercent } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
 import { AccountTransactions } from '@/components/features/accounts/AccountTransactions';
 import type { TimeRange } from '@/components/charts/chart-filters';
@@ -70,12 +70,18 @@ export default function AccountDetailPanel({
 
   return (
     <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
-      {/* Header — styled like the overview summary cards */}
-      <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-sidebar-border/60">
+      {/* Header */}
+      <div className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 min-w-0">
-              <h3 className="text-sm sm:text-base font-bold text-foreground truncate">{account.name}</h3>
+              <h3 className="text-sm sm:text-base font-bold text-sidebar-foreground truncate">{account.name}</h3>
+              <span
+                className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 flex-shrink-0 truncate max-w-[140px] sm:max-w-[180px]"
+                title={account.institution || 'Unknown Institution'}
+              >
+                {account.institution || 'Unknown Institution'}
+              </span>
               {account.isHidden && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -97,9 +103,6 @@ export default function AccountDetailPanel({
                 </Tooltip>
               )}
             </div>
-            <p className="text-[11px] sm:text-xs text-muted-foreground truncate mt-0.5">
-              {account.institution || 'Unknown Institution'}
-            </p>
           </div>
           <button
             type="button"
@@ -111,24 +114,26 @@ export default function AccountDetailPanel({
           </button>
         </div>
 
-        {/* Balance + change, matching net-worth-summary stat styling */}
-        <div className="flex items-end justify-between gap-3 mt-3">
-          <div className="flex flex-col gap-1 min-w-0">
-            <div className="text-xl sm:text-2xl font-bold text-foreground font-mono blur-number">
-              {formatCurrency(account.balance, account.currency)}
-            </div>
-            {trendStats && (
-              <div className={`flex items-center gap-1 text-xs font-medium font-mono ${trendStats.isPositive ? 'text-chart-1' : 'text-destructive'}`}>
-                {trendStats.change >= 0 ? (
-                  <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-                ) : (
-                  <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
-                )}
-                <span className="blur-number">{formatCurrency(Math.abs(trendStats.change), account.currency)}</span>
-                <span className="opacity-80">({formatPercent(trendStats.percentChange)})</span>
-              </div>
-            )}
-          </div>
+        {/* Balance + period delta — same line like combined chart */}
+        <div className="flex items-baseline gap-2.5 mt-2.5 flex-wrap">
+          <p className="text-xl sm:text-2xl font-bold font-mono text-sidebar-foreground blur-number">
+            {formatCurrency(account.balance, account.currency)}
+          </p>
+          {trendStats && trendStats.change !== 0 && (
+            <p
+              className={`text-xs sm:text-sm font-medium ${
+                trendStats.isPositive ? 'text-chart-1' : 'text-destructive'
+              }`}
+            >
+              {trendStats.change >= 0 ? (
+                <ArrowUpRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
+              ) : (
+                <ArrowDownRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
+              )}
+              {formatCurrency(Math.abs(trendStats.change), account.currency)} (
+              {formatPlainPercent(Math.abs(trendStats.percentChange))})
+            </p>
+          )}
         </div>
       </div>
 

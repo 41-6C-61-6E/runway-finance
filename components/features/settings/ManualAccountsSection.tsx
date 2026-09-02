@@ -6,6 +6,8 @@ import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { ActionButton } from '@/components/ui/action-button';
+import { Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
@@ -1033,12 +1035,13 @@ export default function ManualAccountsSection() {
     <div className="p-0">
       <div className="flex items-center justify-between gap-4 mb-4">
         <SectionHeading>Manual Assets & Mortgages</SectionHeading>
-        <button
+        <ActionButton
           onClick={() => setShowCreate(true)}
-          className="px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all shrink-0"
+          icon={Plus}
+          className="shrink-0"
         >
-          + Add
-        </button>
+          Add
+        </ActionButton>
       </div>
 
       {error && (

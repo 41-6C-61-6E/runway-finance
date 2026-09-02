@@ -237,11 +237,7 @@ export default function GroupDetailPanel({
                 {accounts.length} account{accounts.length !== 1 ? 's' : ''}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {isLiab
-                ? 'Total debt in this category'
-                : 'Combined balance across all accounts'}
-            </p>
+
           </div>
 
           <button
@@ -281,16 +277,13 @@ export default function GroupDetailPanel({
         windowNav={showWindowNav ? (
           <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={hierarchyTimeframe} />
         ) : undefined}
-        className="bg-card/30 border-y border-sidebar-border"
+        className="bg-card/30 border-0"
       />
 
       <div className="px-2 sm:px-3 pb-4 sm:pb-5 space-y-5">
         {/* Combined group history chart (stacked by account) */}
         <div className="rounded-2xl border border-sidebar-border bg-card/50 shadow-sm overflow-hidden">
-          <div className="p-3 sm:p-4 space-y-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Combined history
-            </h3>
+          <div className="p-3 sm:p-4">
             {chartData.length < 2 ? (
               <div className="h-[180px]">
                 <ChartEmptyState variant="insufficient" />

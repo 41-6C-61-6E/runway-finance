@@ -32,9 +32,9 @@ function RealEstateContent() {
   }, [activeTab, availableTabs]);
 
   const mainContent = (
-    <div className="space-y-5 sm:space-y-6">
+    <div>
       {availableTabs.length > 1 && (
-        <div className="hidden md:block">
+        <div className="hidden md:block mb-3 sm:mb-3.5">
           <AppTabs
             tabs={availableTabs}
             activeTab={activeTab}
@@ -44,16 +44,18 @@ function RealEstateContent() {
         </div>
       )}
 
-      {activeTab === 'equity' && showEquity && (
-        <Suspense fallback={<LoadingSpinner category="chart" />}>
-          <EquityOverTimeChart />
-        </Suspense>
-      )}
-      {activeTab === 'properties' && showProperties && (
-        <Suspense fallback={<LoadingSpinner category="chart" />}>
-          <PropertyCards />
-        </Suspense>
-      )}
+      <div className="space-y-5 sm:space-y-6">
+        {activeTab === 'equity' && showEquity && (
+          <Suspense fallback={<LoadingSpinner category="chart" />}>
+            <EquityOverTimeChart />
+          </Suspense>
+        )}
+        {activeTab === 'properties' && showProperties && (
+          <Suspense fallback={<LoadingSpinner category="chart" />}>
+            <PropertyCards />
+          </Suspense>
+        )}
+      </div>
     </div>
   );
 

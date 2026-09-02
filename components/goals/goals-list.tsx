@@ -10,7 +10,7 @@ import { useGoalInflow } from './goal-inflow-context';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { Button } from '@/components/ui/button';
+import { ActionButton } from '@/components/ui/action-button';
 import { Plus } from 'lucide-react';
 
 interface Goal {
@@ -346,7 +346,7 @@ export function GoalsList({ targetGoalId }: { targetGoalId?: string | null } = {
   return (
     <div>
       {/* Filters & Actions */}
-      <div className="flex flex-row items-center justify-between flex-wrap gap-4 mb-5 w-full">
+      <div className="flex flex-row items-center justify-between flex-wrap gap-4 mb-3 sm:mb-3.5 w-full">
         <AppTabs
           tabs={filters.map((f) => ({ id: f.key, label: f.label, count: f.count }))}
           activeTab={filter}
@@ -355,15 +355,13 @@ export function GoalsList({ targetGoalId }: { targetGoalId?: string | null } = {
           className="border-b-0"
         />
 
-        <Button
+        <ActionButton
           onClick={() => setShowForm(true)}
-          variant="default"
-          size="sm"
-          className="ml-auto inline-flex items-center gap-1.5"
+          icon={Plus}
+          className="ml-auto"
         >
-          <Plus className="w-3.5 h-3.5" />
           Add Goal
-        </Button>
+        </ActionButton>
       </div>
 
       {/* Active Goals Grid */}

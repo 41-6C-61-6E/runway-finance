@@ -9,6 +9,7 @@ import { AutoBudgetDialog } from './auto-budget-dialog';
 import { BudgetExclusionsDialog } from './budget-exclusions-dialog';
 import { FeatureSettingsMenu } from '@/components/ui/feature-settings-menu';
 import { IconButton } from '@/components/ui/icon-button';
+import { ActionButton } from '@/components/ui/action-button';
 import { BudgetItemTransactionsIcon, getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
 import { isEnvelopeRow, envelopeExplainText, ENVELOPE_STATUS_META, nativePeriodLabel, type EnvelopeBudgetRow } from '@/lib/utils/budget-envelope';
@@ -561,36 +562,24 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               </Select>
             )}
             <TooltipProvider delayDuration={150}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setShowAutoBudget(true)}
-                    aria-label="Auto Budget Wizard"
-                    className="inline-flex items-center justify-center h-8 px-3 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border/80 rounded-lg transition-all shrink-0 cursor-pointer"
-                  >
-                    <span>Auto</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs max-w-xs text-center">
-                  Auto-generate budget proposals based on historical spending
-                </TooltipContent>
-              </Tooltip>
+              <ActionButton
+                onClick={() => setShowAutoBudget(true)}
+                aria-label="Auto Budget Wizard"
+                tooltip="Auto-generate budget proposals based on historical spending"
+                tooltipClassName="max-w-xs text-center"
+              >
+                Auto
+              </ActionButton>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => { setEditBudget(null); setShowForm(true); }}
-                    aria-label="Add Budget"
-                    className="inline-flex items-center justify-center gap-1 h-8 px-2.5 sm:px-3 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border/80 rounded-lg transition-all shrink-0 cursor-pointer"
-                  >
-                    <span>Add</span>
-                    <Plus className="w-3.5 h-3.5 shrink-0" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  Create a custom budget item
-                </TooltipContent>
-              </Tooltip>
+              <ActionButton
+                onClick={() => { setEditBudget(null); setShowForm(true); }}
+                aria-label="Add Budget"
+                icon={Plus}
+                iconPosition="right"
+                tooltip="Create a custom budget item"
+              >
+                Add
+              </ActionButton>
 
               <FeatureSettingsMenu
                 ariaLabel="Budget settings & history actions"

@@ -312,7 +312,7 @@ export default function PlansPage() {
       <PageContent>
         {(() => {
           const planSubNav = (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-1 mb-6 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-1 mb-3 sm:mb-3.5 gap-4">
               <AppTabs
                 tabs={tabs}
                 activeTab={activeTab}

@@ -113,7 +113,7 @@ function AccountsContent() {
           activeTabId={activeTab}
           onTabChange={(tabId) => setActiveTab(tabId as Tab)}
         >
-          <div className="hidden md:block mb-5 sm:mb-6">
+          <div className="hidden md:block mb-3 sm:mb-3.5">
             <AppTabs
               tabs={availableTabs}
               activeTab={activeTab}

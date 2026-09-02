@@ -462,7 +462,7 @@ export default function AccountHierarchyTree({
                             card and the combined detail nests inside — the same treatment an expanded
                             account row gets */}
                         <div
-                          className={`min-w-0 divide-y divide-border/10 ${
+                          className={`min-w-0 ${
                             isGroupSelected
                               ? 'bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit'
                               : ''
@@ -520,8 +520,8 @@ export default function AccountHierarchyTree({
                             {groupDetailPanel}
                           </div>
                         )}
-
-                      {/* Subgroups & Accounts */}
+                        </div>
+                      {/* Subgroups & Accounts - outside shaded card when combined chart is selected */}
                       {isGroupExpanded && (
                         <div className="divide-y divide-border/10 bg-card/5">
                           {(() => {
@@ -979,7 +979,6 @@ export default function AccountHierarchyTree({
                           })()}
                         </div>
                       )}
-                        </div>
                     </div>
                   );
                 })}

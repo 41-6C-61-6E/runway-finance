@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Select } from '@/components/ui/select';
+import { ActionButton } from '@/components/ui/action-button';
+import { Plus } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1472,12 +1474,12 @@ export default function PayrollTab() {
                 </button>
               ))}
             </div>
-            <button
+            <ActionButton
               onClick={() => setShowManualAdd(true)}
-              className="px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/30 rounded-lg transition-colors"
+              icon={Plus}
             >
-              + Add Paystub
-            </button>
+              Add Paystub
+            </ActionButton>
             {filteredPaystubs.length > 0 && (
               <button
                 onClick={() => setShowDeleteAllConfirm(true)}

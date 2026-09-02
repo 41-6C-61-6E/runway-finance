@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { CATEGORY_COLORS } from '@/lib/colors/palette';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Sparkles, Search, Filter, Copy, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ActionButton } from '@/components/ui/action-button';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -369,13 +370,12 @@ export default function CategoriesTab() {
               Removes unused categories, adds missing defaults, and re-classifies existing categories (e.g. marks Transfers as transfer type).
             </div>
           </div>
-          <button
+          <ActionButton
             onClick={openAdd}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
+            icon={Plus}
           >
-            <Plus className="h-3.5 w-3.5" />
             Add Category
-          </button>
+          </ActionButton>
         </div>
       </div>
 

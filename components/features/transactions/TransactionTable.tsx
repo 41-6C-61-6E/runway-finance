@@ -56,6 +56,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ListRow } from "@/components/ui/list-row";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { IconButton } from "@/components/ui/icon-button";
+import { ActionButton } from "@/components/ui/action-button";
 
 
 type Transaction = {
@@ -1660,13 +1661,13 @@ export default function TransactionTable({
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/10">
               <div className="flex items-center gap-2">
                 {onAddTransaction && (
-                  <button
+                  <ActionButton
                     onClick={onAddTransaction}
-                    className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg transition-colors border border-primary/20 cursor-pointer"
+                    icon={Plus}
+                    size="sm"
                   >
-                    <Plus className="h-3.5 w-3.5" />
                     Add Transaction
-                  </button>
+                  </ActionButton>
                 )}
                 {pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed && onOpenAiSuggestions && (
                   <button

@@ -114,7 +114,7 @@ function SpendingContent() {
           activeTabId={activeTab}
           onTabChange={(tabId) => handleTabChange(tabId)}
         >
-          <div className="hidden md:block mb-5 sm:mb-6">
+          <div className="hidden md:block mb-3 sm:mb-3.5">
             <AppTabs
               tabs={availableTabs}
               activeTab={activeTab}

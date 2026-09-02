@@ -154,7 +154,7 @@ function SettingsPageBody() {
         </div>
 
         {/* Mobile: in-page tab switcher (desktop uses the sidebar aside) */}
-        <div className="w-full mb-4 lg:hidden">
+        <div className="w-full mb-3 lg:hidden">
           <MobileTabStrip
             tabs={SETTINGS_TABS.map((t) => ({ id: t.id, label: t.label }))}
             activeTab={activeTab}
@@ -232,7 +232,7 @@ function SettingsPageBody() {
                   }}
                   fullWidth
                   size="sm"
-                  className="mb-5 sm:mb-6"
+                  className="mb-3 sm:mb-3.5"
                 />
 
 

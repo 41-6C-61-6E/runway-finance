@@ -55,12 +55,12 @@ function NetWorthContent() {
   );
 
   const mainContent = (
-    <>
+    <div>
       {/* Desktop / tablet: tab row at the top of the main column, above the
           active chart card (hidden on mobile, where the floating sub-nav
           capsule carries the same tabs — same as the other tabbed pages). */}
       {visibleTabs.length > 0 && (
-        <div className="hidden md:block">
+        <div className="hidden md:block mb-3 sm:mb-3.5">
           <AppTabs
             tabs={visibleTabs}
             activeTab={activeChartTab}
@@ -92,7 +92,7 @@ function NetWorthContent() {
           </p>
         </div>
       )}
-    </>
+    </div>
   );
 
   const summaryContent = (

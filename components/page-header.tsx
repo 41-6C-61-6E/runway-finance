@@ -92,7 +92,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         style={{
           paddingTop: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 10px))',
         } as React.CSSProperties}
-        className="flex flex-col gap-3 px-4 pb-3 md:hidden w-full"
+        className="flex flex-col gap-3 px-4 pb-1.5 md:hidden w-full"
       >
         <div className="flex items-center gap-3 min-h-[42px] pr-[155px]">
           <Icon className="w-6 h-6 text-primary flex-shrink-0" />

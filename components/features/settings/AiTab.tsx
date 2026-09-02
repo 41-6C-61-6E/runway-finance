@@ -8,6 +8,8 @@ import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Select } from '@/components/ui/select';
+import { ActionButton } from '@/components/ui/action-button';
+import { Plus } from 'lucide-react';
 
 type Provider = {
   id: string;
@@ -346,12 +348,13 @@ export default function AiTab() {
               Configure OpenAI-compatible API endpoints. Compatible with Ollama, Open WebUI, and any OpenAI-compatible provider.
             </p>
           </div>
-          <button
+          <ActionButton
             onClick={openAddForm}
-            className="px-2 py-1.5 text-sm font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all shrink-0"
+            icon={Plus}
+            className="shrink-0"
           >
-            + Add Provider
-          </button>
+            Add Provider
+          </ActionButton>
         </div>
 
         {providers.length === 0 && (

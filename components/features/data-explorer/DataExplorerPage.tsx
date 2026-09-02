@@ -270,7 +270,7 @@ export default function DataExplorerPage() {
               activeTab={activeTab}
               onChange={(tabId) => setActiveTab(tabId as 'explore' | 'cleanup')}
               variant="underline"
-              className="mb-5 sm:mb-6"
+              className="mb-3 sm:mb-3.5"
             />
 
             {error && activeTab === 'explore' && (

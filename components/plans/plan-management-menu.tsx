@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select } from '@/components/ui/select';
+import { ActionButton } from '@/components/ui/action-button';
 
 export interface PlanManagementMenuProps {
   plans: any[];
@@ -83,14 +84,14 @@ export function PlanManagementMenu({
       </Select>
 
       {/* New Plan Button */}
-      <button
+      <ActionButton
         onClick={onOpenWizardNew}
-        className="flex items-center gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer"
-        title="Create new plan using Setup Wizard"
+        icon={Plus}
+        tooltip="Create new plan using Setup Wizard"
+        aria-label="Create new plan using Setup Wizard"
       >
-        <Plus className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">New Plan</span>
-      </button>
+      </ActionButton>
 
       {/* Plan Management Menu Dropdown Button */}
       <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>

@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ActionButton } from '@/components/ui/action-button';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
@@ -446,15 +447,12 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
           }
           rightActions={
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
+              <ActionButton
                 onClick={() => setCreateModalOpen(true)}
-                className="h-8 text-xs font-semibold px-3 rounded-lg shadow-xs cursor-pointer"
+                icon={Plus}
               >
-                <Plus className="w-3.5 h-3.5 mr-1" />
                 Add Recurring
-              </Button>
+              </ActionButton>
               <RecurringSettingsMenu
                 onScan={handleScan}
                 onRefresh={refreshRecurring}

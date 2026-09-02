@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Plus, Pencil, Trash2, Tag, Search, Hash } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { ActionButton } from '@/components/ui/action-button';
 import { useUserSettings } from '@/components/user-settings-provider';
 
 type Tag = {
@@ -216,13 +217,13 @@ export default function TagsTab() {
               {feedback.message}
             </span>
           )}
-          <button
+          <ActionButton
             onClick={openAdd}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all shrink-0"
+            icon={Plus}
+            className="shrink-0"
           >
-            <Plus className="h-3.5 w-3.5" />
             New Tag
-          </button>
+          </ActionButton>
         </div>
       </div>
 

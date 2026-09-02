@@ -100,7 +100,7 @@ export function BudgetPeriodSelector({ hideTypeTabsOnMobile = false }: { hideTyp
   ];
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 mb-5 sm:mb-6 pb-2 sm:pb-0">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 mb-3 sm:mb-3.5 pb-2 sm:pb-0">
       <AppTabs
         tabs={tabs}
         activeTab={periodType}

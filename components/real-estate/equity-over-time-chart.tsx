@@ -19,12 +19,7 @@ import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
-import { EstimatePill } from '@/components/ui/estimate-pill';
-import { SectionHeading } from '@/components/ui/section-heading';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { TrendingUp } from 'lucide-react';
-import { getMonthRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { Select } from '@/components/ui/select';
@@ -63,7 +58,6 @@ interface RealEstateData {
 
 export function EquityOverTimeChart() {
   const { privacyMode } = usePrivacyMode();
-  const isCollapsed = false;
   const { isEnabled } = useSyntheticData();
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -398,13 +392,7 @@ export function EquityOverTimeChart() {
   if (loading) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          title={
-            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
-          }
-        />
-        {!isCollapsed && <LoadingSpinner category="chart" className="h-[300px]" />}
+        <LoadingSpinner category="chart" className="h-[300px]" />
       </div>
     );
   }
@@ -412,17 +400,9 @@ export function EquityOverTimeChart() {
   if (error) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          title={
-            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
-          }
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState variant="error" error={error} />
-          </div>
-        )}
+        <div className="p-5">
+          <ChartEmptyState variant="error" error={error} />
+        </div>
       </div>
     );
   }
@@ -430,17 +410,9 @@ export function EquityOverTimeChart() {
   if (properties.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          title={
-            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
-          }
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState variant="nodata" />
-          </div>
-        )}
+        <div className="p-5">
+          <ChartEmptyState variant="nodata" />
+        </div>
       </div>
     );
   }
@@ -448,22 +420,13 @@ export function EquityOverTimeChart() {
   if (activeTimeline.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          title={
-            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
-          }
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState variant="empty" description="No data available for the selected time period." />
-          </div>
-        )}
+        <div className="p-5">
+          <ChartEmptyState variant="empty" description="No data available for the selected time period." />
+        </div>
       </div>
     );
   }
 
-  const hasEstimated = showSynth && displayTimeline.some((pt) => pt.isSynthetic);
   const maxVal = Math.max(...displayTimeline.map((pt) => pt.homeValue), 1);
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -518,18 +481,6 @@ export function EquityOverTimeChart() {
           {srSummary}
         </div>
       )}
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <SectionHeading size="sm" icon={<TrendingUp className="w-4 h-4 text-primary" />}>Equity Over Time</SectionHeading>
-            {!isCollapsed && hasEstimated && <EstimatePill />}
-          </div>
-        }
-      />
-
-      {!isCollapsed && (
-        <>
           {properties.length > 1 && (
             <CollapsibleFilterPanel
               isOpen={showFilters}
@@ -694,8 +645,6 @@ export function EquityOverTimeChart() {
               );
             })}
           </div>
-        </>
-      )}
     </div>
   );
 }

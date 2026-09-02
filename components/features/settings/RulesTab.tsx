@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
 import { Select } from '@/components/ui/select';
+import { ActionButton } from '@/components/ui/action-button';
 
 type Condition = {
   id: string; // temp id for UI
@@ -679,21 +680,21 @@ export default function RulesTab() {
           >
             Reset to Defaults
           </button>
-           <button
+          <ActionButton
             onClick={handleRunAll}
             disabled={runningAll || filteredRules.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-all disabled:opacity-50 shrink-0"
+            icon={Play}
+            className="shrink-0"
           >
-            <Play className="h-3.5 w-3.5" />
             {runningAll ? 'Running...' : 'Run All'}
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             onClick={openAdd}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
+            icon={Plus}
+            className="shrink-0"
           >
-            <Plus className="h-3.5 w-3.5" />
             Add Rule
-          </button>
+          </ActionButton>
         </div>
       </div>
 

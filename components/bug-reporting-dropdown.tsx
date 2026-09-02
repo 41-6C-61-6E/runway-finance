@@ -512,9 +512,9 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                               {/* Lower Actions Section */}
                               <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-1">
                                 {/* Status Badge Dropdown */}
-                                <div className="relative flex items-center">
+                                <div className="flex items-center">
                                   <Select
-                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded border cursor-pointer transition-all ${getStatusStyles(issue.status)}`}
+                                    className={`text-[10px] font-semibold h-auto pl-2 pr-7 py-0.5 rounded border cursor-pointer transition-all ${getStatusStyles(issue.status)}`}
                                     value={issue.status}
                                     onChange={(e) => updateStatusMutation.mutate({ id: issue.id, status: e.target.value })}
                                     aria-label="Change issue status"
@@ -525,7 +525,6 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                                       </option>
                                     ))}
                                   </Select>
-                                  <ChevronDown className="w-3 h-3 text-current absolute right-1.5 pointer-events-none" />
                                 </div>
 
                                 {/* Delete Button */}

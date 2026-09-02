@@ -227,7 +227,7 @@ export default function InvestmentsPage() {
               activeTabId={activeTab}
                   onTabChange={(tabId) => setActiveTab(tabId as 'overview' | 'holdings' | 'income')}
             >
-              <div className="hidden md:block mb-5 sm:mb-6">
+              <div className="hidden md:block mb-3 sm:mb-3.5">
                 <AppTabs
                   tabs={INVESTMENT_TABS}
                   activeTab={activeTab}

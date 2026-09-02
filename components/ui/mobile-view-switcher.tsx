@@ -308,8 +308,8 @@ export function MobileTabSwipeContainer({
   };
 
   return (
-    <div className={cn("w-full space-y-4", className)}>
-      {desktopHeader && <div className="hidden lg:block">{desktopHeader}</div>}
+    <div className={cn("w-full", className)}>
+      {desktopHeader && <div className="hidden lg:block mb-3 sm:mb-3.5">{desktopHeader}</div>}
       
       {/* Touch Swipe Container */}
       <div

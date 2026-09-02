@@ -9,7 +9,6 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { MobileTabStrip } from '@/components/ui/mobile-tab-strip';
 import { PieChart as PieIcon } from 'lucide-react';
 import { getDisplayTicker } from '@/lib/types/investments';
 
@@ -348,145 +347,154 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
       />
 
       {!isCollapsed && (
-        <div className="flex-1 flex flex-col p-4 sm:p-5">
-          {/* Main Mode Toggle: Allocation vs Rebalance */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-3 mb-4">
-            <MobileTabStrip
+        <div className="flex-1 flex flex-col">
+          {/* Primary View Navigation: Allocation vs Rebalance */}
+          <div className="px-4 sm:px-5">
+            <AppTabs
               tabs={[
                 { id: 'allocation', label: 'Allocation' },
                 { id: 'rebalance', label: 'Rebalance' },
               ]}
               activeTab={viewMode}
-              onChange={(tabId) => setViewMode(tabId as 'allocation' | 'rebalance')}
-              aria-label="View mode"
+              onChange={(tabId) => setViewMode(tabId as ViewMode)}
+              variant="underline"
+              size="sm"
+              aria-label="Asset allocation view"
             />
-
-            {viewMode === 'allocation' && (
-              <AppTabs
-                tabs={groupOptions.map((opt) => ({ id: opt.value, label: opt.label }))}
-                activeTab={groupBy}
-                onChange={(tabId) => setGroupBy(tabId as GroupByOption)}
-                variant="underline"
-                size="sm"
-                className="border-b-0 -mb-3 pb-0"
-              />
-            )}
           </div>
 
-          {viewMode === 'allocation' ? (
-            <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-4 min-h-[240px]">
-              {/* Donut Chart */}
-              <div className="w-52 h-52 shrink-0 relative">
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</span>
-                  <span className="text-sm font-bold text-foreground blur-number">
-                    {formatCompactCurrency(totalValue)}
-                  </span>
-                </div>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius="65%"
-                      outerRadius="85%"
-                      paddingAngle={1}
-                      cornerRadius={3}
-                      stroke="none"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (!active || !payload || !payload.length) return null;
-                        const d = payload[0].payload as ChartItem;
-                        return (
-                          <ChartTooltip>
-                            <TooltipHeader>
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
-                                <span>{d.name}</span>
-                              </div>
-                            </TooltipHeader>
-                            <TooltipRow label="Value" value={formatCurrency(d.value)} />
-                            <TooltipRow label="Portfolio %" value={formatPlainPercent(d.percentage)} />
-                          </ChartTooltip>
-                        );
-                      }}
+          <div className="flex-1 flex flex-col p-4 sm:p-5">
+            {viewMode === 'allocation' ? (
+              <>
+                {/* Secondary Controls: Grouping Filter */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none">
+                      Group by
+                    </span>
+                    <AppTabs
+                      tabs={groupOptions.map((opt) => ({ id: opt.value, label: opt.label }))}
+                      activeTab={groupBy}
+                      onChange={(tabId) => setGroupBy(tabId as GroupByOption)}
+                      variant="pills"
+                      size="sm"
+                      aria-label="Group holdings by"
                     />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Legend Details */}
-              <div className="flex-1 w-full space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                {chartData.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs py-0.5 border-b border-border/10">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: item.color }} />
-                      {groupBy === 'security' ? (
-                        item.ticker ? (
-                          <span className="flex items-center gap-1.5 min-w-0" title={`${item.fundName ?? ''} (${item.ticker})`.trim()}>
-                            <span className="font-semibold font-mono text-foreground shrink-0">{item.ticker}</span>
-                            {item.fundName && item.fundName !== item.ticker ? (
-                              <span className="truncate text-foreground/80">{item.fundName}</span>
-                            ) : null}
-                          </span>
-                        ) : (
-                          <span className="truncate text-foreground/80" title={item.fundName ?? item.name}>{item.fundName ?? item.name}</span>
-                        )
-                      ) : (
-                        <span className="text-muted-foreground truncate" title={item.name}>{item.name}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-2 font-medium">
-                      <span className="text-foreground font-mono tabular-nums blur-number">{formatCurrency(item.value)}</span>
-                      <span className="text-muted-foreground/80 font-mono w-10 text-right tabular-nums">{formatPlainPercent(item.percentage)}</span>
-                    </div>
                   </div>
-                ))}
-                {groupBy === 'security' || groupBy === 'account' ? (
-                  holdings.length > 7 && (
-                    <button
-                      onClick={() => setShowAll(!showAll)}
-                      className="mt-1 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors w-full text-center py-1"
-                    >
-                      {showAll ? 'Show less' : `Show all ${holdings.length} holdings`}
-                    </button>
-                  )
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            /* Rebalancing Assistant View */
-            <div className="space-y-4">
-              {/* Preset Selector */}
-              <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-muted/20 border border-border/50">
-                <span className="text-xs font-semibold text-foreground">Target Strategy:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {Object.entries(PRESET_MODELS).map(([key, model]) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setActiveModel(key);
-                        setCustomTargets(model.targets);
-                      }}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
-                        activeModel === key
-                          ? 'bg-primary text-primary-foreground shadow-xs'
-                          : 'bg-muted text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {model.label}
-                    </button>
-                  ))}
                 </div>
-              </div>
+
+                <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-4 min-h-[240px]">
+                  {/* Donut Chart */}
+                  <div className="w-52 h-52 shrink-0 relative">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</span>
+                      <span className="text-sm font-bold text-foreground blur-number">
+                        {formatCompactCurrency(totalValue)}
+                      </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius="65%"
+                          outerRadius="85%"
+                          paddingAngle={1}
+                          cornerRadius={3}
+                          stroke="none"
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload || !payload.length) return null;
+                            const d = payload[0].payload as ChartItem;
+                            return (
+                              <ChartTooltip>
+                                <TooltipHeader>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                                    <span>{d.name}</span>
+                                  </div>
+                                </TooltipHeader>
+                                <TooltipRow label="Value" value={formatCurrency(d.value)} />
+                                <TooltipRow label="Portfolio %" value={formatPlainPercent(d.percentage)} />
+                              </ChartTooltip>
+                            );
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Legend Details */}
+                  <div className="flex-1 w-full space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {chartData.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs py-0.5 border-b border-border/10">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: item.color }} />
+                          {groupBy === 'security' ? (
+                            item.ticker ? (
+                              <span className="flex items-center gap-1.5 min-w-0" title={`${item.fundName ?? ''} (${item.ticker})`.trim()}>
+                                <span className="font-semibold font-mono text-foreground shrink-0">{item.ticker}</span>
+                                {item.fundName && item.fundName !== item.ticker ? (
+                                  <span className="truncate text-foreground/80">{item.fundName}</span>
+                                ) : null}
+                              </span>
+                            ) : (
+                              <span className="truncate text-foreground/80" title={item.fundName ?? item.name}>{item.fundName ?? item.name}</span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground truncate" title={item.name}>{item.name}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 ml-2 font-medium">
+                          <span className="text-foreground font-mono tabular-nums blur-number">{formatCurrency(item.value)}</span>
+                          <span className="text-muted-foreground/80 font-mono w-10 text-right tabular-nums">{formatPlainPercent(item.percentage)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {groupBy === 'security' || groupBy === 'account' ? (
+                      holdings.length > 7 && (
+                        <button
+                          onClick={() => setShowAll(!showAll)}
+                          className="mt-1 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors w-full text-center py-1"
+                        >
+                          {showAll ? 'Show less' : `Show all ${holdings.length} holdings`}
+                        </button>
+                      )
+                    ) : null}
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Rebalancing Assistant View */
+              <div className="space-y-4">
+                {/* Secondary Controls: Target Strategy Selector */}
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-muted/20 border border-border/50">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none">
+                    Target Strategy
+                  </span>
+                  <AppTabs
+                    tabs={Object.entries(PRESET_MODELS).map(([key, model]) => ({
+                      id: key,
+                      label: model.label,
+                    }))}
+                    activeTab={activeModel}
+                    onChange={(key) => {
+                      setActiveModel(key);
+                      setCustomTargets(PRESET_MODELS[key].targets);
+                    }}
+                    variant="pills"
+                    size="sm"
+                    aria-label="Target strategy"
+                  />
+                </div>
 
               {/* Rebalancing Comparison Table */}
               <div className="border border-border/60 rounded-xl overflow-hidden divide-y divide-border/40 text-xs">
@@ -532,6 +540,7 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
               </div>
             </div>
           )}
+        </div>
         </div>
       )}
     </div>
