@@ -894,9 +894,11 @@ export default function AccountHistoryChart({
     <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
 
         <>
+          <div className="mb-5 sm:mb-6 bg-muted hover:bg-muted/85 border border-border rounded-xl transition-all duration-200 overflow-visible">
           <CollapsibleFilterPanel
             isOpen={showHistoryFilters}
             onToggle={() => setShowHistoryFilters(!showHistoryFilters)}
+            className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
             feedback={
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
@@ -1400,6 +1402,7 @@ export default function AccountHistoryChart({
               </div>
             </div>
           </CollapsibleFilterPanel>
+          </div>
 
           <CardContent className="p-2 sm:p-5">
             <div className="h-[380px] w-full relative">

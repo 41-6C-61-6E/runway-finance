@@ -93,6 +93,7 @@ export default function TagsTab() {
     budgets: true,
     forecast: true,
     suggestions: true,
+    accounts: true,
   };
 
   const toggleVisibility = async (field: string) => {
@@ -382,6 +383,17 @@ export default function TagsTab() {
             <Switch
               checked={visibilitySettings.suggestions !== false}
               onCheckedChange={() => toggleVisibility('suggestions')}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-4">
+              <label className="text-xs font-medium text-foreground">Show in Accounts List</label>
+              <p className="text-[10px] text-muted-foreground">Display tag pills next to account names in Accounts → List</p>
+            </div>
+            <Switch
+              checked={visibilitySettings.accounts !== false}
+              onCheckedChange={() => toggleVisibility('accounts')}
             />
           </div>
         </div>

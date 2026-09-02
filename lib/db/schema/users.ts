@@ -196,6 +196,7 @@ export const userSettings = pgTable('user_settings', {
     budgets: true,
     forecast: true,
     suggestions: true,
+    accounts: true,
   }),
   budgetExclusions: jsonb('budget_exclusions').default({
     categoryIds: [],

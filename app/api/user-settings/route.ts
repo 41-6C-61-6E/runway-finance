@@ -381,9 +381,15 @@ export async function PATCH(request: Request) {
 		if (typeof accountTagVisibility !== 'object' || accountTagVisibility === null || Array.isArray(accountTagVisibility)) {
 			return Response.json({ error: 'Invalid accountTagVisibility value' }, { status: 400 });
 		}
-		const VALID_KEYS = ['sidebar', 'transactions', 'legend', 'budgets', 'forecast', 'suggestions'];
+		const VALID_KEYS = ['sidebar', 'transactions', 'legend', 'budgets', 'forecast', 'suggestions', 'accounts'];
 		for (const key of VALID_KEYS) {
 			if (key in accountTagVisibility && typeof accountTagVisibility[key] !== 'boolean') {
+				return Response.json({ error: `Invalid accountTagVisibility.${key} value` }, { status: 400 });
+			}
+		}
+		// Also validate any extra keys are booleans (forward compat)
+		for (const key of Object.keys(accountTagVisibility)) {
+			if (!VALID_KEYS.includes(key) && typeof accountTagVisibility[key] !== 'boolean') {
 				return Response.json({ error: `Invalid accountTagVisibility.${key} value` }, { status: 400 });
 			}
 		}

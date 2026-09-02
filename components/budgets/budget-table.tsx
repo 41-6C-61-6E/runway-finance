@@ -446,14 +446,14 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
           </span>
         </div>
         <div
-          className="h-2 w-full overflow-hidden rounded-full bg-muted/80"
+          className="h-2 w-full overflow-hidden rounded-full budget-progress-track"
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.min(Math.max(Math.round(pct), 0), 100)}
           aria-label={`${formatCurrency(spent)} of ${formatCurrency(total)} used`}
         >
-          <div className={`h-full rounded-full transition-all ${fillClass}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
+          <div className={`h-full rounded-full transition-all duration-400 ${fillClass === 'bg-primary' ? 'budget-progress-fill' : fillClass}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
         </div>
       </div>
     );
@@ -644,10 +644,11 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                 <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor }} />
+                      <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/30 shadow-sm" style={{ backgroundColor: b.categoryColor }} />
                       <Link
                         href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
-                        className="text-foreground font-medium text-sm truncate hover:text-primary hover:underline transition-colors"
+                        title={b.categoryName}
+                        className="text-foreground font-medium text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch] max-w-[22ch]"
                       >
                         {b.categoryName}
                       </Link>
@@ -689,7 +690,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                 <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
+                      <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/30 shadow-sm" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                       <Link
                         href={getTxUrl(
                           isEE && b.groupedBreakout && b.groupedBreakout.length > 0
@@ -697,7 +698,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             : b.coveredCategoryIds,
                           b.categoryId
                         )}
-                        className="text-foreground font-semibold text-sm truncate hover:text-primary hover:underline transition-colors"
+                        title={b.categoryName}
+                        className="text-foreground font-semibold text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch] max-w-[22ch]"
                       >
                         {b.categoryName}
                       </Link>
@@ -819,32 +821,46 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
             })}
           </div>
         ) : (
-          <div ref={containerRef} className="w-full overflow-x-auto min-w-0 border-collapse">
+          <div ref={containerRef} className="w-full overflow-x-auto min-w-0">
             {(() => {
               // Preserve progress longer; variance is the first metric removed
-              // as the table gets narrower. The category cell yields width first.
+              // as the table gets narrower. Category flexes to fill remaining space.
               const showProgressCol = containerWidth >= 650;
               const showVarianceCol = containerWidth >= 850;
               const showAccountCol = containerWidth >= 1050 && hasAnyAccount;
               const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
+              // Responsive category cap: 16ch at 340px → 32ch at ~1140px, fluid
+              const catMaxCh = Math.round(Math.min(32, Math.max(16, containerWidth * 0.028)));
+              // Fluid progress height: 6→10px, width is flex (reclaims category slack)
+              const barH = Math.round(Math.min(10, Math.max(6, containerWidth * 0.0075)));
+              const isSpacious = containerWidth >= 900;
 
               return (
-                <table className="w-full table-fixed text-xs sm:text-sm border-collapse min-w-[360px]">
+                <table className="table-auto text-xs sm:text-sm border-collapse min-w-[340px] w-full">
+                  <colgroup>
+                    <col style={{ width: 'auto' }} />
+                    <col style={{ width: '1%' }} />
+                    <col style={{ width: '1%' }} />
+                    {showVarianceCol && <col style={{ width: '1%' }} />}
+                    {showProgressCol && <col style={{ width: 'auto' }} />}
+                    {showAccountCol && <col style={{ width: '1%' }} />}
+                    <col style={{ width: '1%' }} />
+                  </colgroup>
                   <thead>
                     <tr className="border-t border-border">
-                      <th className="w-[30%] text-left px-2.5 sm:px-3.5 py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
-                      <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
-                      <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
+                      <th className="text-left px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground" style={{ minWidth: '16ch', maxWidth: `${catMaxCh}ch` }}>{renderSortHeader('category', 'Category', 'left')}</th>
+                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
+                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
                       {showVarianceCol && (
-                        <th className="text-right px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('variance', 'Variance', 'right')}</th>
+                        <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('variance', 'Variance', 'right')}</th>
                       )}
                       {showProgressCol && (
-                        <th className="text-left px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('progress', 'Progress', 'left')}</th>
+                        <th className="text-left px-2 sm:px-2.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ minWidth: isSpacious ? '140px' : '96px' }}>{renderSortHeader('progress', 'Progress', 'left')}</th>
                       )}
                       {showAccountCol && (
-                        <th className="text-left px-1.5 sm:px-2.5 py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('account', 'Account', 'left')}</th>
+                        <th className="text-left px-2 sm:px-2.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('account', 'Account', 'left')}</th>
                       )}
-                      <th className="text-right px-1.5 sm:px-2 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      <th className="text-right px-1 sm:px-1.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
                         Actions
                       </th>
                     </tr>
@@ -865,12 +881,14 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       const envSub = envelopeSubText(b);
                       return (
                         <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
-                          <td className={`px-2.5 sm:px-3.5 py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
-                            <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-                              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor }} />
+                          <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ maxWidth: `${catMaxCh}ch`, minWidth: '16ch' }}>
+                            <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                              <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor }} />
                               <Link
                                 href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
-                                className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-[140px] md:max-w-[200px] inline-block align-middle"
+                                title={b.categoryName}
+                                className="text-foreground font-medium budget-fade hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
+                                style={{ minWidth: '16ch', maxWidth: `${catMaxCh}ch` }}
                               >
                                 {b.categoryName}
                               </Link>
@@ -891,34 +909,34 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               )}
                             </div>
                           </td>
-                          <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
-                          <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground font-medium blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
+                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
+                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground font-medium blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
                           {showVarianceCol && (
-                            <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? 'text-muted-foreground' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
+                            <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? 'text-muted-foreground' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
                               {isEnvelope(b) ? <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span> : <>{b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}</>}
                             </td>
                           )}
                           {showProgressCol && (
-                            <td className="px-1.5 sm:px-2.5 py-2.5 whitespace-nowrap overflow-hidden">
-                              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                                <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
-                                  <div className={`h-full ${isTargetMet ? 'bg-primary' : 'bg-amber-500'} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ minWidth: isSpacious ? '140px' : '96px' }}>
+                              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
+                                  <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill shadow-sm' : isTargetMet ? 'bg-primary' : 'bg-amber-500'}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                                 </div>
-                                <span className={`text-[10px] font-mono shrink-0 ${isTargetMet ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                                <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${isTargetMet ? 'text-primary' : 'text-muted-foreground'}`}>
                                   {(b.percentUsed || 0).toFixed(0)}%
                                 </span>
                               </div>
                             </td>
                           )}
                           {showAccountCol && (
-                            <td className="px-1.5 sm:px-2.5 py-2.5 text-xs text-muted-foreground/50 truncate">
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground/50 truncate">
                               &mdash;
                             </td>
                           )}
-                          <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                              <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
-                              <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
+                          <td className="px-1 sm:px-1 py-2 sm:py-2.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-0.5">
+                              <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                              <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                             </div>
                           </td>
                         </tr>
@@ -943,9 +961,9 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       return (
                         <Fragment key={b.id}>
                           <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
-                            <td className={`px-2.5 sm:px-3.5 py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
-                              <div className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-wrap">
-                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
+                            <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ maxWidth: `${catMaxCh}ch`, minWidth: '16ch' }}>
+                              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap">
+                                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                                 <Link
                                   href={getTxUrl(
                                     isEE && b.groupedBreakout && b.groupedBreakout.length > 0
@@ -953,7 +971,9 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                       : b.coveredCategoryIds,
                                     b.categoryId
                                   )}
-                                    className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors flex-1 min-w-0 max-w-[90px] sm:max-w-[140px] md:max-w-[200px] inline-block align-middle"
+                                  title={b.categoryName}
+                                  className="text-foreground font-semibold budget-fade hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
+                                  style={{ minWidth: '16ch', maxWidth: `${catMaxCh}ch` }}
                                 >
                                   {b.categoryName}
                                 </Link>
@@ -997,23 +1017,30 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               </div>
                               {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
                             </td>
-                            <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
-                            <td className="px-1.5 sm:px-2.5 py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
+                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
+                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
                             {showVarianceCol && (
-                              <td className={`px-1.5 sm:px-2.5 py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? 'text-muted-foreground' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
+                              <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? 'text-muted-foreground' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
                                 {isEnvelope(b) ? <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span> : formatCurrency(b.remaining)}
                               </td>
                             )}
                             {showProgressCol && (
-                              <td className="px-1.5 sm:px-2.5 py-2.5 whitespace-nowrap overflow-hidden">
+                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ minWidth: isSpacious ? '140px' : '96px' }}>
                                 {isEnvelope(b) ? (
-                                  renderEnvelopeProgress(b)
-                                ) : (
-                                  <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                                    <div className="w-10 sm:w-14 h-1.5 bg-muted/80 rounded-full overflow-hidden shrink">
-                                      <div className={`h-full ${progressColor} rounded-full transition-all`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0" title={`${Math.round(b.envelopePercentUsed ?? 0)}% of ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} envelope`}>
+                                    <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
+                                      <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill' : (ENVELOPE_STATUS_META[b.envelopeStatus ?? 'within']?.barClass ?? 'bg-primary')}`} style={{ width: `${Math.min(Math.max(b.envelopePercentUsed ?? 0, 0), 100)}%` }} />
                                     </div>
-                                    <span className={`text-[10px] font-mono shrink-0 ${isOver ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                                    <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${ENVELOPE_STATUS_META[b.envelopeStatus ?? 'within']?.textClass ?? 'text-muted-foreground'}`}>
+                                      {Math.round(b.envelopePercentUsed ?? 0)}%/{b.nativePeriodType === 'quarterly' ? 'Q' : 'yr'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                    <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
+                                      <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill shadow-sm' : progressColor}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                    </div>
+                                    <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${isOver ? 'text-destructive' : 'text-muted-foreground'}`}>
                                       {(b.percentUsed || 0).toFixed(0)}%
                                     </span>
                                   </div>
@@ -1021,14 +1048,14 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               </td>
                             )}
                             {showAccountCol && (
-                              <td className="px-1.5 sm:px-2.5 py-2.5 text-xs text-muted-foreground/50 truncate">
+                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground/50 truncate">
                                 &mdash;
                               </td>
                             )}
-                            <td className="px-1.5 sm:px-2 py-2.5 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                                <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
-                                <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
+                            <td className="px-1 sm:px-1 py-2 sm:py-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-0.5">
+                                <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                                <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                               </div>
                             </td>
                           </tr>

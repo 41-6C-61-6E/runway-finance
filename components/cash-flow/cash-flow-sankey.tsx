@@ -512,12 +512,11 @@ const SankeyCustomNode = ({
   const hubDeltaY = shiftedY + height - hubDeltaHeight;
 
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
-  const hubLabelCenterY = hubDeltaCenterY;
-  // R-2: anchor the hub badge to the chart's reserved right-margin column.
-  const hasChartWidth = typeof chartWidth === 'number' && chartWidth > 0;
-  const mRight = margin?.right ?? 140;
-  const hubBadgeX = hasChartWidth ? chartWidth - mRight + 8 : 0;
-  const hubBadgeW = hasChartWidth ? Math.max(0, Math.min(400, mRight - 16)) : 0;
+  // Hub label is centered directly on the middle bar (not in the right margin)
+  const hubBadgeW = Math.min(180, Math.max(width + 40, 140));
+  const hubBadgeH = 48;
+  const hubBadgeX = x + width / 2 - hubBadgeW / 2;
+  const hubBadgeY = Math.max(2, hubDeltaCenterY - hubBadgeH / 2);
 
   // Suppress redundant leaf labels if the leaf has the same name as its parent
   const isLeaf = colIndex === 0 || colIndex === 4;
@@ -572,56 +571,54 @@ const SankeyCustomNode = ({
               fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
-          {/* R-2: hub total rides in the reserved right-margin column — the
-              foreignObject is clamped to that space instead of running to the
-              viewport edge, with a 1px leader from the node's delta band. */}
-          {hasChartWidth && (
-            <>
-              <line
-                x1={x + width + 1}
-                y1={hubLabelCenterY}
-                x2={chartWidth - mRight + 6}
-                y2={hubLabelCenterY}
-                stroke="var(--border)"
-                strokeWidth={1}
-                pointerEvents="none"
-                opacity={isDimmed ? 0.3 : 0.9}
-              />
-              <foreignObject
-                x={hubBadgeX}
-                y={Math.max(2, hubLabelCenterY - 29)}
-                width={hubBadgeW}
-                height={58}
-                pointerEvents="none"
-                style={{ opacity: isDimmed ? 0.3 : 1 }}
-              >
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  height: '100%'}}
-                >
-                  <div style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    lineHeight: 1.4,
-                  }}>
-                    {payload.label}
-                  </div>
-                <div className="blur-number" style={{
-                  fontSize: isMobileSize ? 13 : 17,
-                  fontWeight: 800,
-                  color: isNetSurplus ? '#10b981' : '#ef4444',
-                  lineHeight: 1.3,
-                  whiteSpace: 'nowrap',
-                }}>
-                  {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
-                </div>
+          <foreignObject
+            x={hubBadgeX}
+            y={hubBadgeY}
+            width={hubBadgeW}
+            height={hubBadgeH}
+            pointerEvents="none"
+            style={{ opacity: isDimmed ? 0.3 : 1 }}
+          >
+            <div
 
-                </div>
-              </foreignObject>
-            </>
-          )}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                textAlign: 'center',
+                gap: 1,
+                background: 'hsl(var(--card) / 0.92)',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: 8,
+                padding: '4px 8px',
+                backdropFilter: 'blur(6px)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              }}
+            >
+              <div style={{
+                fontSize: 10,
+                fontWeight: 600,
+                lineHeight: 1.4,
+                letterSpacing: 0.3,
+                textTransform: 'uppercase' as const,
+                color: 'hsl(var(--muted-foreground))',
+                whiteSpace: 'nowrap',
+              }}>
+                {payload.label}
+              </div>
+              <div className="blur-number" style={{
+                fontSize: isMobileSize ? 13 : 16,
+                fontWeight: 800,
+                color: isNetSurplus ? '#10b981' : '#ef4444',
+                lineHeight: 1.3,
+                whiteSpace: 'nowrap',
+              }}>
+                {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
+              </div>
+            </div>
+          </foreignObject>
         </>
       ) : (
         // R-2: measured SankeyLabel — truncation budget comes from the column

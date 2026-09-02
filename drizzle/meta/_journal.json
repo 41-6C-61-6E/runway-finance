@@ -673,6 +673,13 @@
       "when": 1787543173246,
       "tag": "0095_reflective_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1787600000000,
+      "tag": "0096_add_accounts_tag_visibility",
+      "breakpoints": true
     }
   ]
 }

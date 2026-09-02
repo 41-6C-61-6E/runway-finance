@@ -20,6 +20,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { Sparkline } from '@/components/ui/sparkline';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
+import { useUserSettings } from '@/components/user-settings-provider';
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
@@ -54,6 +55,8 @@ export default function AccountHierarchyTree({
   targetAccountId,
 }: AccountHierarchyTreeProps) {
   const { hideSubheadings } = useAccountSubheadings();
+  const settingsContext = useUserSettings();
+  const showAccountTags = settingsContext?.settings?.accountTagVisibility?.accounts !== false;
 
   const [showHierarchyFilters, setShowHierarchyFilters] = useState(false);
   const [hierarchyTimeframe, setHierarchyTimeframe] = usePersistentState<TimeRange>('finance:accounts:hierarchyTimeframe', '1m');
@@ -426,9 +429,11 @@ export default function AccountHierarchyTree({
             </CardContent>
           ) : (
             <>
+              <div className="mb-5 sm:mb-6 bg-muted hover:bg-muted/85 border border-border rounded-xl transition-all duration-200 overflow-visible">
               <CollapsibleFilterPanel
                 isOpen={showHierarchyFilters}
                 onToggle={() => setShowHierarchyFilters(!showHierarchyFilters)}
+                className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
                 centerContent={
                   <div className="relative w-full max-w-xs">
                     <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -775,6 +780,7 @@ export default function AccountHierarchyTree({
                   </div>
                 </div>
               </CollapsibleFilterPanel>
+              </div>
 
               <div className="border-t border-border/10" />
               <div className="divide-y divide-border/10">
@@ -936,7 +942,7 @@ export default function AccountHierarchyTree({
                                                 </TooltipContent>
                                               </Tooltip>
                                             )}
-                                            {acc.tags && acc.tags.length > 0 && (
+                                            {showAccountTags && acc.tags && acc.tags.length > 0 && (
                                               <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
                                                 {acc.tags.map((tag) => (
                                                   <Tooltip key={tag.id}>
@@ -1116,7 +1122,7 @@ export default function AccountHierarchyTree({
                                                       </TooltipContent>
                                                     </Tooltip>
                                                   )}
-                                                  {acc.tags && acc.tags.length > 0 && (
+                                                  {showAccountTags && acc.tags && acc.tags.length > 0 && (
                                                     <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
                                                       {acc.tags.map((tag) => (
                                                         <Tooltip key={tag.id}>
@@ -1242,7 +1248,7 @@ export default function AccountHierarchyTree({
                                           {singleAcc.isExcludedFromNetWorth && (
                                             <span className="text-micro sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
                                           )}
-                                          {singleAcc.tags && singleAcc.tags.length > 0 && (
+                                          {showAccountTags && singleAcc.tags && singleAcc.tags.length > 0 && (
                                             <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
                                               {singleAcc.tags.map((tag) => (
                                                 <span
