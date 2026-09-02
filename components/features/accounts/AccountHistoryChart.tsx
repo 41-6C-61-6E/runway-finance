@@ -1380,27 +1380,6 @@ export default function AccountHistoryChart({
                       </div>
                     )}
 
-                    {totalHiddenCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setOtherExpanded((v) => !v)}
-                        title={otherCount > 0 ? 'Click to expand the aggregated series' : 'Click to collapse back into "Other"'}
-                        className={`flex items-center gap-2 text-xs transition-colors w-full text-left ${otherCount > 0 ? 'text-foreground/70 hover:text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                      >
-                        <span
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: OTHER_COLOR, opacity: otherCount > 0 ? 1 : 0.45 }}
-                        />
-                        <span className="truncate">
-                          Other ({totalHiddenCount})
-                        </span>
-                        <span className="ml-auto text-[10px] text-muted-foreground flex-shrink-0">
-                          {otherCount > 0
-                            ? `+${totalHiddenCount} · click to expand`
-                            : 'click to collapse'}
-                        </span>
-                      </button>
-                    )}
                   </div>
 
                   {/* Reset/Clear button */}
@@ -1711,6 +1690,28 @@ export default function AccountHistoryChart({
                           })}
                         </div>
                       </div>
+                    )}
+
+                    {totalHiddenCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setOtherExpanded((v) => !v)}
+                        title={otherCount > 0 ? 'Click to expand the aggregated series' : 'Click to collapse back into "Other"'}
+                        className={`flex items-center gap-2 text-xs transition-colors w-full text-left ${otherCount > 0 ? 'text-foreground/70 hover:text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: OTHER_COLOR, opacity: otherCount > 0 ? 1 : 0.45 }}
+                        />
+                        <span className="truncate">
+                          Other ({totalHiddenCount})
+                        </span>
+                        <span className="ml-auto text-[10px] text-muted-foreground flex-shrink-0">
+                          {otherCount > 0
+                            ? `+${totalHiddenCount} · click to expand`
+                            : 'click to collapse'}
+                        </span>
+                      </button>
                     )}
                   </div>
                 </div>
