@@ -163,7 +163,7 @@ export default function AccountsSidebar() {
         const subGroupExpanded = isExpanded(group, subGroup);
         return (
           <div key={`${group}::${subGroup}`}>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-md hover:bg-muted/30 transition-colors">
+            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-md hover:bg-muted/30 transition-colors">
               <button onClick={() => toggle(group, subGroup)} aria-expanded={subGroupExpanded} aria-label={`${subGroupExpanded ? 'Collapse' : 'Expand'} ${subGroup} accounts`} className="p-0.5 rounded hover:bg-muted transition-colors cursor-pointer flex-shrink-0">
                 {subGroupExpanded ? (
                   <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30" />
@@ -313,7 +313,7 @@ export default function AccountsSidebar() {
 
         {/* Hierarchical Account List */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-1.5 space-y-2">
+          <div className="p-1.5 space-y-1">
             {sortedGroups.map((group) => {
               const subMap = hierarchy.get(group)!;
               const groupTotal = getGroupTotal(group);
@@ -321,9 +321,9 @@ export default function AccountsSidebar() {
               const groupExpanded = isGroupExpanded(group);
 
               return (
-                <div key={group} className="pb-2 last:pb-0">
+                <div key={group} className="pb-1 last:pb-0">
                   {/* Group Header */}
-                  <div className="flex items-center gap-1.5 px-2 py-2 rounded-md bg-muted/40 transition-colors">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40 transition-colors">
                     <button
                       onClick={() => toggleGroup(group)}
                       aria-expanded={groupExpanded}

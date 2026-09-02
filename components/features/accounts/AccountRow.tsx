@@ -105,13 +105,15 @@ export default function AccountRow({
           </div>
         )}
       </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <RowAction
-          label="Edit account"
-          onActivate={() => onOpenDrawer(account)}
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </RowAction>
+      <div className="flex items-center flex-shrink-0">
+        <div className="hidden group-hover/listrow:flex focus-within:flex items-center mr-1.5">
+          <RowAction
+            label="Edit account"
+            onActivate={() => onOpenDrawer(account)}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </RowAction>
+        </div>
         <span className="font-mono text-[13px] font-semibold tabular-nums blur-number text-foreground">
           {fmt.sign}{fmt.text}
         </span>
