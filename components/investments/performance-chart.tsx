@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import type { TimeRange } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import {
   AreaChart,
   Area,
@@ -56,10 +57,10 @@ type DisplayMode = 'dollar' | 'percent' | 'twr';
 
 async function fetchBenchmark(timeframe: TimeRange): Promise<BenchmarkPoint[]> {
   try {
-    const rangeMap: Record<TimeRange, string> = {
+    const rangeMap: Record<string, string> = {
       '1d': '1d', '7d': '5d', '30d': '1mo', '365d': '1y',
       '1m': '1mo', '3m': '3mo', '6m': '6mo', '1y': '1y',
-      '5y': '5y', 'ytd': 'ytd', 'all': '10y',
+      '3y': '3y', '5y': '5y', 'ytd': 'ytd', 'all': '10y',
       '1d_discrete': '1d',
       '7d_discrete': '5d',
     };
@@ -131,6 +132,7 @@ export function PerformanceChart() {
         case '3m': return 1.5;
         case '6m': return 3;
         case '1y': return 4;
+        case '3y': return 5;
         case 'ytd': return 4;
         case '5y': return 7;
         case 'all': return 14;
@@ -144,6 +146,7 @@ export function PerformanceChart() {
         case '3m': return 0;
         case '6m': return 4;
         case '1y': return 7;
+        case '3y': return 14;
         case 'ytd': return 7;
         case '5y': return 30;
         case 'all': return 45;
@@ -345,7 +348,7 @@ export function PerformanceChart() {
   const benchmarkColor = 'var(--color-chart-3)';
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       {!privacyMode && (
         <div className="sr-only" aria-live="polite">
           {srSummary}
@@ -357,17 +360,8 @@ export function PerformanceChart() {
           <CollapsibleFilterPanel
             isOpen={showFilters}
             onToggle={() => setShowFilters(!showFilters)}
-            feedback={
-              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
-              </span>
-            }
           >
             <div className="flex flex-wrap items-center gap-4">
-              {/* Timeframe */}
-              <div className="flex items-center">
-                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-              </div>
 
               {/* Display mode */}
               <div className="flex items-center gap-2">
@@ -410,6 +404,7 @@ export function PerformanceChart() {
               </div>
             </div>
           </CollapsibleFilterPanel>
+          <ChartTimeframeBar value={timeframe} onChange={setTimeframe} />
 
           <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
             {/* Chart Area */}

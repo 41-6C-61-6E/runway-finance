@@ -14,6 +14,7 @@ interface AccountDetailPanelProps {
   account: Account | null;
   historyData: any[];
   hierarchyTimeframe: TimeRange;
+  onHierarchyTimeframeChange?: (tf: TimeRange) => void;
   onClose: () => void;
 }
 
@@ -21,6 +22,7 @@ export default function AccountDetailPanel({
   account,
   historyData,
   hierarchyTimeframe,
+  onHierarchyTimeframeChange,
   onClose,
 }: AccountDetailPanelProps) {
   // Balance change over the selected timeframe (mirrors net-worth-summary delta styling)
@@ -136,6 +138,7 @@ export default function AccountDetailPanel({
         historyData={historyData}
         isLiability={isLiabilityAccount(account.type)}
         hierarchyTimeframe={hierarchyTimeframe}
+        onHierarchyTimeframeChange={onHierarchyTimeframeChange}
         className="bg-transparent"
       />
     </div>

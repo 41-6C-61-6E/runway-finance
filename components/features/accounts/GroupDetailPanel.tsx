@@ -29,12 +29,16 @@ import {
   getChartXTicksUnified,
 } from '../../../lib/utils/chart-format';
 import { ChartEmptyState } from '../../charts/chart-empty-state';
+import { ChartTimeframeBar } from '../../charts/chart-timeframe-bar';
+import { DateWindowNav } from '../../charts/date-window-nav';
+import { useDateWindow } from '../../../lib/hooks/use-date-window';
 
 interface GroupDetailPanelProps {
   group: string | null;
   accounts: Account[];
   historyData: any[];
   hierarchyTimeframe: TimeRange;
+  onHierarchyTimeframeChange?: (tf: TimeRange) => void;
   onClose: () => void;
 }
 
@@ -92,8 +96,12 @@ export default function GroupDetailPanel({
   accounts,
   historyData,
   hierarchyTimeframe,
+  onHierarchyTimeframeChange,
   onClose,
 }: GroupDetailPanelProps) {
+  const {
+    windowEnd, setWindowEnd, prevWindow, nextWindow, isNextDisabled, windowLabel, periodOptions, showWindowNav,
+  } = useDateWindow(null, `finance:group-detail:${group ?? 'default'}:windowEnd`, hierarchyTimeframe, hierarchyTimeframe);
   const isLiab = useMemo(
     () => accounts.some((a) => isLiabilityAccount(a.type)),
     [accounts]
@@ -108,12 +116,12 @@ export default function GroupDetailPanel({
     return map;
   }, [accounts]);
 
-  // Sliced history window (shared by chart + stats)
+  // Sliced history window (shared by chart + stats) - uses windowEnd for navigable timeframes
   const slicedHistory = useMemo(() => {
     if (historyData.length === 0) return [];
-    const range = getPreciseDateRange(hierarchyTimeframe);
+    const range = getPreciseDateRange(hierarchyTimeframe, showWindowNav ? windowEnd : undefined);
     return historyData.filter((d) => d.date >= range.start && d.date <= range.end);
-  }, [historyData, hierarchyTimeframe]);
+  }, [historyData, hierarchyTimeframe, windowEnd, showWindowNav]);
 
   // Trend stats for the combined group series over the visible timeframe
   const trendStats = useMemo(() => {
@@ -267,6 +275,14 @@ export default function GroupDetailPanel({
           )}
         </div>
       </div>
+      <ChartTimeframeBar
+        value={hierarchyTimeframe}
+        onChange={(v) => onHierarchyTimeframeChange?.(v)}
+        windowNav={showWindowNav ? (
+          <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={hierarchyTimeframe} />
+        ) : undefined}
+        className="bg-card/30 border-y border-sidebar-border"
+      />
 
       <div className="px-2 sm:px-3 pb-4 sm:pb-5 space-y-5">
         {/* Combined group history chart (stacked by account) */}

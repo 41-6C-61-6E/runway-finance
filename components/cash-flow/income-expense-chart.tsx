@@ -24,8 +24,9 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import type { TimeRange } from '@/components/charts/chart-filters';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { Switch } from '@/components/ui/switch';
 import { ArrowRightLeft, TrendingUp, Info, ChevronDown, ChevronUp, Settings2, PiggyBank, Layers } from 'lucide-react';
@@ -56,14 +57,13 @@ interface SavingsRatePoint {
   };
 }
 
-const MONTH_MAP: Record<TimeRange, number> = {
-  '1d': 1, '7d': 1, '30d': 1, '365d': 12,
-  '1m': 1, '3m': 3, '6m': 6, '1y': 12, '5y': 60, 'ytd': 12, 'all': 120,
-  '1d_discrete': 1,
+const MONTH_MAP: Record<string, number> = {
+  '7d': 1, '30d': 1, '90d': 3, '365d': 12,
+  '1m': 1, '3m': 3, '6m': 6, '1y': 12, '3y': 36, '5y': 60, 'ytd': 12, 'all': 120,
   '7d_discrete': 1,
 };
 
-const incomeExpensePresets = TIME_RANGE_PRESETS.filter((p) => ['1m', '3m', '6m', '1y', 'ytd', 'all', '30d', '365d', '5y'].includes(p.value));
+const incomeExpensePresets = TIME_RANGE_PRESETS.filter((p) => ['1m', '3m', '6m', '1y', '3y', 'ytd', 'all', '30d', '90d', '365d', '5y', '7d', '7d_discrete'].includes(p.value));
 
 const typeOptions = [
   { value: 'bar' as ChartType, label: 'Bar' },
@@ -435,7 +435,7 @@ export function IncomeExpenseChart() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       {!privacyMode && (
         <div className="sr-only" aria-live="polite">
           {srSummary}
@@ -469,27 +469,10 @@ export function IncomeExpenseChart() {
               <span key="view" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                 {activeView === 'income' ? 'Net Income' : 'Savings Rate'}
               </span>,
-              <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
-              </span>,
               <span key="chartType" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                 {chartType.toUpperCase()}
               </span>,
             ]}
-            rightActions={
-              showWindowNav && (
-                <DateWindowNav
-                  prev={prevWindow}
-                  next={nextWindow}
-                  nextDisabled={isNextDisabled}
-                  label={windowLabel}
-                  options={periodOptions}
-                  currentValue={windowEnd}
-                  onSelect={setWindowEnd}
-                  timeframe={timeframe}
-                />
-              )
-            }
           >
             <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
               <div className="flex items-center gap-3 flex-wrap">
@@ -521,7 +504,6 @@ export function IncomeExpenseChart() {
                   </button>
                 </div>
 
-                <TimeRangeFilter value={timeframe} presets={incomeExpensePresets} onChange={setTimeframe} />
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Style</span>
@@ -773,6 +755,25 @@ export function IncomeExpenseChart() {
               )}
             </div>
           )}
+          <ChartTimeframeBar
+            value={timeframe}
+            onChange={setTimeframe}
+            presets={incomeExpensePresets}
+            windowNav={
+              showWindowNav ? (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                  timeframe={timeframe}
+                />
+              ) : undefined
+            }
+          />
 
           <div className="p-2.5 sm:p-5">
             <div className="flex items-center justify-between gap-1.5 mb-3 flex-wrap">

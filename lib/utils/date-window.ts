@@ -6,7 +6,7 @@ export function getCurrentMonth(): string {
 }
 
 export function snapToPeriod(ym: string, timeframe: TimeRange): string {
-  if (timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return ym;
+  if (timeframe === '7d' || timeframe === '30d' || timeframe === '90d' || timeframe === '365d' || timeframe === '1d') return ym;
   
   if (timeframe === '1d_discrete' || timeframe === '7d_discrete') {
     if (/^\d{4}-\d{2}-\d{2}$/.test(ym)) return ym;
@@ -42,12 +42,13 @@ export function snapToPeriod(ym: string, timeframe: TimeRange): string {
       else { sy = y - 1; sm = 12; }
       break;
     }
+    case '3y':
     case '5y':
     case '1y': { sm = 12; break; }
     default: break;
   }
   // Ensure the range does not start in the future
-  const monthsBack = ({ '1m': 0, '3m': 2, '6m': 5, '1y': 11, '5y': 59 } as Record<string, number>)[timeframe] ?? 0;
+  const monthsBack = ({ '1m': 0, '3m': 2, '6m': 5, '1y': 11, '3y': 35, '5y': 59 } as Record<string, number>)[timeframe] ?? 0;
   const start = new Date(sy, sm - 1 - monthsBack, 1);
   const startYm = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
   const currentYm = getCurrentMonth();
@@ -78,7 +79,7 @@ export function getMonthRange(timeframe: TimeRange, windowEnd?: string): { start
   }
 
   const baseEnd = end.includes('-') && end.split('-').length === 3 ? end.slice(0, 7) : end;
-  const monthsBack = ({ '1m': 0, '3m': 2, '6m': 5, '1y': 11, '5y': 59 } as Record<string, number>)[timeframe] ?? 0;
+  const monthsBack = ({ '1m': 0, '3m': 2, '6m': 5, '1y': 11, '3y': 35, '5y': 59 } as Record<string, number>)[timeframe] ?? 0;
   const [ey, em] = baseEnd.split('-').map(Number);
   const start = new Date(ey, em - 1 - monthsBack, 1);
   return {
@@ -109,12 +110,13 @@ export function getPreciseDateRange(timeframe: TimeRange, windowEnd?: string): {
     return { start: formatDate(startDate), end: cleanEndStr };
   }
 
-  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') {
+  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '90d' || timeframe === '365d') {
     const end = new Date();
     const start = new Date();
     if (timeframe === '1d') start.setDate(start.getDate() - 1);
     if (timeframe === '7d') start.setDate(start.getDate() - 7);
     if (timeframe === '30d') start.setDate(start.getDate() - 30);
+    if (timeframe === '90d') start.setDate(start.getDate() - 90);
     if (timeframe === '365d') start.setDate(start.getDate() - 365);
     return { start: formatDate(start), end: formatDate(end) };
   }
@@ -158,11 +160,13 @@ export function getPeriodLabel(ym: string, timeframe: TimeRange): string {
     case '1d': return 'Previous 24 Hours';
     case '7d': return 'Last 7 Days';
     case '30d': return 'Last 30 Days';
+    case '90d': return 'Last 90 Days';
     case '365d': return 'Last 365 Days';
     case '1m': return formatMonth(base);
     case '3m': return `Q${m / 3} ${y}`;
     case '6m': return `H${m / 6} ${y}`;
     case '1y': return `${y}`;
+    case '3y': return `${y - 2} – ${y}`;
     case 'ytd': return `YTD ${y}`;
     case '5y': return `${y - 4} – ${y}`;
     default: return '';

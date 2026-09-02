@@ -90,7 +90,7 @@ export function formatChartXAxisDate(
     return `${formatted} ${yearVal}`;
   }
 
-  if (timeframe === '5y' || timeframe === 'all') {
+  if (timeframe === '3y' || timeframe === '5y' || timeframe === 'all') {
     return `${yearVal}`;
   }
 
@@ -167,7 +167,7 @@ export function getChartXTicksUnified<T extends { [key: string]: any }>(
   const getYearMonth = (dateStr: string) => dateStr.slice(0, 7); // 'YYYY-MM'
   const getYear = (dateStr: string) => dateStr.slice(0, 4); // 'YYYY'
 
-  const isMultiYear = timeframe === '5y' || timeframe === 'all';
+  const isMultiYear = timeframe === '3y' || timeframe === '5y' || timeframe === 'all';
 
   // Find transition points where the month (or year) changes
   const transitions: string[] = [dates[0]];

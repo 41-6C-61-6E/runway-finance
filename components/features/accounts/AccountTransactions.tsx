@@ -13,6 +13,7 @@ import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, formatChartDateRange } from '@/lib/utils/chart-format';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/chart-tooltip';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { cn } from '@/lib/utils';
 
 export interface AccountTransactionsProps {
@@ -20,10 +21,11 @@ export interface AccountTransactionsProps {
   historyData: any[];
   isLiability: boolean;
   hierarchyTimeframe: TimeRange;
+  onHierarchyTimeframeChange?: (tf: TimeRange) => void;
   className?: string;
 }
 
-export function AccountTransactions({ accountId, historyData, isLiability, hierarchyTimeframe, className }: AccountTransactionsProps) {
+export function AccountTransactions({ accountId, historyData, isLiability, hierarchyTimeframe, onHierarchyTimeframeChange, className }: AccountTransactionsProps) {
   const {
     timeframe,
     windowEnd,
@@ -156,23 +158,26 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
 
   return (
     <div className={cn('py-4 px-0 transition-all duration-300 !border-none [&+div]:!border-t-0', className)}>
+      <ChartTimeframeBar
+        value={hierarchyTimeframe}
+        onChange={(v) => onHierarchyTimeframeChange?.(v)}
+        windowNav={showWindowNav ? (
+          <DateWindowNav
+            prev={prevWindow}
+            next={nextWindow}
+            nextDisabled={isNextDisabled}
+            label={windowLabel}
+            options={periodOptions}
+            currentValue={windowEnd}
+            onSelect={setWindowEnd}
+            timeframe={timeframe}
+          />
+        ) : undefined}
+        className="mb-3 rounded-xl border border-border/20"
+      />
       <div className="grid grid-cols-1 gap-5 sm:gap-6 px-2 sm:px-4">
         {/* Balance History Mini-Chart */}
         <div className="flex flex-col space-y-3">
-          <div className="flex items-center justify-between">
-            {showWindowNav && (
-              <DateWindowNav
-                prev={prevWindow}
-                next={nextWindow}
-                nextDisabled={isNextDisabled}
-                label={windowLabel}
-                options={periodOptions}
-                currentValue={windowEnd}
-                onSelect={setWindowEnd}
-                timeframe={timeframe}
-              />
-            )}
-          </div>
 
           <div className="flex-1 min-h-[140px] w-full relative bg-card/40 rounded-xl border border-border/20 p-2 overflow-hidden flex items-center justify-center">
             {visibleMiniData.length === 0 ? (

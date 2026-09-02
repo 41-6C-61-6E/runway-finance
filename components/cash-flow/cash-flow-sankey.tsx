@@ -8,7 +8,8 @@ import { formatPlainPercent } from '@/lib/utils/format';
 import { SankeyLabel, computeLabelGutter } from '@/components/charts/sankey/sankey-label';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { type TimeRange } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
@@ -1146,16 +1147,13 @@ export function CashFlowSankey() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
 
         <>
           <CollapsibleFilterPanel
             isOpen={showFilters}
             onToggle={() => setShowFilters(!showFilters)}
             feedbackItems={[
-              <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
-              </span>,
               <span key="unit" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                 {showPercentages ? '%' : '$'}
               </span>,
@@ -1174,30 +1172,9 @@ export function CashFlowSankey() {
                   </span>
               ] : []),
             ]}
-            rightActions={
-              showWindowNav && (
-                <DateWindowNav
-                  prev={prevWindow}
-                  next={nextWindow}
-                  nextDisabled={isNextDisabled}
-                  label={windowLabel}
-                  options={periodOptions}
-                  currentValue={windowEnd}
-                  onSelect={setWindowEnd}
-                  timeframe={timeframe}
-                />
-              )
-            }
           >
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <TimeRangeFilter
-                    value={timeframe}
-                    onChange={setTimeframe}
-                  />
-                </div>
-
                 {/* Percentage switch */}
                 <div className="flex items-center gap-2 border-l border-border/30 pl-4">
                   <Switch
@@ -1340,6 +1317,7 @@ export function CashFlowSankey() {
               </div>
             </div>
           </CollapsibleFilterPanel>
+          <ChartTimeframeBar value={timeframe} onChange={setTimeframe} windowNav={showWindowNav ? <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} /> : undefined} />
 
           {/* Content: loading / error / empty / chart */}
           <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full touch-pan-y">

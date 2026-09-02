@@ -15,7 +15,7 @@ import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
@@ -530,34 +530,17 @@ export function EquityOverTimeChart() {
 
       {!isCollapsed && (
         <>
-          <CollapsibleFilterPanel
-            isOpen={showFilters}
-            onToggle={() => setShowFilters(!showFilters)}
-            feedbackItems={[
-              <span key="property" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {properties.find(p => p.id === selectedPropertyId)?.name ?? 'ALL PROPERTIES'}
-              </span>,
-              <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
-              </span>,
-            ]}
-            rightActions={
-              showWindowNav && (
-                <DateWindowNav
-                  prev={prevWindow}
-                  next={nextWindow}
-                  nextDisabled={isNextDisabled}
-                  label={windowLabel}
-                  options={periodOptions}
-                  currentValue={windowEnd}
-                  onSelect={setWindowEnd}
-                  timeframe={timeframe}
-                />
-              )
-            }
-          >
-            <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-              {properties.length > 1 && (
+          {properties.length > 1 && (
+            <CollapsibleFilterPanel
+              isOpen={showFilters}
+              onToggle={() => setShowFilters(!showFilters)}
+              feedbackItems={[
+                <span key="property" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
+                  {properties.find(p => p.id === selectedPropertyId)?.name ?? 'ALL PROPERTIES'}
+                </span>,
+              ]}
+            >
+              <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Property</span>
                   <Select
@@ -573,12 +556,27 @@ export function EquityOverTimeChart() {
                     ))}
                   </Select>
                 </div>
-              )}
-              <div className="flex items-center">
-                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
               </div>
-            </div>
-          </CollapsibleFilterPanel>
+            </CollapsibleFilterPanel>
+          )}
+          <ChartTimeframeBar
+            value={timeframe}
+            onChange={setTimeframe}
+            windowNav={
+              showWindowNav ? (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                  timeframe={timeframe}
+                />
+              ) : undefined
+            }
+          />
           <div className="h-[300px] px-2 pb-2">
             <div className="h-full relative">
               <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>

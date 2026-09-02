@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { getPreciseDateRange, getPeriodLabel } from '@/lib/utils/date-window';
-import { formatChartDateRange } from '@/lib/utils/chart-format';
+import { getPeriodLabel } from '@/lib/utils/date-window';
 
 interface DateWindowNavProps {
   prev: () => void;
@@ -29,17 +28,14 @@ export function DateWindowNav({ prev, next, nextDisabled, label, options, curren
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isRolling = timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d';
+  const isRolling = timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '90d' || timeframe === '365d';
 
   if (isRolling) {
-    const range = getPreciseDateRange(timeframe as any);
-    const dateRangeStr = formatChartDateRange(range.start, range.end);
     const windowLabel = getPeriodLabel('', timeframe as any);
 
     return (
       <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-lg border border-border/40 select-none">
         <span>{windowLabel}</span>
-        <span className="text-[10px] text-muted-foreground/60 font-normal">({dateRangeStr})</span>
       </div>
     );
   }

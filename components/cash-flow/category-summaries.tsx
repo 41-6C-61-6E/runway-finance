@@ -4,12 +4,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { type TimeRange } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { List } from 'lucide-react';
 import { getMonthRange, getPeriodLabel } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
@@ -82,7 +82,6 @@ export function CategorySummaries() {
     dateRange,
   } = useDateWindow('finance:category-summaries:timeframe', 'finance:category-summaries:windowEnd', '1m');
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('categorySummaries');
-  const [showFilters, setShowFilters] = useState(false);
 
   const queryParams = useMemo(() => {
     return `startDate=${dateRange.start}&endDate=${dateRange.end}`;
@@ -297,7 +296,7 @@ export function CategorySummaries() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
@@ -315,35 +314,7 @@ export function CategorySummaries() {
       />
       {!isCollapsed && (
         <>
-          <CollapsibleFilterPanel
-            isOpen={showFilters}
-            onToggle={() => setShowFilters(!showFilters)}
-            feedback={
-              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
-              </span>
-            }
-            rightActions={
-              showWindowNav && (
-                <DateWindowNav
-                  prev={prevWindow}
-                  next={nextWindow}
-                  nextDisabled={isNextDisabled}
-                  label={windowLabel}
-                  options={periodOptions}
-                  currentValue={windowEnd}
-                  onSelect={setWindowEnd}
-                  timeframe={timeframe}
-                />
-              )
-            }
-          >
-            <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-              <div className="flex items-center">
-                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-              </div>
-            </div>
-          </CollapsibleFilterPanel>
+          <ChartTimeframeBar value={timeframe} onChange={setTimeframe} windowNav={showWindowNav ? <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} /> : undefined} />
           <div className="pb-4">
             {income.length > 0 && renderSection(income, true)}
             {expenses.length > 0 && renderSection(expenses, false)}

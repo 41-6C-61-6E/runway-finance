@@ -14,8 +14,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { type TimeRange } from '@/components/charts/chart-filters';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Sparkline } from '@/components/ui/sparkline';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
@@ -251,14 +250,6 @@ export default function AccountHierarchyTree({
       if (acc.isHidden) continue;
       const { group, subGroup } = getHierarchy(acc.type);
 
-      if (hierarchySelectedGroups.size > 0 && !hierarchySelectedGroups.has(group)) continue;
-      if (hierarchySelectedTypes.size > 0 && !hierarchySelectedTypes.has(subGroup)) continue;
-      if (hierarchySelectedAccounts.size > 0 && !hierarchySelectedAccounts.has(acc.id)) continue;
-      if (hierarchySelectedTags.size > 0) {
-        const accTags = acc.tags || [];
-        const hasMatchingTag = accTags.some((t: any) => hierarchySelectedTags.has(t.id));
-        if (!hasMatchingTag) continue;
-      }
       if (q) {
         const matchesName = acc.name.toLowerCase().includes(q);
         const matchesInstitution = acc.institution ? acc.institution.toLowerCase().includes(q) : false;
@@ -377,13 +368,14 @@ export default function AccountHierarchyTree({
         accounts={selectedGroupAccounts}
         historyData={historyData}
         hierarchyTimeframe={hierarchyTimeframe}
+        onHierarchyTimeframeChange={setHierarchyTimeframe}
         onClose={() => setSelectedGroup(null)}
       />
     ) : null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
-      <Card className="@container lg:col-span-5 bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
+      <Card className="@container lg:col-span-5 bg-card/40 backdrop-blur-md border-0 shadow-sm overflow-hidden">
 
         <>
           {accountsLoading ? (
@@ -429,357 +421,27 @@ export default function AccountHierarchyTree({
             </CardContent>
           ) : (
             <>
-              <div className="mb-5 sm:mb-6 bg-muted hover:bg-muted/85 border border-border rounded-xl transition-all duration-200 overflow-visible">
-              <CollapsibleFilterPanel
-                isOpen={showHierarchyFilters}
-                onToggle={() => setShowHierarchyFilters(!showHierarchyFilters)}
-                className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
-                centerContent={
-                  <div className="relative w-full max-w-xs">
-                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search accounts, institutions, tags..."
-                      className="h-8 w-full pl-8 pr-7 bg-background border border-border rounded-lg text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchQuery('')}
-                        aria-label="Clear search"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                }
-                feedbackItems={[
-                  <span key="count" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                    Showing {visibleAccountCount} Accounts
-                  </span>,
-                  <span key="timeframe" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                    {hierarchyTimeframe.toUpperCase()}
-                  </span>,
-                  hasActiveFilters && (
-                    <span key="filtered" className="bg-chart-3/15 text-chart-3 border border-chart-3/25 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                      FILTERED
-                    </span>
-                  ),
-                ].filter(Boolean) as React.ReactNode[]}
-              >
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
-                    <TimeRangeFilter value={hierarchyTimeframe} onChange={setHierarchyTimeframe} />
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    {/* Group Dropdown */}
-                    <div className="relative z-30" ref={hierarchyGroupsRef}>
-                      <button
-                        type="button"
-                        onClick={() => setHierarchyGroupsOpen(!hierarchyGroupsOpen)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-                          hierarchySelectedGroups.size > 0
-                            ? 'bg-primary/15 border border-primary text-primary'
-                            : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
-                        }`}
-                      >
-                        <span>Group</span>
-                        {hierarchySelectedGroups.size > 0 && (
-                          <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
-                            {hierarchySelectedGroups.size}
-                          </span>
-                        )}
-                        <ChevronDown className={`h-3 w-3 transition-transform ${hierarchyGroupsOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      {hierarchyGroupsOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
-                          <div className="overflow-y-auto flex-1 p-1">
-                            <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
-                              <input
-                                type="checkbox"
-                                checked={hierarchySelectedGroups.size === hierarchyAvailableGroups.length && hierarchyAvailableGroups.length > 0}
-                                onChange={() => {
-                                  if (hierarchySelectedGroups.size === hierarchyAvailableGroups.length) {
-                                    setHierarchySelectedGroups(new Set());
-                                  } else {
-                                    setHierarchySelectedGroups(new Set(hierarchyAvailableGroups));
-                                  }
-                                }}
-                                className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                              />
-                              Select All
-                            </label>
-                            {hierarchyAvailableGroups.map((group) => (
-                              <label
-                                key={group}
-                                className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={hierarchySelectedGroups.has(group)}
-                                  onChange={() => {
-                                    const next = new Set(hierarchySelectedGroups);
-                                    if (next.has(group)) next.delete(group);
-                                    else next.add(group);
-                                    setHierarchySelectedGroups(next);
-                                  }}
-                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                />
-                                <span>{group}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Type Dropdown */}
-                    <div className="relative z-30" ref={hierarchyTypesRef}>
-                      <button
-                        type="button"
-                        onClick={() => setHierarchyTypesOpen(!hierarchyTypesOpen)}
-                        className={`px-3 py-1.5 min-h-8 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-                          hierarchySelectedTypes.size > 0
-                            ? 'bg-primary/15 border border-primary text-primary'
-                            : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
-                        }`}
-                      >
-                        <span>Type</span>
-                        {hierarchySelectedTypes.size > 0 && (
-                          <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
-                            {hierarchySelectedTypes.size}
-                          </span>
-                        )}
-                        <ChevronDown className={`h-3 w-3 transition-transform ${hierarchyTypesOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      {hierarchyTypesOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
-                          <div className="p-2 border-b border-border/50">
-                            <input
-                              type="text"
-                              value={hierarchyTypeSearch}
-                              onChange={(e) => setHierarchyTypeSearch(e.target.value)}
-                              placeholder="Search types..."
-                              className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-                            />
-                          </div>
-                          <div className="overflow-y-auto flex-1 p-1">
-                            <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
-                              <input
-                                type="checkbox"
-                                checked={hierarchySelectedTypes.size === hierarchyAvailableTypes.length && hierarchyAvailableTypes.length > 0}
-                                onChange={() => {
-                                  if (hierarchySelectedTypes.size === hierarchyAvailableTypes.length) {
-                                    setHierarchySelectedTypes(new Set());
-                                  } else {
-                                    setHierarchySelectedTypes(new Set(hierarchyAvailableTypes));
-                                  }
-                                }}
-                                className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                              />
-                              Select All
-                            </label>
-                            {hierarchyAvailableTypes
-                              .filter((t) => !hierarchyTypeSearch || t.toLowerCase().includes(hierarchyTypeSearch.toLowerCase()))
-                              .map((type) => (
-                                <label
-                                  key={type}
-                                  className="flex items-center gap-2 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={hierarchySelectedTypes.has(type)}
-                                    onChange={() => {
-                                      const next = new Set(hierarchySelectedTypes);
-                                      if (next.has(type)) next.delete(type);
-                                      else next.add(type);
-                                      setHierarchySelectedTypes(next);
-                                    }}
-                                    className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                  />
-                                  <span>{type}</span>
-                                </label>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Account Dropdown */}
-                    <div className="relative z-30" ref={hierarchyAccountsRef}>
-                      <button
-                        type="button"
-                        onClick={() => setHierarchyAccountsOpen(!hierarchyAccountsOpen)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-                          hierarchySelectedAccounts.size > 0
-                            ? 'bg-primary/15 border border-primary text-primary'
-                            : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
-                        }`}
-                      >
-                        <span>Account</span>
-                        {hierarchySelectedAccounts.size > 0 && (
-                          <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
-                            {hierarchySelectedAccounts.size}
-                          </span>
-                        )}
-                        <ChevronDown className={`h-3 w-3 transition-transform ${hierarchyAccountsOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      {hierarchyAccountsOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
-                          <div className="p-2 border-b border-border/50">
-                            <input
-                              type="text"
-                              value={hierarchyAccountSearch}
-                              onChange={(e) => setHierarchyAccountSearch(e.target.value)}
-                              placeholder="Search accounts..."
-                              className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-                            />
-                          </div>
-                          <div className="overflow-y-auto flex-1 p-1">
-                            <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
-                              <input
-                                type="checkbox"
-                                checked={hierarchySelectedAccounts.size === hierarchyAvailableAccounts.length && hierarchyAvailableAccounts.length > 0}
-                                onChange={() => {
-                                  if (hierarchySelectedAccounts.size === hierarchyAvailableAccounts.length) {
-                                    setHierarchySelectedAccounts(new Set());
-                                  } else {
-                                    setHierarchySelectedAccounts(new Set(hierarchyAvailableAccounts.map((a) => a.id)));
-                                  }
-                                }}
-                                className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                              />
-                              Select All
-                            </label>
-                            {hierarchyAvailableAccounts
-                              .filter((a) => !hierarchyAccountSearch || a.name.toLowerCase().includes(hierarchyAccountSearch.toLowerCase()) || (a.institution && a.institution.toLowerCase().includes(hierarchyAccountSearch.toLowerCase())))
-                              .map((acc) => (
-                                <label
-                                  key={acc.id}
-                                  className="flex items-center gap-3 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={hierarchySelectedAccounts.has(acc.id)}
-                                    onChange={() => {
-                                      const next = new Set(hierarchySelectedAccounts);
-                                      if (next.has(acc.id)) next.delete(acc.id);
-                                      else next.add(acc.id);
-                                      setHierarchySelectedAccounts(next);
-                                    }}
-                                    className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                  />
-                                  <div className="text-left">
-                                    <p className="font-medium text-foreground">{acc.name}</p>
-                                    {acc.institution && <p className="text-[10px] text-muted-foreground">{acc.institution}</p>}
-                                  </div>
-                                </label>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Tags Dropdown */}
-                    <div className="relative z-30" ref={hierarchyTagsRef}>
-                      <button
-                        type="button"
-                        onClick={() => setHierarchyTagsOpen(!hierarchyTagsOpen)}
-                        className={`px-3 py-1.5 min-h-8 rounded-lg text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
-                          hierarchySelectedTags.size > 0
-                            ? 'bg-primary/15 border border-primary text-primary'
-                            : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
-                        }`}
-                      >
-                        <span>Tags</span>
-                        {hierarchySelectedTags.size > 0 && (
-                          <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center">
-                            {hierarchySelectedTags.size}
-                          </span>
-                        )}
-                        <ChevronDown className={`h-3 w-3 transition-transform ${hierarchyTagsOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      {hierarchyTagsOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
-                          <div className="p-2 border-b border-border/50">
-                            <input
-                              type="text"
-                              value={hierarchyTagSearch}
-                              onChange={(e) => setHierarchyTagSearch(e.target.value)}
-                              placeholder="Search tags..."
-                              className="w-full px-3 py-1.5 bg-background border border-input rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-                            />
-                          </div>
-                          <div className="overflow-y-auto flex-1 p-1">
-                            <label className="flex items-center gap-2 px-3 py-2 text-xs text-foreground/80 hover:bg-muted/50 cursor-pointer font-medium transition-colors border-b border-border/30">
-                              <input
-                                type="checkbox"
-                                checked={hierarchySelectedTags.size === allTags.length && allTags.length > 0}
-                                onChange={() => {
-                                  if (hierarchySelectedTags.size === allTags.length) {
-                                    setHierarchySelectedTags(new Set());
-                                  } else {
-                                    setHierarchySelectedTags(new Set(allTags.map((t) => t.id)));
-                                  }
-                                }}
-                                className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                              />
-                              Select All
-                            </label>
-                            {allTags
-                              .filter((t) => !hierarchyTagSearch || t.name.toLowerCase().includes(hierarchyTagSearch.toLowerCase()))
-                              .map((tag) => (
-                                <label
-                                  key={tag.id}
-                                  className="flex items-center gap-3 px-3 py-2 text-[11px] text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={hierarchySelectedTags.has(tag.id)}
-                                    onChange={() => {
-                                      const next = new Set(hierarchySelectedTags);
-                                      if (next.has(tag.id)) next.delete(tag.id);
-                                      else next.add(tag.id);
-                                      setHierarchySelectedTags(next);
-                                    }}
-                                    className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
-                                  />
-                                  <div className="flex items-center gap-2">
-                                    <div 
-                                      className="w-2.5 h-2.5 rounded-full" 
-                                      style={{ backgroundColor: tag.color }}
-                                    />
-                                    <span className="font-medium text-foreground">{tag.name}</span>
-                                  </div>
-                                </label>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Reset button */}
-                    {(hierarchySelectedGroups.size > 0 || hierarchySelectedTypes.size > 0 || hierarchySelectedAccounts.size > 0 || hierarchySelectedTags.size > 0) && (
-                      <button
-                        onClick={() => {
-                          setHierarchySelectedGroups(new Set());
-                          setHierarchySelectedTypes(new Set());
-                          setHierarchySelectedAccounts(new Set());
-                          setHierarchySelectedTags(new Set());
-                        }}
-                        className="px-2.5 py-1 text-xs font-semibold rounded bg-muted/40 border border-border/20 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
-                      >
-                        Clear Filters
-                      </button>
-                    )}
-                  </div>
+              <div className="mb-3 bg-muted/50 rounded-xl p-3">
+                <div className="relative w-full max-w-md">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search accounts, institutions, tags..."
+                    className="h-8 w-full pl-8 pr-7 bg-background border border-border rounded-lg text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      aria-label="Clear search"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
-              </CollapsibleFilterPanel>
               </div>
 
               <div className="border-t border-border/10" />
@@ -1002,6 +664,7 @@ export default function AccountHierarchyTree({
                                             historyData={historyData}
                                             isLiability={isLiabilityAccount(acc.type)}
                                             hierarchyTimeframe={hierarchyTimeframe}
+                                            onHierarchyTimeframeChange={setHierarchyTimeframe}
                                           />
                                         </div>
                                       </div>
@@ -1180,6 +843,7 @@ export default function AccountHierarchyTree({
                                                   historyData={historyData}
                                                   isLiability={isLiabilityAccount(acc.type)}
                                                   hierarchyTimeframe={hierarchyTimeframe}
+                                            onHierarchyTimeframeChange={setHierarchyTimeframe}
                                                 />
                                               </div>
                                             </div>
@@ -1302,6 +966,7 @@ export default function AccountHierarchyTree({
                                           historyData={historyData}
                                           isLiability={isLiabilityAccount(singleAcc.type)}
                                           hierarchyTimeframe={hierarchyTimeframe}
+                                            onHierarchyTimeframeChange={setHierarchyTimeframe}
                                         />
                                       </div>
                                     </div>
@@ -1332,6 +997,7 @@ export default function AccountHierarchyTree({
             account={selectedAccount}
             historyData={historyData}
             hierarchyTimeframe={hierarchyTimeframe}
+            onHierarchyTimeframeChange={setHierarchyTimeframe}
             onClose={() => setExpandedAccounts({})}
           />
         )}

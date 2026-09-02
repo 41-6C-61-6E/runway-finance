@@ -21,7 +21,7 @@ import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, 
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { TimeRangeFilter } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
@@ -287,36 +287,14 @@ export function CashVsCreditCard() {
   const hasNoHistory = !chartData || chartData.length === 0;
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
 
         <>
           <CollapsibleFilterPanel
             isOpen={showFilters}
             onToggle={() => setShowFilters(!showFilters)}
-            feedback={
-              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
-              </span>
-            }
-            rightActions={
-              showWindowNav && (
-                <DateWindowNav
-                  prev={prevWindow}
-                  next={nextWindow}
-                  nextDisabled={isNextDisabled}
-                  label={windowLabel}
-                  options={periodOptions}
-                  currentValue={windowEnd}
-                  onSelect={setWindowEnd}
-                  timeframe={timeframe}
-                />
-              )
-            }
           >
             <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-              <div className="flex items-center">
-                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-              </div>
               <div className="flex items-center gap-2">
                 <Switch
                   id="include-savings"
@@ -339,6 +317,24 @@ export function CashVsCreditCard() {
               </div>
             </div>
           </CollapsibleFilterPanel>
+          <ChartTimeframeBar
+            value={timeframe}
+            onChange={setTimeframe}
+            windowNav={
+              showWindowNav ? (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                  timeframe={timeframe}
+                />
+              ) : undefined
+            }
+          />
 
           <div className="px-5 pt-2 pb-5">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 mb-6 border-b border-border/40 pb-6">

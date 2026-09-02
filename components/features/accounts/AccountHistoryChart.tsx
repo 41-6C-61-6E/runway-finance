@@ -18,7 +18,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { ChartTypeSelector } from '@/components/charts/chart-type-selector';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
+import type { TimeRange } from '@/components/charts/chart-filters';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -752,9 +753,10 @@ export default function AccountHistoryChart({
     const idx = Math.round(fraction * (visibleData.length - 1));
     const clickedDate = String(visibleData[idx]?.date ?? '');
 
-    const zoomMap: Record<TimeRange, TimeRange> = {
+    const zoomMap: Record<string, TimeRange> = {
       all: '5y',
-      '5y': '1y',
+      '5y': '3y',
+      '3y': '1y',
       '365d': '6m',
       '1y': '6m',
       '6m': '3m',
@@ -762,9 +764,9 @@ export default function AccountHistoryChart({
       '1m': '30d',
       '30d': '7d',
       '7d': '7d',
-      '1d': '1d',
+      '1d': '7d',
       ytd: '3m',
-      '1d_discrete': '1d_discrete',
+      '1d_discrete': '7d_discrete',
       '7d_discrete': '7d_discrete',
     };
     const nextTimeframe = zoomMap[timeframe];
@@ -894,16 +896,13 @@ export default function AccountHistoryChart({
     <Card className="bg-card/40 backdrop-blur-md border-border/60 shadow-sm overflow-hidden">
 
         <>
-          <div className="mb-5 sm:mb-6 bg-muted hover:bg-muted/85 border border-border rounded-xl transition-all duration-200 overflow-visible">
+          <div className="mb-5 sm:mb-6 bg-muted hover:bg-muted/85 border border-border rounded-xl transition-all duration-200 overflow-hidden">
           <CollapsibleFilterPanel
             isOpen={showHistoryFilters}
             onToggle={() => setShowHistoryFilters(!showHistoryFilters)}
             className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
             feedback={
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
-                </span>
                 <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
                   {chartType === 'line' ? 'Area' : 'Bar'}
                 </span>
@@ -927,28 +926,10 @@ export default function AccountHistoryChart({
                 )}
               </div>
             }
-            rightActions={
-              showWindowNav && (
-                <DateWindowNav
-                  prev={prevWindow}
-                  next={nextWindow}
-                  nextDisabled={isNextDisabled}
-                  label={windowLabel}
-                  options={periodOptions}
-                  currentValue={windowEnd}
-                  onSelect={setWindowEnd}
-                  timeframe={timeframe}
-                />
-              )
-            }
           >
             <div className="space-y-4">
-              {/* Timeframe & Chart Style Row */}
-              <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Timeframe</span>
-                  <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-                </div>
+              {/* Chart Style Row */}
+              <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Style</span>
                   <ChartTypeSelector 
@@ -1403,6 +1384,24 @@ export default function AccountHistoryChart({
             </div>
           </CollapsibleFilterPanel>
           </div>
+          <ChartTimeframeBar
+            value={timeframe}
+            onChange={setTimeframe}
+            windowNav={
+              showWindowNav ? (
+                <DateWindowNav
+                  prev={prevWindow}
+                  next={nextWindow}
+                  nextDisabled={isNextDisabled}
+                  label={windowLabel}
+                  options={periodOptions}
+                  currentValue={windowEnd}
+                  onSelect={setWindowEnd}
+                  timeframe={timeframe}
+                />
+              ) : undefined
+            }
+          />
 
           <CardContent className="p-2 sm:p-5">
             <div className="h-[380px] w-full relative">

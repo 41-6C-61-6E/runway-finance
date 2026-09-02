@@ -10,12 +10,12 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
+import { type TimeRange } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { getMonthRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
-import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { SegPill } from '@/components/ui/seg-pill';
@@ -46,7 +46,6 @@ export function SpendingBreakdown() {
   const router = useRouter();
   const { privacyMode } = usePrivacyMode();
 
-  const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -220,14 +219,13 @@ export function SpendingBreakdown() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       {!privacyMode && (
         <div className="sr-only" aria-live="polite">
           {srSummary}
         </div>
       )}
-
-      <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2">
+      <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2 border-b border-border bg-muted/20">
         <SegPill<BreakdownView>
           options={[{ id: 'donut', label: 'Donut' }, { id: 'treemap', label: 'Treemap' }, { id: 'bar', label: 'Bar' }]}
           value={view}
@@ -241,31 +239,11 @@ export function SpendingBreakdown() {
           onToggle={toggleGroup}
           aria-label="Spending groups"
         />
-        <span className="text-xs text-muted-foreground/50">|</span>
-        <button type="button" onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}
-          className="flex items-center gap-1.5 px-2.5 h-8 bg-background hover:bg-muted border border-border/80 rounded-lg text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm">
-          <Filter size={12} className="text-primary" />
-          <span className="hidden sm:inline">Options</span>
-          {showFilters ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        </button>
-        {showWindowNav && (
-          <div className="basis-full flex items-center justify-center px-2 sm:px-4 pt-2 pb-0">
-            <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel}
-              options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} />
-          </div>
-        )}
       </div>
+      <ChartTimeframeBar value={timeframe} onChange={setTimeframe} windowNav={showWindowNav ? <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} /> : undefined} />
 
       {/* ── Card Content Grid ── */}
 
-        <>
-          {showFilters && (
-            <div className="mx-3 sm:mx-5 mb-1 p-4 bg-background/50 border border-border/40 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200">
-              <div className="flex justify-center">
-                <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-              </div>
-            </div>
-          )}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 p-3 sm:p-6">
           {/* Chart Column (3/5) */}
           <div className="lg:col-span-3 h-[380px] relative flex flex-col justify-center">
@@ -450,8 +428,7 @@ export function SpendingBreakdown() {
               )}
             </div>
           </div>
-        </div>
-        </>
+          </div>
 
     </div>
   );

@@ -2,6 +2,7 @@ export type TimeFrame =
   | '1d'
   | '7d'
   | '30d'
+  | '90d'
   | '1m'
   | '3m'
   | '6m'
@@ -72,6 +73,9 @@ export function getDateRange(timeframe: TimeFrame | string = '1y'): [Date, Date]
     case '30d':
       startDate.setDate(startDate.getDate() - 30);
       break;
+    case '90d':
+      startDate.setDate(startDate.getDate() - 90);
+      break;
     case '1m':
     case 'month':
       subtractMonthsClamped(startDate, 1);
@@ -124,6 +128,7 @@ export function timeframeToMonths(timeframe: TimeFrame | string = '1y'): number 
     case '1m':
     case 'month':
       return 1;
+    case '90d':
     case '3m':
     case 'quarter':
       return 3;
@@ -169,6 +174,8 @@ export function timeframeToLabel(timeframe: TimeFrame | string): string {
     case '30d':
     case '1m':
       return 'Past Month';
+    case '90d':
+      return 'Past 90 Days';
     case '3m':
     case 'quarter':
       return 'Past 3 Months';

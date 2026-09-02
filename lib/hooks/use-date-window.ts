@@ -6,10 +6,11 @@ import type { TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from './use-persistent-state';
 import { getCurrentMonth, getMonthRange, getPreciseDateRange, getPeriodLabel, snapToPeriod } from '@/lib/utils/date-window';
 
-const WINDOW_SPAN: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, 'ytd': 12, '5y': 60 };
-const MONTHS_BACK: Record<string, number> = { '1m': 0, '3m': 2, '6m': 5, '1y': 11, '5y': 59 };
+const WINDOW_SPAN: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, '3y': 36, 'ytd': 12, '5y': 60 };
+const MONTHS_BACK: Record<string, number> = { '1m': 0, '3m': 2, '6m': 5, '1y': 11, '3y': 35, '5y': 59 };
 
-const VALID_TIMEFRAMES: TimeRange[] = ['1d', '7d', '30d', '1m', '3m', '6m', '1y', '365d', '5y', 'ytd', 'all', '1d_discrete', '7d_discrete'];
+// Keep deprecated 1d values for back-compat (deep links / persisted state) but not surfaced in UI
+const VALID_TIMEFRAMES: TimeRange[] = ['7d', '30d', '90d', '1m', '3m', '6m', '1y', '3y', '365d', '5y', 'ytd', 'all', '7d_discrete', '1d', '1d_discrete'];
 
 export interface DateWindowState {
   timeframe: TimeRange;
@@ -122,6 +123,13 @@ export function useDateWindow(
     }
   }, [timeframe, windowEnd, setWindowEnd, urlWindowEnd]);
 
+  // Auto-migrate deprecated 1d values persisted in DB/localStorage
+  useEffect(() => {
+    if (controlledTimeframe !== undefined) return;
+    if (timeframeState === ('1d' as TimeRange)) _setTimeframe('7d' as TimeRange);
+    else if (timeframeState === ('1d_discrete' as TimeRange)) _setTimeframe('1m' as TimeRange);
+  }, [timeframeState, controlledTimeframe, _setTimeframe]);
+
   const shift = WINDOW_SPAN[timeframe] ?? 1;
 
   const prevWindow = () => {
@@ -199,7 +207,7 @@ export function useDateWindow(
   };
 
   const isNextDisabled = useMemo(() => {
-    if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d') return true;
+    if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '90d' || timeframe === '365d') return true;
     if (timeframe === '1d_discrete' || timeframe === '7d_discrete') {
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -221,7 +229,7 @@ export function useDateWindow(
   const dateRange = useMemo(() => getPreciseDateRange(timeframe, windowEnd), [timeframe, windowEnd]);
 
   const periodOptions = useMemo(() => {
-    if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d' || timeframe === '1d_discrete' || timeframe === '7d_discrete') return [];
+    if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '90d' || timeframe === '365d' || timeframe === '1d_discrete' || timeframe === '7d_discrete') return [];
     const options: { label: string; value: string }[] = [];
     const count = timeframe === '1m' ? 24 : 12;
     const cursor = new Date();

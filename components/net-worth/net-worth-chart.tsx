@@ -31,8 +31,8 @@ import {
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { TimeRangeFilter, type TimeRange } from '@/components/charts/chart-filters';
-import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
+import type { TimeRange } from '@/components/charts/chart-filters';
+import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { TrendingUp, BarChart3 } from 'lucide-react';
 import { getMonthRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
@@ -74,7 +74,6 @@ export function NetWorthChart() {
     showWindowNav,
     dateRange,
   } = useDateWindow('finance:net-worth-chart:timeframe', 'finance:net-worth-chart:windowEnd', '1y');
-  const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showPercent, setShowPercent] = useState(false);
 
@@ -126,6 +125,7 @@ export function NetWorthChart() {
         case '3m': return 1.5;
         case '6m': return 3;
         case '1y': return 4;
+        case '3y': return 5;
         case 'ytd': return 4;
         case '5y': return 7;
         case 'all': return 14;
@@ -140,6 +140,7 @@ export function NetWorthChart() {
         case '3m': return 0;
         case '6m': return 4;
         case '1y': return 7;
+        case '3y': return 14;
         case 'ytd': return 7;
         case '5y': return 30;
         case 'all': return 45;
@@ -401,39 +402,30 @@ export function NetWorthChart() {
 
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm">
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       {!privacyMode && (
         <div className="sr-only" aria-live="polite">
           {srSummary}
         </div>
       )}
-      <CollapsibleFilterPanel
-            isOpen={showFilters}
-            onToggle={() => setShowFilters(!showFilters)}
-            feedback={
-              <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())}
-              </span>
-            }
-            rightActions={
-              showWindowNav && (
-                <DateWindowNav
-                  prev={prevWindow}
-                  next={nextWindow}
-                  nextDisabled={isNextDisabled}
-                  label={windowLabel}
-                  options={periodOptions}
-                  currentValue={windowEnd}
-                  onSelect={setWindowEnd}
-                  timeframe={timeframe}
-                />
-              )
-            }
-          >
-            <div className="flex items-center">
-              <TimeRangeFilter value={timeframe} onChange={setTimeframe} />
-            </div>
-          </CollapsibleFilterPanel>
+      <ChartTimeframeBar
+        value={timeframe}
+        onChange={setTimeframe}
+        windowNav={
+          showWindowNav ? (
+            <DateWindowNav
+              prev={prevWindow}
+              next={nextWindow}
+              nextDisabled={isNextDisabled}
+              label={windowLabel}
+              options={periodOptions}
+              currentValue={windowEnd}
+              onSelect={setWindowEnd}
+              timeframe={timeframe}
+            />
+          ) : undefined
+        }
+      />
           <div className="flex flex-col divide-y divide-border">
             <div className="flex-1 min-w-0 p-2.5 sm:p-5">
               <div className="flex items-center gap-1.5 mb-2">
