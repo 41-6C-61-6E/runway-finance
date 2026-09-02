@@ -3,6 +3,7 @@ import { pushSubscriptions, sentNotifications, budgets, categories, transactions
 import { eq, and, or, isNull, gte, lt, inArray, sql, desc } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { calculateWealthFlow } from '@/lib/services/wealth-flow';
+import { formatCurrency } from '@/lib/utils/format';
 import { logger } from '@/lib/logger';
 import { getShareGroupUserIds, resolveDataUserId } from '@/lib/sharing';
 import webpush from 'web-push';
@@ -1700,11 +1701,19 @@ export async function checkMonthlySummaryAndNotify(userId: string, dek: Uint8Arr
       .where(and(eq(monthlyCashFlow.userId, userId), eq(monthlyCashFlow.yearMonth, yearMonth)))
       .limit(1);
 
-    if (!cf) return;
+    const totalIncome = cf ? parseFloat(await decryptField(cf.totalIncome, dek)) || 0 : 0;
+    const totalExpenses = cf ? parseFloat(await decryptField(cf.totalExpenses, dek)) || 0 : 0;
+    const netCashFlow = cf ? parseFloat(await decryptField(cf.netCashFlow, dek)) || 0 : 0;
 
-    const totalIncome = parseFloat(await decryptField(cf.totalIncome, dek)) || 0;
-    const totalExpenses = parseFloat(await decryptField(cf.totalExpenses, dek)) || 0;
-    const netCashFlow = parseFloat(await decryptField(cf.netCashFlow, dek)) || 0;
+    // Net worth change for the closed month, computed with the exact same
+    // engine the Flows wealth sankey uses (calculateWealthFlow for the
+    // calendar month), so this number matches the chart's "Total Net Worth
+    // Change" for the same window.
+    const [fy, fm] = yearMonth.split('-').map(Number);
+    const flowStart = yearMonth + '-01';
+    const flowEnd = yearMonth + '-' + String(new Date(Date.UTC(fy, fm, 0)).getUTCDate()).padStart(2, '0');
+    const flow = await calculateWealthFlow(userId, flowStart, flowEnd, dek, [], '1m');
+    const netWorthChange = flow.summary.netWorthChange;
 
     const fmt = (n: number) =>
       new Intl.NumberFormat(settings.locale || 'en-US', {
@@ -1718,16 +1727,36 @@ export async function checkMonthlySummaryAndNotify(userId: string, dek: Uint8Arr
       { month: 'long', year: 'numeric', timeZone: 'UTC' }
     );
 
-    const savingsRate = totalIncome > 0 ? Math.round((netCashFlow / totalIncome) * 100) : 0;
+    const hasNetWorth = !isNaN(netWorthChange) && Math.abs(netWorthChange) >= 0.01;
+    if (!cf && !hasNetWorth) return;
+
+    // The net worth figure uses 2 decimals, matching the sankey's
+    // formatCurrency rendering so the two numbers read identically.
+    const fmtNW = (n: number) =>
+      formatCurrency(n, settings.currency || 'USD', settings.locale || 'en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+    const netWorthPhrase = hasNetWorth
+      ? `net worth ${netWorthChange > 0 ? 'increased' : 'decreased'} by ${fmtNW(Math.abs(netWorthChange))}`
+      : '';
+    const cashFlowPhrase = cf
+      ? `cash flow: income ${fmt(totalIncome)}, expenses ${fmt(totalExpenses)}, ` +
+        `net ${netCashFlow >= 0 ? '+' : ''}${fmt(netCashFlow)}` +
+        (totalIncome > 0 ? ` (savings rate ${Math.round((netCashFlow / totalIncome) * 100)}%)` : '')
+      : '';
+
     const body =
-      `${monthLabel}: income ${fmt(totalIncome)}, expenses ${fmt(totalExpenses)}, ` +
-      `net ${netCashFlow >= 0 ? '+' : ''}${fmt(netCashFlow)} (savings rate ${savingsRate}%).`;
+      cf && hasNetWorth
+        ? monthLabel + ': ' + netWorthPhrase + '; ' + cashFlowPhrase + '.'
+        : monthLabel + ': ' + (netWorthPhrase || cashFlowPhrase) + '.';
 
     await sendPushNotification(
       userId,
       `Monthly Summary: ${monthLabel}`,
       body,
-      '/flows',
+      `/flows?timeframe=1m&date=${yearMonth}`,
       'monthly_summary',
       `monthly_summary:${yearMonth}`
     );
