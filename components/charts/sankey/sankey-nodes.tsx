@@ -116,8 +116,17 @@ export function SankeyCustomNode({
   const safeProps = sanitizeRestProps(restProps);
   const hubBadgeW = Math.min(180, Math.max(width + 40, 140));
   const hubBadgeH = 48;
-  const hubBadgeX = x + width / 2 - hubBadgeW / 2;
-  const hubBadgeY = Math.max(2, hubDeltaCenterY - hubBadgeH / 2);
+  const HUB_GAP = 10;
+  const showHubBadge = !isMobile;
+  let hubBadgeX = x + width + HUB_GAP;
+  let hubBadgeY = Math.max(2, hubDeltaCenterY - hubBadgeH / 2);
+  if (showHubBadge && typeof chartWidth === 'number' && chartWidth > 0) {
+    const chartRight = chartWidth - (margin?.right ?? 0);
+    if (hubBadgeX + hubBadgeW > chartRight) {
+      const leftX = x - hubBadgeW - HUB_GAP;
+      if (leftX >= (margin?.left ?? 0)) hubBadgeX = leftX;
+    }
+  }
 
   return (
     <g
@@ -161,62 +170,60 @@ export function SankeyCustomNode({
               fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
-            <foreignObject
-              x={hubBadgeX}
-              y={hubBadgeY}
-              width={hubBadgeW}
-              height={hubBadgeH}
-              pointerEvents="none"
-              style={{ opacity: isDimmed ? 0.3 : 1 }}
-            >
-              <div
-
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  textAlign: 'center',
-                  gap: 1,
-                  background: 'hsl(var(--card) / 0.92)',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: 8,
-                  padding: '4px 8px',
-                  backdropFilter: 'blur(6px)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                }}
+            {showHubBadge && (
+              <foreignObject
+                x={hubBadgeX}
+                y={hubBadgeY}
+                width={hubBadgeW}
+                height={hubBadgeH}
+                pointerEvents="none"
+                style={{ opacity: isDimmed ? 0.3 : 1, overflow: 'visible' }}
               >
                 <div
                   style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    lineHeight: 1.3,
-                    letterSpacing: 0.3,
-                    textTransform: 'uppercase' as const,
-                    color: 'hsl(var(--muted-foreground))',
-                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    textAlign: 'center',
+                    gap: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
                   }}
                 >
-                  {payload.label || payload.name}
-                </div>
-                {hubVisualImbalance !== undefined && (
                   <div
-                    className="blur-number"
                     style={{
-                      fontSize: isMobile ? 13 : 16,
-                      fontWeight: 800,
-                      color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
-                      lineHeight: 1.2,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      lineHeight: 1.3,
+                      letterSpacing: 0.3,
+                      textTransform: 'uppercase' as const,
+                      color: 'hsl(var(--muted-foreground))',
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {hubVisualImbalance >= 0 ? '+' : ''}
-                    {formatCurrency(hubVisualImbalance)}
+                    {payload.label || payload.name}
                   </div>
-                )}
-              </div>
-            </foreignObject>
+                  {hubVisualImbalance !== undefined && (
+                    <div
+                      className="blur-number"
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 800,
+                        color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
+                        lineHeight: 1.2,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {hubVisualImbalance >= 0 ? '+' : ''}
+                      {formatCurrency(hubVisualImbalance)}
+                    </div>
+                  )}
+                </div>
+              </foreignObject>
+            )}
         </>
       )}
 

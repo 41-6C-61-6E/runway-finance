@@ -80,18 +80,21 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
     <div
       ref={ref}
       className={cn(
-        "z-[100] max-w-xs overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 space-y-1",
+        "z-[100] max-w-[280px] min-w-[160px] overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 space-y-1 break-words",
         className
       )}
       style={{
         position: containerRef ? 'fixed' : isCustomPositioned ? 'absolute' : 'relative',
         ...(isCustomPositioned && !containerRef ? { left: `${x}px`, top: `${y}px` } : {}),
         ...(containerRef && position ? { left: `${position.left}px`, top: `${position.top}px` } : {}),
-        width: 'fit-content',
-        maxWidth: 'calc(100vw - 24px)',
+        width: 'max-content',
+        maxWidth: 'min(280px, calc(100vw - 24px))',
         maxHeight: 'calc(100vh - 24px)',
         overflowY: 'auto',
-        overflowWrap: 'anywhere',
+        overflowX: 'hidden',
+        overflowWrap: 'break-word',
+        wordBreak: 'break-word',
+        hyphens: 'auto' as any,
         visibility: containerRef && !position ? 'hidden' : 'visible',
         transition: 'opacity 0.15s ease-out',
         boxSizing: 'border-box',
@@ -118,15 +121,17 @@ interface TooltipRowProps {
 
 export function TooltipRow({ label, value, color, className }: TooltipRowProps) {
   return (
-    <div className={cn("flex items-center gap-1.5 whitespace-nowrap w-full text-xs leading-relaxed", className)}>
-      {color && (
-        <span
-          className="inline-block w-2 h-2 rounded-full shrink-0"
-          style={{ background: color }}
-        />
-      )}
-      <span className="text-muted-foreground truncate min-w-0 shrink flex-1">{label}:</span>
-      <span className="blur-number font-semibold shrink-0 ml-auto text-foreground">{value}</span>
+    <div className={cn("flex items-start justify-between gap-2 w-full text-xs leading-relaxed break-words", className)}>
+      <span className="flex items-center gap-1.5 min-w-0 flex-1 break-words">
+        {color && (
+          <span
+            className="inline-block w-2 h-2 rounded-full shrink-0 mt-0.5"
+            style={{ background: color }}
+          />
+        )}
+        <span className="text-muted-foreground break-words min-w-0 flex-1">{label}:</span>
+      </span>
+      <span className="blur-number font-semibold shrink-0 text-foreground text-right break-all tabular-nums">{value}</span>
     </div>
   );
 }
@@ -138,7 +143,7 @@ interface TooltipHeaderProps {
 
 export function TooltipHeader({ children, className }: TooltipHeaderProps) {
   return (
-    <div className={cn("font-bold text-xs text-foreground pb-1 mb-1 border-b border-border/50", className)}>
+    <div className={cn("font-bold text-xs text-foreground pb-1 mb-1 border-b border-border/50 break-words whitespace-normal leading-snug", className)}>
       {children}
     </div>
   );

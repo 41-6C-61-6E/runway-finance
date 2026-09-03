@@ -8,16 +8,13 @@ import { formatPlainPercent } from '@/lib/utils/format';
 import { SankeyLabel, computeLabelGutter } from '@/components/charts/sankey/sankey-label';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { type TimeRange } from '@/components/charts/chart-filters';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
-import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { ChevronDown, Search } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
-import { Switch } from '@/components/ui/switch';
 import { getOrFetch } from '@/lib/fetch-cache';
+import { SegPill } from '@/components/ui/seg-pill';
 
 interface CategoryData {
   categoryId: string;
@@ -32,12 +29,6 @@ interface CategoryData {
   parentColor?: string | null;
   categoryType?: string;
   expenseParentId?: string | null;
-}
-
-interface AccountData {
-  id: string;
-  name: string;
-  type: string;
 }
 
 interface CategoryInfo {
@@ -157,7 +148,6 @@ function buildSankeyData(
   const incomeItems = enriched.filter((c) => c.categoryType !== 'transfer' && c.isIncome && c.amount > 0);
   const expenseItems = enriched.filter((c) => c.categoryType !== 'transfer' && !c.isIncome && c.amount > 0);
 
-  // Sort and limit income categories to 20 items
   const sortedIncome = incomeItems
     .sort((a, b) => b.amount - a.amount);
 
@@ -175,7 +165,6 @@ function buildSankeyData(
     ];
   }
 
-  // Sort and limit expense categories to 20 items
   const sortedExpense = expenseItems
     .sort((a, b) => b.amount - a.amount);
 
@@ -198,7 +187,6 @@ function buildSankeyData(
   const hubId = '__available_funds__';
   const createdParentNodes = new Set<string>();
 
-  // ── Income side ──────────────────────────────────────────────────────────
   if (showParents) {
     const incomeTopLevel = incomeCategories.filter((cat) => !cat.parentId);
     const incomeChildrenOnly = incomeCategories.filter((cat) => cat.parentId);
@@ -217,7 +205,6 @@ function buildSankeyData(
       }
     });
 
-    // Sort parent groups by total amount descending to maintain a predictable vertical layout
     const incomeParentTotals = new Map<string, number>();
     incomeByParent.forEach((children, parentId) => {
       incomeParentTotals.set(parentId, children.reduce((sum, c) => sum + c.amount, 0));
@@ -280,7 +267,6 @@ function buildSankeyData(
       links.push({ source: parentNodeId, target: hubId, value: totalForParent });
     });
   } else {
-    // Flat: all income categories connect directly to hub
     incomeCategories.forEach((cat) => {
       const childNodeId = `inc_${cat.categoryId}`;
       const label = cat.parentName ? `${cat.parentName} › ${cat.categoryName}` : cat.categoryName;
@@ -303,10 +289,8 @@ function buildSankeyData(
     links.push({ source: fallbackId, target: hubId, value: totalIncome });
   }
 
-  // Hub node
   if (incomeCategories.length > 0 || expenseCategories.length > 0 || totalIncome > 0 || totalExpenses > 0) {
     const isSurplus = totalIncome >= totalExpenses;
-    const hubColor = isSurplus ? '#10b981' : '#ef4444';
     const label = isSurplus ? 'Cash Surplus' : 'Cash Deficit';
     const netChange = totalIncome - totalExpenses;
     nodes.push({
@@ -321,7 +305,6 @@ function buildSankeyData(
     });
   }
 
-  // ── Expense side ─────────────────────────────────────────────────────────
   if (showParents) {
     const expenseTopLevel = expenseCategories.filter((cat) => !cat.parentId);
     const expenseChildrenOnly = expenseCategories.filter((cat) => cat.parentId);
@@ -340,7 +323,6 @@ function buildSankeyData(
       }
     });
 
-    // Sort parent groups by total amount descending to maintain a predictable vertical layout
     const expenseParentTotals = new Map<string, number>();
     expenseByParent.forEach((children, parentId) => {
       expenseParentTotals.set(parentId, children.reduce((sum, c) => sum + c.amount, 0));
@@ -403,7 +385,6 @@ function buildSankeyData(
       links.push({ source: hubId, target: parentNodeId, value: totalForParent });
     });
   } else {
-    // Flat: hub connects directly to all expense categories
     expenseCategories.forEach((cat) => {
       const childNodeId = `exp_${cat.categoryId}`;
       const label = cat.parentName ? `${cat.parentName} › ${cat.categoryName}` : cat.categoryName;
@@ -426,7 +407,6 @@ function buildSankeyData(
     links.push({ source: hubId, target: fallbackId, value: totalExpenses });
   }
 
-  // Explicit Savings / Retained Cash Surplus Sink Node
   if (totalIncome > totalExpenses) {
     const surplus = totalIncome - totalExpenses;
     const savingsId = '__savings__';
@@ -443,9 +423,6 @@ function buildSankeyData(
   return { nodes, links };
 }
 
-// ── Custom node ────────────────────────────────────────────────────────────────
-// showPercentages is passed in so the label updates when the toggle changes.
-// The node data already has `percentage` baked in from buildSankeyData.
 const SankeyCustomNode = ({
   x,
   y,
@@ -464,7 +441,6 @@ const SankeyCustomNode = ({
   chartWidth,
   columnLeftXs,
   usableHeight,
-  // Discarded Recharts internal props to prevent DOM warnings:
   depth,
   index,
   nodeWidth,
@@ -479,8 +455,6 @@ const SankeyCustomNode = ({
 
   const rawLabel = payload.label ?? payload.name ?? '';
   const isMobileSize = isMobile;
-  // R-2: measured truncation budget — SankeyLabel measures and truncates
-  // against the gutter instead of a fixed character slice.
   let label = rawLabel;
   const labelMaxW = computeLabelGutter(x, width, isRightSide, columnLeftXs, chartWidth ?? 0);
 
@@ -492,14 +466,12 @@ const SankeyCustomNode = ({
         ? formatCurrency(payload.value)
         : '';
 
-  // Get vertical offset to center this node's column
   const nodeIdx = nodes.findIndex((n: any) => n.id === payload.id);
   const colIndex = columnMetrics?.columns[nodeIdx] ?? -1;
   const offset = colIndex >= 0 ? (columnOffsets[colIndex] ?? 0) : 0;
 
   const shiftedY = y + offset;
 
-  // Compute hub delta ratio & height based on visual imbalance
   const isHub = payload.isHub;
   const netChange = payload.netChange || 0;
   const isNetSurplus = netChange >= 0;
@@ -513,13 +485,20 @@ const SankeyCustomNode = ({
   const hubDeltaY = shiftedY + height - hubDeltaHeight;
 
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
-  // Hub label is centered directly on the middle bar (not in the right margin)
   const hubBadgeW = Math.min(180, Math.max(width + 40, 140));
   const hubBadgeH = 48;
-  const hubBadgeX = x + width / 2 - hubBadgeW / 2;
-  const hubBadgeY = Math.max(2, hubDeltaCenterY - hubBadgeH / 2);
+  const HUB_GAP = 10;
+  const showHubBadge = !isMobileSize;
+  let hubBadgeX = x + width + HUB_GAP;
+  let hubBadgeY = Math.max(2, hubDeltaCenterY - hubBadgeH / 2);
+  if (showHubBadge && typeof chartWidth === 'number' && chartWidth > 0) {
+    const chartRight = chartWidth - (margin?.right ?? 0);
+    if (hubBadgeX + hubBadgeW > chartRight) {
+      const leftX = x - hubBadgeW - HUB_GAP;
+      if (leftX >= (margin?.left ?? 0)) hubBadgeX = leftX;
+    }
+  }
 
-  // Suppress redundant leaf labels if the leaf has the same name as its parent
   const isLeaf = colIndex === 0 || colIndex === 4;
   if (isLeaf) {
     const parentCol = colIndex === 0 ? 1 : 3;
@@ -572,59 +551,54 @@ const SankeyCustomNode = ({
               fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
-          <foreignObject
-            x={hubBadgeX}
-            y={hubBadgeY}
-            width={hubBadgeW}
-            height={hubBadgeH}
-            pointerEvents="none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          >
-            <div
-
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                textAlign: 'center',
-                gap: 1,
-                background: 'hsl(var(--card) / 0.92)',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: 8,
-                padding: '4px 8px',
-                backdropFilter: 'blur(6px)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-              }}
+          {showHubBadge && (
+            <foreignObject
+              x={hubBadgeX}
+              y={hubBadgeY}
+              width={hubBadgeW}
+              height={hubBadgeH}
+              pointerEvents="none"
+              style={{ opacity: isDimmed ? 0.3 : 1, overflow: 'visible' }}
             >
-              <div style={{
-                fontSize: 10,
-                fontWeight: 600,
-                lineHeight: 1.4,
-                letterSpacing: 0.3,
-                textTransform: 'uppercase' as const,
-                color: 'hsl(var(--muted-foreground))',
-                whiteSpace: 'nowrap',
-              }}>
-                {payload.label}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  textAlign: 'center',
+                  gap: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                }}
+              >
+                <div style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  lineHeight: 1.4,
+                  letterSpacing: 0.3,
+                  textTransform: 'uppercase' as const,
+                  color: 'hsl(var(--muted-foreground))',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {payload.label}
+                </div>
+                <div className="blur-number" style={{
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: isNetSurplus ? '#10b981' : '#ef4444',
+                  lineHeight: 1.3,
+                  whiteSpace: 'nowrap',
+                }}>
+                  {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
+                </div>
               </div>
-              <div className="blur-number" style={{
-                fontSize: isMobileSize ? 13 : 16,
-                fontWeight: 800,
-                color: isNetSurplus ? '#10b981' : '#ef4444',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-              }}>
-                {isNetSurplus ? '+' : ''}{formatCurrency(netChange)}
-              </div>
-            </div>
-          </foreignObject>
+            </foreignObject>
+          )}
         </>
       ) : (
-        // R-2: measured SankeyLabel — truncation budget comes from the column
-        // gutter, so long category names shrink instead of overflowing into
-        // the next depth column.
         <SankeyLabel
           text={label}
           x={isRightSide ? x - 8 : x + width + 8}
@@ -639,11 +613,6 @@ const SankeyCustomNode = ({
   );
 };
 
-// ── Custom link ────────────────────────────────────────────────────────────────
-// Recharts Sankey passes: sourceX, sourceY, targetX, targetY, linkWidth,
-// payload (with source/target node objects), index.
-// sy / ty / dy are NOT passed — those are Nivo-specific props that caused the 
-// links to render NaN paths in the original implementation.
 const SankeyCustomLink = ({
   sourceX,
   sourceY,
@@ -659,7 +628,6 @@ const SankeyCustomLink = ({
   columnOffsets,
   margin,
   usableHeight,
-  // Discarded Recharts internal props to prevent DOM warnings:
   sourceRelativeX,
   sourceRelativeY,
   targetRelativeX,
@@ -683,7 +651,6 @@ const SankeyCustomLink = ({
   }
   const gradId = `link-grad-${index}`;
 
-  // Get column indices for source and target
   const sourceIdx = nodes.findIndex((n: any) => n.id === payload.source.id);
   const targetIdx = nodes.findIndex((n: any) => n.id === payload.target.id);
 
@@ -693,11 +660,9 @@ const SankeyCustomLink = ({
   const sourceOffset = sourceCol >= 0 ? (columnOffsets[sourceCol] ?? 0) : 0;
   const targetOffset = targetCol >= 0 ? (columnOffsets[targetCol] ?? 0) : 0;
 
-  // Use the same y + offset formula as the node renderer (no clamping)
   const shiftedSourceY = sourceY + sourceOffset;
   const shiftedTargetY = targetY + targetOffset;
 
-  // Cubic bezier: control points at 1/2 x distance for smooth S-curve
   const midX = (sourceX + targetX) / 2;
   const halfW = linkWidth / 2;
 
@@ -737,10 +702,8 @@ const SankeyCustomLink = ({
   );
 };
 
-// ── Main component ─────────────────────────────────────────────────────────────
 export function CashFlowSankey() {
 
-  const [showFilters, setShowFilters] = useState(false);
   const router = useRouter();
   const {
     timeframe, setTimeframe,
@@ -754,24 +717,15 @@ export function CashFlowSankey() {
   const [sankeyData, setSankeyData] = useState<SankeyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
-  const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
   const [allCategoryInfo, setAllCategoryInfo] = useState<CategoryInfo[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   const [hideParents, setHideParents] = useState<boolean | null>(null);
   const actualHideParents = hideParents ?? isMobile;
   const showParents = !actualHideParents;
-  // showPercentages is purely a display toggle — no data refetch needed.
-  // It is passed directly into the node renderer and tooltip.
-  const [showPercentages, setShowPercentages] = useState<boolean>(false);
-  const [accountFilterOpen, setAccountFilterOpen] = useState(false);
-  const [accountSearch, setAccountSearch] = useState('');
+  const showPercentages = false;
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
-  // R-2: measured sankey canvas width (svg coordinates), set by
-  // ResponsiveContainer onResize; 0 until the first layout pass.
   const [chartWidth, setChartWidth] = useState(0);
-  const accountFilterRef = useRef<HTMLDivElement>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -784,31 +738,12 @@ export function CashFlowSankey() {
   }, []);
 
   useEffect(() => {
-    getOrFetch('/api/accounts')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((json) => setAllAccounts(Array.isArray(json) ? json : []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     getOrFetch('/api/categories')
       .then((r) => r.json())
       .then((data) => setAllCategoryInfo(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (accountFilterRef.current && !accountFilterRef.current.contains(e.target as Node)) {
-        setAccountFilterOpen(false);
-        setAccountSearch('');
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Rebuild sankey colors when theme changes
   useEffect(() => {
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((m) => {
@@ -821,28 +756,18 @@ export function CashFlowSankey() {
     return () => observer.disconnect();
   }, []);
 
-  const getAccountIdsParam = (excluded: Set<string>, accounts: AccountData[]): string => {
-    if (excluded.size === 0 || excluded.size >= accounts.length) return '';
-    const included = accounts.filter((a) => !excluded.has(a.id));
-    return included.length > 0 ? `&accountIds=${included.map((a) => a.id).join(',')}` : '';
-  };
-
-  // Refetch whenever timeframe, month, accounts filter, or grouping mode changes.
-  // showPercentages is intentionally NOT a dep — it only affects rendering, not data.
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const acctParam = getAccountIdsParam(excludedAccountIds, allAccounts);
-
         let categories: CategoryData[];
         let totalIncome = 0;
         let totalExpenses = 0;
 
         const categoriesRes = await getOrFetch(
-          `/api/cash-flow/categories?startDate=${dateRange.start}&endDate=${dateRange.end}${acctParam}`
+          `/api/cash-flow/categories?startDate=${dateRange.start}&endDate=${dateRange.end}`
         );
         if (!categoriesRes.ok) {
           const body = await categoriesRes.text().catch(() => '');
@@ -867,26 +792,13 @@ export function CashFlowSankey() {
       }
     };
 
-    // Don't fetch until category info has loaded (needed for parent grouping)
-    if (allCategoryInfo.length > 0 || allAccounts.length >= 0) {
+    if (allCategoryInfo.length > 0) {
+      fetchData();
+    } else {
+      // still fetch even if categories empty after first load? allow empty lookup
       fetchData();
     }
-  }, [timeframe, windowEnd, excludedAccountIds, allAccounts, allCategoryInfo, showParents]);
-
-  const toggleAccount = (accountId: string) => {
-    setExcludedAccountIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(accountId)) next.delete(accountId);
-      else next.add(accountId);
-      return next;
-    });
-  };
-
-  const selectOnly = (accountId: string) => {
-    const next = new Set(allAccounts.map((a) => a.id));
-    next.delete(accountId);
-    setExcludedAccountIds(next);
-  };
+  }, [timeframe, windowEnd, allCategoryInfo, showParents, dateRange.start, dateRange.end]);
 
   const getNodeCategoryId = (nodeId: string): string | undefined =>
     (() => {
@@ -911,7 +823,6 @@ export function CashFlowSankey() {
     if (ids) navigateToTransactions(ids);
   }, [sankeyData, dateRange]);
 
-  // Convert named-id links → index-based links that Recharts Sankey requires
   const processedData = useMemo(() => {
     if (!sankeyData) return { nodes: [], links: [] };
 
@@ -928,14 +839,12 @@ export function CashFlowSankey() {
     return { nodes, links };
   }, [sankeyData, themeVersion]);
 
-  // Compute column index and totals for each column to support centering layout
   const columnMetrics = useMemo(() => {
     if (!processedData || processedData.nodes.length === 0) return null;
 
     const nodes = processedData.nodes;
     const links = processedData.links;
 
-    // Topological sorting via BFS to assign columns (0-indexed rank)
     const columns = new Array(nodes.length).fill(-1);
     const incomingCount = new Array(nodes.length).fill(0);
     links.forEach((l) => {
@@ -1032,10 +941,6 @@ export function CashFlowSankey() {
     });
   }, [columnMetrics, scale, usableHeight, nodePadding]);
 
-  // R-2: svg-space left edge of every depth column (recharts `x = node.x +
-  // margin.left` where `node.x = depth * childWidth`, so column d starts at
-  // `margin.left + d * childWidth`) so node labels can be measured against
-  // the gap to the next column instead of a character budget.
   const columnLeftXs = useMemo(() => {
     if (chartWidth <= 0 || !columnMetrics) return null;
     const contentW = chartWidth - margin.left - margin.right;
@@ -1045,8 +950,6 @@ export function CashFlowSankey() {
     return Array.from({ length: maxDepth + 1 }, (_, d) => margin.left + d * childWidth);
   }, [chartWidth, margin, columnMetrics, sankeyNodeWidth]);
 
-  // Stabilize Sankey child elements to avoid recomputing layout on every render
-  // NOTE: must be before early returns to maintain consistent hook order
   const sankeyNode = useMemo(() => (
     <SankeyCustomNode
       onClick={handleNodeClick}
@@ -1092,21 +995,11 @@ export function CashFlowSankey() {
           const linkValue = data.value;
           const sourceNode = data.source;
           const targetNode = data.target;
-          const sourceTotal = sourceNode.value || 0;
-          const targetTotal = targetNode.value || 0;
-          const pctOfSource = sourceTotal > 0 ? (linkValue / sourceTotal) * 100 : 0;
-          const pctOfTarget = targetTotal > 0 ? (linkValue / targetTotal) * 100 : 0;
 
           return (
             <ChartTooltip x={x} y={y} containerRef={chartContainerRef}>
               <TooltipHeader>{(sourceNode.label ?? sourceNode.name)} → {(targetNode.label ?? targetNode.name)}</TooltipHeader>
               <TooltipRow label="Amount" value={formatCurrency(linkValue)} />
-              {showPercentages && (
-                <>
-                  <TooltipRow label="Of Source" value={formatPlainPercent(pctOfSource)} />
-                  <TooltipRow label="Of Target" value={formatPlainPercent(pctOfTarget)} />
-                </>
-              )}
             </ChartTooltip>
           );
         } else {
@@ -1122,16 +1015,11 @@ export function CashFlowSankey() {
               </ChartTooltip>
             );
           }
-          const displayValue = showPercentages && data.percentage !== undefined
-            ? `${formatPlainPercent(data.percentage)}`
-            : formatCurrency(data.value);
+          const displayValue = formatCurrency(data.value);
           return (
             <ChartTooltip x={x} y={y} containerRef={chartContainerRef}>
               <TooltipHeader>{data.label ?? data.name}</TooltipHeader>
-              <TooltipRow label={showPercentages ? 'Percentage' : 'Total'} value={displayValue} />
-              {showPercentages && data.value !== undefined && (
-                <TooltipRow label="Amount" value={formatCurrency(data.value)} />
-              )}
+              <TooltipRow label="Total" value={displayValue} />
             </ChartTooltip>
           );
         }
@@ -1139,229 +1027,58 @@ export function CashFlowSankey() {
     />
   ), [showPercentages, themeVersion, sankeyData, processedData]);
 
-  const allAccountsExcluded = allAccounts.length > 0 && excludedAccountIds.size >= allAccounts.length;
-
-  const filteredAccounts = allAccounts.filter(
-    (a) => !accountSearch || a.name.toLowerCase().includes(accountSearch.toLowerCase()),
-  );
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+      <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2 border-b border-border bg-muted/20">
+        <SegPill
+          options={[{ id: 'grouped', label: 'Grouped' }, { id: 'flat', label: 'Flat' }]}
+          value={showParents ? 'grouped' : 'flat'}
+          onChange={(v) => setHideParents(v === 'flat')}
+          aria-label="Grouping"
+        />
+      </div>
+      <ChartTimeframeBar value={timeframe} onChange={setTimeframe} windowNav={showWindowNav ? <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} /> : undefined} />
 
-        <>
-          <CollapsibleFilterPanel
-            isOpen={showFilters}
-            onToggle={() => setShowFilters(!showFilters)}
-            feedbackItems={[
-              <span key="unit" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {showPercentages ? '%' : '$'}
-              </span>,
-              ...(actualHideParents ? [
-                <span key="groups-hidden" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  GROUPS HIDDEN
-                </span>
-              ] : []),
-              ...(excludedAccountIds.size > 0 ? [
-                <span 
-                  key="accounts"
-                  className="goal-pill px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                    style={{ '--goal-color': 'var(--chart-3)' } as React.CSSProperties}
-                  >
-                    {allAccounts.length - excludedAccountIds.size} ACCOUNTS
-                  </span>
-              ] : []),
-            ]}
-          >
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-                {/* Percentage switch */}
-                <div className="flex items-center gap-2 border-l border-border/30 pl-4">
-                  <Switch
-                    checked={showPercentages}
-                    onCheckedChange={setShowPercentages}
-                    id="cash-flow-show-percentages"
-                  />
-                  <label
-                    htmlFor="cash-flow-show-percentages"
-                    className="text-xs font-medium text-muted-foreground cursor-pointer"
-                  >
-                    Show Percentage
-                  </label>
-                </div>
-
-                {/* Hide Top Categories switch */}
-                <div className="flex items-center gap-2 border-l border-border/30 pl-4">
-                  <Switch
-                    checked={actualHideParents}
-                    onCheckedChange={(checked) => setHideParents(checked)}
-                    id="cash-flow-hide-categories"
-                  />
-                  <label
-                    htmlFor="cash-flow-hide-categories"
-                    className="text-xs font-medium text-muted-foreground cursor-pointer"
-                  >
-                    Hide Top Categories
-                  </label>
-                </div>
-
-                {/* Account filter dropdown */}
-                {allAccounts.length > 0 && (
-                  <div className="relative flex items-center gap-2 border-l border-border/30 pl-4" ref={accountFilterRef}>
-                    <span className="text-xs font-medium text-muted-foreground select-none">
-                      Filtered Accounts:
-                    </span>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => { setAccountFilterOpen(!accountFilterOpen); setAccountSearch(''); }}
-                        className="text-xs bg-background border border-border rounded-lg px-3 py-1.5 hover:bg-muted text-foreground flex items-center gap-1.5 whitespace-nowrap transition-colors select-none cursor-pointer"
-                      >
-                        <span>
-                          Accounts{excludedAccountIds.size > 0 ? ` (${allAccounts.length - excludedAccountIds.size})` : ''}
-                        </span>
-                        <ChevronDown className={`h-3.5 w-3.5 transition-transform text-muted-foreground ${accountFilterOpen ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      {accountFilterOpen && (
-                        <div className="absolute left-0 mt-1 w-64 bg-card border border-border rounded-xl shadow-xl z-50 p-2 space-y-2">
-                          <div className="relative flex items-center bg-muted/30 border border-border rounded-lg px-2 py-1">
-                            <Search className="w-3.5 h-3.5 text-muted-foreground mr-1.5 shrink-0" />
-                            <input
-                              type="text"
-                              value={accountSearch}
-                              onChange={(e) => setAccountSearch(e.target.value)}
-                              placeholder="Search accounts..."
-                              className="bg-transparent border-none text-xs text-foreground focus:outline-none w-full"
-                            />
-                          </div>
-                          <div className="max-h-60 overflow-y-auto space-y-0.5 pr-1 scrollbar-thin">
-                            {filteredAccounts.length === 0 ? (
-                              <div className="px-2 py-3 text-xs text-muted-foreground text-center">No results</div>
-                            ) : (
-                              <>
-                                <div
-                                  className="flex items-center gap-2 p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer border-b border-border/45 pb-2 mb-1.5 font-semibold"
-                                  onClick={() => {
-                                    const allSelected = filteredAccounts.every((a) => !excludedAccountIds.has(a.id));
-                                    const next = new Set(excludedAccountIds);
-                                    filteredAccounts.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
-                                    setExcludedAccountIds(next);
-                                  }}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={filteredAccounts.every((a) => !excludedAccountIds.has(a.id))}
-                                    onChange={(e) => {
-                                      e.stopPropagation();
-                                      const allSelected = filteredAccounts.every((a) => !excludedAccountIds.has(a.id));
-                                      const next = new Set(excludedAccountIds);
-                                      filteredAccounts.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
-                                      setExcludedAccountIds(next);
-                                    }}
-                                    className="rounded border-border bg-background text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer accent-primary"
-                                  />
-                                  <span>Select All</span>
-                                </div>
-                                {filteredAccounts.map((a) => {
-                                  const isExcluded = excludedAccountIds.has(a.id);
-                                  return (
-                                    <div
-                                      key={a.id}
-                                      className="flex items-center justify-between p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer group"
-                                      onClick={() => toggleAccount(a.id)}
-                                    >
-                                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                                        <input
-                                          type="checkbox"
-                                          checked={!isExcluded}
-                                          onChange={(e) => {
-                                            e.stopPropagation();
-                                            toggleAccount(a.id);
-                                          }}
-                                          className="rounded border-border bg-background text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer accent-primary"
-                                        />
-                                        <span className={`truncate ${isExcluded ? 'text-muted-foreground/60' : 'text-foreground'}`}>
-                                          {a.name}
-                                        </span>
-                                      </div>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          selectOnly(a.id);
-                                        }}
-                                        className="text-[10px] text-primary hover:underline px-1 py-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-2 shrink-0"
-                                      >
-                                        only
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </>
-                            )}
-                          </div>
-
-                          {excludedAccountIds.size > 0 && (
-                            <button
-                              onClick={() => setExcludedAccountIds(new Set())}
-                              className="w-full text-[10px] bg-muted/40 text-primary border border-border hover:bg-muted text-center py-1 rounded-lg font-medium transition-colors cursor-pointer"
-                            >
-                              Reset Account Filters
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+      <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full touch-pan-y">
+        <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
+          <div className="min-w-max h-full px-2 pb-2">
+            {loading ? (
+              <LoadingSpinner category="sankey" className="h-[400px]" />
+            ) : error ? (
+              <div className="h-[400px] flex items-center justify-center">
+                <ChartEmptyState variant="error" error={error} />
               </div>
-            </div>
-          </CollapsibleFilterPanel>
-          <ChartTimeframeBar value={timeframe} onChange={setTimeframe} windowNav={showWindowNav ? <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} /> : undefined} />
-
-          {/* Content: loading / error / empty / chart */}
-          <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full touch-pan-y">
-            <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
-              <div className="min-w-max h-full px-2 pb-2">
-                {loading ? (
-                  <LoadingSpinner category="sankey" className="h-[400px]" />
-                ) : error ? (
-                  <div className="h-[400px] flex items-center justify-center">
-                    <ChartEmptyState variant="error" error={error} />
-                  </div>
-                ) : processedData.nodes.length > 0 && processedData.links.length > 0 ? (
-                  <ResponsiveContainer
-                    width="100%"
-                    height="100%"
-                    initialDimension={{ width: 100, height: 100 }}
-                    onResize={(w: number) => setChartWidth((prev) => (prev === w ? prev : w))}
-                  >
-                    <Sankey
-                      data={processedData}
-                      node={sankeyNode}
-                      link={sankeyLink}
-                      iterations={0}
-                      nodePadding={nodePadding}
-                      nodeWidth={sankeyNodeWidth}
-                      margin={margin}
-                      align="left"
-                    >
-                      {sankeyTooltip}
-                    </Sankey>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[400px] flex items-center justify-center">
-                    <ChartEmptyState
-                      variant={allAccountsExcluded ? 'empty' : 'nodata'}
-                      description={allAccountsExcluded ? 'All accounts are excluded. Adjust your filters.' : 'No data available for sankey diagram'}
-                    />
-                  </div>
-                )}
+            ) : processedData.nodes.length > 0 && processedData.links.length > 0 ? (
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 100, height: 100 }}
+                onResize={(w: number) => setChartWidth((prev) => (prev === w ? prev : w))}
+              >
+                <Sankey
+                  data={processedData}
+                  node={sankeyNode}
+                  link={sankeyLink}
+                  iterations={0}
+                  nodePadding={nodePadding}
+                  nodeWidth={sankeyNodeWidth}
+                  margin={margin}
+                  align="left"
+                >
+                  {sankeyTooltip}
+                </Sankey>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[400px] flex items-center justify-center">
+                <ChartEmptyState
+                  variant="nodata"
+                  description="No data available for sankey diagram"
+                />
               </div>
-            </div>
+            )}
           </div>
-        </>
-
+        </div>
+      </div>
     </div>
   );
 }

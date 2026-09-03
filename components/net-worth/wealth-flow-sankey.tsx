@@ -6,44 +6,20 @@ import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { SankeyLabel, computeLabelGutter } from '@/components/charts/sankey/sankey-label';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { type TimeRange } from '@/components/charts/chart-filters';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { Switch } from '@/components/ui/switch';
-import { ArrowLeftRight, HelpCircle, Search, Eye, EyeOff, TrendingUp, TrendingDown, Info, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Info, ChevronDown } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { getOrFetch } from '@/lib/fetch-cache';
-import type { WealthFlowData, WealthFlowNode, WealthFlowSummary, WealthFlowAccountDetail } from '@/lib/types/financial';
+import { SegPill } from '@/components/ui/seg-pill';
+import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
 
 interface AccountData {
   id: string;
   name: string;
   type: string;
-}
-
-interface FlowNode {
-  id: string;
-  label: string;
-  name?: string;
-  color: string;
-  value: number;
-  percentage: number;
-  type?: string;
-  accountGroup?: string;
-  accounts?: WealthFlowAccountDetail[];
-  netWorthChange?: number;
-  visualImbalance?: number;
-  description?: string;
-}
-
-interface FlowLink {
-  source: string | number;
-  target: string | number;
-  value: number;
 }
 
 const SANITIZED_PROPS = new Set([
@@ -73,8 +49,6 @@ const SankeyCustomNode = ({
   const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
-  // R-2: measured truncation budget — SankeyLabel measures and truncates
-  // against the column gutter instead of a fixed character slice.
   const label = payload.label ?? payload.name ?? '';
   const labelMaxW = computeLabelGutter(x, width, isRightSide, columnLeftXs, chartWidth ?? 0);
 
@@ -89,7 +63,6 @@ const SankeyCustomNode = ({
     : payload.value !== undefined ? `${signPrefix}${formatCurrency(payload.value)}` : '';
 
   const hubVisualImbalance = payload.visualImbalance as number | undefined;
-  const isNetSurplus = (hubVisualImbalance || 0) >= 0;
   const maxFlow = payload.value || 0;
   const imbalance = Math.abs(hubVisualImbalance || 0);
 
@@ -97,11 +70,19 @@ const SankeyCustomNode = ({
   const hubDeltaHeight = Math.max(0, height * hubDeltaRatio);
   const hubDeltaY = y + height - hubDeltaHeight;
   const hubDeltaCenterY = hubDeltaY + hubDeltaHeight / 2;
-  // Hub label is centered directly on the middle bar (not in the right margin)
   const hubBadgeW = Math.min(180, Math.max(width + 40, 140));
   const hubBadgeH = 48;
-  const hubBadgeX = x + width / 2 - hubBadgeW / 2;
-  const hubBadgeY = Math.max(2, hubDeltaCenterY - hubBadgeH / 2);
+  const HUB_GAP = 10;
+  let hubBadgeX = x + width + HUB_GAP;
+  let hubBadgeY = Math.max(2, hubDeltaCenterY - hubBadgeH / 2);
+  const showHubBadge = !isMobile;
+  if (showHubBadge && typeof chartWidth === 'number' && chartWidth > 0) {
+    const chartRight = chartWidth - (margin?.right ?? 0);
+    if (hubBadgeX + hubBadgeW > chartRight) {
+      const leftX = x - hubBadgeW - HUB_GAP;
+      if (leftX >= (margin?.left ?? 0)) hubBadgeX = leftX;
+    }
+  }
 
   const safeProps = sanitizeRestProps(restProps);
 
@@ -141,53 +122,48 @@ const SankeyCustomNode = ({
               fillOpacity={isDimmed ? 0.2 : 1}
             />
           )}
-          <foreignObject
-            x={hubBadgeX}
-            y={hubBadgeY}
-            width={hubBadgeW}
-            height={hubBadgeH}
-            pointerEvents="none"
-            style={{ opacity: isDimmed ? 0.3 : 1 }}
-          >
-            <div
-
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                textAlign: 'center',
-                gap: 1,
-                background: 'hsl(var(--card) / 0.92)',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: 8,
-                padding: '4px 8px',
-                backdropFilter: 'blur(6px)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-              }}
+          {showHubBadge && (
+            <foreignObject
+              x={hubBadgeX}
+              y={hubBadgeY}
+              width={hubBadgeW}
+              height={hubBadgeH}
+              pointerEvents="none"
+              style={{ opacity: isDimmed ? 0.3 : 1, overflow: 'visible' }}
             >
-              <div style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.4, letterSpacing: 0.3, textTransform: 'uppercase' as const, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
-                {payload.label}
-              </div>
-              {hubVisualImbalance !== undefined && (
-                <div className="blur-number" style={{
-                  fontSize: isMobile ? 13 : 16, fontWeight: 800, whiteSpace: 'nowrap',
-                  color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
-                  lineHeight: 1.3,
-                }}>
-                  {hubVisualImbalance >= 0 ? '+' : ''}{formatCurrency(hubVisualImbalance)}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  textAlign: 'center',
+                  gap: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.4, letterSpacing: 0.3, textTransform: 'uppercase' as const, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
+                  {payload.label}
                 </div>
-              )}
-            </div>
-          </foreignObject>
+                {hubVisualImbalance !== undefined && (
+                  <div className="blur-number" style={{
+                    fontSize: 16, fontWeight: 800, whiteSpace: 'nowrap',
+                    color: hubVisualImbalance >= 0 ? '#10b981' : '#ef4444',
+                    lineHeight: 1.3,
+                  }}>
+                    {hubVisualImbalance >= 0 ? '+' : ''}{formatCurrency(hubVisualImbalance)}
+                  </div>
+                )}
+              </div>
+            </foreignObject>
+          )}
         </>
       )}
 
       {!isHub && (
-        // R-2: measured SankeyLabel — truncation budget comes from the column
-        // gutter, so long names shrink instead of overflowing into the next
-        // depth column.
         <SankeyLabel
           text={label}
           x={isRightSide ? x - 8 : x + width + 8}
@@ -464,9 +440,8 @@ function DetailModal({
 }
 
 export function WealthFlowSankey() {
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('networth-flow-sankey-collapsed');
-  const [isDriversCollapsed, setIsDriversCollapsed] = useCardCollapsed('wealthFlowDrivers');
-  const [showFilters, setShowFilters] = useState(false);
+  // Force collapsed by default via new key; previous `wealthFlowDrivers` state ignored.
+  const [isDriversCollapsed, setIsDriversCollapsed] = useCardCollapsed('wealthFlowDrivers_v2', true);
 
   const {
     timeframe, setTimeframe, windowEnd, setWindowEnd,
@@ -478,22 +453,15 @@ export function WealthFlowSankey() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
-  const [accountsLoaded, setAccountsLoaded] = useState(false);
-  const [excludedAccountIds, setExcludedAccountIds] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
-  const [showPercentages, setShowPercentages] = useState(false);
   const [routeThroughAccounts, setRouteThroughAccounts] = useState(false);
-  const [accountFilterOpen, setAccountFilterOpen] = useState(false);
-  const [accountSearch, setAccountSearch] = useState('');
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
-  // R-2: measured sankey canvas width (svg coordinates), set by
-  // ResponsiveContainer's onResize; 0 until the first layout pass.
   const [chartWidth, setChartWidth] = useState(0);
   const [chartMounted, setChartMounted] = useState(false);
   const [selectedNodeDetails, setSelectedNodeDetails] = useState<WealthFlowNode | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const accountFilterRef = useRef<HTMLDivElement>(null);
+  const showPercentages = false;
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -506,19 +474,7 @@ export function WealthFlowSankey() {
     getOrFetch('/api/accounts')
       .then((r) => (r.ok ? r.json() : []))
       .then((json) => setAllAccounts(Array.isArray(json) ? json : []))
-      .catch(() => setAllAccounts([]))
-      .finally(() => setAccountsLoaded(true));
-  }, []);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (accountFilterRef.current && !accountFilterRef.current.contains(e.target as Node)) {
-        setAccountFilterOpen(false);
-        setAccountSearch('');
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+      .catch(() => setAllAccounts([]));
   }, []);
 
   useEffect(() => {
@@ -537,14 +493,7 @@ export function WealthFlowSankey() {
     return () => observer.disconnect();
   }, []);
 
-  const getAccountIdsParam = (excluded: Set<string>, accounts: AccountData[]): string => {
-    if (excluded.size === 0 || excluded.size >= accounts.length) return '';
-    const included = accounts.filter((a) => !excluded.has(a.id));
-    return included.length > 0 ? `&accountIds=${included.map((a) => a.id).join(',')}` : '';
-  };
-
   useEffect(() => {
-    if (!accountsLoaded) return;
     let isCurrent = true;
 
     const fetchData = async () => {
@@ -552,8 +501,7 @@ export function WealthFlowSankey() {
         setLoading(true);
         setError(null);
 
-        const acctParam = getAccountIdsParam(excludedAccountIds, allAccounts);
-        const url = `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}&timeframe=${timeframe}${acctParam}`;
+        const url = `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}&timeframe=${timeframe}`;
 
         const res = await getOrFetch(url);
         if (!res.ok) throw new Error(`Failed to load wealth flow data (${res.status})`);
@@ -568,7 +516,7 @@ export function WealthFlowSankey() {
 
     fetchData();
     return () => { isCurrent = false; };
-  }, [timeframe, windowEnd, excludedAccountIds, allAccounts, accountsLoaded]);
+  }, [timeframe, windowEnd, dateRange.start, dateRange.end]);
 
   const displayWealthFlowData = useMemo(() => {
     if (!wealthFlowData) return null;
@@ -675,9 +623,6 @@ export function WealthFlowSankey() {
 
   const sankeyNodeWidth = 12;
 
-  // R-2: svg-space left edge of every depth column (recharts `x = node.x +
-  // margin.left` where `node.x = depth * childWidth`) so node labels can be
-  // measured against the gap to the next column.
   const columnLeftXs = useMemo(() => {
     if (chartWidth <= 0 || !columnMetrics) return null;
     const contentW = chartWidth - margin.left - margin.right;
@@ -695,8 +640,6 @@ export function WealthFlowSankey() {
     const verticalMargin = margin.top + margin.bottom;
     return Math.max(520, requiredUsableHeight + verticalMargin + 30);
   }, [columnMetrics, isMobile, nodePadding, margin]);
-
-  const usableHeight = chartHeight - margin.top - margin.bottom;
 
   const sankeyNode = useMemo(
     () => (
@@ -782,7 +725,7 @@ export function WealthFlowSankey() {
 
               {node.description && (
                 <div className="border-t border-border/30 mt-2 pt-2">
-                  <div className="text-[10px] text-muted-foreground leading-relaxed">
+                  <div className="text-[10px] text-muted-foreground leading-relaxed break-words whitespace-normal">
                     {node.description}
                   </div>
                 </div>
@@ -794,9 +737,9 @@ export function WealthFlowSankey() {
                     Account Breakdown
                   </div>
                   {accounts.slice(0, 6).map((a) => (
-                    <div key={a.id} className="flex justify-between gap-3 text-xs">
-                      <span className="text-muted-foreground truncate max-w-[120px]">{a.name}</span>
-                      <span className={`font-mono tabular-nums ${a.signedNWDelta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    <div key={a.id} className="flex justify-between gap-2 text-xs break-words">
+                      <span className="text-muted-foreground break-words min-w-0 flex-1 pr-2">{a.name}</span>
+                      <span className={`font-mono tabular-nums shrink-0 text-right ${a.signedNWDelta >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                         {a.signedNWDelta >= 0 ? '+' : ''}{formatCurrency(a.signedNWDelta)}
                       </span>
                     </div>
@@ -816,23 +759,6 @@ export function WealthFlowSankey() {
     [showPercentages, themeVersion, processedData]
   );
 
-  const toggleAccount = (id: string) => {
-    setExcludedAccountIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const clearExcluded = () => setExcludedAccountIds(new Set());
-
-  const selectOnly = (id: string) => {
-    const next = new Set(allAccounts.map((a) => a.id));
-    next.delete(id);
-    setExcludedAccountIds(next);
-  };
-
   const drivers = useMemo(() => {
     if (!displayWealthFlowData) return { increases: [], decreases: [] };
     return {
@@ -841,254 +767,80 @@ export function WealthFlowSankey() {
     };
   }, [displayWealthFlowData]);
 
-  const allAccountsExcluded = allAccounts.length > 0 && excludedAccountIds.size >= allAccounts.length;
-  const filteredAccountsList = allAccounts.filter((a) =>
-    a.name.toLowerCase().includes(accountSearch.toLowerCase())
-  );
   const summary = wealthFlowData?.summary;
 
   return (
     <>
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <ArrowLeftRight className="w-4 h-4 text-primary shrink-0" />
-<span>Wealth Flow</span>
-            <span className="font-normal text-muted-foreground text-xs"> for {windowLabel}</span>
+        <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2 border-b border-border bg-muted/20">
+          <SegPill
+            options={[{ id: 'grouped', label: 'Grouped' }, { id: 'perAccount', label: 'Per Account' }]}
+            value={routeThroughAccounts ? 'perAccount' : 'grouped'}
+            onChange={(v) => setRouteThroughAccounts(v === 'perAccount')}
+            aria-label="Account breakdown"
+          />
+        </div>
+        <ChartTimeframeBar value={timeframe} onChange={setTimeframe} windowNav={showWindowNav ? <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} /> : undefined} />
+
+        <div className="p-4 md:p-6 pt-0">
+          {loading ? (
+            <LoadingSpinner category="sankey" className="h-[400px]" />
+          ) : error ? (
+            <div className="h-[400px] flex items-center justify-center">
+              <ChartEmptyState variant="error" error={error} />
             </div>
-          }
-        />
-
-        {!isCollapsed && (
-          <>
-            <CollapsibleFilterPanel
-              isOpen={showFilters}
-              onToggle={() => setShowFilters(!showFilters)}
-              feedbackItems={[
-                <span key="unit" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                  {showPercentages ? '%' : '$'}
-                </span>,
-                ...(routeThroughAccounts ? [
-                  <span key="account-routing" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                    ACCOUNTS
-                  </span>
-                ] : []),
-                ...(excludedAccountIds.size > 0 ? [
-                  <span key="accounts" className="bg-chart-3/10 text-chart-3 border border-chart-3/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                    {allAccounts.length - excludedAccountIds.size} ACCOUNTS
-                  </span>
-                ] : []),
-              ]}
-            >
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-                  <div className="flex items-center gap-2 border-l border-border/30 pl-4">
-                    <Switch
-                      checked={showPercentages}
-                      onCheckedChange={setShowPercentages}
-                      id="wealth-flow-show-percentages"
-                    />
-                    <label
-                      htmlFor="wealth-flow-show-percentages"
-                      className="text-xs font-medium text-muted-foreground cursor-pointer"
-                    >
-                      Show percentages (%)
-                    </label>
-                  </div>
-
-                  <div className="flex items-center gap-2 border-l border-border/30 pl-4">
-                    <Switch
-                      checked={routeThroughAccounts}
-                      onCheckedChange={setRouteThroughAccounts}
-                      id="wealth-flow-account-routing"
-                    />
-                    <label
-                      htmlFor="wealth-flow-account-routing"
-                      className="text-xs font-medium text-muted-foreground cursor-pointer"
-                    >
-                      Per account
-                    </label>
-                  </div>
-
-                  {allAccounts.length > 0 && (
-                    <div className="flex items-center gap-2 border-l border-border/30 pl-4">
-                      <span className="text-xs font-medium text-muted-foreground select-none">
-                        Filtered Accounts:
-                      </span>
-                      <div className="relative" ref={accountFilterRef}>
-                        <button
-                          type="button"
-                          onClick={() => { setAccountFilterOpen(!accountFilterOpen); setAccountSearch(''); }}
-                          className="text-xs bg-background border border-border rounded-lg px-3 py-1.5 hover:bg-muted text-foreground flex items-center gap-1.5 whitespace-nowrap transition-colors select-none cursor-pointer"
-                        >
-                          <span>
-                            Accounts
-                            {excludedAccountIds.size > 0
-                              ? ` (${allAccounts.length - excludedAccountIds.size})`
-                              : ''}
-                          </span>
-                          <ChevronDown className={`h-3.5 w-3.5 transition-transform text-muted-foreground ${accountFilterOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {accountFilterOpen && (
-                          <div className="absolute left-0 mt-1 w-64 bg-card border border-border rounded-xl shadow-xl z-50 p-2 space-y-2">
-                            <div className="relative flex items-center bg-muted/30 border border-border rounded-lg px-2 py-1">
-                              <Search className="w-3.5 h-3.5 text-muted-foreground mr-1.5 shrink-0" />
-                              <input
-                                type="text"
-                                placeholder="Search accounts..."
-                                value={accountSearch}
-                                onChange={(e) => setAccountSearch(e.target.value)}
-                                className="bg-transparent border-none text-xs text-foreground focus:outline-none w-full"
-                              />
-                            </div>
-
-                            <div className="max-h-60 overflow-y-auto space-y-0.5 pr-1 scrollbar-thin">
-                              {filteredAccountsList.length === 0 ? (
-                                <div className="px-2 py-3 text-xs text-muted-foreground text-center">No results</div>
-                              ) : (
-                                <>
-                                  <div
-                                    className="flex items-center gap-2 p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer border-b border-border/45 pb-2 mb-1.5 font-semibold"
-                                    onClick={() => {
-                                      const allSelected = filteredAccountsList.every((a) => !excludedAccountIds.has(a.id));
-                                      const next = new Set(excludedAccountIds);
-                                      filteredAccountsList.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
-                                      setExcludedAccountIds(next);
-                                    }}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={filteredAccountsList.every((a) => !excludedAccountIds.has(a.id))}
-                                      onChange={(e) => {
-                                        e.stopPropagation();
-                                        const allSelected = filteredAccountsList.every((a) => !excludedAccountIds.has(a.id));
-                                        const next = new Set(excludedAccountIds);
-                                        filteredAccountsList.forEach((a) => allSelected ? next.add(a.id) : next.delete(a.id));
-                                        setExcludedAccountIds(next);
-                                      }}
-                                      className="rounded border-border bg-background text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer accent-primary"
-                                    />
-                                    <span>Select All</span>
-                                  </div>
-                                  {filteredAccountsList.map((a) => {
-                                    const isExcluded = excludedAccountIds.has(a.id);
-                                    return (
-                                      <div
-                                        key={a.id}
-                                        className="flex items-center justify-between p-1.5 hover:bg-muted rounded-lg text-xs cursor-pointer group"
-                                        onClick={() => toggleAccount(a.id)}
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                          <input
-                                            type="checkbox"
-                                            checked={!isExcluded}
-                                            onChange={(e) => {
-                                              e.stopPropagation();
-                                              toggleAccount(a.id);
-                                            }}
-                                            className="rounded border-border bg-background text-primary focus:ring-ring h-3.5 w-3.5 cursor-pointer accent-primary"
-                                          />
-                                          <span className={`truncate ${isExcluded ? 'text-muted-foreground/60' : 'text-foreground'}`}>
-                                            {a.name}
-                                          </span>
-                                        </div>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            selectOnly(a.id);
-                                          }}
-                                          className="text-[10px] text-primary hover:underline px-1 py-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-2 shrink-0"
-                                        >
-                                          only
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-                                </>
-                              )}
-                            </div>
-
-                            {excludedAccountIds.size > 0 && (
-                              <button
-                                onClick={clearExcluded}
-                                className="w-full text-[10px] bg-muted/40 text-primary border border-border hover:bg-muted text-center py-1 rounded-lg font-medium transition-colors cursor-pointer"
-                              >
-                                Reset Account Filters
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CollapsibleFilterPanel>
-            <ChartTimeframeBar value={timeframe} onChange={setTimeframe} windowNav={showWindowNav ? <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} /> : undefined} />
-
-            <div className="p-4 md:p-6 pt-0">
-              {loading ? (
-                <LoadingSpinner category="sankey" className="h-[400px]" />
-              ) : error ? (
-                <div className="h-[400px] flex items-center justify-center">
-                  <ChartEmptyState variant="error" error={error} />
-                </div>
-              ) : allAccountsExcluded ? (
-                <div className="h-[400px] flex items-center justify-center">
-                  <ChartEmptyState variant="empty" description="All accounts are excluded. Adjust your filters." />
-                </div>
-              ) : processedData.nodes.length === 0 || processedData.links.length === 0 ? (
-                <div className="h-[400px] flex items-center justify-center">
-                  <ChartEmptyState variant="nodata" description="No data available for the selected range." />
-                </div>
-              ) : (
-                <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full min-w-0">
-                  {chartMounted && chartHeight > 0 && (
-                    <ResponsiveContainer
-                      width="100%"
-                      height="100%"
-                      minWidth={0}
-                      onResize={(w: number) => setChartWidth((prev) => (prev === w ? prev : w))}
-                    >
-                      <Sankey
-                        data={processedData}
-                        node={sankeyNode}
-                        link={sankeyLink}
-                        nodeWidth={sankeyNodeWidth}
-                        nodePadding={nodePadding}
-                        margin={margin}
-                        sort={false}
-                        align="left"
-                      >
-                        {sankeyTooltip}
-                      </Sankey>
-                    </ResponsiveContainer>
-                  )}
-                </div>
+          ) : processedData.nodes.length === 0 || processedData.links.length === 0 ? (
+            <div className="h-[400px] flex items-center justify-center">
+              <ChartEmptyState variant="nodata" description="No data available for the selected range." />
+            </div>
+          ) : (
+            <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full min-w-0">
+              {chartMounted && chartHeight > 0 && (
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  minWidth={0}
+                  onResize={(w: number) => setChartWidth((prev) => (prev === w ? prev : w))}
+                >
+                  <Sankey
+                    data={processedData}
+                    node={sankeyNode}
+                    link={sankeyLink}
+                    nodeWidth={sankeyNodeWidth}
+                    nodePadding={nodePadding}
+                    margin={margin}
+                    sort={false}
+                    align="left"
+                  >
+                    {sankeyTooltip}
+                  </Sankey>
+                </ResponsiveContainer>
               )}
             </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
 
       {summary && processedData.nodes.length > 0 && (
-        <div className="bg-card border border-border rounded-xl shadow-sm">
-          <CollapsibleCardHeader
-            isCollapsed={isDriversCollapsed}
-            onToggle={setIsDriversCollapsed}
-            title={
-              <div className="flex items-center gap-2">
-                <span>Net Worth Drivers</span>
-                <span className="font-normal text-muted-foreground text-xs">for {windowLabel}</span>
-              </div>
-            }
-          />
+        <div className="border border-dashed border-border/60 bg-muted/5 rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsDriversCollapsed(!isDriversCollapsed)}
+            aria-expanded={!isDriversCollapsed}
+            aria-label={isDriversCollapsed ? 'Expand Net Worth Drivers' : 'Collapse Net Worth Drivers'}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors group"
+          >
+            <span className="text-xs italic">Net worth drivers for {windowLabel}</span>
+            <span className="ml-1 inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 border border-primary/20 text-primary group-hover:bg-primary/15 transition-colors shrink-0">
+              <ChevronDown
+                size={16}
+                strokeWidth={2.5}
+                className={`transition-transform duration-200 ${!isDriversCollapsed ? 'rotate-180' : ''}`}
+              />
+            </span>
+          </button>
           {!isDriversCollapsed && (
-            <div className="p-5">
+            <div className="p-5 border-t border-dashed border-border/50 bg-card">
               <div className="max-w-xl mx-auto space-y-3">
                 <div className="flex justify-between items-center text-sm font-medium pb-2">
                   <span className="text-muted-foreground">Beginning Net Worth</span>

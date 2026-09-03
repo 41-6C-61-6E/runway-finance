@@ -22,17 +22,16 @@ import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { ChartTypeSelector, type ChartType } from '@/components/charts/chart-type-selector';
+import type { ChartType } from '@/components/charts/chart-type-selector';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
-import { Switch } from '@/components/ui/switch';
 import { ArrowRightLeft, TrendingUp, Info, ChevronDown, ChevronUp, Settings2, PiggyBank, Layers } from 'lucide-react';
-import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
+import { SegPill } from '@/components/ui/seg-pill';
 
 interface SavingsRatePoint {
   yearMonth: string;
@@ -154,7 +153,6 @@ export function IncomeExpenseChart() {
   } = useDateWindow('finance:income-expense:timeframe', 'finance:income-expense:windowEnd', '1y');
   const [chartType, setChartType] = useState<ChartType>('bar');
 
-  const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   // Active accounts and categorized helper data structures
@@ -443,74 +441,39 @@ export function IncomeExpenseChart() {
       )}
 
         <>
-          <CollapsibleFilterPanel
-            isOpen={showFilters}
-            onToggle={() => setShowFilters(!showFilters)}
-            actions={
-              <button
-                type="button"
-                onClick={() => setShowCustomizer(!showCustomizer)}
-                className={`flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-1 border rounded-lg text-[11px] font-semibold transition-all cursor-pointer shadow-sm select-none shrink-0 ${
-                  showCustomizer
-                    ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/15'
-                    : 'bg-background hover:bg-muted border-border/80 text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Settings2 size={12} className="text-primary shrink-0" />
-                <span className="hidden sm:inline">Customize Data</span>
-                {showCustomizer ? (
-                  <ChevronUp size={12} className="text-muted-foreground/60 shrink-0" />
-                ) : (
-                  <ChevronDown size={12} className="text-muted-foreground/60 shrink-0" />
-                )}
-              </button>
-            }
-            feedbackItems={[
-              <span key="view" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {activeView === 'income' ? 'Net Income' : 'Savings Rate'}
-              </span>,
-              <span key="chartType" className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider">
-                {chartType.toUpperCase()}
-              </span>,
-            ]}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* View Switcher: Net Income vs Savings Rate */}
-                <div className="inline-flex rounded-lg border border-border bg-background p-0.5 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setActiveView('income')}
-                    className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-                      activeView === 'income'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <ArrowRightLeft className="w-3 h-3" />
-                    <span>Net Income</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveView('savingsRate')}
-                    className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-                      activeView === 'savingsRate'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <PiggyBank className="w-3 h-3" />
-                    <span>Savings Rate</span>
-                  </button>
-                </div>
-
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Style</span>
-                <ChartTypeSelector value={chartType} options={typeOptions} onChange={setChartType} />
-              </div>
-            </div>
-          </CollapsibleFilterPanel>
+          <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2 border-b border-border bg-muted/20">
+            <SegPill
+              options={[{ id: 'income', label: 'Net Income' }, { id: 'savingsRate', label: 'Savings Rate' }]}
+              value={activeView}
+              onChange={(v) => setActiveView(v as 'income' | 'savingsRate')}
+              aria-label="View"
+            />
+            <span className="text-xs text-muted-foreground/50 hidden sm:inline">|</span>
+            <SegPill
+              options={[{ id: 'bar', label: 'Bar' }, { id: 'line', label: 'Area' }]}
+              value={chartType}
+              onChange={(v) => setChartType(v as ChartType)}
+              aria-label="Chart style"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCustomizer(!showCustomizer)}
+              aria-expanded={showCustomizer}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none ${
+                showCustomizer
+                  ? 'bg-primary/15 border-primary/20 text-primary'
+                  : 'bg-background border-border text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              <Settings2 size={12} className="shrink-0" />
+              <span>Customize</span>
+              {showCustomizer ? (
+                <ChevronUp size={12} className="shrink-0 opacity-60" />
+              ) : (
+                <ChevronDown size={12} className="shrink-0 opacity-60" />
+              )}
+            </button>
+          </div>
 
           {showCustomizer && (
             <div className="border-b border-border bg-muted/5 px-5 py-4 space-y-4 animate-in slide-in-from-top-2 duration-250">
