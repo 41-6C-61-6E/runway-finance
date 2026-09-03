@@ -266,9 +266,10 @@ export function BudgetSummary() {
     (b) => b.remaining < -0.01 && !significantOverBudgets.includes(b)
   );
 
-  // Envelope budgets over their FULL native-period amount — the real
-  // over-budget condition for lumpy budgets (tracked over the whole year/quarter,
-  // no pace).
+  // Envelope budgets (longer-period) are tracked row-level and excluded from
+  // this period's status (Opt A: longer -> shorter does not influence status).
+  // Kept here only for potential footnote/info; not used for healthStatus/alert.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const envelopeExceeded = envelopeExpenseBudgets.filter((b) => b.envelopeStatus === 'exceeded');
 
   const finishLabel = isPast ? 'Final finish' : `Projected ${periodConfig.endNoun} finish`;
@@ -288,8 +289,10 @@ export function BudgetSummary() {
     description: onTrackDescription,
   };
 
-  // Rule 1: Major Over Budget (Red). Longer-period envelope budgets are
-  // evaluated separately because exceeding their full period is not critical.
+  // Rule 1: Major Over Budget (Red) — core budgets only.
+  // Longer-period envelope budgets (yearly/quarterly viewed in a shorter period)
+  // are intentionally excluded here: they are shown row-level and in the
+  // "Excludes X envelope" footnote, but must not influence this period's status.
   if (totalExpenseActual > totalExpenseBudgeted || significantOverBudgets.length > 0) {
     healthStatus = {
       label: 'Major Over Budget',
@@ -300,15 +303,7 @@ export function BudgetSummary() {
         : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'budget is' : 'budgets are'} more than 200% used or more than ${formatCurrency(overBudgetThreshold)} over budget.`,
     };
   }
-  // Rule 2: Over Budget (Orange)
-  else if (envelopeExceeded.length > 0) {
-    healthStatus = {
-      label: 'Over Budget',
-      badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-      icon: TrendingUp,
-      description: `${envelopeExceeded.length} longer-period ${envelopeExceeded.length === 1 ? 'budget is' : 'budgets are'} over the full ${envelopeExceeded[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} budget amount (${envelopeExceeded.map((b) => b.categoryName).join(', ')}).`,
-    };
-  }
+  // Rule 2: Over Budget (Orange) — projected pace of core budgets only.
   else if (!isPast && !isFuture && projectedExpenseTotal > totalExpenseBudgeted + toleranceBuffer) {
     healthStatus = {
       label: 'Over Budget',
@@ -350,15 +345,9 @@ export function BudgetSummary() {
   let alertText: string | null = null;
   let alertClass = '';
 
-  if (envelopeExceeded.length === 1) {
-    alertText = `Envelope budget over its ${envelopeExceeded[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} (${envelopeExceeded[0].categoryName})`;
-    alertHref = getTxUrl(undefined, envelopeExceeded[0].categoryId);
-    alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
-  } else if (envelopeExceeded.length > 1) {
-    alertText = `${envelopeExceeded.length} envelope budgets over their ${envelopeExceeded[0].nativePeriodType === 'quarterly' ? 'quarter' : 'year'} amount`;
-    alertHref = getTxUrl(envelopeExceeded.map((b) => b.categoryId));
-    alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
-  } else if (significantOverBudgets.length === 1) {
+  // Envelope budgets (longer-period) are excluded from status/alerts here.
+  // They are visible row-level and via the "Excludes X envelope" footnote.
+  if (significantOverBudgets.length === 1) {
     alertText = `1 category over budget (${significantOverBudgets[0].categoryName})`;
     alertHref = getTxUrl(undefined, significantOverBudgets[0].categoryId);
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
@@ -366,7 +355,7 @@ export function BudgetSummary() {
     alertText = `${significantOverBudgets.length} categories over budget`;
     alertHref = getTxUrl(significantOverBudgets.map((b) => b.categoryId));
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
-  } else if (healthStatus.label === 'Over Budget' && envelopeExceeded.length === 0) {
+  } else if (healthStatus.label === 'Over Budget') {
     alertText = `Projected spending exceeds the budget by end of ${periodConfig.noun}`;
     alertHref = `/budgets`;
     alertClass = 'text-orange-500 bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15';

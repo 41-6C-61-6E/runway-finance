@@ -812,44 +812,78 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
         ) : (
           <div ref={containerRef} className="w-full overflow-x-auto min-w-0">
             {(() => {
-              // Preserve progress longer; variance is the first metric removed
-              // as the table gets narrower. Category flexes to fill remaining space.
               const showProgressCol = containerWidth >= 650;
               const showVarianceCol = containerWidth >= 850;
               const showAccountCol = containerWidth >= 1050 && hasAnyAccount;
               const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
-              // Responsive category cap: 16ch at 340px → 32ch at ~1140px, fluid
-              const catMaxCh = Math.round(Math.min(32, Math.max(16, containerWidth * 0.028)));
-              // Fluid progress height: 6→10px, width is flex (reclaims category slack)
-              const barH = Math.round(Math.min(10, Math.max(6, containerWidth * 0.0075)));
               const isSpacious = containerWidth >= 900;
+              const barH = Math.round(Math.min(10, Math.max(6, containerWidth * 0.0075)));
+
+              // ── Dynamic fit: measure content, not container % ────────────────
+              // Category width from longest name (char ≈6.6px at text-xs) + dot/icon/padding.
+              // Previously Category was `width:auto` with `w-full` table → it consumed ALL slack
+              // between Category and Budgeted, especially when Progress hidden.
+              // Icon (transactions) is now collapsed on desktop until hover, so don't reserve its width in the base measure
+              const BASE_PAD = 38; // dot 10 + gap 8 + cell h-pad 16 + fudge 4 (icon 16 not counted until hover)
+              let maxCategoryLen = 10;
+              let hasEnvelopeAny = false;
+              const allBudgetsForMeasure: BudgetData[] = [...incomeBudgets, ...expenseBudgets] as BudgetData[];
+              for (const b of allBudgetsForMeasure) {
+                const len = (b.categoryName || '').length;
+                if (len > maxCategoryLen) maxCategoryLen = len;
+                if (isEnvelope(b)) hasEnvelopeAny = true;
+              }
+              let estimatedCategoryPx = Math.ceil(maxCategoryLen * 6.6 + BASE_PAD);
+              if (hasEnvelopeAny) estimatedCategoryPx += 10;
+              const categoryMinPx = 150;
+              const categoryMaxPx = isSpacious ? 268 : 210;
+              const categoryWidthPx = Math.max(categoryMinPx, Math.min(categoryMaxPx, estimatedCategoryPx));
+
+              const budgetedW = isSpacious ? 96 : 86;
+              // When avg is shown (envelope), actual column shows "x of y" text which is wider
+              // than a currency. Size actual to fit that text; variance becomes blank.
+              const actualW = hasEnvelopeAny ? (isSpacious ? 150 : 132) : budgetedW;
+              const varianceW = !showVarianceCol ? 0 : budgetedW;
+              const accountW = showAccountCol ? 86 : 0;
+              const actionsW = isSpacious ? 76 : 68;
+              const progressMinPx = isSpacious ? 140 : 96;
+              const progressMaxPx = 200;
+              const fixedWithoutProgress = categoryWidthPx + budgetedW + actualW + varianceW + accountW + actionsW + 8;
+              let progressWidthPx = 0;
+              if (showProgressCol) {
+                const avail = containerWidth - fixedWithoutProgress;
+                if (avail >= progressMinPx) progressWidthPx = Math.min(progressMaxPx, avail);
+                else progressWidthPx = progressMinPx;
+              }
+              const tableWidthPx = fixedWithoutProgress + progressWidthPx;
+              const tableStyle: React.CSSProperties = { width: tableWidthPx, minWidth: Math.min(tableWidthPx, 340) };
 
               return (
-                <table className="table-auto text-xs sm:text-sm border-collapse min-w-[340px] w-full">
+                <table className="table-fixed text-xs sm:text-sm border-collapse" style={tableStyle}>
                   <colgroup>
-                    <col style={{ width: 'auto' }} />
-                    <col style={{ width: '1%' }} />
-                    <col style={{ width: '1%' }} />
-                    {showVarianceCol && <col style={{ width: '1%' }} />}
-                    {showProgressCol && <col style={{ width: 'auto' }} />}
-                    {showAccountCol && <col style={{ width: '1%' }} />}
-                    <col style={{ width: '1%' }} />
+                    <col style={{ width: categoryWidthPx }} />
+                    <col style={{ width: budgetedW }} />
+                    <col style={{ width: actualW }} />
+                    {showVarianceCol && <col style={{ width: varianceW }} />}
+                    {showProgressCol && <col style={{ width: progressWidthPx }} />}
+                    {showAccountCol && <col style={{ width: accountW }} />}
+                    <col style={{ width: actionsW }} />
                   </colgroup>
                   <thead>
                     <tr className="border-t border-border">
-                      <th className="text-left px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground" style={{ minWidth: '16ch', maxWidth: `${catMaxCh}ch` }}>{renderSortHeader('category', 'Category', 'left')}</th>
-                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
-                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
+                      <th className="text-left px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground" style={{ width: categoryWidthPx }}>{renderSortHeader('category', 'Category', 'left')}</th>
+                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: budgetedW }}>{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
+                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: actualW }}>{renderSortHeader('actual', 'Actual', 'right')}</th>
                       {showVarianceCol && (
-                        <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('variance', 'Variance', 'right')}</th>
+                        <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: varianceW }}>{renderSortHeader('variance', 'Variance', 'right')}</th>
                       )}
                       {showProgressCol && (
-                        <th className="text-left px-2 sm:px-2.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ minWidth: isSpacious ? '140px' : '96px' }}>{renderSortHeader('progress', 'Progress', 'left')}</th>
+                        <th className="text-left px-2 sm:px-2.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: progressWidthPx, minWidth: progressMinPx }}>{renderSortHeader('progress', 'Progress', 'left')}</th>
                       )}
                       {showAccountCol && (
-                        <th className="text-left px-2 sm:px-2.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('account', 'Account', 'left')}</th>
+                        <th className="text-left px-2 sm:px-2.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground truncate" style={{ width: accountW }}>{renderSortHeader('account', 'Account', 'left')}</th>
                       )}
-                      <th className="text-right px-1 sm:px-1.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      <th className="text-right px-1 sm:px-1.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: actionsW }}>
                         Actions
                       </th>
                     </tr>
@@ -870,14 +904,13 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       const envSub = envelopeSubText(b);
                       return (
                         <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
-                          <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ maxWidth: `${catMaxCh}ch`, minWidth: '16ch' }}>
+                          <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ width: categoryWidthPx, maxWidth: categoryWidthPx }}>
                             <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                               <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor }} />
                               <Link
                                 href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
                                 title={b.categoryName}
-                                className="text-foreground font-medium budget-fade hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
-                                style={{ minWidth: '16ch', maxWidth: `${catMaxCh}ch` }}
+                                className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
                               >
                                 {b.categoryName}
                               </Link>
@@ -898,15 +931,21 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               )}
                             </div>
                           </td>
-                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.budgeted)}</td>
-                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground font-medium blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
+                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm" style={{ width: budgetedW }}>{renderBudgetCell(b)}</td>
+                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm" style={{ width: actualW }}>
+                            {isEnvelope(b) && envSub ? (
+                              <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span>
+                            ) : (
+                              <span className="text-foreground font-medium blur-number">{formatCurrency(b.actual)}</span>
+                            )}
+                          </td>
                           {showVarianceCol && (
-                            <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? 'text-muted-foreground' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
-                              {isEnvelope(b) ? <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span> : <>{b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}</>}
+                            <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`} style={{ width: varianceW }}>
+                              {isEnvelope(b) && envSub ? null : <>{b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}</>}
                             </td>
                           )}
                           {showProgressCol && (
-                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ minWidth: isSpacious ? '140px' : '96px' }}>
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ width: progressWidthPx, minWidth: progressMinPx }}>
                               <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                                 <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
                                   <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill shadow-sm' : isTargetMet ? 'bg-primary' : 'bg-amber-500'}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
@@ -918,11 +957,11 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             </td>
                           )}
                           {showAccountCol && (
-                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground/50 truncate">
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground/50 truncate" style={{ width: accountW }}>
                               &mdash;
                             </td>
                           )}
-                          <td className="px-1 sm:px-1 py-2 sm:py-2.5 text-right whitespace-nowrap">
+                          <td className="px-1 sm:px-1 py-2 sm:py-2.5 text-right whitespace-nowrap" style={{ width: actionsW }}>
                             <div className="flex items-center justify-end gap-0.5">
                               <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
                               <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
@@ -950,7 +989,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       return (
                         <Fragment key={b.id}>
                           <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
-                            <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ maxWidth: `${catMaxCh}ch`, minWidth: '16ch' }}>
+                            <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ width: categoryWidthPx, maxWidth: categoryWidthPx }}>
                               <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap">
                                 <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                                 <Link
@@ -961,8 +1000,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                     b.categoryId
                                   )}
                                   title={b.categoryName}
-                                  className="text-foreground font-semibold budget-fade hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
-                                  style={{ minWidth: '16ch', maxWidth: `${catMaxCh}ch` }}
+                                  className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
                                 >
                                   {b.categoryName}
                                 </Link>
@@ -1006,15 +1044,21 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               </div>
                               {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
                             </td>
-                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
-                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{formatCurrency(b.actual)}</td>
+                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm" style={{ width: budgetedW }}>{renderBudgetCell(b)}</td>
+                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm" style={{ width: actualW }}>
+                              {isEnvelope(b) && envSub ? (
+                                <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span>
+                              ) : (
+                                <span className="text-foreground blur-number">{formatCurrency(b.actual)}</span>
+                              )}
+                            </td>
                             {showVarianceCol && (
-                              <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) ? 'text-muted-foreground' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
-                                {isEnvelope(b) ? <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span> : formatCurrency(b.remaining)}
+                              <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`} style={{ width: varianceW }}>
+                                {isEnvelope(b) && envSub ? null : formatCurrency(b.remaining)}
                               </td>
                             )}
                             {showProgressCol && (
-                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ minWidth: isSpacious ? '140px' : '96px' }}>
+                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ width: progressWidthPx, minWidth: progressMinPx }}>
                                 {isEnvelope(b) ? (
                                   <div className="flex items-center gap-1.5 sm:gap-2 min-w-0" title={`${Math.round(b.envelopePercentUsed ?? 0)}% of ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} envelope`}>
                                     <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
@@ -1037,11 +1081,11 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               </td>
                             )}
                             {showAccountCol && (
-                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground/50 truncate">
+                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground/50 truncate" style={{ width: accountW }}>
                                 &mdash;
                               </td>
                             )}
-                            <td className="px-1 sm:px-1 py-2 sm:py-2.5 text-right whitespace-nowrap">
+                            <td className="px-1 sm:px-1 py-2 sm:py-2.5 text-right whitespace-nowrap" style={{ width: actionsW }}>
                               <div className="flex items-center justify-end gap-0.5">
                                 <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
                                 <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>

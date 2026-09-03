@@ -218,8 +218,10 @@ export function BudgetItemTransactionsIcon({
             onMouseLeave={handleMouseLeave}
             aria-label={`View transactions for ${categoryName}`}
             className={cn(
-              "inline-flex items-center justify-center min-w-[28px] min-h-[28px] sm:min-w-[24px] sm:min-h-[24px] p-1 rounded-md text-muted-foreground/60 hover:text-primary hover:bg-accent/80 transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary shrink-0 opacity-90 sm:opacity-0 group-hover/row:opacity-100 group-hover/cat:opacity-100 focus:opacity-100",
-              open && "text-primary bg-accent opacity-100",
+              "inline-flex items-center justify-center min-w-[28px] min-h-[28px] p-1 rounded-md text-muted-foreground/60 hover:text-primary hover:bg-accent/80 transition-all duration-150 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary shrink-0 opacity-90 group-hover/cat:opacity-100 focus:opacity-100",
+              // Desktop: collapse width until row is hovered so category name gets full space and only truncates to make room on hover
+              "sm:min-w-0 sm:w-0 sm:max-w-0 sm:min-h-[24px] sm:p-0 sm:overflow-hidden sm:opacity-0 sm:group-hover/row:min-w-[24px] sm:group-hover/row:w-6 sm:group-hover/row:max-w-[28px] sm:group-hover/row:p-1 sm:group-hover/row:opacity-100 sm:group-hover/row:overflow-visible sm:focus:min-w-[24px] sm:focus:w-6 sm:focus:max-w-[28px] sm:focus:p-1 sm:focus:opacity-100 sm:focus:overflow-visible",
+              open && "text-primary bg-accent opacity-100 sm:min-w-[24px] sm:w-6 sm:max-w-[28px] sm:p-1 sm:opacity-100 sm:overflow-visible",
               className
             )}
           >
