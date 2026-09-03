@@ -810,21 +810,16 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
             })}
           </div>
         ) : (
-          <div ref={containerRef} className="w-full overflow-x-auto min-w-0">
+          <div ref={containerRef} className="w-full overflow-hidden min-w-0">
             {(() => {
-              const showProgressCol = containerWidth >= 650;
-              const showVarianceCol = containerWidth >= 850;
-              const showAccountCol = containerWidth >= 1050 && hasAnyAccount;
-              const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
+              let showProgressCol = containerWidth >= 650;
+              let showVarianceCol = containerWidth >= 850;
+              let showAccountCol = containerWidth >= 1050 && hasAnyAccount;
               const isSpacious = containerWidth >= 900;
               const barH = Math.round(Math.min(10, Math.max(6, containerWidth * 0.0075)));
 
               // ── Dynamic fit: measure content, not container % ────────────────
-              // Category width from longest name (char ≈6.6px at text-xs) + dot/icon/padding.
-              // Previously Category was `width:auto` with `w-full` table → it consumed ALL slack
-              // between Category and Budgeted, especially when Progress hidden.
-              // Icon (transactions) is now collapsed on desktop until hover, so don't reserve its width in the base measure
-              const BASE_PAD = 38; // dot 10 + gap 8 + cell h-pad 16 + fudge 4 (icon 16 not counted until hover)
+              const BASE_PAD = 38;
               let maxCategoryLen = 10;
               let hasEnvelopeAny = false;
               const allBudgetsForMeasure: BudgetData[] = [...incomeBudgets, ...expenseBudgets] as BudgetData[];
@@ -837,26 +832,92 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               if (hasEnvelopeAny) estimatedCategoryPx += 10;
               const categoryMinPx = 150;
               const categoryMaxPx = isSpacious ? 268 : 210;
-              const categoryWidthPx = Math.max(categoryMinPx, Math.min(categoryMaxPx, estimatedCategoryPx));
+              let categoryWidthPx = Math.max(categoryMinPx, Math.min(categoryMaxPx, estimatedCategoryPx));
 
-              const budgetedW = isSpacious ? 96 : 86;
-              // When avg is shown (envelope), actual column shows "x of y" text which is wider
-              // than a currency. Size actual to fit that text; variance becomes blank.
-              const actualW = hasEnvelopeAny ? (isSpacious ? 150 : 132) : budgetedW;
-              const varianceW = !showVarianceCol ? 0 : budgetedW;
-              const accountW = showAccountCol ? 86 : 0;
+              let budgetedW = isSpacious ? 96 : 86;
+              let actualW = hasEnvelopeAny ? (isSpacious ? 150 : 132) : budgetedW;
+              let varianceW = !showVarianceCol ? 0 : budgetedW;
+              let accountW = showAccountCol ? 86 : 0;
               const actionsW = isSpacious ? 76 : 68;
               const progressMinPx = isSpacious ? 140 : 96;
               const progressMaxPx = 200;
-              const fixedWithoutProgress = categoryWidthPx + budgetedW + actualW + varianceW + accountW + actionsW + 8;
+
+              // Never allow horizontal scroll: shrink / drop columns to fit containerWidth
+              const calcFixed = () => categoryWidthPx + budgetedW + actualW + varianceW + accountW + actionsW + 8;
+              let fixedWithoutProgress = calcFixed();
+              let idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
+
+              // 1) Drop variance if not enough space (even if breakpoint said show)
+              if (idealWithProgressMin > containerWidth && showVarianceCol) {
+                showVarianceCol = false;
+                varianceW = 0;
+                fixedWithoutProgress = calcFixed();
+                idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
+              }
+              // 2) Drop account if still tight
+              if (idealWithProgressMin > containerWidth && showAccountCol) {
+                showAccountCol = false;
+                accountW = 0;
+                fixedWithoutProgress = calcFixed();
+                idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
+              }
+              // 3) Drop progress if still tight
+              if (idealWithProgressMin > containerWidth && showProgressCol) {
+                showProgressCol = false;
+                idealWithProgressMin = fixedWithoutProgress;
+              }
+              // 4) Shrink category (truncate name) to fit
+              if (idealWithProgressMin > containerWidth) {
+                const otherFixed = budgetedW + actualW + varianceW + accountW + actionsW + 8;
+                const maxCatFit = Math.max(96, containerWidth - otherFixed - (showProgressCol ? progressMinPx : 0));
+                if (categoryWidthPx > maxCatFit) {
+                  categoryWidthPx = maxCatFit;
+                  fixedWithoutProgress = calcFixed();
+                  idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
+                }
+              }
+              // 5) As last resort shrink amount cols (truncate currency) down to 68px min
+              if (idealWithProgressMin > containerWidth) {
+                const minAmt = 68;
+                let overflow = idealWithProgressMin - containerWidth;
+                // Try shrinking actual first (it may be wide due to envelope)
+                if (actualW > minAmt && overflow > 0) {
+                  const reduce = Math.min(actualW - minAmt, overflow);
+                  actualW -= reduce;
+                  overflow -= reduce;
+                  fixedWithoutProgress = calcFixed();
+                  idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
+                }
+                if (budgetedW > minAmt && overflow > 0) {
+                  const reduce = Math.min(budgetedW - minAmt, overflow);
+                  budgetedW -= reduce;
+                  overflow -= reduce;
+                  fixedWithoutProgress = calcFixed();
+                  idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
+                }
+                if (varianceW > minAmt && overflow > 0) {
+                  const reduce = Math.min(varianceW - minAmt, overflow);
+                  varianceW -= reduce;
+                  // overflow not needed further
+                }
+                fixedWithoutProgress = calcFixed();
+              }
+
               let progressWidthPx = 0;
               if (showProgressCol) {
                 const avail = containerWidth - fixedWithoutProgress;
-                if (avail >= progressMinPx) progressWidthPx = Math.min(progressMaxPx, avail);
-                else progressWidthPx = progressMinPx;
+                // avail is >= progressMinPx due to steps above; clamp to max
+                progressWidthPx = Math.max(progressMinPx, Math.min(progressMaxPx, avail));
+                // If avail < min due to rounding, progress already hidden above
               }
-              const tableWidthPx = fixedWithoutProgress + progressWidthPx;
-              const tableStyle: React.CSSProperties = { width: tableWidthPx, minWidth: Math.min(tableWidthPx, 340) };
+              const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
+              // When content fits, let table be content width (right whitespace, no inter-col gap)
+              // When tight, table fills container (no scroll)
+              const tableWidthPx = showProgressCol ? containerWidth : Math.min(fixedWithoutProgress, containerWidth);
+              const tableStyle: React.CSSProperties = {
+                width: tableWidthPx,
+                maxWidth: '100%',
+              };
 
               return (
                 <table className="table-fixed text-xs sm:text-sm border-collapse" style={tableStyle}>
@@ -931,16 +992,16 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               )}
                             </div>
                           </td>
-                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm" style={{ width: budgetedW }}>{renderBudgetCell(b)}</td>
-                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm" style={{ width: actualW }}>
+                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" style={{ width: budgetedW }}>{renderBudgetCell(b)}</td>
+                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" style={{ width: actualW }}>
                             {isEnvelope(b) && envSub ? (
-                              <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span>
+                              <span className="text-[10px] font-sans text-muted-foreground block truncate" title={envSub ?? undefined}>{envSub}</span>
                             ) : (
-                              <span className="text-foreground font-medium blur-number">{formatCurrency(b.actual)}</span>
+                              <span className="text-foreground font-medium blur-number block truncate">{formatCurrency(b.actual)}</span>
                             )}
                           </td>
                           {showVarianceCol && (
-                            <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`} style={{ width: varianceW }}>
+                            <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap overflow-hidden text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`} style={{ width: varianceW }}>
                               {isEnvelope(b) && envSub ? null : <>{b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}</>}
                             </td>
                           )}
@@ -1044,16 +1105,16 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               </div>
                               {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
                             </td>
-                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm" style={{ width: budgetedW }}>{renderBudgetCell(b)}</td>
-                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm" style={{ width: actualW }}>
+                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" style={{ width: budgetedW }}>{renderBudgetCell(b)}</td>
+                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" style={{ width: actualW }}>
                               {isEnvelope(b) && envSub ? (
-                                <span className="text-[10px] font-sans text-muted-foreground">{envSub}</span>
+                                <span className="text-[10px] font-sans text-muted-foreground block truncate" title={envSub ?? undefined}>{envSub}</span>
                               ) : (
-                                <span className="text-foreground blur-number">{formatCurrency(b.actual)}</span>
+                                <span className="text-foreground blur-number block truncate">{formatCurrency(b.actual)}</span>
                               )}
                             </td>
                             {showVarianceCol && (
-                              <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`} style={{ width: varianceW }}>
+                              <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap overflow-hidden text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`} style={{ width: varianceW }}>
                                 {isEnvelope(b) && envSub ? null : formatCurrency(b.remaining)}
                               </td>
                             )}

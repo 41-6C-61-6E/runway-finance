@@ -66,6 +66,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const MD_BREAKPOINT_PX = 768;
+
 export function MobileNav() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
@@ -106,6 +108,18 @@ export function MobileNav() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Auto-close the drawer when crossing to desktop breakpoint where
+  // the left sidebar takes over navigation.
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= MD_BREAKPOINT_PX && isOpen) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isOpen]);
 
   const handleSubNavTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
@@ -157,7 +171,6 @@ export function MobileNav() {
   // removed — nothing ever gets clipped.
   const HOME_BAR_ITEM_GAP_PX = 8;
   const HOME_BUTTON_MIN_WIDTH_PX = 44;
-  const MD_BREAKPOINT_PX = 768;
   const [homeNavSlotCount, setHomeNavSlotCount] = useState(3);
   useEffect(() => {
     // md (768px) matches the desktop sidebar breakpoint (hidden md:flex):
@@ -518,11 +531,11 @@ export function MobileNav() {
     return index % 2 === 0 ? 'animate-wiggle-even' : 'animate-wiggle-odd';
   };
 
-  const backdropClasses = `fixed inset-0 z-30 bg-transparent transition-opacity duration-300 ${
+  const backdropClasses = `fixed inset-0 z-30 bg-transparent transition-opacity duration-300 md:hidden ${
     isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
   }`;
 
-  const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar/45 backdrop-blur-xl border-t border-sidebar-border/30 rounded-t-[2rem] px-6 py-4 transition-transform duration-300 ease-out shadow-[0_-8px_32px_rgba(0,0,0,0.15)] ${
+  const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar/45 backdrop-blur-xl border-t border-sidebar-border/30 rounded-t-[2rem] px-6 py-4 transition-transform duration-300 ease-out shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:hidden ${
     isOpen ? 'translate-y-0 pointer-events-auto' : 'translate-y-full pointer-events-none'
   }`;
 
@@ -548,7 +561,7 @@ export function MobileNav() {
       {/* Decoupled Floating Sub-Navigation Capsule (View & Swipe Control) */}
       {hasSubNav && !isOpen && (
         <div
-          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none lg:hidden transition-all duration-300 ${
+          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden transition-all duration-300 ${
             isScrollingDown ? 'opacity-55 hover:opacity-100 scale-95' : 'opacity-100 scale-100'
           }`}
           style={{
@@ -577,7 +590,7 @@ export function MobileNav() {
 
       {/* Main Single-Row Floating Bottom Navigation Bar */}
       <nav
-          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center gap-2 lg:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
+          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center gap-2 md:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
         style={{
           bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
         }}
