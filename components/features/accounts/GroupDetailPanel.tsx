@@ -127,7 +127,12 @@ export default function GroupDetailPanel({
   const trendStats = useMemo(() => {
     if (slicedHistory.length === 0) return null;
     const points = slicedHistory.map((d) =>
-      accounts.reduce((sum, acc) => sum + (d[acc.id] ?? 0), 0)
+      accounts.reduce((sum, acc) => {
+        const v = d[acc.id];
+        // Absent (null/undefined) means the account is no longer active at
+        // this date (e.g. mortgage paid off / refinanced) — exclude it.
+        return v == null ? sum : sum + (Number(v) || 0);
+      }, 0)
     );
     const starting = Math.abs(points[0] || 0);
     const current = Math.abs(points[points.length - 1] || 0);
@@ -192,16 +197,26 @@ export default function GroupDetailPanel({
 
   // Per-account composition at the most recent known balance point
   const composition = useMemo(() => {
-    if (historyData.length === 0) return [] as CompositionEntry[];
     const entries: CompositionEntry[] = [];
     for (const acc of accounts) {
-      let value = 0;
-      // Walk back from the latest point to find the account's most recent known balance
-      for (let j = historyData.length - 1; j >= 0; j--) {
-        const v = historyData[j][acc.id];
-        if (v == null) continue;
-        value = v;
-        break;
+      // Use the account's current balance — it is the authoritative "now" figure
+      // (matches the account list). The history series must NOT be used here:
+      // paid-off/refinanced mortgages are omitted from all points from their end
+      // date onward, so a walk-back scan would resurrect the last (stale) balance.
+      const liveBalance = acc.balance;
+      let value =
+        typeof liveBalance === 'number' && Number.isFinite(liveBalance)
+          ? liveBalance
+          : Number(liveBalance) || 0;
+      // Fallback ONLY when no usable balance number is provided at all.
+      // A real 0 balance is a payoff — never resurrect it from history.
+      if (typeof liveBalance !== 'number' || !Number.isFinite(liveBalance)) {
+        for (let j = historyData.length - 1; j >= 0; j--) {
+          const v = historyData[j][acc.id];
+          if (v == null) continue;
+          value = v;
+          break;
+        }
       }
       if (value > 0) {
         entries.push({
