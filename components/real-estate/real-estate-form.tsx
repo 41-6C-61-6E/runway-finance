@@ -3,8 +3,11 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { extractRedfinPropertyId } from './estimate-helpers';
 
 export interface RealEstateFormMeta {
+  redfinPropertyId?: string;
+  /** Legacy: previously used for address-based lookup; kept for display only. */
   address?: string;
   valuationMethod?: string;
   bedrooms?: string | number;
@@ -45,29 +48,26 @@ export function RealEstateFormFields({
   showSyncFrequency = true,
 }: RealEstateFormFieldsProps) {
 
-  const handleAddressChange = (newAddress: string) => {
-    const extractedZip = extractZipCodeFromAddress(newAddress);
-    const updated: RealEstateFormMeta = {
-      ...meta,
-      address: newAddress,
-    };
-    if (extractedZip && (!meta.zipCode || meta.zipCode === extractZipCodeFromAddress(meta.address || ''))) {
-      updated.zipCode = extractedZip;
-    }
-    onChange(updated);
+  // Existing accounts may still carry the ID inside the legacy address
+  // field (pasted link or bare ID) — surface it so nothing has to be retyped.
+  const legacyIdFromAddress = extractRedfinPropertyId(meta.address);
+  const propertyIdValue = meta.redfinPropertyId || legacyIdFromAddress || '';
+
+  const handlePropertyIdChange = (raw: string) => {
+    onChange({ ...meta, redfinPropertyId: extractRedfinPropertyId(raw) || raw.trim() });
   };
 
   return (
     <div className="space-y-4">
-      {/* Property Address */}
+      {/* Redfin Property ID */}
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Property Address</label>
+        <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
         <div className="flex gap-2">
           <div className="relative flex-grow">
             <Input
-              value={meta.address || ''}
-              onChange={(e) => handleAddressChange(e.target.value)}
-              placeholder="e.g., 123 Main St, San Francisco, CA 94105"
+              value={propertyIdValue}
+              onChange={(e) => handlePropertyIdChange(e.target.value)}
+              placeholder="e.g., 446533"
             />
           </div>
           {onValidateAddress && (
@@ -81,6 +81,9 @@ export function RealEstateFormFields({
             </button>
           )}
         </div>
+        <p className="text-[11px] mt-1 text-muted-foreground">
+          Find it on redfin.com — it&apos;s the number after /home/ in the property URL. Pasting the full link works too.
+        </p>
         {validationResult && (
           <p className={`text-xs mt-1 font-medium ${validationResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
             {validationResult.message}

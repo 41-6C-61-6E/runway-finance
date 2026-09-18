@@ -9,8 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatCompactEstimate, formatRedfinSuccessMessage } from './estimate-helpers';
-import { RealEstateFormFields, extractZipCodeFromAddress } from './real-estate-form';
+import { formatCompactEstimate, formatRedfinSuccessMessage, extractRedfinPropertyId, isRedfinLinkInput } from './estimate-helpers';
+import { RealEstateFormFields } from './real-estate-form';
 import { Select } from '@/components/ui/select';
 
 const PROPERTY_TYPES = [
@@ -110,13 +110,14 @@ export function PropertyCards() {
     message: string;
     price?: number;
     estimates?: { normal: number; conservative: number; optimistic: number };
+    propertyId?: string;
   } | null>(null);
 
   const handleValidateAddress = async (metaToValidate?: Record<string, string>) => {
     const meta = metaToValidate || propertyEditMeta;
-    const address = meta.address?.trim();
-    if (!address) {
-      setValidationResult({ status: 'error', message: 'Please enter a property address to validate.' });
+    const propertyId = extractRedfinPropertyId(meta.redfinPropertyId) || extractRedfinPropertyId(meta.address);
+    if (!propertyId) {
+      setValidationResult({ status: 'error', message: 'Please enter a Redfin Property ID to validate.' });
       return;
     }
     setValidatingAddress(true);
@@ -127,23 +128,20 @@ export function PropertyCards() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          address,
-          propertyType: meta.propertyType || undefined,
-          bedrooms: meta.bedrooms || undefined,
-          bathrooms: meta.bathrooms || undefined,
-          squareFootage: meta.squareFootage || undefined,
+          propertyId,
           valuationMethod: meta.valuationMethod || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.valid) {
-        setValidationResult({ status: 'error', message: data.message || 'Validation failed. No estimate found for this address.' });
+        setValidationResult({ status: 'error', message: data.message || 'Validation failed. No estimate found for this property ID.' });
       } else {
         setValidationResult({
           status: 'success',
           message: formatRedfinSuccessMessage(data.price),
           price: data.price,
           estimates: data.estimates,
+          propertyId: data.propertyId,
         });
       }
     } catch {
@@ -238,7 +236,8 @@ export function PropertyCards() {
     const mortgageIds = (meta.mortgageAccountIds as string[]) ?? [];
     setSelectedMortgageIds(mortgageIds);
     setPropertyEditMeta(flat);
-    if (flat.address) {
+    const hasPropertyId = extractRedfinPropertyId(flat.redfinPropertyId) || extractRedfinPropertyId(flat.address);
+    if (hasPropertyId) {
       handleValidateAddress(flat);
     }
   };
@@ -269,6 +268,18 @@ export function PropertyCards() {
       else delete metadata.initialValue;
       if (propertyEditMeta.valuationMethod) metadata.valuationMethod = propertyEditMeta.valuationMethod;
       else delete metadata.valuationMethod;
+      // The only lookup input is the Redfin property ID. Migrate IDs still
+      // sitting in the legacy address field so existing users change nothing.
+      const redfinPropertyId =
+        extractRedfinPropertyId(propertyEditMeta.redfinPropertyId) ||
+        extractRedfinPropertyId(propertyEditMeta.address) ||
+        (validationResult?.status === 'success' ? validationResult.propertyId : undefined) ||
+        (editingProperty.metadata as Record<string, unknown>).redfinPropertyId;
+      if (redfinPropertyId) metadata.redfinPropertyId = redfinPropertyId;
+      else delete (metadata as Record<string, unknown>).redfinPropertyId;
+      // Drop the legacy address if it was only ever a pasted link/bare ID.
+      if (isRedfinLinkInput(propertyEditMeta.address)) metadata.address = '';
+      else if (propertyEditMeta.address !== undefined) metadata.address = propertyEditMeta.address;
       
       metadata.mortgageAccountIds = selectedMortgageIds;
 

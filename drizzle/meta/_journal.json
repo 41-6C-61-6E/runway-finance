@@ -680,6 +680,13 @@
       "when": 1787600000000,
       "tag": "0096_add_accounts_tag_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1787700000000,
+      "tag": "0097_notify_app_updates",
+      "breakpoints": true
     }
   ]
 }

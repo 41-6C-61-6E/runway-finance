@@ -62,6 +62,7 @@ export default function NotificationsTab() {
   const weeklyNetWorthAlertDay = (settings.weeklyNetWorthAlertDay as string) || 'sunday';
   const userTimezone = (settings.timezone as string) || 'America/New_York';
   const notifyAiProposals = settings.notifyAiProposals !== false;
+  const notifyAppUpdates = settings.notifyAppUpdates !== false;
   const notifyRecurringPriceChanges = settings.notifyRecurringPriceChanges !== false;
   const notifyUpcomingBills = settings.notifyUpcomingBills ?? false;
   const upcomingBillsLeadDays = settings.upcomingBillsLeadDays ?? 3;
@@ -234,6 +235,13 @@ export default function NotificationsTab() {
 
   const handleUpdateSetting = async (key: string, value: any) => {
     if (!updateSetting) return;
+    // Keep the PWA update-toast's local mirror in sync so PWARegister
+    // honors the new preference immediately, even before refetch.
+    if (key === 'notifyAppUpdates') {
+      try {
+        localStorage.setItem('pf_update_toast_enabled', value ? 'true' : 'false');
+      } catch {}
+    }
     try {
       await updateSetting(key, value);
       toast.success('Preference updated successfully.');
@@ -582,6 +590,21 @@ export default function NotificationsTab() {
                 id="notify-ai-proposals"
                 checked={notifyAiProposals}
                 onCheckedChange={(checked) => handleUpdateSetting('notifyAiProposals', checked)}
+              />
+            </div>
+
+            {/* App Update Toast Toggle */}
+            <div className="flex items-center justify-between py-4">
+              <div className="space-y-1 pr-4">
+                <Label htmlFor="notify-app-updates" className="font-medium text-sm text-foreground cursor-pointer">App Update Notifications</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Show an in-app toast when a new app version is ready to install.
+                </p>
+              </div>
+              <Switch
+                id="notify-app-updates"
+                checked={notifyAppUpdates}
+                onCheckedChange={(checked) => handleUpdateSetting('notifyAppUpdates', checked)}
               />
             </div>
 

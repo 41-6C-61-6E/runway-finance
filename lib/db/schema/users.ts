@@ -221,6 +221,7 @@ export const userSettings = pgTable('user_settings', {
   notifyWeeklyNetWorthChange: boolean('notify_weekly_net_worth_change').notNull().default(true),
   weeklyNetWorthAlertDay: text('weekly_net_worth_alert_day').notNull().default('sunday'),
   notifyAiProposals: boolean('notify_ai_proposals').notNull().default(true),
+  notifyAppUpdates: boolean('notify_app_updates').notNull().default(true),
   notifyRecurringPriceChanges: boolean('notify_recurring_price_changes').notNull().default(true),
   notifyUpcomingBills: boolean('notify_upcoming_bills').notNull().default(false),
   upcomingBillsLeadDays: integer('upcoming_bills_lead_days').notNull().default(3),

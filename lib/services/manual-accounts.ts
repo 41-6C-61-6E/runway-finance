@@ -100,249 +100,108 @@ function cleanRedfinJson(text: string): any {
   return JSON.parse(cleanText);
 }
 
-function extractPropertyIdFromHtml(html: string): string | undefined {
-  // Check 1: Decoded Yahoo RU= redirect parameters
-  const ruMatches = html.match(/RU=([^&"'>]+)/gi) || [];
-  for (const m of ruMatches) {
-    const decoded = decodeURIComponent(m.replace(/^RU=/i, ''));
-    try {
-      const parsedUrl = new URL(decoded);
-      if (
-        (parsedUrl.hostname === 'redfin.com' || parsedUrl.hostname.endsWith('.redfin.com')) &&
-        parsedUrl.pathname.includes('/home/')
-      ) {
-        const propIdMatch = parsedUrl.pathname.match(/\/home\/(\d+)/);
-        if (propIdMatch) return propIdMatch[1];
-      }
-    } catch {}
-  }
-
-  // Check 2: Direct Redfin property URLs anywhere in HTML
-  const directMatches = html.match(/https?:\/\/(?:www\.)?redfin\.com\/[^\s"'>]*\/home\/(\d+)/gi) || [];
-  for (const m of directMatches) {
-    try {
-      const parsedUrl = new URL(m);
-      if (parsedUrl.hostname === 'redfin.com' || parsedUrl.hostname.endsWith('.redfin.com')) {
-        const propIdMatch = parsedUrl.pathname.match(/\/home\/(\d+)/);
-        if (propIdMatch) return propIdMatch[1];
-      }
-    } catch {}
-  }
-
-  return undefined;
-}
-
 export interface RedfinEstimates {
   normal: number;
   conservative: number;
   optimistic: number;
+  /** Redfin property ID the valuation was fetched for. */
+  propertyId?: string;
 }
+
+/**
+ * Extract a Redfin property ID from free-form input: a pasted Redfin
+ * property link (.../home/<id>), a bare numeric ID, or undefined.
+ * Kept so existing users with a link/ID stored in their address field
+ * keep working without any changes.
+ */
+export function extractRedfinPropertyId(input?: unknown): string | undefined {
+  if (typeof input !== 'string') return undefined;
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  const urlMatch = trimmed.match(/\/home\/(\d+)/);
+  if (urlMatch) return urlMatch[1];
+  if (/^\d+$/.test(trimmed)) return trimmed;
+  return undefined;
+}
+
+/** Where to find the Redfin property ID for a listing. */
+const REDFIN_ID_HELP = 'Enter the Redfin Property ID (the number after /home/ in the property\'s Redfin URL, e.g. 446533).';
 
 export async function fetchRedfinValuationDetails(
   params: {
-    address: string;
-    propertyType?: string;
-    bedrooms?: number;
-    bathrooms?: number;
-    squareFootage?: number;
+    /** Redfin property ID, or a pasted Redfin property link containing one. */
+    propertyId?: string;
+    /** Legacy alias: an address field that may hold a pasted link/bare ID. */
+    address?: string;
   },
   apiConfig?: ApiConfig
 ): Promise<RedfinEstimates> {
-  const address = params.address.trim();
   const baseUrl = normalizeRedfinApiUrl(apiConfig?.redfinApiUrl);
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  let propertyId: string | undefined;
+  const propertyId =
+    extractRedfinPropertyId(params.propertyId) ??
+    extractRedfinPropertyId(params.address);
 
-  // Step 1: Support direct Redfin property URL or numeric Property ID in address input
-  const urlMatch = address.match(/\/home\/(\d+)/) || address.match(/^(\d+)$/);
-  if (urlMatch) {
-    propertyId = urlMatch[1];
-    logger.info(`${LOG_TAG} Extracted Redfin property ID directly from input`, { propertyId, address });
-  }
-
-  // Step 2: Search web for exact Redfin property URL if address is text
   if (!propertyId) {
-    try {
-      const yahooUrl = `https://search.yahoo.com/search?p=site:redfin.com+${encodeURIComponent(address)}`;
-      logger.info(`${LOG_TAG} Web search lookup for Redfin property URL`, { address, url: yahooUrl });
-      const res = await fetch(yahooUrl, {
-        headers: {
-          'User-Agent': userAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      });
-
-      if (res.ok) {
-        const html = await res.text();
-        propertyId = extractPropertyIdFromHtml(html);
-        if (propertyId) {
-          logger.info(`${LOG_TAG} Resolved Redfin property ID via web search`, { propertyId, address });
-        }
-      }
-    } catch (err) {
-      logger.warn(`${LOG_TAG} Web search lookup error`, { address, error: String(err) });
-    }
-
-    // Secondary fallback: DuckDuckGo HTML search if Yahoo search returned no matches
-    if (!propertyId) {
-      try {
-        const ddgUrl = `https://html.duckduckgo.com/html/?q=site:redfin.com+${encodeURIComponent(address)}`;
-        logger.info(`${LOG_TAG} DuckDuckGo fallback for Redfin property URL`, { address, url: ddgUrl });
-        const ddgRes = await fetch(ddgUrl, {
-          headers: {
-            'User-Agent': userAgent,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          },
-        });
-
-        if (ddgRes.ok) {
-          const html = await ddgRes.text();
-          propertyId = extractPropertyIdFromHtml(html);
-          if (propertyId) {
-            logger.info(`${LOG_TAG} Resolved Redfin property ID via DuckDuckGo search`, { propertyId, address });
-          }
-        }
-      } catch (err) {
-        logger.warn(`${LOG_TAG} DuckDuckGo search lookup error`, { address, error: String(err) });
-      }
-    }
+    throw new Error(`No Redfin property ID provided. ${REDFIN_ID_HELP}`);
   }
 
-  let matchedHome: any;
+  logger.info(`${LOG_TAG} Redfin AVM call`, { propertyId, url: `${baseUrl}/api/home/details/avm?propertyId=${propertyId}&accessLevel=1` });
 
-  // Step 3: US Census Geocoder + GIS spatial query ONLY if exact street line matches
-  if (!propertyId) {
-    let lat: number | undefined;
-    let lon: number | undefined;
-
-    try {
-      const censusUrl = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(address)}&benchmark=Public_AR_Current&format=json`;
-      logger.info(`${LOG_TAG} US Census geocoding call`, { address, url: censusUrl });
-      const censusRes = await fetch(censusUrl, {
-        headers: { 'User-Agent': 'RunwayFinance/1.0' },
-      });
-      if (censusRes.ok) {
-        const censusJson = await censusRes.json() as any;
-        const match = censusJson.result?.addressMatches?.[0];
-        if (match?.coordinates) {
-          lon = parseFloat(match.coordinates.x);
-          lat = parseFloat(match.coordinates.y);
-        }
-      }
-    } catch (err) {
-      logger.warn(`${LOG_TAG} US Census geocoding error`, { address, error: String(err) });
-    }
-
-    if (lat !== undefined && lon !== undefined && !isNaN(lat) && !isNaN(lon)) {
-      const d = 0.005;
-      const poly = `${lon - d}+${lat - d},${lon + d}+${lat - d},${lon + d}+${lat + d},${lon - d}+${lat + d},${lon - d}+${lat - d}`;
-      const gisUrl = `${baseUrl}/api/gis?al=1&poly=${poly}&v=8`;
-      logger.info(`${LOG_TAG} Redfin GIS call`, { address, url: gisUrl });
-
-      try {
-        const gisRes = await fetch(gisUrl, {
-          headers: {
-            'User-Agent': userAgent,
-            'Accept': 'application/json, text/plain, */*',
-            'Referer': 'https://www.redfin.com/',
-          },
-        });
-
-        if (gisRes.ok) {
-          const text = await gisRes.text();
-          const json = cleanRedfinJson(text);
-          const homes = json.payload?.homes || [];
-          const streetPart = address.split(',')[0].toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-
-          for (const h of homes) {
-            const s = (h.streetLine?.value || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-            // Strict match ONLY - never fallback to arbitrary homes[0]
-            if (s && (s.includes(streetPart) || streetPart.includes(s))) {
-              matchedHome = h;
-              propertyId = String(h.propertyId);
-              break;
-            }
-          }
-        }
-      } catch (err) {
-        logger.warn(`${LOG_TAG} GIS query error`, { address, error: String(err) });
-      }
-    }
-  }
-
-  // Step 3: Query Redfin AVM endpoint if propertyId found
   let normalPrice: number | undefined;
   let lowPrice: number | undefined;
   let highPrice: number | undefined;
-  let isRateLimited = false;
 
-  const targetPropId = propertyId || matchedHome?.propertyId;
-
-  if (targetPropId) {
-    try {
-      const avmUrl = `${baseUrl}/api/home/details/avm?propertyId=${targetPropId}&accessLevel=1`;
-      logger.info(`${LOG_TAG} Redfin AVM call`, { propertyId: targetPropId, url: avmUrl });
-      const avmRes = await fetch(avmUrl, {
-        headers: {
-          'User-Agent': userAgent,
-          'Accept': 'application/json, text/plain, */*',
-          'Referer': 'https://www.redfin.com/',
-        },
-      });
-      if (avmRes.status === 403 || avmRes.status === 429 || avmRes.status === 503) {
-        isRateLimited = true;
-        logger.warn(`${LOG_TAG} Redfin AVM rate limited (HTTP ${avmRes.status})`, { propertyId: targetPropId });
-      } else if (avmRes.ok) {
-        const text = await avmRes.text();
-        const trimmed = text.trim().toLowerCase();
-        if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html') || trimmed.includes('challenge') || trimmed.includes('captcha')) {
-          isRateLimited = true;
-          logger.warn(`${LOG_TAG} Redfin AVM returned WAF challenge/captcha page`, { propertyId: targetPropId });
-        } else {
-          try {
-            const json = cleanRedfinJson(text);
-            const p = json.payload || {};
-            normalPrice = p.predictedValue ?? p.value ?? p.price;
-            lowPrice = p.priceRangeLow ?? p.predictedValueMin ?? p.priceRangeMin;
-            highPrice = p.priceRangeHigh ?? p.predictedValueMax ?? p.priceRangeMax;
-          } catch (jsonErr) {
-            isRateLimited = true;
-            logger.warn(`${LOG_TAG} Redfin AVM JSON parse error (likely WAF challenge)`, { propertyId: targetPropId, error: String(jsonErr) });
-          }
-        }
-      }
-    } catch (err) {
-      logger.warn(`${LOG_TAG} AVM query error`, { propertyId: targetPropId, error: String(err) });
+  try {
+    const avmUrl = `${baseUrl}/api/home/details/avm?propertyId=${propertyId}&accessLevel=1`;
+    const avmRes = await fetch(avmUrl, {
+      headers: {
+        'User-Agent': userAgent,
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://www.redfin.com/',
+      },
+    });
+    if (avmRes.status === 403 || avmRes.status === 429 || avmRes.status === 503) {
+      throw new Error(`Redfin rate limit reached for property ${propertyId}. Please wait a few minutes before trying again, or enter the value manually.`);
     }
+    if (!avmRes.ok) {
+      throw new Error(`Redfin estimate unavailable for property ${propertyId} (HTTP ${avmRes.status}). Please check the Property ID, ${REDFIN_ID_HELP.charAt(0).toLowerCase() + REDFIN_ID_HELP.slice(1)}`);
+    }
+    const text = await avmRes.text();
+    const trimmed = text.trim().toLowerCase();
+    if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html') || trimmed.includes('challenge') || trimmed.includes('captcha')) {
+      throw new Error(`Redfin rate limit reached for property ${propertyId}. Please wait a few minutes before trying again, or enter the value manually.`);
+    }
+    const json = cleanRedfinJson(text);
+    const p = json.payload || {};
+    normalPrice = p.predictedValue ?? p.value ?? p.price;
+    lowPrice = p.priceRangeLow ?? p.predictedValueMin ?? p.priceRangeMin;
+    highPrice = p.priceRangeHigh ?? p.predictedValueMax ?? p.priceRangeMax;
+  } catch (err) {
+    if (err instanceof Error && (err.message.startsWith('Redfin rate limit') || err.message.startsWith('Redfin estimate unavailable'))) {
+      throw err;
+    }
+    logger.warn(`${LOG_TAG} AVM query error`, { propertyId, error: String(err) });
+    throw new Error(`Redfin estimate unavailable for property ${propertyId}. Please check the Property ID or enter the value manually.`);
   }
 
-  // Fallback to GIS price if AVM response is not available
-  if (!normalPrice && matchedHome?.price?.value) {
-    normalPrice = matchedHome.price.value;
-  }
-
-  if (!normalPrice) {
-    if (isRateLimited) {
-      throw new Error(`Redfin rate limit reached for "${address}". Please chill and wait a few minutes before validating again, or enter the value manually.`);
-    }
-    throw new Error(`Redfin estimate unavailable for address "${address}". Please check the address, paste the Redfin property link (e.g. redfin.com/.../home/446533), or enter value manually.`);
+  if (normalPrice === undefined || normalPrice === null || isNaN(normalPrice)) {
+    throw new Error(`Redfin returned no estimate for property ${propertyId}. Please check the Property ID or enter the value manually.`);
   }
 
   const conservative = (lowPrice !== undefined && lowPrice !== null) ? Math.round((lowPrice + normalPrice) / 2) : Math.round(normalPrice * 0.95);
   const optimistic = (highPrice !== undefined && highPrice !== null) ? Math.round((highPrice + normalPrice) / 2) : Math.round(normalPrice * 1.05);
 
-  return { normal: normalPrice, conservative, optimistic };
+  return { normal: normalPrice, conservative, optimistic, propertyId };
 }
 
 export async function fetchRedfinValue(
   params: {
-    address: string;
-    propertyType?: string;
-    bedrooms?: number;
-    bathrooms?: number;
-    squareFootage?: number;
+    /** Redfin property ID, or a pasted Redfin property link containing one. */
+    propertyId?: string;
+    /** Legacy alias: an address field that may hold a pasted link/bare ID. */
+    address?: string;
     valuationMethod?: 'conservative' | 'normal' | 'optimistic';
   },
   apiConfig?: ApiConfig
@@ -660,6 +519,8 @@ export async function syncManualAccount(
     rawMeta = account.metadata || {};
   }
   const meta = JSON.parse(typeof rawMeta === 'string' ? rawMeta : JSON.stringify(rawMeta)) as Record<string, unknown>;
+  // Snapshot so we can persist a newly learned redfinPropertyId after sync.
+  const initialRedfinPropertyId = meta.redfinPropertyId;
   let newValue: number;
 
   try {
@@ -676,18 +537,30 @@ export async function syncManualAccount(
       case 'townhouse':
       case 'multi-family':
       case 'other': {
-        const address = meta.address as string | undefined;
-        if (!address) {
-          throw new Error('No property address in metadata. Please edit the account to provide a property address for Redfin sync.');
+        // The only input is the Redfin property ID. Existing accounts may
+        // still carry it inside the legacy address/redfinUrl fields — adopt
+        // it automatically so those users don't have to change anything.
+        const storedPropertyId =
+          extractRedfinPropertyId(meta.redfinPropertyId) ||
+          extractRedfinPropertyId(meta.redfinUrl) ||
+          extractRedfinPropertyId(meta.address);
+        if (!storedPropertyId) {
+          throw new Error(`No Redfin Property ID for "${account.name}". Edit the property and enter the Redfin Property ID (the number after /home/ in the property's Redfin URL, e.g. 446533).`);
         }
-        newValue = await fetchRedfinValue({
-          address,
-          propertyType: meta.propertyType as string | undefined,
-          bedrooms: meta.bedrooms !== undefined && meta.bedrooms !== null ? parseFloat(String(meta.bedrooms)) : undefined,
-          bathrooms: meta.bathrooms !== undefined && meta.bathrooms !== null ? parseFloat(String(meta.bathrooms)) : undefined,
-          squareFootage: meta.squareFootage !== undefined && meta.squareFootage !== null ? parseFloat(String(meta.squareFootage)) : undefined,
-          valuationMethod: meta.valuationMethod as 'conservative' | 'normal' | 'optimistic' | undefined,
+        const estimates = await fetchRedfinValuationDetails({
+          propertyId: storedPropertyId,
         }, apiConfig);
+        const method = (meta.valuationMethod as 'conservative' | 'normal' | 'optimistic' | undefined) || 'normal';
+        const selectedValue = estimates[method];
+        if (selectedValue === undefined || selectedValue === null || isNaN(selectedValue)) {
+          throw new Error(`Redfin parse error: No valid valuation field returned in response.`);
+        }
+        newValue = selectedValue;
+        // Migrate a legacy-embedded ID to the canonical field.
+        if (meta.redfinPropertyId !== estimates.propertyId) {
+          meta.redfinPropertyId = estimates.propertyId;
+          logger.info(`${LOG_TAG} Stored Redfin property ID for account`, { accountId, propertyId: estimates.propertyId });
+        }
         break;
       }
 
@@ -745,8 +618,10 @@ export async function syncManualAccount(
     updatedAt: new Date(),
   };
 
-  if (meta.syncError !== undefined) {
-    delete meta.syncError;
+  if (meta.syncError !== undefined || meta.redfinPropertyId !== initialRedfinPropertyId) {
+    if (meta.syncError !== undefined) {
+      delete meta.syncError;
+    }
     const updatedMeta = JSON.stringify(meta);
     accountUpdate.metadata = dek ? await encryptField(updatedMeta, dek) : updatedMeta;
   }

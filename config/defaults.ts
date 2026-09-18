@@ -94,6 +94,7 @@ export const NOTIFICATION_DEFAULTS = {
   notifyWeeklyNetWorthChange: true,
   weeklyNetWorthAlertDay: 'sunday',
   notifyAiProposals: true,
+  notifyAppUpdates: true,
   notifyRecurringPriceChanges: true,
   notifyUpcomingBills: false,
   upcomingBillsLeadDays: 3,
@@ -255,6 +256,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'notifyWeeklyNetWorthChange', label: 'Notify Weekly Net Worth Change', description: 'Enable push notifications when your net worth changes over the past week', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyWeeklyNetWorthChange },
   { key: 'weeklyNetWorthAlertDay', label: 'Weekly Net Worth Alert Day', description: 'Day of the week to send the weekly net worth change alert (sunday, monday, etc.)', type: 'string', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.weeklyNetWorthAlertDay },
   { key: 'notifyAiProposals', label: 'Notify AI Proposals', description: 'Enable push notifications when new AI categorization proposals are generated', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyAiProposals },
+  { key: 'notifyAppUpdates', label: 'Notify App Updates', description: 'Show an in-app toast when a new app version is ready to install', type: 'boolean', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notifyAppUpdates },
   { key: 'maxNotificationsPerPeriod', label: 'Max Notifications Per Period', description: 'Maximum number of push notifications to send within the sliding window', type: 'number', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.maxNotificationsPerPeriod },
   { key: 'notificationLimiterPeriodMinutes', label: 'Notification Limiter Window (Minutes)', description: 'Window size in minutes for the notifications rate limiter', type: 'number', group: 'Notifications', defaultValue: NOTIFICATION_DEFAULTS.notificationLimiterPeriodMinutes },
 

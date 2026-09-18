@@ -13,9 +13,8 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { getTypesByGroup, ACCOUNT_TYPE_LABELS, TYPE_HIERARCHY, isRealEstateType, parseAccountMetadata } from '@/lib/constants/account-types';
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
-import { formatCompactEstimate, formatRedfinSuccessMessage } from '@/components/real-estate/estimate-helpers';
+import { formatCompactEstimate, formatRedfinSuccessMessage, extractRedfinPropertyId, isRedfinLinkInput } from '@/components/real-estate/estimate-helpers';
 import { getBadgeClasses } from '@/lib/utils/account-badge';
-import { RealEstateFormFields, extractZipCodeFromAddress } from '@/components/real-estate/real-estate-form';
 import { Select } from '@/components/ui/select';
 
 type ManualAccount = {
@@ -260,13 +259,14 @@ export default function ManualAccountsSection() {
   const [editMeta, setEditMeta] = useState<Record<string, string>>({});
   const [editLoading, setEditLoading] = useState(false);
 
-  // Address validation states
+  // Redfin property validation states
   const [validatingAddress, setValidatingAddress] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     status: 'success' | 'error';
     message: string;
     price?: number;
     estimates?: { normal: number; conservative: number; optimistic: number };
+    propertyId?: string;
   } | null>(null);
 
   // Tags state
@@ -308,9 +308,9 @@ export default function ManualAccountsSection() {
   }, [fetchAccounts]);
 
   const handleValidateAddress = async (meta: Record<string, string>, isEdit: boolean) => {
-    const address = meta.address?.trim();
-    if (!address) {
-      setValidationResult({ status: 'error', message: 'Please enter a property address to validate.' });
+    const propertyId = extractRedfinPropertyId(meta.redfinPropertyId) || extractRedfinPropertyId(meta.address);
+    if (!propertyId) {
+      setValidationResult({ status: 'error', message: 'Please enter a Redfin Property ID to validate.' });
       return;
     }
     setValidatingAddress(true);
@@ -321,26 +321,26 @@ export default function ManualAccountsSection() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          address,
-          propertyType: meta.propertyType || undefined,
-          bedrooms: meta.bedrooms || undefined,
-          bathrooms: meta.bathrooms || undefined,
-          squareFootage: meta.squareFootage || undefined,
+          propertyId,
           valuationMethod: meta.valuationMethod || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.valid) {
-        setValidationResult({ status: 'error', message: data.message || 'Validation failed. No estimate found for this address.' });
+        setValidationResult({ status: 'error', message: data.message || 'Validation failed. No estimate found for this property ID.' });
       } else {
         setValidationResult({
           status: 'success',
           message: formatRedfinSuccessMessage(data.price),
           price: data.price,
           estimates: data.estimates,
+          propertyId: data.propertyId,
         });
         if (!isEdit) {
           setCreateInitialValue(String(data.price));
+          if (data.propertyId) {
+            setCreateMeta((m) => ({ ...m, redfinPropertyId: data.propertyId }));
+          }
         }
       }
     } catch {
@@ -371,7 +371,10 @@ export default function ManualAccountsSection() {
         if (createMeta.purchaseDate) metadata.purchaseDate = createMeta.purchaseDate;
       }
       if (REAL_ESTATE_TYPES.includes(createType)) {
-        metadata.address = createMeta.address || '';
+        const redfinPropertyId = extractRedfinPropertyId(createMeta.redfinPropertyId) || extractRedfinPropertyId(createMeta.address);
+        if (redfinPropertyId) metadata.redfinPropertyId = redfinPropertyId;
+        // Keep a human address for display; drop it if it was only a pasted link/bare ID.
+        metadata.address = isRedfinLinkInput(createMeta.address) ? '' : (createMeta.address || '');
         if (createMeta.bedrooms) metadata.bedrooms = parseFloat(createMeta.bedrooms);
         if (createMeta.bathrooms) metadata.bathrooms = parseFloat(createMeta.bathrooms);
         if (createMeta.squareFootage) metadata.squareFootage = parseFloat(createMeta.squareFootage);
@@ -582,7 +585,14 @@ export default function ManualAccountsSection() {
       const metadata: Record<string, unknown> = {};
 
       if (REAL_ESTATE_TYPES.includes(editAccount.type)) {
-        metadata.address = editMeta.address || '';
+        const redfinPropertyId =
+          extractRedfinPropertyId(editMeta.redfinPropertyId) ||
+          extractRedfinPropertyId(editMeta.address) ||
+          (validationResult?.status === 'success' ? validationResult.propertyId : undefined) ||
+          (editAccount.metadata as Record<string, unknown>)?.redfinPropertyId;
+        if (redfinPropertyId) metadata.redfinPropertyId = redfinPropertyId;
+        // Keep a human address for display; drop it if it was only a pasted link/bare ID.
+        metadata.address = isRedfinLinkInput(editMeta.address) ? '' : (editMeta.address || '');
         if (editMeta.bedrooms) metadata.bedrooms = parseFloat(editMeta.bedrooms);
         if (editMeta.bathrooms) metadata.bathrooms = parseFloat(editMeta.bathrooms);
         if (editMeta.squareFootage) metadata.squareFootage = parseFloat(editMeta.squareFootage);
@@ -791,13 +801,13 @@ export default function ManualAccountsSection() {
             </Select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Property Address or Redfin ID</label>
+            <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
             <div className="flex gap-2">
               <div className="relative flex-grow">
                 <Input
-                  value={createMeta.address || ''}
-                  onChange={(e) => setCreateMeta((m) => ({ ...m, address: e.target.value }))}
-                  placeholder="e.g., 123 Main St, San Francisco, CA or 446533"
+                  value={createMeta.redfinPropertyId || extractRedfinPropertyId(createMeta.address) || ''}
+                  onChange={(e) => setCreateMeta((m) => ({ ...m, redfinPropertyId: extractRedfinPropertyId(e.target.value) || e.target.value.trim() }))}
+                  placeholder="e.g., 446533"
                 />
               </div>
               <button
@@ -809,6 +819,9 @@ export default function ManualAccountsSection() {
                 {validatingAddress ? 'Checking...' : 'Validate'}
               </button>
             </div>
+            <p className="text-[11px] mt-1 text-muted-foreground">
+              Find it on redfin.com — it&apos;s the number after /home/ in the property URL. Pasting the full link works too.
+            </p>
             {validationResult && (
               <p className={`text-xs mt-1 font-medium ${validationResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
                 {validationResult.message}
@@ -1177,12 +1190,12 @@ export default function ManualAccountsSection() {
                     <div className="flex-grow min-w-0">
                       <span className="font-semibold block mb-0.5">Sync Failed</span>
                       <span className="break-words block">{String(account.metadata.syncError)}</span>
-                      {String(account.metadata.syncError).toLowerCase().includes('address') && (
+                      {String(account.metadata.syncError).toLowerCase().includes('property id') && (
                         <button
                           onClick={() => openEdit(account)}
                           className="mt-1.5 block text-[10px] font-bold text-primary hover:underline text-left cursor-pointer"
                         >
-                          Edit account to provide a property address
+                          Edit account to enter the Redfin Property ID
                         </button>
                       )}
                     </div>
@@ -1452,13 +1465,13 @@ export default function ManualAccountsSection() {
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Property Address or Redfin ID</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Redfin Property ID</label>
                   <div className="flex gap-2">
                     <div className="relative flex-grow">
                       <Input
-                        value={editMeta.address || ''}
-                        onChange={(e) => setEditMeta((m) => ({ ...m, address: e.target.value }))}
-                        placeholder="e.g., 123 Main St, San Francisco, CA or 446533"
+                        value={editMeta.redfinPropertyId || extractRedfinPropertyId(editMeta.address) || ''}
+                        onChange={(e) => setEditMeta((m) => ({ ...m, redfinPropertyId: extractRedfinPropertyId(e.target.value) || e.target.value.trim() }))}
+                        placeholder="e.g., 446533"
                       />
                     </div>
                     <button
@@ -1470,6 +1483,9 @@ export default function ManualAccountsSection() {
                       {validatingAddress ? 'Checking...' : 'Validate'}
                     </button>
                   </div>
+                  <p className="text-[11px] mt-1 text-muted-foreground">
+                    Find it on redfin.com — it&apos;s the number after /home/ in the property URL. Pasting the full link works too.
+                  </p>
                   {validationResult && (
                     <p className={`text-xs mt-1 font-medium ${validationResult.status === 'success' ? 'text-chart-1' : 'text-destructive'}`}>
                       {validationResult.message}

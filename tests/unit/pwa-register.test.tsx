@@ -158,7 +158,7 @@ describe('PWARegister Component', () => {
     expect(queryByText('fix: v2 bug')).toBeNull();
   });
 
-  it('displays top commit message when matchedIndex is 0', async () => {
+  it('stays silent via updatefound when already on the latest version (matchedIndex 0)', async () => {
     localStorage.setItem('pf_installed_hash', 'hash-v3');
 
     const mockRegistration = {
@@ -206,16 +206,118 @@ describe('PWARegister Component', () => {
 
     render(<PWARegister />);
 
-    await waitFor(() => {
-      expect(toast.info).toHaveBeenCalled();
-    });
+    // Already up to date → no toast, even though updatefound fired.
+    await new Promise((r) => setTimeout(r, 150));
+    expect(toast.info).not.toHaveBeenCalled();
+  });
 
-    const toastCall = (toast.info as any).mock.calls[0];
-    const descriptionElement = toastCall[1].description;
-    const { getByText, queryByText } = render(descriptionElement);
+  it('does not show a toast when the installed hash already matches the latest entry', async () => {
+    localStorage.setItem('pf_installed_hash', 'hash-v3');
 
-    expect(getByText('New changes (1):')).not.toBeNull();
-    expect(getByText('feat: v3 feature')).not.toBeNull();
-    expect(queryByText('fix: v2 bug')).toBeNull();
+    const mockRegistration = {
+      waiting: { postMessage: vi.fn() },
+      addEventListener: vi.fn(),
+      update: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // @ts-ignore
+    navigator.serviceWorker = {
+      register: vi.fn().mockResolvedValue(mockRegistration),
+      controller: {},
+    };
+
+    const versionData = {
+      buildNumber: '26.08.100',
+      hash: 'hash-v3',
+      commits: ['feat: v3 feature'],
+      history: [
+        { hash: 'hash-v3', message: 'feat: v3 feature' },
+        { hash: 'hash-v2', message: 'fix: v2 bug' },
+      ],
+    };
+
+    global.fetch = vi.fn((url: any) => {
+      if (typeof url === 'string' && url.includes('/api/user-settings')) {
+        return Promise.resolve({ ok: true, json: async () => ({ notifyAppUpdates: true }) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => versionData } as Response);
+    }) as any;
+
+    render(<PWARegister />);
+
+    // Allow the async version check to settle, then assert silence.
+    await new Promise((r) => setTimeout(r, 150));
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it('does not show a toast when the version fetch fails', async () => {
+    localStorage.setItem('pf_installed_hash', 'hash-v1');
+
+    const mockRegistration = {
+      waiting: { postMessage: vi.fn() },
+      addEventListener: vi.fn(),
+      update: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // @ts-ignore
+    navigator.serviceWorker = {
+      register: vi.fn().mockResolvedValue(mockRegistration),
+      controller: {},
+    };
+
+    global.fetch = vi.fn((url: any) => {
+      if (typeof url === 'string' && url.includes('/api/user-settings')) {
+        return Promise.resolve({ ok: true, json: async () => ({ notifyAppUpdates: true }) } as Response);
+      }
+      return Promise.reject(new Error('network down'));
+    }) as any;
+
+    render(<PWARegister />);
+
+    await new Promise((r) => setTimeout(r, 150));
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it('does not show a toast when app update notifications are disabled', async () => {
+    localStorage.setItem('pf_installed_hash', 'hash-v1');
+
+    const mockRegistration = {
+      waiting: { postMessage: vi.fn() },
+      addEventListener: vi.fn(),
+      update: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // @ts-ignore
+    navigator.serviceWorker = {
+      register: vi.fn().mockResolvedValue(mockRegistration),
+      controller: {},
+    };
+
+    const versionData = {
+      buildNumber: '26.08.100',
+      hash: 'hash-v3',
+      commits: ['feat: v3 feature'],
+      history: [
+        { hash: 'hash-v3', message: 'feat: v3 feature' },
+        { hash: 'hash-v2', message: 'fix: v2 bug' },
+        { hash: 'hash-v1', message: 'feat: v1 initial' },
+      ],
+    };
+
+    const fetchMock = vi.fn((url: any) => {
+      if (typeof url === 'string' && url.includes('/api/user-settings')) {
+        return Promise.resolve({ ok: true, json: async () => ({ notifyAppUpdates: false }) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => versionData } as Response);
+    }) as any;
+    global.fetch = fetchMock;
+
+    render(<PWARegister />);
+
+    await new Promise((r) => setTimeout(r, 150));
+    expect(toast.info).not.toHaveBeenCalled();
+    // The version-info fetch must never fire once the setting is off.
+    expect(fetchMock.mock.calls.some((c: any[]) => typeof c[0] === 'string' && c[0].includes('version-info.json'))).toBe(false);
+    expect(localStorage.getItem('pf_update_toast_enabled')).toBe('false');
   });
 });

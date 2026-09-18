@@ -104,7 +104,8 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       { name: 'notify_upcoming_bills', type: 'BOOLEAN NOT NULL DEFAULT FALSE' },
       { name: 'upcoming_bills_lead_days', type: 'INTEGER NOT NULL DEFAULT 3' },
       { name: 'birth_year', type: 'INTEGER' },
-      { name: 'text_size', type: "TEXT NOT NULL DEFAULT 'default'" }
+      { name: 'text_size', type: "TEXT NOT NULL DEFAULT 'default'" },
+      { name: 'notify_app_updates', type: 'BOOLEAN NOT NULL DEFAULT TRUE' }
     ];
 
     for (const col of columnsToCheck) {

@@ -27,9 +27,9 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import { fetchRedfinValue, normalizeRedfinApiUrl } from '@/lib/services/manual-accounts';
+import { fetchRedfinValue, fetchRedfinValuationDetails, extractRedfinPropertyId, normalizeRedfinApiUrl } from '@/lib/services/manual-accounts';
 
-describe('Redfin fetchRedfinValue', () => {
+describe('Redfin fetchRedfinValue (property-ID only)', () => {
   const apiConfig = {
     redfinApiUrl: 'https://www.redfin.com/stingray',
   };
@@ -38,70 +38,38 @@ describe('Redfin fetchRedfinValue', () => {
     vi.restoreAllMocks();
   });
 
-  it('correctly resolves Property ID via web search and AVM for normal valuationMethod', async () => {
-    const mockYahooHtml = '<a href="https://search.yahoo.com/r?RU=https%3A%2F%2Fwww.redfin.com%2FCA%2FSan-Francisco%2F123-Main-St-94105%2Fhome%2F123456/RK=2">Match</a>';
-    const mockAvmText = '{}&&' + JSON.stringify({
-      payload: {
-        predictedValue: 850000,
-        priceRangeLow: 800000,
-        priceRangeHigh: 900000,
-      },
-    });
-
+  function mockAvm(payload: Record<string, unknown>, status = 200) {
+    const mockAvmText = '{}&&' + JSON.stringify({ payload });
     global.fetch = vi.fn().mockImplementation(async (url: string) => {
       const parsed = new URL(url);
-      if (parsed.hostname.endsWith('search.yahoo.com')) {
-        return {
-          ok: true,
-          text: async () => mockYahooHtml,
-        } as Response;
-      }
       if (parsed.pathname.includes('/api/home/details/avm')) {
-        return {
-          ok: true,
-          text: async () => mockAvmText,
-        } as Response;
+        if (status !== 200) return { ok: false, status } as Response;
+        return { ok: true, status: 200, text: async () => mockAvmText } as Response;
       }
       return { ok: false, status: 404 } as Response;
     });
+  }
+
+  it('fetches the AVM directly by property ID for normal valuationMethod', async () => {
+    mockAvm({ predictedValue: 850000, priceRangeLow: 800000, priceRangeHigh: 900000 });
 
     const price = await fetchRedfinValue(
-      { address: '123 Main St', valuationMethod: 'normal' },
+      { propertyId: '123456', valuationMethod: 'normal' },
       apiConfig
     );
 
     expect(price).toBe(850000);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(global.fetch).mock.calls[0][0]).toBe(
+      'https://www.redfin.com/stingray/api/home/details/avm?propertyId=123456&accessLevel=1'
+    );
   });
 
   it('correctly calculates conservative valuationMethod', async () => {
-    const mockYahooHtml = '<a href="https://search.yahoo.com/r?RU=https%3A%2F%2Fwww.redfin.com%2FCA%2FOakland%2F456-Oak-St-94612%2Fhome%2F654321/RK=2">Match</a>';
-    const mockAvmText = '{}&&' + JSON.stringify({
-      payload: {
-        predictedValue: 500000,
-        priceRangeLow: 460000,
-        priceRangeHigh: 540000,
-      },
-    });
-
-    global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      const parsed = new URL(url);
-      if (parsed.hostname.endsWith('search.yahoo.com')) {
-        return {
-          ok: true,
-          text: async () => mockYahooHtml,
-        } as Response;
-      }
-      if (parsed.pathname.includes('/api/home/details/avm')) {
-        return {
-          ok: true,
-          text: async () => mockAvmText,
-        } as Response;
-      }
-      return { ok: false, status: 404 } as Response;
-    });
+    mockAvm({ predictedValue: 500000, priceRangeLow: 460000, priceRangeHigh: 540000 });
 
     const price = await fetchRedfinValue(
-      { address: '456 Oak St', valuationMethod: 'conservative' },
+      { propertyId: '654321', valuationMethod: 'conservative' },
       apiConfig
     );
 
@@ -110,34 +78,10 @@ describe('Redfin fetchRedfinValue', () => {
   });
 
   it('correctly calculates optimistic valuationMethod', async () => {
-    const mockYahooHtml = '<a href="https://search.yahoo.com/r?RU=https%3A%2F%2Fwww.redfin.com%2FCA%2FSan-Francisco%2F123-Main-St-94105%2Fhome%2F123456/RK=2">Match</a>';
-    const mockAvmText = '{}&&' + JSON.stringify({
-      payload: {
-        predictedValue: 500000,
-        priceRangeLow: 460000,
-        priceRangeHigh: 540000,
-      },
-    });
-
-    global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      const parsed = new URL(url);
-      if (parsed.hostname.endsWith('search.yahoo.com')) {
-        return {
-          ok: true,
-          text: async () => mockYahooHtml,
-        } as Response;
-      }
-      if (parsed.pathname.includes('/api/home/details/avm')) {
-        return {
-          ok: true,
-          text: async () => mockAvmText,
-        } as Response;
-      }
-      return { ok: false, status: 404 } as Response;
-    });
+    mockAvm({ predictedValue: 500000, priceRangeLow: 460000, priceRangeHigh: 540000 });
 
     const price = await fetchRedfinValue(
-      { address: '123 Main St', valuationMethod: 'optimistic' },
+      { propertyId: '123456', valuationMethod: 'optimistic' },
       apiConfig
     );
 
@@ -145,77 +89,65 @@ describe('Redfin fetchRedfinValue', () => {
     expect(price).toBe(520000);
   });
 
-  it('falls back to GIS price if AVM fails', async () => {
-    const mockCensusRes = {
-      result: {
-        addressMatches: [
-          { coordinates: { x: -122.4194, y: 37.7749 } }
-        ]
-      }
-    };
+  it('accepts a pasted Redfin link via the legacy address field', async () => {
+    mockAvm({ predictedValue: 1067552 });
 
-    const mockGisText = '{}&&' + JSON.stringify({
-      payload: {
-        homes: [
-          { propertyId: 123456, streetLine: { value: '123 Main St' }, price: { value: 750000 } }
-        ]
-      },
-    });
-
-    global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      const parsed = new URL(url);
-      if (parsed.hostname.endsWith('search.yahoo.com')) {
-        return { ok: false, status: 404 } as Response;
-      }
-      if (parsed.hostname.endsWith('geocoding.geo.census.gov')) {
-        return { ok: true, json: async () => mockCensusRes } as Response;
-      }
-      if (parsed.pathname.includes('/api/gis')) {
-        return { ok: true, text: async () => mockGisText } as Response;
-      }
-      if (parsed.pathname.includes('/api/home/details/avm')) {
-        return { ok: false, status: 403 } as Response;
-      }
-      return { ok: false, status: 404 } as Response;
-    });
-
-    const price = await fetchRedfinValue(
-      { address: '123 Main St', valuationMethod: 'normal' },
+    const details = await fetchRedfinValuationDetails(
+      { address: 'https://www.redfin.com/WA/Carnation/1618-290th-Ave-NE-98014/home/446533' },
       apiConfig
     );
 
-    expect(price).toBe(750000);
+    expect(details.propertyId).toBe('446533');
+    expect(details.normal).toBe(1067552);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a bare numeric ID via the legacy address field', async () => {
+    mockAvm({ predictedValue: 600000 });
+
+    const price = await fetchRedfinValue({ address: '157939' }, apiConfig);
+
+    expect(price).toBe(600000);
+  });
+
+  it('throws a helpful error when no property ID is provided', async () => {
+    global.fetch = vi.fn();
+
+    await expect(
+      fetchRedfinValue({ address: '1618 290TH AVE NE, CARNATION, WA, 98014' }, apiConfig)
+    ).rejects.toThrow('No Redfin property ID provided');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('throws a helpful error when nothing is provided at all', async () => {
+    global.fetch = vi.fn();
+
+    await expect(fetchRedfinValue({}, apiConfig)).rejects.toThrow('No Redfin property ID provided');
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('throws a rate limit error if AVM returns 403', async () => {
-    global.fetch = vi.fn().mockImplementation(async (url: string) => {
-      const parsed = new URL(url);
-      if (parsed.hostname.endsWith('search.yahoo.com')) {
-        return {
-          ok: true,
-          text: async () => '<a href="https://search.yahoo.com/r?RU=https%3A%2F%2Fwww.redfin.com%2Fhome%2F446533">Link</a>',
-        } as Response;
-      }
-      if (parsed.pathname.includes('/api/home/details/avm')) {
-        return { ok: false, status: 403 } as Response;
-      }
-      return { ok: false, status: 404 } as Response;
-    });
+    mockAvm({}, 403);
 
     await expect(
-      fetchRedfinValue({ address: '446533' }, apiConfig)
-    ).rejects.toThrow('Redfin rate limit reached for "446533". Please chill and wait a few minutes before validating again, or enter the value manually.');
+      fetchRedfinValue({ propertyId: '446533' }, apiConfig)
+    ).rejects.toThrow('Redfin rate limit reached for property 446533');
   });
 
-  it('throws an error if estimate is unavailable', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-    } as Response);
+  it('throws an unavailable error if AVM returns 404 (bad ID)', async () => {
+    mockAvm({}, 404);
 
     await expect(
-      fetchRedfinValue({ address: 'Unknown St' }, apiConfig)
-    ).rejects.toThrow('Redfin estimate unavailable for address "Unknown St". Please check the address, paste the Redfin property link (e.g. redfin.com/.../home/446533), or enter value manually.');
+      fetchRedfinValue({ propertyId: '000000' }, apiConfig)
+    ).rejects.toThrow('Redfin estimate unavailable for property 000000');
+  });
+
+  it('throws an unavailable error when AVM returns no estimate', async () => {
+    mockAvm({});
+
+    await expect(
+      fetchRedfinValue({ propertyId: '446533' }, apiConfig)
+    ).rejects.toThrow('Redfin returned no estimate for property 446533');
   });
 
   it('normalizes misconfigured redfinApiUrl to include /stingray', () => {
@@ -242,11 +174,21 @@ describe('Redfin fetchRedfinValue', () => {
     });
 
     const price = await fetchRedfinValue(
-      { address: '157939' },
+      { propertyId: '157939' },
       { redfinApiUrl: 'https://www.redfin.com/what-is-my-home-worth' }
     );
 
     expect(price).toBe(600000);
     expect(requestedUrl).toBe('https://www.redfin.com/stingray/api/home/details/avm?propertyId=157939&accessLevel=1');
+  });
+
+  it('extractRedfinPropertyId parses links, bare IDs, and rejects plain addresses', () => {
+    expect(extractRedfinPropertyId('https://www.redfin.com/WA/Carnation/1618-290th-Ave-NE-98014/home/446533')).toBe('446533');
+    expect(extractRedfinPropertyId('www.redfin.com/WA/Carnation/x/home/446533')).toBe('446533');
+    expect(extractRedfinPropertyId('446533')).toBe('446533');
+    expect(extractRedfinPropertyId('  446533  ')).toBe('446533');
+    expect(extractRedfinPropertyId('1618 290TH AVE NE, CARNATION, WA, 98014')).toBeUndefined();
+    expect(extractRedfinPropertyId(undefined)).toBeUndefined();
+    expect(extractRedfinPropertyId('')).toBeUndefined();
   });
 });

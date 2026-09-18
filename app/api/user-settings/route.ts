@@ -95,6 +95,7 @@ export async function GET() {
       notifyWeeklyNetWorthChange: created?.notifyWeeklyNetWorthChange ?? DEFAULTS.notifyWeeklyNetWorthChange,
       weeklyNetWorthAlertDay: created?.weeklyNetWorthAlertDay ?? DEFAULTS.weeklyNetWorthAlertDay,
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
+      notifyAppUpdates: (created as any)?.notifyAppUpdates ?? DEFAULTS.notifyAppUpdates,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
       recurringExclusions: created?.recurringExclusions ?? DEFAULTS.recurringExclusions,
@@ -168,6 +169,7 @@ export async function GET() {
     notifyWeeklyNetWorthChange: settings[0].notifyWeeklyNetWorthChange ?? DEFAULTS.notifyWeeklyNetWorthChange,
     weeklyNetWorthAlertDay: settings[0].weeklyNetWorthAlertDay ?? DEFAULTS.weeklyNetWorthAlertDay,
     notifyAiProposals: settings[0].notifyAiProposals ?? DEFAULTS.notifyAiProposals,
+    notifyAppUpdates: (settings[0] as any).notifyAppUpdates ?? DEFAULTS.notifyAppUpdates,
     maxNotificationsPerPeriod: settings[0].maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: settings[0].notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
     recurringExclusions: settings[0].recurringExclusions ?? DEFAULTS.recurringExclusions,
@@ -242,6 +244,7 @@ export async function PATCH(request: Request) {
 	const notifyWeeklyNetWorthChange = body.notifyWeeklyNetWorthChange;
 	const weeklyNetWorthAlertDay = body.weeklyNetWorthAlertDay;
 	const notifyAiProposals = body.notifyAiProposals;
+	const notifyAppUpdates = body.notifyAppUpdates;
 	const maxNotificationsPerPeriod = body.maxNotificationsPerPeriod;
 	const notificationLimiterPeriodMinutes = body.notificationLimiterPeriodMinutes;
 	const deletePendingOlderThan30Days = body.deletePendingOlderThan30Days;
@@ -479,6 +482,9 @@ export async function PATCH(request: Request) {
 	if (notifyAiProposals !== undefined && typeof notifyAiProposals !== 'boolean') {
 		return Response.json({ error: 'Invalid notifyAiProposals value' }, { status: 400 });
 	}
+	if (notifyAppUpdates !== undefined && typeof notifyAppUpdates !== 'boolean') {
+		return Response.json({ error: 'Invalid notifyAppUpdates value' }, { status: 400 });
+	}
   // R6: cap limiter settings server-side so users cannot configure a limiter
   // so strict that it silently drops legitimate alerts, or so loose that it
   // becomes a no-op. (maxNotificationsPerPeriod: 1–50, period: 5–1440 min.)
@@ -607,6 +613,7 @@ export async function PATCH(request: Request) {
       notifyWeeklyNetWorthChange: created?.notifyWeeklyNetWorthChange ?? DEFAULTS.notifyWeeklyNetWorthChange,
       weeklyNetWorthAlertDay: created?.weeklyNetWorthAlertDay ?? DEFAULTS.weeklyNetWorthAlertDay,
       notifyAiProposals: created?.notifyAiProposals ?? DEFAULTS.notifyAiProposals,
+      notifyAppUpdates: (created as any)?.notifyAppUpdates ?? DEFAULTS.notifyAppUpdates,
       maxNotificationsPerPeriod: created?.maxNotificationsPerPeriod ?? DEFAULTS.maxNotificationsPerPeriod,
       notificationLimiterPeriodMinutes: created?.notificationLimiterPeriodMinutes ?? DEFAULTS.notificationLimiterPeriodMinutes,
       recurringExclusions: created?.recurringExclusions ?? DEFAULTS.recurringExclusions,
@@ -692,6 +699,7 @@ export async function PATCH(request: Request) {
 	if (notifyWeeklyNetWorthChange !== undefined) updates.notifyWeeklyNetWorthChange = notifyWeeklyNetWorthChange;
 	if (weeklyNetWorthAlertDay !== undefined) updates.weeklyNetWorthAlertDay = weeklyNetWorthAlertDay.toLowerCase();
 	if (notifyAiProposals !== undefined) updates.notifyAiProposals = notifyAiProposals;
+	if (notifyAppUpdates !== undefined) (updates as any).notifyAppUpdates = notifyAppUpdates;
 	if (notifyRecurringPriceChanges !== undefined) updates.notifyRecurringPriceChanges = notifyRecurringPriceChanges;
 	if (notifyUpcomingBills !== undefined) updates.notifyUpcomingBills = notifyUpcomingBills;
 	if (upcomingBillsLeadDays !== undefined) updates.upcomingBillsLeadDays = upcomingBillsLeadDays;
@@ -921,6 +929,7 @@ export async function PATCH(request: Request) {
     notifyWeeklyNetWorthChange: resultSetting.notifyWeeklyNetWorthChange,
     weeklyNetWorthAlertDay: resultSetting.weeklyNetWorthAlertDay,
     notifyAiProposals: resultSetting.notifyAiProposals,
+    notifyAppUpdates: (resultSetting as any).notifyAppUpdates ?? DEFAULTS.notifyAppUpdates,
     maxNotificationsPerPeriod: resultSetting.maxNotificationsPerPeriod,
     notificationLimiterPeriodMinutes: resultSetting.notificationLimiterPeriodMinutes,
     recurringExclusions: resultSetting.recurringExclusions ?? DEFAULTS.recurringExclusions,

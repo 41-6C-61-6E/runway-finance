@@ -171,24 +171,28 @@ export default function GeneralTab() {
       <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
         <div className="space-y-5 sm:space-y-6">
           {/* Theme */}
-          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-foreground">Theme</h3>
               <p className="text-xs text-muted-foreground mt-1">Select between Daylight, Moonlight, and Starlight themes</p>
             </div>
-            <ModeToggle />
+            <div className="shrink-0">
+              <ModeToggle />
+            </div>
           </div>
 
           {/* Accent Color */}
-          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-foreground">Accent Color</h3>
               <p className="text-xs text-muted-foreground mt-1">Choose the accent color used throughout the app</p>
             </div>
-            <AccentPicker
-              value={accentColor}
-              onChange={handleAccentColorChange}
-            />
+            <div className="shrink-0">
+              <AccentPicker
+                value={accentColor}
+                onChange={handleAccentColorChange}
+              />
+            </div>
           </div>
 
           {/* Chart Color Scheme */}
@@ -234,13 +238,14 @@ export default function GeneralTab() {
           </div>
 
           {/* Base Currency */}
-          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-foreground">Base Currency</h3>
               <p className="text-xs text-muted-foreground mt-1">Default currency symbol and denomination used across net worth, budgets, and plans</p>
             </div>
             <Select
               className="h-9 text-xs font-medium"
+              wrapperClassName="w-full sm:w-56 sm:shrink-0"
               value={currency}
               onChange={(e) => handleCurrencyChange(e.target.value)}
             >
@@ -264,14 +269,14 @@ export default function GeneralTab() {
           </div>
 
           {/* Timezone */}
-          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-foreground">Timezone</h3>
               <p className="text-xs text-muted-foreground mt-1">Timezone used for daily syncs, date boundaries, and automated alerts</p>
             </div>
             <Select
               className="h-9 text-xs font-medium"
-              wrapperClassName="max-w-xs"
+              wrapperClassName="w-full sm:w-56 sm:shrink-0"
               value={timezone}
               onChange={(e) => handleTimezoneChange(e.target.value)}
             >
@@ -309,13 +314,14 @@ export default function GeneralTab() {
           </div>
 
           {/* Locale / Number Format */}
-          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-foreground">Locale & Language</h3>
               <p className="text-xs text-muted-foreground mt-1">Number, currency, and decimal separator formatting</p>
             </div>
             <Select
               className="h-9 text-xs font-medium"
+              wrapperClassName="w-full sm:w-56 sm:shrink-0"
               value={locale}
               onChange={(e) => handleLocaleChange(e.target.value)}
             >
@@ -333,13 +339,14 @@ export default function GeneralTab() {
           </div>
 
           {/* Date Format */}
-          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-foreground">Date Format</h3>
               <p className="text-xs text-muted-foreground mt-1">How calendar dates are displayed across ledger tables and statements</p>
             </div>
             <Select
               className="h-9 text-xs font-medium"
+              wrapperClassName="w-full sm:w-56 sm:shrink-0"
               value={dateFormat}
               onChange={(e) => handleDateFormatChange(e.target.value)}
             >
@@ -353,24 +360,26 @@ export default function GeneralTab() {
 
           {/* Compact Mode */}
           <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-2">
               <h3 className="text-sm font-medium text-foreground">Compact Mode</h3>
               <p className="text-xs text-muted-foreground mt-1">Increase table data density and reduce padding across desktop views</p>
             </div>
             <Switch
+              className="shrink-0"
               checked={compactMode}
               onCheckedChange={handleCompactModeChange}
             />
           </div>
 
           {/* Text Size */}
-          <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 pb-5 border-b border-border">
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-foreground">Text Size</h3>
               <p className="text-xs text-muted-foreground mt-1">Adjust typography scaling across tables, cards, charts, and headings</p>
             </div>
             <Select
               className="h-9 text-xs font-medium"
+              wrapperClassName="w-full sm:w-56 sm:shrink-0"
               value={textSize}
               onChange={(e) => handleTextSizeChange(e.target.value)}
             >
@@ -383,12 +392,13 @@ export default function GeneralTab() {
 
           {/* Privacy Mode */}
           <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-2">
               <h3 className="text-sm font-medium text-foreground">Privacy Mode</h3>
               <p className="text-xs text-muted-foreground mt-1">Pixelate financial data when showing the app to others</p>
               <p className="text-xs text-muted-foreground mt-1">Visually hides amounts on this device only. It does not hide data from other household members.</p>
             </div>
             <Switch
+              className="shrink-0"
               checked={privacyMode ?? false}
               onCheckedChange={togglePrivacyMode}
               disabled={privacyModeLoading}
@@ -397,11 +407,12 @@ export default function GeneralTab() {
 
           {/* Hide Account Subheadings */}
           <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-2">
               <h3 className="text-sm font-medium text-foreground">Hide Account Subheadings</h3>
               <p className="text-xs text-muted-foreground mt-1">Group accounts by major category only (e.g. Banking, Credit)</p>
             </div>
             <Switch
+              className="shrink-0"
               checked={hideSubheadings}
               onCheckedChange={updateHideSubheadings}
             />
@@ -409,11 +420,12 @@ export default function GeneralTab() {
 
           {/* Dev Mode */}
           <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pr-2">
               <h3 className="text-sm font-medium text-foreground">Developer Tools</h3>
               <p className="text-xs text-muted-foreground mt-1">Enable developer tools such as the Financial Logic and Data Explorer pages</p>
             </div>
             <Switch
+              className="shrink-0"
               checked={devMode ?? false}
               onCheckedChange={handleToggleDevMode}
               disabled={devModeLoading}
@@ -457,9 +469,10 @@ export default function GeneralTab() {
                 pageKey;
 
               return (
-                <div key={pageKey} className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-lg">
-                  <span className="text-sm text-foreground">{pageLabel}</span>
+                <div key={pageKey} className="flex items-center justify-between gap-4 p-3 bg-muted/30 border border-border rounded-lg">
+                  <span className="text-sm text-foreground flex-1 min-w-0">{pageLabel}</span>
                   <Switch
+                    className="shrink-0"
                     checked={!isHidden(pageKey)}
                     onCheckedChange={(checked) => updateHidden(pageKey, !checked)}
                   />

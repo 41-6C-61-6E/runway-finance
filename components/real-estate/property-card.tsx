@@ -139,6 +139,7 @@ export function PropertyCard({
   const valuationLabel =
     valuationMethod === 'redfin' ? 'Redfin AVM' : valuationMethod === 'hpi' ? 'FHFA HPI' : 'Manual Entry';
   const address = meta.address as string | undefined;
+  const redfinPropertyId = meta.redfinPropertyId as string | undefined;
   const bedrooms = meta.bedrooms as number | undefined;
   const bathrooms = meta.bathrooms as number | undefined;
   const squareFootage = meta.squareFootage as number | undefined;
@@ -287,12 +288,12 @@ export function PropertyCard({
                     <div className="flex-grow min-w-0">
                       <span className="font-semibold block mb-0.5">Sync Failed</span>
                       <span className="break-words block">{String(meta.syncError)}</span>
-                      {String(meta.syncError).toLowerCase().includes('address') && onEditProperty && (
+                      {String(meta.syncError).toLowerCase().includes('property id') && onEditProperty && (
                         <button
                           onClick={onEditProperty}
                           className="mt-1.5 block text-[10px] font-bold text-primary hover:underline text-left cursor-pointer"
                         >
-                          Edit property to add address
+                          Edit property to enter the Redfin Property ID
                         </button>
                       )}
                     </div>
@@ -630,6 +631,12 @@ export function PropertyCard({
                         <div className="flex justify-between items-center py-0.5">
                           <span className="text-muted-foreground">Sq Ft</span>
                           <span className="text-foreground font-mono">{squareFootage.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {redfinPropertyId && (
+                        <div className="flex justify-between items-center py-0.5">
+                          <span className="text-muted-foreground">Redfin ID</span>
+                          <span className="text-foreground font-mono">{redfinPropertyId}</span>
                         </div>
                       )}
                       {address && (
