@@ -111,7 +111,7 @@ export default function AiTab() {
     aiAutoApprove: false,
     aiAutoApproveThreshold: 95,
     aiBatchSize: 25,
-    aiAnalysisTimeoutSeconds: 600,
+    aiAnalysisTimeoutSeconds: 3600,
   });
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [testPromptExpanded, setTestPromptExpanded] = useState(false);
@@ -159,7 +159,7 @@ export default function AiTab() {
           aiAutoApprove: data.aiAutoApprove ?? false,
           aiAutoApproveThreshold: data.aiAutoApproveThreshold ?? 95,
           aiBatchSize: data.aiBatchSize ?? 25,
-          aiAnalysisTimeoutSeconds: data.aiAnalysisTimeoutSeconds ?? 600,
+          aiAnalysisTimeoutSeconds: data.aiAnalysisTimeoutSeconds ?? 3600,
         });
       }
     } catch {
@@ -689,22 +689,22 @@ export default function AiTab() {
               onBlur={(e) => saveSetting({ aiBatchSize: parseInt(e.target.value) || 25 })}
               className="w-24 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <p className="text-xs text-muted-foreground mt-1">Number of transactions to analyze per API call</p>
+            <p className="text-xs text-muted-foreground mt-1">Number of transactions to analyze per API call. Slow models (~20 tok/s) work best at 5–10 for frequent progress updates.</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Analysis timeout</label>
             <input
               type="number"
-              min={30}
-              max={600}
-              step={30}
+              min={60}
+              max={3600}
+              step={60}
               value={automation.aiAnalysisTimeoutSeconds}
-              onChange={(e) => setAutomation((s) => ({ ...s, aiAnalysisTimeoutSeconds: parseInt(e.target.value) || 600 }))}
-              onBlur={(e) => saveSetting({ aiAnalysisTimeoutSeconds: parseInt(e.target.value) || 600 })}
+              onChange={(e) => setAutomation((s) => ({ ...s, aiAnalysisTimeoutSeconds: parseInt(e.target.value) || 3600 }))}
+              onBlur={(e) => saveSetting({ aiAnalysisTimeoutSeconds: parseInt(e.target.value) || 3600 })}
               className="w-24 px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <p className="text-xs text-muted-foreground mt-1">Seconds before analysis auto-cancels (30–600s)</p>
+            <p className="text-xs text-muted-foreground mt-1">Seconds before analysis auto-cancels (60–3600s). Slow models need 1500s+ for large backlogs.</p>
           </div>
         </div>
       </div>

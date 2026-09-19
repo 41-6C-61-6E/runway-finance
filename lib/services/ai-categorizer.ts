@@ -11,7 +11,21 @@ import { findDuplicateRule } from '@/lib/services/rules-engine';
 import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[ai-categorizer]';
-const BATCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes per batch
+// Adaptive per-batch timeout so slower models (~20 tok/s) aren't killed:
+// output grows ~120 tokens per transaction, plus prefill and a cold model
+// load on the first batch.
+const BATCH_TIMEOUT_BASE_MS = 2 * 60 * 1000;
+const BATCH_TIMEOUT_PER_TXN_MS = 30 * 1000;
+const FIRST_BATCH_EXTRA_MS = 3 * 60 * 1000;
+const BATCH_TIMEOUT_MAX_MS = 30 * 60 * 1000;
+
+function batchTimeoutMs(batchSize: number, isFirstBatch: boolean): number {
+  const timeout =
+    BATCH_TIMEOUT_BASE_MS +
+    Math.max(1, batchSize) * BATCH_TIMEOUT_PER_TXN_MS +
+    (isFirstBatch ? FIRST_BATCH_EXTRA_MS : 0);
+  return Math.min(timeout, BATCH_TIMEOUT_MAX_MS);
+}
 const activeAiAnalysisUsers = new Set<string>();
 
 type TransactionInfo = {
@@ -210,6 +224,15 @@ export async function analyzeUncategorized(
 
     const batchSize = settings.aiBatchSize ?? 100;
     const autoApproveThreshold = settings.aiAutoApproveThreshold ?? 95;
+    // Overall deadline (previously a settings field that nothing enforced).
+    const analysisTimeoutSeconds = Math.min(
+      Math.max(settings.aiAnalysisTimeoutSeconds ?? 3600, 60),
+      3600
+    );
+    const deadline = Date.now() + analysisTimeoutSeconds * 1000;
+    onLog?.(
+      `Budget: ${analysisTimeoutSeconds}s overall, ~${Math.round(batchTimeoutMs(batchSize, true) / 1000)}s for the first batch of ${batchSize} then ~${Math.round(batchTimeoutMs(batchSize, false) / 1000)}s per batch.`
+    );
     let proposalsCreated = 0;
     let autoApproved = 0;
     let processedCount = 0;
@@ -222,6 +245,16 @@ export async function analyzeUncategorized(
       // Check if analysis has been aborted
       if (abortController?.signal.aborted) {
         onLog?.('Analysis cancelled by user');
+        break;
+      }
+
+      // Enforce the overall analysis timeout so slow models stop gracefully
+      // instead of running unbounded.
+      if (Date.now() > deadline) {
+        const msg = `Analysis timeout after ${analysisTimeoutSeconds}s — stopping with ${proposalsCreated} proposal(s) so far. Raise the analysis timeout in Settings → AI Suggestions → Automation for slower models.`;
+        onLog?.(msg);
+        errors.push(msg);
+        logger.warn(`${LOG_TAG} Analysis timeout reached`, { userId, proposalsCreated });
         break;
       }
 
@@ -294,11 +327,13 @@ export async function analyzeUncategorized(
       const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
       onLog?.(`Batch ${batchNum}: Prepared prompt with ${decryptedTxns.length} transaction(s).`);
 
-      // Per-batch AbortController with its own timeout
+      // Per-batch AbortController with a timeout scaled to the batch size
+      // (slow models need minutes per batch, plus cold-start on batch 1).
+      const perBatchTimeout = batchTimeoutMs(batchSize, batchNum === 1);
       const batchAbortController = new AbortController();
       const batchTimeoutId = setTimeout(() => {
         batchAbortController.abort();
-      }, BATCH_TIMEOUT_MS);
+      }, perBatchTimeout);
 
       // Propagate main cancel signal to per-batch controller
       const onMainAbort = () => {
@@ -364,7 +399,7 @@ export async function analyzeUncategorized(
           break;
         }
         if (err instanceof Error && err.name === 'AbortError') {
-          const msg = `Batch ${batchNum} timed out after ${BATCH_TIMEOUT_MS / 1000}s, skipping.`;
+          const msg = `Batch ${batchNum} timed out after ${Math.round(perBatchTimeout / 1000)}s, skipping ${txnRows.length} transaction(s) — lower the batch size in Settings → AI Suggestions → Automation for slower models.`;
           onLog?.(msg);
           errors.push(msg);
         } else {
