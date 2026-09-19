@@ -151,21 +151,21 @@ describe('AI Providers Seeding & Sanitization', () => {
       expect(state.userSettingsRows.some(s => s.aiActiveProviderId === state.aiProvidersRows[0].id)).toBe(true);
     });
 
-    it('is strictly idempotent and does not overwrite existing user-modified keys', async () => {
+    it('always overrides the existing provider with env values (env wins)', async () => {
       // Simulate existing provider with user's manually updated key
       state.aiProvidersRows = [
         {
           id: 'prov_existing',
           userId: 'user1',
-          name: 'OpenAI',
-          endpoint: 'https://api.openai.com/v1',
-          model: 'gpt-4o-mini',
+          name: 'Custom Name',
+          endpoint: 'https://old-endpoint.example.com/v1',
+          model: 'old-model',
           apiKeyEncrypted: 'encrypted:user-manual-key',
-          isActive: true,
+          isActive: false,
         },
       ];
 
-      // Env vars have a different key or old key
+      // Env vars define the deployment-wide provider
       process.env.AI_PROVIDER_NAME = 'OpenAI';
       process.env.AI_PROVIDER_ENDPOINT = 'https://api.openai.com/v1/';
       process.env.AI_PROVIDER_MODEL = 'gpt-4o-mini';
@@ -173,9 +173,67 @@ describe('AI Providers Seeding & Sanitization', () => {
 
       await seedUserAiProviders('user1');
 
-      // The provider list was not duplicated or overwritten
+      // Still a single row, now matching env (endpoint normalized)
       expect(state.aiProvidersRows.length).toBe(1);
-      expect(state.aiProvidersRows[0].apiKeyEncrypted).toBe('encrypted:user-manual-key');
+      expect(state.aiProvidersRows[0]).toMatchObject({
+        name: 'OpenAI',
+        endpoint: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        apiKeyEncrypted: 'encrypted:sk-env-key',
+        isActive: true,
+      });
+    });
+
+    it('keeps the saved key when env provides no API key', async () => {
+      state.aiProvidersRows = [
+        {
+          id: 'prov_existing',
+          userId: 'user1',
+          name: 'Old',
+          endpoint: 'https://old-endpoint.example.com/v1',
+          model: 'old-model',
+          apiKeyEncrypted: 'encrypted:user-manual-key',
+          isActive: true,
+        },
+      ];
+
+      process.env.AI_PROVIDER_NAME = 'Ollama';
+      process.env.AI_PROVIDER_ENDPOINT = 'http://localhost:11434/v1';
+      process.env.AI_PROVIDER_MODEL = 'llama3';
+      delete process.env.AI_PROVIDER_API_KEY;
+
+      await seedUserAiProviders('user1');
+
+      expect(state.aiProvidersRows.length).toBe(1);
+      expect(state.aiProvidersRows[0]).toMatchObject({
+        endpoint: 'http://localhost:11434/v1',
+        model: 'llama3',
+        apiKeyEncrypted: 'encrypted:user-manual-key',
+      });
+    });
+
+    it('is a no-op when already matching env (no rewrite churn)', async () => {
+      state.aiProvidersRows = [
+        {
+          id: 'prov_existing',
+          userId: 'user1',
+          name: 'OpenAI',
+          endpoint: 'https://api.openai.com/v1',
+          model: 'gpt-4o-mini',
+          apiKeyEncrypted: 'encrypted:sk-env-key',
+          isActive: true,
+        },
+      ];
+
+      process.env.AI_PROVIDER_NAME = 'OpenAI';
+      process.env.AI_PROVIDER_ENDPOINT = 'https://api.openai.com/v1';
+      process.env.AI_PROVIDER_MODEL = 'gpt-4o-mini';
+      process.env.AI_PROVIDER_API_KEY = 'sk-env-key';
+
+      await seedUserAiProviders('user1');
+
+      expect(state.aiProvidersRows.length).toBe(1);
+      expect(state.userSettingsRows.length).toBe(0);
     });
 
     it('seeds provider with null apiKeyEncrypted if no API key is provided in env', async () => {

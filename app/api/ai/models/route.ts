@@ -5,7 +5,7 @@ import { validateEndpointUrl } from '@/lib/utils/ssrf';
 
 import { getDb } from '@/lib/db';
 import { aiProviders } from '@/lib/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 
@@ -28,6 +28,33 @@ export async function POST(request: Request) {
   // Disregard masked API keys
   if (apiKey && (/^[•*]+$/.test(apiKey) || /\.{3}/.test(apiKey))) {
     apiKey = '';
+  }
+
+  // Fall back to the single saved provider so the model dropdown works
+  // without retyping the key (blank key = use saved key).
+  if (!apiKey || !rawEndpoint) {
+    try {
+      const db = getDb();
+      const dek = await getSessionDEK();
+      const rows = await db
+        .select()
+        .from(aiProviders)
+        .where(eq(aiProviders.userId, session.user.id))
+        .orderBy(asc(aiProviders.createdAt))
+        .limit(10);
+
+      const saved = rows.find((r) => r.isActive) ?? rows[0];
+      if (saved) {
+        if (!rawEndpoint) {
+          rawEndpoint = saved.endpoint.replace(/\/$/, '');
+        }
+        if (!apiKey && saved.apiKeyEncrypted) {
+          apiKey = await decryptField(saved.apiKeyEncrypted, dek);
+        }
+      }
+    } catch (err) {
+      logger.warn('[ai/models] Failed to load saved credentials', { error: String(err) });
+    }
   }
 
   if (body.providerId && (!apiKey || !rawEndpoint)) {

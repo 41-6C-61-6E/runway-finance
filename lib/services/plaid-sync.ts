@@ -792,7 +792,7 @@ export async function syncPlaidConnection(
             .where(eq(userSettings.userId, userId))
             .limit(1);
 
-          if (settingsRow?.aiAutoAnalyze && settingsRow?.aiActiveProviderId) {
+          if (settingsRow?.aiAutoAnalyze) {
             analyzeUncategorized(userId).catch((err) => {
               logger.error(`${LOG_TAG} AI auto-categorization failed`, { error: String(err) });
             });

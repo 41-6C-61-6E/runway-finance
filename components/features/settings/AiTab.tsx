@@ -1,26 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
 import { DEFAULT_AI_SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from '@/config/defaults';
 import { Slider } from '@/components/ui/slider';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Select } from '@/components/ui/select';
-import { ActionButton } from '@/components/ui/action-button';
-import { Plus } from 'lucide-react';
-
-type Provider = {
-  id: string;
-  name: string;
-  endpoint: string;
-  model: string;
-  apiKey: string;
-  hasApiKey?: boolean;
-  isActive: boolean;
-  jsonMode: boolean;
-};
 
 type AutomationSettings = {
   aiSystemPrompt: string | null;
@@ -29,12 +14,46 @@ type AutomationSettings = {
   aiAutoApproveThreshold: number;
   aiBatchSize: number;
   aiAnalysisTimeoutSeconds: number;
-  aiActiveProviderId: string | null;
 };
+
+function endpointHint(endpoint: string): string | null {
+  const trimmed = endpoint.trim().replace(/\/+$/, '');
+  try {
+    const url = new URL(trimmed);
+    const path = url.pathname.replace(/\/+$/, '');
+    if (/(^|\/)api\/v1$/.test(path)) {
+      return `For Open WebUI use ${url.origin}${path.replace(/\/v1$/, '')} (remove the trailing /v1). Tests POST {endpoint}/chat/completions.`;
+    }
+    if (path === '/v1') {
+      return 'For Open WebUI use https://your-host/api instead of a /v1-only path.';
+    }
+  } catch {
+    /* not a valid URL yet */
+  }
+  return null;
+}
 
 export default function AiTab() {
   const [loading, setLoading] = useState(true);
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Single provider form state
+  const [endpoint, setEndpoint] = useState('');
+  const [model, setModel] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [jsonMode, setJsonMode] = useState(false);
+  const [managed, setManaged] = useState(false);
+
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; response?: string } | null>(null);
+
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [modelsFetchError, setModelsFetchError] = useState<string | null>(null);
+  const [isCustomModel, setIsCustomModel] = useState(false);
+
   const [automation, setAutomation] = useState<AutomationSettings>({
     aiSystemPrompt: null,
     aiAutoAnalyze: false,
@@ -42,7 +61,6 @@ export default function AiTab() {
     aiAutoApproveThreshold: 95,
     aiBatchSize: 25,
     aiAnalysisTimeoutSeconds: 600,
-    aiActiveProviderId: null,
   });
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [testPromptExpanded, setTestPromptExpanded] = useState(false);
@@ -56,32 +74,31 @@ export default function AiTab() {
       }
     } catch { /* ignore */ }
   }, []);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formName, setFormName] = useState('');
-  const [formEndpoint, setFormEndpoint] = useState('');
-  const [formModel, setFormModel] = useState('');
-  const [formApiKey, setFormApiKey] = useState('');
-  const [formSetActive, setFormSetActive] = useState(false);
-  const [formJsonMode, setFormJsonMode] = useState(false);
-  const [formTesting, setFormTesting] = useState(false);
-  const [formTestResult, setFormTestResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [showTestProgress, setShowTestProgress] = useState<string | null>(null);
-  const [testProgressFn, setTestProgressFn] = useState<((signal: AbortSignal) => Promise<{ ok: boolean; message: string; response?: string }>) | null>(null);
-  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
-  const [fetchingModels, setFetchingModels] = useState(false);
-  const [modelsFetchError, setModelsFetchError] = useState<string | null>(null);
-  const [isCustomModel, setIsCustomModel] = useState(false);
 
   const loadData = async () => {
     try {
       const [provRes, settingsRes] = await Promise.all([
-        fetch('/api/ai/providers', { credentials: 'include' }),
+        fetch('/api/ai/provider', { credentials: 'include' }),
         fetch('/api/user-settings', { credentials: 'include' }),
       ]);
       if (provRes.ok) {
-        const data: Provider[] = await provRes.json();
-        setProviders(data);
+        const data = await provRes.json();
+        // Support the legacy array shape just in case an old backend responds.
+        const single = Array.isArray(data)
+          ? (data.find((p: any) => p.isActive) ?? data[0] ?? null)
+          : data;
+        if (single) {
+          setEndpoint(single.endpoint ?? '');
+          setModel(single.model ?? '');
+          setHasApiKey(!!single.hasApiKey);
+          setJsonMode(!!single.jsonMode);
+          setManaged(!!single.managed);
+          if (single.model) {
+            setIsCustomModel(false);
+          }
+        } else if (data?.managed) {
+          setManaged(true);
+        }
       }
       if (settingsRes.ok) {
         const data = await settingsRes.json();
@@ -92,7 +109,6 @@ export default function AiTab() {
           aiAutoApproveThreshold: data.aiAutoApproveThreshold ?? 95,
           aiBatchSize: data.aiBatchSize ?? 25,
           aiAnalysisTimeoutSeconds: data.aiAnalysisTimeoutSeconds ?? 600,
-          aiActiveProviderId: data.aiActiveProviderId ?? null,
         });
       }
     } catch {
@@ -105,9 +121,9 @@ export default function AiTab() {
     loadData();
   }, []);
 
-  // Debounced model fetching
+  // Debounced model fetching — blank key falls back to the saved key server-side.
   useEffect(() => {
-    if (!showForm || !formEndpoint.trim() || !formEndpoint.startsWith('http')) {
+    if (!endpoint.trim() || !endpoint.startsWith('http')) {
       setFetchedModels([]);
       setModelsFetchError(null);
       return;
@@ -117,27 +133,23 @@ export default function AiTab() {
       setFetchingModels(true);
       setModelsFetchError(null);
       try {
-        const body: Record<string, string> = {
-          endpoint: formEndpoint.trim(),
-        };
-        if (formApiKey.trim()) {
-          body.apiKey = formApiKey.trim();
-        } else if (editingId) {
-          body.providerId = editingId;
-        }
-
         const res = await fetch('/api/ai/models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify(body),
+          body: JSON.stringify({
+            endpoint: endpoint.trim(),
+            ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+          }),
         });
         if (res.ok) {
           const data = await res.json();
           const list = data.models || [];
           setFetchedModels(list);
-          if (formModel && !list.includes(formModel)) {
+          if (model && list.length > 0 && !list.includes(model)) {
             setIsCustomModel(true);
+          } else if (list.length > 0 && list.includes(model)) {
+            setIsCustomModel(false);
           }
         } else {
           const data = await res.json().catch(() => ({}));
@@ -151,173 +163,80 @@ export default function AiTab() {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [formEndpoint, formApiKey, showForm, editingId]);
+  }, [endpoint, apiKey]);
 
-  const openAddForm = () => {
-    setEditingId(null);
-    setFormName('');
-    setFormEndpoint('');
-    setFormModel('');
-    setFormApiKey('');
-    setFormSetActive(false);
-    setFormJsonMode(false);
-    setShowForm(true);
-    setFetchedModels([]);
-    setIsCustomModel(false);
-    setModelsFetchError(null);
-  };
-
-  const openEditForm = (p: Provider) => {
-    setEditingId(p.id);
-    setFormName(p.name);
-    setFormEndpoint(p.endpoint);
-    setFormModel(p.model);
-    setFormApiKey('');
-    setFormSetActive(false);
-    setFormJsonMode(p.jsonMode ?? false);
-    setShowForm(true);
-    setFetchedModels([]);
-    setIsCustomModel(false);
-    setModelsFetchError(null);
-  };
-
-  const handleSaveProvider = async () => {
-    if (!formName.trim() || !formEndpoint.trim() || !formModel.trim()) return;
-
-    const url = editingId ? `/api/ai/providers/${editingId}` : '/api/ai/providers';
-    const method = editingId ? 'PATCH' : 'POST';
-
-    const body: Record<string, unknown> = {
-      name: formName.trim(),
-      endpoint: formEndpoint.trim(),
-      model: formModel.trim(),
-      jsonMode: formJsonMode,
-    };
-    if (editingId) {
-      body.isActive = formSetActive;
-      if (formApiKey.trim() !== '') {
-        body.apiKey = formApiKey.trim();
-      }
-    } else {
-      body.setActive = formSetActive;
-      body.apiKey = formApiKey.trim();
-    }
-
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(body),
-    });
-
-    if (res.ok) {
-      setShowForm(false);
-      setFormTestResult(null);
-      await loadData();
-    } else {
+  const handleSave = async () => {
+    if (!endpoint.trim() || !model.trim()) return;
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      const res = await fetch('/api/ai/provider', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          endpoint: endpoint.trim(),
+          model: model.trim(),
+          jsonMode,
+          ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+        }),
+      });
       const data = await res.json().catch(() => ({}));
-      setFormTestResult({ ok: false, message: data.error || data.message || 'Failed to save provider' });
-    }
-  };
-
-  const handleFormTest = () => {
-    if (!formEndpoint.trim()) return;
-    setTestProgressFn(() => async (signal) => {
-      setFormTesting(true);
-      setFormTestResult(null);
-      try {
-        let customPrompt: string | undefined;
-        try { customPrompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined; } catch { /* ignore */ }
-
-        let res: Response;
-        if (editingId && !formApiKey.trim()) {
-          res = await fetch(`/api/ai/providers/${editingId}/test`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: customPrompt ? JSON.stringify({ prompt: customPrompt }) : undefined,
-            signal,
-          });
-        } else {
-          res = await fetch('/api/ai/test-connection', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              endpoint: formEndpoint.trim(),
-              model: formModel.trim(),
-              apiKey: formApiKey.trim(),
-              prompt: customPrompt,
-            }),
-            signal,
-          });
-        }
-
-        const data = await res.json().catch(() => ({ ok: false, message: 'Failed to parse response' }));
-        const result = { ok: !!data.ok, message: data.message || (data.ok ? 'Connection successful' : 'Connection failed'), response: data.response };
-        setFormTestResult(result);
-        return result;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to reach server';
-        const result = { ok: false, message: message.includes('abort') ? 'Request timed out' : 'Failed to reach server' };
-        setFormTestResult(result);
-        return result;
-      } finally {
-        setFormTesting(false);
+      if (res.ok) {
+        setHasApiKey(!!data.hasApiKey || (hasApiKey && !apiKey.trim()));
+        setApiKey('');
+        setSaveResult({ ok: true, message: 'AI provider saved.' });
+      } else {
+        setSaveResult({ ok: false, message: data.error || 'Failed to save provider' });
       }
-    });
-    setShowTestProgress('form');
-  };
-
-  const handleDeleteProvider = async (id: string) => {
-    if (!confirm('Delete this provider?')) return;
-    const res = await fetch(`/api/ai/providers/${id}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-    if (res.ok) {
-      await loadData();
-    } else {
-      console.error('Failed to delete provider');
+    } catch {
+      setSaveResult({ ok: false, message: 'Failed to save provider' });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleSetActive = async (id: string) => {
-    const res = await fetch(`/api/ai/providers/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ isActive: true }),
-    });
-    if (res.ok) {
-      await loadData();
-    } else {
-      console.error('Failed to set active provider');
+  const handleTest = async () => {
+    if (!endpoint.trim() || !model.trim() || testing) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      let customPrompt: string | undefined;
+      try { customPrompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined; } catch { /* ignore */ }
+
+      const res = await fetch('/api/ai/provider/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          endpoint: endpoint.trim(),
+          model: model.trim(),
+          jsonMode,
+          ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+          ...(customPrompt ? { prompt: customPrompt } : {}),
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      const data = await res.json().catch(() => ({ ok: false, message: 'Failed to parse response' }));
+      setTestResult({
+        ok: !!data.ok,
+        message: data.message || (data.ok ? 'Connection successful' : 'Connection failed'),
+        response: data.response,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reach server';
+      setTestResult({
+        ok: false,
+        message: /abort|timeout/i.test(message)
+          ? 'Request timed out. The model may still be loading — wait a moment and try again.'
+          : 'Failed to reach server',
+      });
+    } finally {
+      setTesting(false);
     }
   };
 
-  const handleTestProvider = (provider: Provider) => {
-    setTestProgressFn(() => async (signal) => {
-      try {
-        let customPrompt: string | undefined;
-        try { customPrompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined; } catch { /* ignore */ }
-        const res = await fetch(`/api/ai/providers/${provider.id}/test`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: customPrompt ? JSON.stringify({ prompt: customPrompt }) : undefined,
-          signal,
-        });
-        const data = await res.json();
-        return { ok: data.ok, message: data.message, response: data.response };
-      } catch {
-        return { ok: false, message: 'Failed to reach server' };
-      }
-    });
-    setShowTestProgress(provider.id);
-  };
-
-  const saveSetting = useCallback(async (partial: Partial<AutomationSettings>) => {
+  const saveSetting = useCallback(async (partial: Record<string, unknown>) => {
     try {
       await fetch('/api/user-settings', {
         method: 'PATCH',
@@ -337,254 +256,165 @@ export default function AiTab() {
     return <div className="text-muted-foreground py-4">Loading AI settings...</div>;
   }
 
+  const hint = endpointHint(endpoint);
+  const chatUrl = endpoint.trim() ? `${endpoint.trim().replace(/\/+$/, '')}/chat/completions` : null;
+
   return (
     <div className="space-y-4">
-      {/* AI Providers */}
+      {/* AI Provider (single) */}
       <div className="p-5 bg-card border border-border rounded-xl">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-          <div className="flex-1 min-w-0">
-            <SectionHeading>AI Providers</SectionHeading>
-            <p className="text-xs text-muted-foreground">
-              Configure OpenAI-compatible API endpoints. Compatible with Ollama, Open WebUI, and any OpenAI-compatible provider.
-            </p>
-          </div>
-          <ActionButton
-            onClick={openAddForm}
-            icon={Plus}
-            className="shrink-0"
-          >
-            Add Provider
-          </ActionButton>
-        </div>
-
-        {providers.length === 0 && (
-          <div className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
-            No providers configured yet. Add one to get started.
-          </div>
+        <SectionHeading>AI Provider</SectionHeading>
+        <p className="text-xs text-muted-foreground mb-4">
+          Connect one OpenAI-compatible endpoint (OpenAI, Ollama, Open WebUI). For Open WebUI use the <span className="font-mono">…/api</span> base, not <span className="font-mono">…/api/v1</span>.
+        </p>
+        {managed && (
+          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 mb-4">
+            Managed by the deployment: endpoint, model, and API key come from the server’s env vars and override any changes on save. JSON Mode can still be adjusted below.
+          </p>
         )}
 
-        <div className="space-y-3">
-          {providers.map((p) => (
-            <div key={p.id} className={`relative border rounded-xl p-4 transition-all ${p.isActive ? 'border-primary/40 bg-primary/[0.03]' : 'border-border'}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold text-foreground">{p.name}</span>
-                    {p.isActive && (
-                      <span className="text-[10px] font-medium text-primary-foreground bg-primary px-1.5 py-0.5 rounded-full">Active</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground space-y-0.5">
-                    <div><span className="font-mono">{p.endpoint}</span> / <span className="font-mono">{p.model}</span></div>
-                    <div>API key: {p.apiKey ? '••••••••' : '(none)'} | JSON Mode: {p.jsonMode ? 'Enabled' : 'Disabled'}</div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                  {!p.isActive && (
-                    <button
-                      onClick={() => handleSetActive(p.id)}
-                      className="px-2.5 py-1 text-[11px] font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors"
-                      title="Set as active provider"
-                    >
-                      Activate
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleTestProvider(p)}
-                    className="px-2.5 py-1 text-[11px] font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors"
-                  >
-                    Test
-                  </button>
-                  <button
-                    onClick={() => openEditForm(p)}
-                    className="px-2.5 py-1 text-[11px] font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteProvider(p.id)}
-                    className="px-2.5 py-1 text-[11px] font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1.5">Endpoint URL</label>
+            <input
+              value={endpoint}
+              onChange={(e) => setEndpoint(e.target.value)}
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="https://antithropic.app/api"
+            />
+            {chatUrl && (
+              <p className="text-[10px] text-muted-foreground mt-1 font-mono">
+                Will test POST {chatUrl}
+              </p>
+            )}
+            {hint && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+                {hint}
+              </p>
+            )}
+          </div>
 
-      {/* Add/Edit Provider Dialog */}
-      <Dialog
-        open={showForm}
-        onOpenChange={(open) => {
-          setShowForm(open);
-          if (!open) {
-            setFormTestResult(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-lg p-6">
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit AI Provider' : 'Add AI Provider'}</DialogTitle>
-            <DialogDescription>
-              {editingId
-                ? 'Update your AI provider endpoint, model, and authentication settings.'
-                : 'Connect an OpenAI-compatible API endpoint (compatible with Ollama, Open WebUI, OpenAI, and more).'}
-            </DialogDescription>
-          </DialogHeader>
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1.5">API Key</label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder={hasApiKey ? '•••••••• (saved — leave blank to keep)' : 'sk-... (leave blank if not required)'}
+            />
+            {hasApiKey && !apiKey && (
+              <p className="text-[10px] text-muted-foreground mt-1">A key is saved. Enter a new one only to replace it.</p>
+            )}
+          </div>
 
-          <div className="space-y-4 py-1">
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">Name</label>
-              <input
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="e.g. OpenAI, Ollama Local"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">API Key</label>
-              <input
-                type="password"
-                value={formApiKey}
-                onChange={(e) => setFormApiKey(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder={
-                  editingId && providers.find((p) => p.id === editingId)?.hasApiKey
-                    ? '•••••••• (leave blank to keep current key)'
-                    : 'sk-... (leave blank if not required)'
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">Endpoint URL</label>
-              <input
-                value={formEndpoint}
-                onChange={(e) => setFormEndpoint(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="http://localhost:11434/v1"
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium text-foreground">Model Name</label>
-                {fetchingModels && (
-                  <span className="text-[10px] text-primary animate-pulse flex items-center gap-1">
-                    <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Fetching models...
-                  </span>
-                )}
-                {!fetchingModels && fetchedModels.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomModel(!isCustomModel)}
-                    className="text-[10px] text-primary hover:underline font-medium"
-                  >
-                    {isCustomModel ? 'Select from list' : '✏️ Enter custom name'}
-                  </button>
-                )}
-              </div>
-
-              {(!isCustomModel && fetchedModels.length > 0) ? (
-                <Select
-                  value={formModel}
-                  onChange={(e) => setFormModel(e.target.value)}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-medium text-foreground">Model Name</label>
+              {fetchingModels && (
+                <span className="text-[10px] text-primary animate-pulse flex items-center gap-1">
+                  <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Fetching models...
+                </span>
+              )}
+              {!fetchingModels && fetchedModels.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModel(!isCustomModel)}
+                  className="text-[10px] text-primary hover:underline font-medium"
                 >
-                  <option value="" disabled>Select a model...</option>
-                  {fetchedModels.map((modelName) => (
-                    <option key={modelName} value={modelName}>
-                      {modelName}
-                    </option>
-                  ))}
-                </Select>
-              ) : (
-                <div className="space-y-1">
-                  <input
-                    value={formModel}
-                    onChange={(e) => setFormModel(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="e.g. gpt-4o, llama3"
-                  />
-                  {modelsFetchError && (
-                    <p className="text-[10px] text-destructive font-medium">
-                      Could not fetch models: {modelsFetchError} (entering manually)
-                    </p>
-                  )}
-                  {fetchedModels.length === 0 && !fetchingModels && !modelsFetchError && formEndpoint.trim() && (
-                    <p className="text-[10px] text-muted-foreground">
-                      No models found or endpoint not queried. Enter model manually.
-                    </p>
-                  )}
-                </div>
+                  {isCustomModel ? 'Select from list' : '✏️ Enter custom name'}
+                </button>
               )}
             </div>
 
-            <div className="pt-1 space-y-3">
-              <label className="flex items-start gap-2.5 cursor-pointer">
+            {(!isCustomModel && fetchedModels.length > 0) ? (
+              <Select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+              >
+                <option value="" disabled>Select a model...</option>
+                {fetchedModels.map((modelName) => (
+                  <option key={modelName} value={modelName}>
+                    {modelName}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <div className="space-y-1">
                 <input
-                  type="checkbox"
-                  checked={formJsonMode}
-                  onChange={(e) => setFormJsonMode(e.target.checked)}
-                  className="mt-0.5 rounded border-border accent-primary"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="e.g. gpt-4o, llama3"
                 />
-                <div className="flex-1">
-                  <span className="text-xs font-medium text-foreground">Enable JSON Mode (response_format)</span>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Forces the model to respond in JSON. Omit/disable this for providers that experience FSM/grammar issues (like local vLLM).
+                {modelsFetchError && (
+                  <p className="text-[10px] text-destructive font-medium">
+                    Could not fetch models: {modelsFetchError} (entering manually)
                   </p>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formSetActive}
-                  onChange={(e) => setFormSetActive(e.target.checked)}
-                  className="rounded border-border accent-primary"
-                />
-                <span className="text-xs text-foreground">Set as active provider</span>
-              </label>
-            </div>
-
-            {formTestResult && (
-              <div className={`text-xs px-3 py-2 rounded-lg ${formTestResult.ok ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
-                {formTestResult.message}
+                )}
+                {fetchedModels.length === 0 && !fetchingModels && !modelsFetchError && endpoint.trim() && (
+                  <p className="text-[10px] text-muted-foreground">
+                    No models found or endpoint not queried. Enter model manually.
+                  </p>
+                )}
               </div>
             )}
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={jsonMode}
+              onChange={(e) => setJsonMode(e.target.checked)}
+              className="mt-0.5 rounded border-border accent-primary"
+            />
+            <div className="flex-1">
+              <span className="text-xs font-medium text-foreground">Enable JSON Mode (response_format)</span>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Forces the model to respond in JSON. Disable this for providers with FSM/grammar issues (like local vLLM).
+              </p>
+            </div>
+          </label>
+
+          {saveResult && (
+            <div className={`text-xs px-3 py-2 rounded-lg ${saveResult.ok ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
+              {saveResult.message}
+            </div>
+          )}
+
+          {testResult && (
+            <div className={`text-xs px-3 py-2 rounded-lg ${testResult.ok ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
+              <p className="font-medium">{testResult.message}</p>
+              {testResult.ok && testResult.response && (
+                <p className="mt-1 font-mono whitespace-pre-wrap opacity-80">{testResult.response}</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
             <button
               type="button"
-              onClick={handleFormTest}
-              disabled={formTesting || !formEndpoint.trim()}
-              className="px-3 py-2 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors disabled:opacity-50 sm:mr-auto"
+              onClick={handleTest}
+              disabled={testing || !endpoint.trim() || !model.trim()}
+              className="px-4 py-2 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-colors disabled:opacity-50"
             >
-              {formTesting ? 'Testing...' : 'Test Connection'}
+              {testing ? 'Testing… (up to 60s)' : 'Test Connection'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveProvider}
-              disabled={!formName.trim() || !formEndpoint.trim() || !formModel.trim()}
+              onClick={handleSave}
+              disabled={saving || !endpoint.trim() || !model.trim()}
               className="px-4 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
             >
-              {editingId ? 'Save Changes' : 'Add Provider'}
+              {saving ? 'Saving…' : 'Save'}
             </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      </div>
 
       {/* System Prompt Editor */}
       <div className="p-5 bg-card border border-border rounded-xl">
@@ -638,7 +468,7 @@ export default function AiTab() {
           <div className="flex-1 min-w-0">
             <SectionHeading>Test Prompt</SectionHeading>
             <p className="text-xs text-muted-foreground">
-              Customize the message sent when testing a provider connection. A short prompt speeds up the test.
+              Customize the message sent when testing the provider connection. A short prompt speeds up the test.
             </p>
           </div>
           <button
@@ -775,17 +605,6 @@ export default function AiTab() {
       </div>
 
       <p className="text-[10px] text-muted-foreground text-right">Settings are saved automatically.</p>
-
-      {showTestProgress && testProgressFn && (
-        <AiTestProgress
-          title={showTestProgress === 'form' ? 'Test Connection' : `Test: ${providers.find(p => p.id === showTestProgress)?.name ?? 'Provider'}`}
-          testFn={testProgressFn}
-          onClose={() => {
-            setShowTestProgress(null);
-            setTestProgressFn(null);
-          }}
-        />
-      )}
     </div>
   );
 }

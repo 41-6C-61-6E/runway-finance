@@ -278,10 +278,10 @@ All variables are defined in `.env.example`. For local development copy it to `.
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`| ❌ | — | VAPID public key (optional — for web push notifications) |
 | `VAPID_PRIVATE_KEY` | ❌ | — | VAPID private key (optional — for web push notifications) |
 | `VAPID_SUBJECT` | ❌ | — | VAPID subject email, e.g. `mailto:admin@example.com` (optional) |
-| `AI_PROVIDER_NAME` | ❌ | — | Auto-seed AI provider name (e.g. "OpenAI", "Ollama") |
-| `AI_PROVIDER_ENDPOINT` | ❌ | — | Auto-seed AI provider API base endpoint (e.g. "https://api.openai.com/v1") |
-| `AI_PROVIDER_MODEL` | ❌ | — | Auto-seed AI provider model ID (e.g. "gpt-4o-mini") |
-| `AI_PROVIDER_API_KEY` | ❌ | — | Auto-seed AI provider API key (optional) |
+| `AI_PROVIDER_NAME` | ❌ | — | Enforced AI provider name — overrides all users' saved provider |
+| `AI_PROVIDER_ENDPOINT` | ❌ | — | Enforced AI provider API base endpoint (for Open WebUI use `.../api`, not `.../api/v1`) |
+| `AI_PROVIDER_MODEL` | ❌ | — | Enforced AI provider model ID (e.g. "gpt-4o-mini") |
+| `AI_PROVIDER_API_KEY` | ❌ | — | Enforced AI provider API key (when set, overrides all users' saved keys) |
 
 ---
 

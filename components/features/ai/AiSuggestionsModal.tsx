@@ -1354,7 +1354,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                 try {
                   prompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined;
                 } catch { /* ignore */ }
-                const res = await fetch('/api/ai/providers/test-active', {
+                const res = await fetch('/api/ai/provider/test', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   credentials: 'include',
