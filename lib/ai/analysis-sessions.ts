@@ -9,6 +9,7 @@ export type AnalysisSession = {
   startedAt?: number;
   proposalsCreated?: number;
   autoApproved?: number;
+  errors?: string[];
 };
 
 /**

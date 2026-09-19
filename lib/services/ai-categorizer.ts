@@ -427,6 +427,165 @@ export async function analyzeUncategorized(
   }
 }
 
+/**
+ * Analyze one uncategorized transaction on demand (per-row "Ask AI" button).
+ * Always creates a `pending` proposal for review — never auto-approves.
+ */
+export async function analyzeSingleTransaction(
+  userId: string,
+  transactionId: string,
+  dek: Uint8Array,
+): Promise<{ proposalId: string; type: string; message: string }> {
+  const db = getDb();
+  const dataUserId = await resolveDataUserId(userId);
+
+  const txnRows = await db
+    .select({ transaction: transactions, account: accounts })
+    .from(transactions)
+    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
+    .where(and(eq(transactions.id, transactionId), eq(transactions.userId, dataUserId)))
+    .limit(1);
+
+  if (!txnRows.length) {
+    throw new Error('Transaction not found');
+  }
+  const txnRow = txnRows[0];
+  if (txnRow.transaction.categoryId) {
+    throw new Error('Transaction is already categorized');
+  }
+  if (txnRow.transaction.deleted) {
+    throw new Error('Transaction is deleted');
+  }
+
+  const tx = await decryptRow('transactions', txnRow.transaction, dek);
+  let accountType: string | null = null;
+  if (txnRow.account?.type) {
+    accountType = await decryptField(txnRow.account.type, dek);
+  }
+  const txnInfo: TransactionInfo = {
+    index: 1,
+    id: tx.id,
+    description: tx.description,
+    payee: tx.payee,
+    memo: tx.memo,
+    amount: tx.amount,
+    date: tx.date,
+    accountType,
+  };
+
+  const categoryRows = await db
+    .select()
+    .from(categoriesTable)
+    .where(eq(categoriesTable.userId, dataUserId));
+  const decryptedCategories = await decryptRows('categories', categoryRows, dek);
+  const categoryMap = new Map(decryptedCategories.map((c) => [c.id, c.name]));
+  const categories: CategoryInfo[] = decryptedCategories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    parentName: c.parentId ? categoryMap.get(c.parentId) ?? null : null,
+    parentId: c.parentId,
+    color: c.color,
+    isIncome: c.isIncome,
+  }));
+
+  const ruleRows = await db
+    .select()
+    .from(categoryRules)
+    .where(and(eq(categoryRules.userId, dataUserId), eq(categoryRules.isActive, true)));
+  const decryptedRules = await decryptRows('category_rules', ruleRows, dek);
+  const rules: RuleInfo[] = decryptedRules.map((r) => ({
+    name: r.name,
+    conditionField: r.conditionField,
+    conditionOperator: r.conditionOperator,
+    conditionValue: r.conditionValue,
+    setCategoryName: r.setCategoryId ? categoryMap.get(r.setCategoryId) ?? null : null,
+  }));
+
+  const settingsRows = await db
+    .select()
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .limit(1);
+  const systemPrompt = settingsRows[0]?.aiSystemPrompt || SYSTEM_PROMPT;
+
+  const pickProvider = (rows: typeof aiProviders.$inferSelect[]) =>
+    rows.find((r) => r.isActive) ?? rows[0];
+  const ownRows = await db
+    .select()
+    .from(aiProviders)
+    .where(eq(aiProviders.userId, userId))
+    .limit(10);
+  let provider = pickProvider(ownRows);
+  if (!provider) {
+    const householdRows = await db
+      .select()
+      .from(aiProviders)
+      .where(eq(aiProviders.userId, dataUserId))
+      .limit(10);
+    provider = pickProvider(householdRows);
+  }
+  if (!provider) {
+    throw new Error('No AI provider configured. Add one in Settings → AI Suggestions.');
+  }
+
+  const validation = await validateEndpointUrl(provider.endpoint);
+  if (!validation.ok) {
+    throw new Error(`AI provider endpoint is invalid or blocked: ${validation.error}`);
+  }
+
+  let apiKey = '';
+  if (provider.apiKeyEncrypted) {
+    apiKey = await decryptField(provider.apiKeyEncrypted, dek);
+  }
+
+  const prompt = buildPrompt(categories, rules, [txnInfo]);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120_000);
+  let aiResponse: AiResponse;
+  try {
+    aiResponse = await callAiApi(
+      provider.endpoint,
+      provider.model,
+      apiKey,
+      prompt,
+      systemPrompt,
+      provider.jsonMode ?? false,
+      controller.signal,
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const suggestion =
+    aiResponse.suggestions.find((s) => s.type === 'categorize') ?? aiResponse.suggestions[0];
+  if (!suggestion) {
+    throw new Error('AI returned no suggestions for this transaction');
+  }
+  const payload = buildPayload(suggestion, [txnInfo], categories);
+  if (!payload) {
+    throw new Error('AI suggestion could not be matched to this transaction');
+  }
+
+  const [created] = await db
+    .insert(aiProposals)
+    .values({
+      userId: dataUserId,
+      type: suggestion.type,
+      status: 'pending',
+      confidence: String(Math.round(suggestion.confidence * 100)),
+      payload: payload as any,
+      explanation: suggestion.explanation,
+    })
+    .returning({ id: aiProposals.id });
+
+  logger.info(`${LOG_TAG} Single-transaction suggestion created`, { userId, transactionId, type: suggestion.type });
+  return {
+    proposalId: created.id,
+    type: suggestion.type,
+    message: 'AI suggestion created — review it in AI Suggestions.',
+  };
+}
+
 function buildPrompt(
   categories: CategoryInfo[],
   rules: RuleInfo[],
@@ -492,8 +651,47 @@ function cleanJsonString(content: string): string {
   return clean;
 }
 
-async function callAiApi(
-  endpoint: string,
+function parseAiContent(content: string): AiResponse {
+  let parsed: AiResponse;
+  let jsonText = content;
+  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    jsonText = jsonMatch[1];
+  }
+
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (firstErr) {
+    try {
+      const cleanedText = cleanJsonString(jsonText);
+      parsed = JSON.parse(cleanedText);
+      logger.info(`${LOG_TAG} AI response JSON successfully repaired and parsed after initial failure`, { contentLength: content.length });
+    } catch (secondErr) {
+      const errMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+      throw new Error(`Failed to parse AI response as JSON: ${errMsg}. Response preview: ${content.slice(0, 200)}`);
+    }
+  }
+
+  if (!parsed.suggestions || !Array.isArray(parsed.suggestions)) {
+    throw new Error(`AI response missing suggestions array. Response preview: ${content.slice(0, 200)}`);
+  }
+
+  for (const s of parsed.suggestions) {
+    if (!s.type || !['categorize', 'create_category', 'create_rule'].includes(s.type)) {
+      throw new Error(`Invalid suggestion type: ${s.type}`);
+    }
+    if (typeof s.confidence !== 'number' || s.confidence < 0 || s.confidence > 100) {
+      throw new Error(`Invalid confidence value: ${s.confidence}`);
+    }
+    if (s.confidence > 1) {
+      s.confidence /= 100;
+    }
+  }
+
+  return parsed;
+}
+
+export async function callAiApi(  endpoint: string,
   model: string,
   apiKey: string,
   prompt: string,
@@ -509,7 +707,6 @@ async function callAiApi(
       { role: 'user', content: prompt },
     ],
     temperature: 0.1,
-    chat_id: 'finance-categorize',
     stream: true,
   };
 
@@ -555,16 +752,43 @@ async function callAiApi(
         throw new Error('AI API returned response body that is not readable');
       }
 
+      const contentType = response.headers.get('content-type') ?? '';
+
+      // Some OpenAI-compatible servers (e.g. Open WebUI in certain configs)
+      // ignore `stream: true` and return a single JSON payload instead of
+      // SSE. Handle that shape directly.
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        const msg = data.choices?.[0]?.message;
+        const direct =
+          (typeof msg?.content === 'string' && msg.content) ||
+          msg?.reasoning ||
+          msg?.reasoning_content ||
+          '';
+        if (!direct) {
+          throw new Error(
+            `AI API returned a non-streaming JSON response with no message content (model: ${model}). Raw keys: ${Object.keys(data ?? {}).join(',') || 'none'}`
+          );
+        }
+        return parseAiContent(direct);
+      }
+
       const decoder = new TextDecoder();
       let content = '';
       let buffer = '';
+      let rawSnippet = '';
+      let sawReasoningOnly = false;
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
+          const decoded = decoder.decode(value, { stream: true });
+          if (!rawSnippet && decoded) {
+            rawSnippet = decoded.slice(0, 200);
+          }
+          buffer += decoded;
           const lines = buffer.split('\n');
           buffer = lines.pop() ?? '';
 
@@ -575,8 +799,12 @@ async function callAiApi(
             if (cleanLine.startsWith('data: ')) {
               try {
                 const parsedChunk = JSON.parse(cleanLine.slice(6));
-                const text = parsedChunk.choices?.[0]?.delta?.content ?? '';
+                const delta = parsedChunk.choices?.[0]?.delta;
+                const text = delta?.content ?? '';
                 content += text;
+                if (!text && (delta?.reasoning_content || delta?.reasoning)) {
+                  sawReasoningOnly = true;
+                }
               } catch {
                 // Ignore parsing errors for incomplete SSE lines
               }
@@ -597,46 +825,15 @@ async function callAiApi(
       }
 
       if (!content) {
-        throw new Error('AI API returned empty response');
+        const hint = sawReasoningOnly
+          ? ' The model streamed only reasoning (reasoning_content) with no answer content — disable thinking mode for this model or use a non-reasoning model.'
+          : '';
+        throw new Error(
+          `AI API returned empty response (model: ${model}, content-type: ${contentType || 'unknown'}).${hint} First bytes: ${rawSnippet || '(none)'}`.slice(0, 500)
+        );
       }
 
-      let parsed: AiResponse;
-      let jsonText = content;
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (jsonMatch) {
-        jsonText = jsonMatch[1];
-      }
-
-      try {
-        parsed = JSON.parse(jsonText);
-      } catch (firstErr) {
-        try {
-          const cleanedText = cleanJsonString(jsonText);
-          parsed = JSON.parse(cleanedText);
-          logger.info(`${LOG_TAG} AI response JSON successfully repaired and parsed after initial failure`, { contentLength: content.length });
-        } catch (secondErr) {
-          const errMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
-          throw new Error(`Failed to parse AI response as JSON: ${errMsg}`);
-        }
-      }
-
-      if (!parsed.suggestions || !Array.isArray(parsed.suggestions)) {
-        throw new Error('AI response missing suggestions array');
-      }
-
-      for (const s of parsed.suggestions) {
-        if (!s.type || !['categorize', 'create_category', 'create_rule'].includes(s.type)) {
-          throw new Error(`Invalid suggestion type: ${s.type}`);
-        }
-        if (typeof s.confidence !== 'number' || s.confidence < 0 || s.confidence > 100) {
-          throw new Error(`Invalid confidence value: ${s.confidence}`);
-        }
-        if (s.confidence > 1) {
-          s.confidence /= 100;
-        }
-      }
-
-      return parsed;
+      return parseAiContent(content);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') throw err;
       const isNonRetryableHttp = err instanceof Error && /^AI API error: [4][0-9]{2}/.test(err.message);

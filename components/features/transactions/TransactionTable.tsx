@@ -54,6 +54,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import AiCategorizeButton from "@/components/features/transactions/AiCategorizeButton";
 import { ListRow } from "@/components/ui/list-row";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { IconButton } from "@/components/ui/icon-button";
@@ -124,6 +125,8 @@ interface TransactionTableProps {
   aiSuggestionsDismissed?: boolean;
   onAiSuggestionsDismissed?: (dismissed: boolean) => void;
   onOpenAiSuggestions?: () => void;
+  onAiProposalCreated?: () => void;
+  aiConfigured?: boolean;
   analysisRunning?: boolean;
   analysisProcessed?: number;
   analysisTotal?: number;
@@ -224,6 +227,8 @@ export default function TransactionTable({
   aiSuggestionsDismissed,
   onAiSuggestionsDismissed,
   onOpenAiSuggestions,
+  onAiProposalCreated,
+  aiConfigured,
   analysisRunning,
   analysisProcessed,
   analysisTotal,
@@ -1150,22 +1155,32 @@ export default function TransactionTable({
         header: ({ column }) => <SortableHeader column={column} title="AI" />,
         cell: ({ row }) => {
           const categorizedByAi = row.getValue("ai") as boolean;
-          if (!categorizedByAi) return null;
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className="flex items-center justify-center cursor-help"
-                  aria-label="Categorized by AI"
-                >
-                  <Sparkles className="h-3.5 w-3.5 text-primary/70" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                Categorized automatically by AI rule
-              </TooltipContent>
-            </Tooltip>
-          );
+          if (categorizedByAi) {
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className="flex items-center justify-center cursor-help"
+                    aria-label="Categorized by AI"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-primary/70" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Categorized automatically by AI rule
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
+          const tx = row.original;
+          if (!tx.categoryId && aiConfigured && !(tx.splits && tx.splits.length > 0)) {
+            return (
+              <div className="flex items-center justify-center">
+                <AiCategorizeButton transactionId={tx.id} onSuggested={onAiProposalCreated} />
+              </div>
+            );
+          }
+          return null;
         },
       },
       {
@@ -2197,6 +2212,9 @@ export default function TransactionTable({
                                 )}
                               </div>
                             </>
+                          )}
+                          {!tx.categoryId && !(tx.splits && tx.splits.length > 0) && aiConfigured && (
+                            <AiCategorizeButton transactionId={tx.id} onSuggested={onAiProposalCreated} className="ml-1 shrink-0" />
                           )}
                         </div>
                       )}

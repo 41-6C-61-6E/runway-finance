@@ -649,7 +649,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             if (data.log) setAnalysisLogs(data.log);
             setCurrentStep('Analysis complete.');
             
-            const msg = `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`;
+            const msg = `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).` + ((data.errors?.length ?? 0) > 0 ? ` (${data.errors.length} batch error(s) — see log)` : '');
             const finalStatus: AnalysisStatus = { status: 'completed', message: msg };
             persistStatus(finalStatus);
             

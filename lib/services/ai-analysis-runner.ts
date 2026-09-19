@@ -61,10 +61,19 @@ export function startAiAnalysis(
     .then((result) => {
       const existing = activeAnalysisSessions.get(userId);
       if (existing) {
-        existing.status = 'completed';
-        existing.processedCount = existing.totalCount ?? 0;
         existing.proposalsCreated = result.proposalsCreated;
         existing.autoApproved = result.autoApproved;
+        existing.errors = result.errors;
+        if (result.proposalsCreated === 0 && result.errors.length > 0) {
+          // Nothing to show the user — surface as a failed run instead of a
+          // silent "completed with 0 suggestions".
+          existing.status = 'error';
+          existing.error = result.errors[0].slice(0, 500);
+          existing.log.push(`Error: ${existing.error}`);
+        } else {
+          existing.status = 'completed';
+          existing.processedCount = existing.totalCount ?? 0;
+        }
       }
       if (result.errors.length > 0) {
         logger.warn(`${LOG_TAG} Analysis finished with errors`, { userId, errors: result.errors });

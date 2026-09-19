@@ -21,6 +21,7 @@ export async function GET() {
     processedCount: existing.processedCount ?? 0,
     totalCount: existing.totalCount ?? 0,
     error: existing.error ?? null,
+    errors: existing.errors ?? [],
     log: existing.log ?? [],
     startedAt: existing.startedAt,
     proposalsCreated: existing.proposalsCreated ?? 0,

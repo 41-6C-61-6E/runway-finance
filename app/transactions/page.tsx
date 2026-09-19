@@ -190,6 +190,27 @@ function TransactionsContent() {
     fetchRecurringCount();
   }, [queryClient, fetchPendingAi, fetchRecurringCount]);
 
+  // Single AI provider configured? Gates the per-transaction "Ask AI" buttons.
+  const [aiConfigured, setAiConfigured] = useState(false);
+  useEffect(() => {
+    fetch('/api/ai/provider', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const single = Array.isArray(data)
+          ? (data.find((p: any) => p.isActive) ?? data[0] ?? null)
+          : data;
+        setAiConfigured(!!single?.endpoint);
+      })
+      .catch(() => {});
+  }, []);
+
+  // A per-transaction AI suggestion was created: refresh counts and open the
+  // suggestions modal so the user can review it immediately.
+  const handleAiProposalCreated = useCallback(() => {
+    fetchPendingAi();
+    setAiModalOpen(true);
+  }, [fetchPendingAi]);
+
   // Poll analysis status so the toolbar slot shows "in progress" with a
   // click-through to the live progress in the suggestions modal.
   useEffect(() => {
@@ -565,6 +586,8 @@ function TransactionsContent() {
                   aiSuggestionsDismissed={isSuggestionsDismissed}
                   onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
                   onOpenAiSuggestions={() => setAiModalOpen(true)}
+                  onAiProposalCreated={handleAiProposalCreated}
+                  aiConfigured={aiConfigured}
                   analysisRunning={analysisRunning}
                   analysisProcessed={analysisProcessed}
                   analysisTotal={analysisTotal}
@@ -576,6 +599,8 @@ function TransactionsContent() {
                     onClose={handleDrawerClose}
                     onSuccess={handleDrawerSuccess}
                     mode={drawerMode}
+                    aiConfigured={aiConfigured}
+                    onAiProposalCreated={handleAiProposalCreated}
                   />
                 )}
                 <AiSuggestionsModal

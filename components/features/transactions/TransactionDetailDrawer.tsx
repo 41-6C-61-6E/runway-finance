@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Search, Sparkles, Plus, Repeat, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import AiCategorizeButton from '@/components/features/transactions/AiCategorizeButton';
 import { MarkAsRecurringModal } from './MarkAsRecurringModal';
 
 
@@ -69,12 +70,14 @@ interface TransactionDetailDrawerProps {
   onClose: () => void;
   onSuccess: () => void;
   mode: 'create' | 'edit';
+  aiConfigured?: boolean;
+  onAiProposalCreated?: () => void;
 }
 
 import { useUserSettings } from '@/components/user-settings-provider';
 import { Select } from '@/components/ui/select';
 
-export default function TransactionDetailDrawer({ transaction, open, onClose, onSuccess, mode }: TransactionDetailDrawerProps) {
+export default function TransactionDetailDrawer({ transaction, open, onClose, onSuccess, mode, aiConfigured, onAiProposalCreated }: TransactionDetailDrawerProps) {
   const settingsContext = useUserSettings();
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
 
@@ -883,7 +886,12 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
           {/* Category Selector */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Category</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-foreground">Category</label>
+              {!categoryId && aiConfigured && mode === 'edit' && transaction?.id && (
+                <AiCategorizeButton transactionId={transaction.id} onSuggested={onAiProposalCreated} />
+              )}
+            </div>
             {isCreatingCategory ? (
               <div className="space-y-3 p-3 bg-muted/20 border border-border rounded-lg">
                 <div className="text-xs font-semibold text-foreground uppercase tracking-wider mb-1">New Category</div>
