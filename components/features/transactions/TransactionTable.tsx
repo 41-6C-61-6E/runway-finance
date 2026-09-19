@@ -51,6 +51,7 @@ import {
   AlertCircle,
   RotateCcw,
   Repeat,
+  Loader2,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ListRow } from "@/components/ui/list-row";
@@ -123,6 +124,9 @@ interface TransactionTableProps {
   aiSuggestionsDismissed?: boolean;
   onAiSuggestionsDismissed?: (dismissed: boolean) => void;
   onOpenAiSuggestions?: () => void;
+  analysisRunning?: boolean;
+  analysisProcessed?: number;
+  analysisTotal?: number;
 }
 
 const ALL_COLUMNS: string[] = [
@@ -220,6 +224,9 @@ export default function TransactionTable({
   aiSuggestionsDismissed,
   onAiSuggestionsDismissed,
   onOpenAiSuggestions,
+  analysisRunning,
+  analysisProcessed,
+  analysisTotal,
 }: TransactionTableProps) {
   const queryClient = useQueryClient();
   const settingsContext = useUserSettings();
@@ -1668,6 +1675,21 @@ export default function TransactionTable({
                   >
                     Add Transaction
                   </ActionButton>
+                )}
+                {analysisRunning && onOpenAiSuggestions && (
+                  <button
+                    type="button"
+                    onClick={onOpenAiSuggestions}
+                    title="View analysis progress"
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-colors shadow-sm cursor-pointer"
+                  >
+                    <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+                    <span>
+                      {analysisTotal !== undefined && analysisTotal > 0
+                        ? `Analyzing… ${analysisProcessed ?? 0}/${analysisTotal}`
+                        : 'AI analysis in progress'}
+                    </span>
+                  </button>
                 )}
                 {pendingAiCount !== undefined && pendingAiCount > 0 && !aiSuggestionsDismissed && onOpenAiSuggestions && (
                   <button

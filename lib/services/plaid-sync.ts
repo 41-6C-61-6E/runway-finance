@@ -12,7 +12,6 @@ import {
 } from '@/lib/db/schema';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, formatToCents } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
-import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
@@ -793,9 +792,13 @@ export async function syncPlaidConnection(
             .limit(1);
 
           if (settingsRow?.aiAutoAnalyze) {
-            analyzeUncategorized(userId).catch((err) => {
-              logger.error(`${LOG_TAG} AI auto-categorization failed`, { error: String(err) });
-            });
+            try {
+              const { startAiAnalysis } = await import('@/lib/services/ai-analysis-runner');
+              const started = startAiAnalysis(userId, { dek });
+              logger.info(`${LOG_TAG} AI auto-analysis ${started} after sync`, { userId });
+            } catch (err) {
+              logger.error(`${LOG_TAG} AI auto-analysis failed to start (non-fatal)`, { userId, error: String(err) });
+            }
           }
         } catch {}
       }

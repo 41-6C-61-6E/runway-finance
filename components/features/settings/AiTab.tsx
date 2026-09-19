@@ -54,6 +54,57 @@ export default function AiTab() {
   const [modelsFetchError, setModelsFetchError] = useState<string | null>(null);
   const [isCustomModel, setIsCustomModel] = useState(false);
 
+  // Manual analysis run state (mirrors GET /api/ai/status)
+  const [analysisStatus, setAnalysisStatus] = useState<{
+    status: string;
+    processedCount?: number;
+    totalCount?: number;
+    error?: string | null;
+  }>({ status: 'idle' });
+  const [analysisBusy, setAnalysisBusy] = useState(false);
+
+  const refreshAnalysisStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/status', { credentials: 'include' });
+      if (res.ok) {
+        setAnalysisStatus(await res.json());
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    refreshAnalysisStatus();
+    const timer = setInterval(refreshAnalysisStatus, 5000);
+    return () => clearInterval(timer);
+  }, [refreshAnalysisStatus]);
+
+  const handleRunAnalysis = async () => {
+    if (analysisBusy) return;
+    setAnalysisBusy(true);
+    try {
+      const res = await fetch('/api/ai/analyze', { method: 'POST', credentials: 'include' });
+      if (res.status === 409) {
+        await refreshAnalysisStatus();
+      } else if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setAnalysisStatus({ status: 'error', error: data.error || 'Failed to start analysis' });
+      } else {
+        await refreshAnalysisStatus();
+      }
+    } catch {
+      setAnalysisStatus({ status: 'error', error: 'Failed to reach server' });
+    } finally {
+      setAnalysisBusy(false);
+    }
+  };
+
+  const handleCancelAnalysis = async () => {
+    try {
+      await fetch('/api/ai/cancel', { method: 'POST', credentials: 'include' });
+    } catch { /* ignore */ }
+    await refreshAnalysisStatus();
+  };
+
   const [automation, setAutomation] = useState<AutomationSettings>({
     aiSystemPrompt: null,
     aiAutoAnalyze: false,
@@ -414,6 +465,60 @@ export default function AiTab() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Manual Analysis */}
+      <div className="p-5 bg-card border border-border rounded-xl">
+        <SectionHeading>AI Analysis</SectionHeading>
+        <p className="text-xs text-muted-foreground mb-4">
+          Run categorization on all uncategorized transactions now. Progress also appears on the Transactions page; results land in Transactions → AI Suggestions.
+        </p>
+
+        {analysisStatus.status === 'running' ? (
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-foreground">
+              Analyzing… {(analysisStatus.processedCount ?? 0)}{(analysisStatus.totalCount ?? 0) > 0 ? `/${analysisStatus.totalCount}` : ''} transactions
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <a
+                href="/transactions?aiSuggestions=true"
+                className="px-4 py-2 text-xs font-medium text-center text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all"
+              >
+                View Live Progress
+              </a>
+              <button
+                type="button"
+                onClick={handleCancelAnalysis}
+                className="px-4 py-2 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors"
+              >
+                Cancel Analysis
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {analysisStatus.status === 'error' && analysisStatus.error && (
+              <div className="text-xs px-3 py-2 rounded-lg bg-destructive/20 text-destructive">
+                Last run failed: {analysisStatus.error}
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRunAnalysis}
+                disabled={analysisBusy || !endpoint.trim() || !model.trim()}
+                className="px-4 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {analysisBusy ? 'Starting…' : 'Run Analysis Now'}
+              </button>
+              <span className="text-[11px] text-muted-foreground">
+                {automation.aiAutoAnalyze
+                  ? 'Auto-analyze after sync is on.'
+                  : 'Tip: enable “Auto-analyze after sync” below to run this automatically.'}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* System Prompt Editor */}

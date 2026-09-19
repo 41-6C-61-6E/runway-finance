@@ -95,6 +95,9 @@ function TransactionsContent() {
   const [pendingAiCount, setPendingAiCount] = useState<number>(0);
   const [pendingAiIds, setPendingAiIds] = useState<string[]>([]);
   const [aiSuggestionsDismissed, setAiSuggestionsDismissed] = useState(false);
+  const [analysisRunning, setAnalysisRunning] = useState(false);
+  const [analysisProcessed, setAnalysisProcessed] = useState(0);
+  const [analysisTotal, setAnalysisTotal] = useState(0);
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = usePersistentState<string[]>('finance:transactions:dismissedSuggestionIds', []);
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
   const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
@@ -186,6 +189,32 @@ function TransactionsContent() {
     fetchPendingAi();
     fetchRecurringCount();
   }, [queryClient, fetchPendingAi, fetchRecurringCount]);
+
+  // Poll analysis status so the toolbar slot shows "in progress" with a
+  // click-through to the live progress in the suggestions modal.
+  useEffect(() => {
+    let cancelled = false;
+    const checkStatus = () => {
+      fetch('/api/ai/status', { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (cancelled || !data) return;
+          const running = data.status === 'running';
+          setAnalysisRunning(running);
+          if (running) {
+            setAnalysisProcessed(data.processedCount ?? 0);
+            setAnalysisTotal(data.totalCount ?? 0);
+          }
+        })
+        .catch(() => {});
+    };
+    checkStatus();
+    const timer = setInterval(checkStatus, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [aiModalOpen]);
 
   const handleApplyPreset = useCallback((preset: TransactionPreset) => {
     setFilters({
@@ -536,6 +565,9 @@ function TransactionsContent() {
                   aiSuggestionsDismissed={isSuggestionsDismissed}
                   onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
                   onOpenAiSuggestions={() => setAiModalOpen(true)}
+                  analysisRunning={analysisRunning}
+                  analysisProcessed={analysisProcessed}
+                  analysisTotal={analysisTotal}
                 />
                 {(selectedTransaction || drawerMode === 'create') && (
                   <TransactionDetailDrawer

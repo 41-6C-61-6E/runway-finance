@@ -56,6 +56,7 @@ export async function analyzeUncategorized(
   onProgress?: (processedCount: number, totalCount: number | null) => void,
   onLog?: (message: string) => void,
   abortController?: AbortController,
+  dekOverride?: Uint8Array,
 ): Promise<{ proposalsCreated: number; autoApproved: number; errors: string[] }> {
   if (activeAiAnalysisUsers.has(userId)) {
     logger.info(`${LOG_TAG} Analysis already in progress for user, skipping duplicate run`, { userId });
@@ -83,7 +84,9 @@ export async function analyzeUncategorized(
 
     const settings = userSettingsRow[0];
     const dataUserId = await resolveDataUserId(userId);
-    const dek = await getSessionDEK();
+    // Accept an explicit DEK so background runs kicked off from sync jobs
+    // don't depend on request-scoped auth after the response completes.
+    const dek = dekOverride ?? await getSessionDEK();
 
     // Enforce the deployment-wide provider (env vars win over saved settings).
     try {

@@ -2,7 +2,6 @@ import { getDb, getPool } from '@/lib/db';
 import { simplifinConnections, accounts, transactions, syncLogs, netWorthSnapshots, accountSnapshots, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, categories, transactionTags } from '@/lib/db/schema';
 import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, formatToCents } from '@/lib/services/account-history';
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
-import { analyzeUncategorized } from '@/lib/services/ai-categorizer';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
 import { invalidateUserSearchCache, getUserTransactionsFromCache } from '@/lib/services/search-cache';
 import { userSettings } from '@/lib/db/schema';
@@ -1239,9 +1238,13 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
           if (userSettingsRow.length > 0 && userSettingsRow[0].aiAutoAnalyze) {
             logger.info(`${LOG_TAG} Auto-triggering AI analysis after sync`, { connectionId, userId });
-            analyzeUncategorized(userId).catch((err) => {
-              logger.error(`${LOG_TAG} AI analysis failed (non-fatal)`, { connectionId, userId, error: String(err) });
-            });
+            try {
+              const { startAiAnalysis } = await import('@/lib/services/ai-analysis-runner');
+              const started = startAiAnalysis(userId, { dek });
+              logger.info(`${LOG_TAG} AI auto-analysis ${started}`, { connectionId, userId });
+            } catch (err) {
+              logger.error(`${LOG_TAG} AI analysis failed to start (non-fatal)`, { connectionId, userId, error: String(err) });
+            }
           }
         } catch (err) {
           logger.debug(`${LOG_TAG} AI auto-categorization check failed (non-fatal)`, {
