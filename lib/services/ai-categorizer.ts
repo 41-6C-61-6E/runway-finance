@@ -399,7 +399,10 @@ export async function analyzeUncategorized(
           break;
         }
         if (err instanceof Error && err.name === 'AbortError') {
-          const msg = `Batch ${batchNum} timed out after ${Math.round(perBatchTimeout / 1000)}s, skipping ${txnRows.length} transaction(s) — lower the batch size in Settings → AI Suggestions → Automation for slower models.`;
+          const sizeHint = batchSize <= 5
+            ? ' The model may be stalled or extremely slow — check the provider logs and that the model isn’t still loading.'
+            : ' Lower the batch size in Settings → AI Suggestions → Automation for slower models.';
+          const msg = `Batch ${batchNum} timed out after ${Math.round(perBatchTimeout / 1000)}s, skipping ${txnRows.length} transaction(s).${sizeHint}`;
           onLog?.(msg);
           errors.push(msg);
         } else {
@@ -726,6 +729,47 @@ function parseAiContent(content: string): AiResponse {
   return parsed;
 }
 
+/**
+ * Pull answer text out of one parsed SSE `data:` payload. Handles two
+ * dialects:
+ * - Chat Completions: `{choices:[{delta:{content}}]}`
+ * - Responses API (what Open WebUI proxies emit): `event: response.created`
+ *   snapshots shaped `{response:{...}}` plus `output_text.delta` events shaped
+ *   `{delta:"..."}` or `{type:"response.output_text.delta",delta:"..."}`.
+ * Returns incremental text plus any full-text snapshot (from a completed
+ * event) for use as a fallback when no deltas arrived.
+ */
+function extractStreamChunk(chunk: any): { text: string; reasoning: boolean; completedText: string } {
+  if (!chunk || typeof chunk !== 'object') {
+    return { text: '', reasoning: false, completedText: '' };
+  }
+  const delta = chunk.choices?.[0]?.delta;
+  if (typeof delta?.content === 'string' && delta.content) {
+    return { text: delta.content, reasoning: false, completedText: '' };
+  }
+  if (typeof chunk.delta === 'string' && chunk.delta) {
+    return { text: chunk.delta, reasoning: false, completedText: '' };
+  }
+
+  let completedText = '';
+  const outputs = chunk.response?.output ?? chunk.output;
+  if (Array.isArray(outputs)) {
+    for (const item of outputs) {
+      const parts = item?.content;
+      if (Array.isArray(parts)) {
+        for (const part of parts) {
+          if (typeof part?.text === 'string') {
+            completedText += part.text;
+          }
+        }
+      }
+    }
+  }
+
+  const reasoning = !!(delta?.reasoning_content || delta?.reasoning || chunk.reasoning);
+  return { text: '', reasoning, completedText };
+}
+
 export async function callAiApi(  endpoint: string,
   model: string,
   apiKey: string,
@@ -799,6 +843,7 @@ export async function callAiApi(  endpoint: string,
           (typeof msg?.content === 'string' && msg.content) ||
           msg?.reasoning ||
           msg?.reasoning_content ||
+          extractStreamChunk(data).completedText ||
           '';
         if (!direct) {
           throw new Error(
@@ -813,6 +858,8 @@ export async function callAiApi(  endpoint: string,
       let buffer = '';
       let rawSnippet = '';
       let sawReasoningOnly = false;
+      let completedSnapshot = '';
+      const seenEvents: string[] = [];
 
       try {
         while (true) {
@@ -830,14 +877,23 @@ export async function callAiApi(  endpoint: string,
           for (const line of lines) {
             const cleanLine = line.trim();
             if (!cleanLine) continue;
+            if (cleanLine.startsWith('event:')) {
+              const name = cleanLine.slice(6).trim();
+              if (name && !seenEvents.includes(name)) {
+                seenEvents.push(name);
+              }
+              continue;
+            }
             if (cleanLine === 'data: [DONE]') continue;
             if (cleanLine.startsWith('data: ')) {
               try {
                 const parsedChunk = JSON.parse(cleanLine.slice(6));
-                const delta = parsedChunk.choices?.[0]?.delta;
-                const text = delta?.content ?? '';
+                const { text, reasoning, completedText } = extractStreamChunk(parsedChunk);
                 content += text;
-                if (!text && (delta?.reasoning_content || delta?.reasoning)) {
+                if (completedText) {
+                  completedSnapshot = completedText;
+                }
+                if (!text && reasoning) {
                   sawReasoningOnly = true;
                 }
               } catch {
@@ -851,9 +907,21 @@ export async function callAiApi(  endpoint: string,
         if (cleanBuffer.startsWith('data: ') && cleanBuffer !== 'data: [DONE]') {
           try {
             const parsedChunk = JSON.parse(cleanBuffer.slice(6));
-            const text = parsedChunk.choices?.[0]?.delta?.content ?? '';
+            const { text, reasoning, completedText } = extractStreamChunk(parsedChunk);
             content += text;
+            if (completedText) {
+              completedSnapshot = completedText;
+            }
+            if (!text && reasoning) {
+              sawReasoningOnly = true;
+            }
           } catch {}
+        }
+
+        // Responses-API servers may only deliver the full text in the
+        // completed-event snapshot rather than as deltas.
+        if (!content && completedSnapshot) {
+          content = completedSnapshot;
         }
       } finally {
         reader.releaseLock();
@@ -863,8 +931,9 @@ export async function callAiApi(  endpoint: string,
         const hint = sawReasoningOnly
           ? ' The model streamed only reasoning (reasoning_content) with no answer content — disable thinking mode for this model or use a non-reasoning model.'
           : '';
+        const events = seenEvents.length > 0 ? ` Stream events seen: ${seenEvents.slice(0, 8).join(',')}.` : '';
         throw new Error(
-          `AI API returned empty response (model: ${model}, content-type: ${contentType || 'unknown'}).${hint} First bytes: ${rawSnippet || '(none)'}`.slice(0, 500)
+          `AI API returned empty response (model: ${model}, content-type: ${contentType || 'unknown'}).${hint}${events} First bytes: ${rawSnippet || '(none)'}`.slice(0, 600)
         );
       }
 
