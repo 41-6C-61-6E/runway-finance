@@ -146,7 +146,6 @@ export async function analyzeUncategorized(
     }
     const endpoint = activeProvider.endpoint;
     const model = activeProvider.model;
-    const jsonMode = activeProvider.jsonMode ?? false;
 
     // Validate endpoint URL against SSRF
     const validation = await validateEndpointUrl(endpoint);
@@ -347,7 +346,7 @@ export async function analyzeUncategorized(
         const batchStart = Date.now();
         logger.info(`${LOG_TAG} Calling AI API (batch ${batchNum})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
         onLog?.(`Batch ${batchNum}: Calling model (${model}). Waiting for response...`);
-        const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, jsonMode, batchAbortController.signal);
+        const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, batchAbortController.signal);
 
         const { suggestions } = aiResponse;
         const elapsed = ((Date.now() - batchStart) / 1000).toFixed(1);
@@ -587,7 +586,6 @@ export async function analyzeSingleTransaction(
       apiKey,
       prompt,
       systemPrompt,
-      provider.jsonMode ?? false,
       controller.signal,
     );
   } finally {
@@ -692,8 +690,10 @@ function cleanJsonString(content: string): string {
 /**
  * Extract the first balanced {...} JSON object from text that may contain
  * prose before/after it. String- and escape-aware. Returns null if none.
+ * Exported for reuse by the connection test, which validates JSON output
+ * the same way production parsing does.
  */
-function extractJsonObject(text: string): string | null {
+export function extractJsonObject(text: string): string | null {
   const start = text.indexOf('{');
   if (start === -1) return null;
   let depth = 0;
@@ -819,16 +819,25 @@ function extractStreamChunk(chunk: any): { text: string; reasoning: boolean; com
   return { text: '', reasoning, completedText };
 }
 
-export async function callAiApi(  endpoint: string,
+/**
+ * True when an error means the server rejected the constrained-JSON request
+ * (`response_format`), as opposed to a transient or auth failure. Used to
+ * fall back to plain mode automatically.
+ */
+export function isJsonFormatRejection(message: string): boolean {
+  return /response_format|json_object|response format|json mode|grammar/i.test(message);
+}
+
+export async function callAiApi(
+  endpoint: string,
   model: string,
   apiKey: string,
   prompt: string,
   systemPrompt: string,
-  jsonMode: boolean,
   signal?: AbortSignal,
 ): Promise<AiResponse> {
   const url = `${endpoint.replace(/\/$/, '')}/chat/completions`;
-  const body: Record<string, any> = {
+  const baseBody: Record<string, any> = {
     model,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -842,10 +851,6 @@ export async function callAiApi(  endpoint: string,
     enable_thinking: false,
   };
 
-  if (jsonMode) {
-    body.response_format = { type: 'json_object' };
-  }
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -853,6 +858,42 @@ export async function callAiApi(  endpoint: string,
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
+  // Smart JSON mode: try constrained JSON first (cleanest output), then fall
+  // back to plain mode when the server rejects `response_format`. The parse
+  // repair pipeline below is the final safety net either way.
+  let lastError: unknown = null;
+  for (const useJsonFormat of [true, false]) {
+    const body: Record<string, any> = { ...baseBody };
+    if (useJsonFormat) {
+      body.response_format = { type: 'json_object' };
+    }
+
+    try {
+      const result = await callAiApiOnce(url, headers, body, model, signal);
+      if (!useJsonFormat) {
+        logger.info(`${LOG_TAG} Plain (non-JSON-mode) request succeeded`, { model });
+      }
+      return result;
+    } catch (err) {
+      if (useJsonFormat && err instanceof Error && !/abort/i.test(err.name) && isJsonFormatRejection(err.message)) {
+        logger.info(`${LOG_TAG} Server rejected response_format, retrying without JSON mode`, { model, error: err.message.slice(0, 200) });
+        lastError = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('AI API call failed after retries');
+}
+
+async function callAiApiOnce(
+  url: string,
+  headers: Record<string, string>,
+  body: Record<string, any>,
+  model: string,
+  signal?: AbortSignal,
+): Promise<AiResponse> {
   const MAX_RETRIES = 2;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {

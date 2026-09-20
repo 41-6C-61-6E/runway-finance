@@ -33,7 +33,6 @@ function toShape(row: any, hasApiKey: boolean) {
     endpoint: row.endpoint,
     model: row.model,
     hasApiKey,
-    jsonMode: row.jsonMode ?? false,
     updatedAt: row.updatedAt ?? null,
     managed: !!readEnvProvider(),
   };
@@ -57,7 +56,7 @@ export async function GET() {
 
   const row = await getSingleProvider(session.user.id);
   if (!row) {
-    return NextResponse.json({ endpoint: '', model: '', hasApiKey: false, jsonMode: false, updatedAt: null, managed: !!readEnvProvider() });
+    return NextResponse.json({ endpoint: '', model: '', hasApiKey: false, updatedAt: null, managed: !!readEnvProvider() });
   }
 
   let hasApiKey = false;
@@ -77,7 +76,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  let body: { endpoint?: string; model?: string; apiKey?: string; jsonMode?: boolean };
+  let body: { endpoint?: string; model?: string; apiKey?: string };
   try {
     body = await request.json();
   } catch {
@@ -91,7 +90,7 @@ export async function PUT(request: Request) {
   }
 
   // When the deployment enforces a provider via env, endpoint/model/key
-  // always come from env (jsonMode remains user-adjustable).
+  // always come from env.
   const envProvider = readEnvProvider();
   const effectiveEndpointRaw = envProvider ? envProvider.endpoint : endpointRaw;
   const effectiveModel = envProvider ? envProvider.model : model;
@@ -130,7 +129,6 @@ export async function PUT(request: Request) {
           model: effectiveModel,
           apiKeyEncrypted: apiKeyEncrypted ?? null,
           isActive: true,
-          jsonMode: body.jsonMode ?? false,
         })
         .returning();
       logger.info('[api/ai/provider] Created single provider', { userId: session.user.id });
@@ -144,7 +142,6 @@ export async function PUT(request: Request) {
       updatedAt: new Date(),
     };
     if (envProvider) updates.name = envProvider.name;
-    if (body.jsonMode !== undefined) updates.jsonMode = body.jsonMode;
     if (apiKeyEncrypted !== undefined) updates.apiKeyEncrypted = apiKeyEncrypted;
 
     const [updated] = await db

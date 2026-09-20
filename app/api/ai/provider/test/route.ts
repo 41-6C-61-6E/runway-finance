@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  let body: { endpoint?: string; model?: string; apiKey?: string; jsonMode?: boolean; prompt?: string };
+  let body: { endpoint?: string; model?: string; apiKey?: string; prompt?: string };
   try {
     body = await request.json();
   } catch {
@@ -55,9 +55,8 @@ export async function POST(request: Request) {
   const endpoint = (envProvider?.endpoint ?? body.endpoint ?? saved?.endpoint ?? '').trim();
   const model = (envProvider?.model ?? body.model ?? saved?.model ?? '').trim();
   const effectiveKey = envProvider?.apiKey ? envProvider.apiKey : apiKey;
-  const jsonMode = body.jsonMode ?? saved?.jsonMode ?? false;
   const prompt = body.prompt || DEFAULT_TEST_PROMPT;
 
-  const result = await testChatCompletion({ endpoint, model, apiKey: effectiveKey, jsonMode, prompt });
+  const result = await testChatCompletion({ endpoint, model, apiKey: effectiveKey, prompt, expectJson: !body.prompt });
   return NextResponse.json(result);
 }

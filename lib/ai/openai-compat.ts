@@ -1,6 +1,7 @@
 import { DEFAULT_TEST_PROMPT } from '@/lib/ai/prompts';
 import { logger } from '@/lib/logger';
 import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
+import { extractJsonObject, isJsonFormatRejection } from '@/lib/services/ai-categorizer';
 
 export const TEST_TIMEOUT_MS = 45_000;
 export const MODELS_TIMEOUT_MS = 15_000;
@@ -51,9 +52,15 @@ type TestChatArgs = {
   endpoint: string;
   model: string;
   apiKey?: string;
-  jsonMode?: boolean;
   prompt?: string;
   timeoutMs?: number;
+  /**
+   * When true (default prompt), the response is validated as JSON the same
+   * way production parsing does — the test then proves the model can do the
+   * actual categorization task, not just chat. Skipped for custom prompts
+   * whose shape is unknown.
+   */
+  expectJson?: boolean;
 };
 
 export type TestChatResult = {
@@ -65,8 +72,8 @@ export type TestChatResult = {
 /**
  * Single shared chat-completion test used by every test path so the Test
  * button exercises the same request shape as production (no `chat_id`,
- * `temperature: 0.1`, optional `response_format`, `fetchSecure` so
- * redirects are followed and SSRF-checked on every hop).
+ * `temperature: 0.1`, automatic JSON mode with plain fallback, `fetchSecure`
+ * so redirects are followed and SSRF-checked on every hop).
  */
 export async function testChatCompletion(args: TestChatArgs): Promise<TestChatResult> {
   const endpoint = normalizeEndpoint(args.endpoint);
@@ -89,7 +96,7 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
   const targetUrl = buildChatUrl(endpoint);
   logger.info('Testing AI connection', { endpoint, model, hasKey: !!args.apiKey });
 
-  const body: Record<string, unknown> = {
+  const baseBody: Record<string, unknown> = {
     model,
     messages: [
       { role: 'system', content: 'You are a helpful assistant. Respond directly and quickly.' },
@@ -97,9 +104,6 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
     ],
     temperature: 0.1,
   };
-  if (args.jsonMode) {
-    body.response_format = { type: 'json_object' };
-  }
 
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -107,17 +111,32 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
       headers['Authorization'] = `Bearer ${args.apiKey}`;
     }
 
-    const startTime = Date.now();
-    const res = await fetchSecure(targetUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      timeoutMs,
-    });
-    const elapsed = Date.now() - startTime;
+    // Smart JSON mode (mirrors production): try constrained JSON first,
+    // fall back to plain when the server rejects `response_format`.
+    let res: Response | null = null;
+    let elapsed = 0;
+    let usedJsonMode = false;
+    let lastDetail = '';
+    for (const useJsonFormat of [true, false]) {
+      const body: Record<string, unknown> = { ...baseBody };
+      if (useJsonFormat) {
+        body.response_format = { type: 'json_object' };
+      }
+      const startTime = Date.now();
+      const attempt = await fetchSecure(targetUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        timeoutMs,
+      });
+      elapsed = Date.now() - startTime;
 
-    if (!res.ok) {
-      const text = await res.text();
+      if (attempt.ok) {
+        res = attempt;
+        usedJsonMode = useJsonFormat;
+        break;
+      }
+      const text = await attempt.text();
       let detail = text.slice(0, 500);
       try {
         const json = JSON.parse(text);
@@ -126,6 +145,21 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
       } catch {
         /* keep raw text */
       }
+      if (useJsonFormat && attempt.status === 400 && isJsonFormatRejection(detail)) {
+        logger.info('Test connection: server rejected response_format, retrying without JSON mode', { endpoint });
+        lastDetail = detail;
+        continue;
+      }
+      res = attempt;
+      lastDetail = detail;
+      break;
+    }
+    if (!res) {
+      return { ok: false, message: `Connection failed: ${lastDetail || 'no response'}` };
+    }
+    const detail = lastDetail;
+
+    if (!res.ok) {
 
       // Open WebUI management-API base misconfiguration is the common 405.
       if (res.status === 405) {
@@ -155,9 +189,28 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
       msg?.reasoning_content ||
       '(empty response)';
 
+    // Mirror the real task: the default prompt demands JSON, so prove the
+    // model returns parseable JSON rather than just connected chat.
+    const modeNote = usedJsonMode ? ' (JSON mode)' : ' (plain mode)';
+    if (args.expectJson !== false) {
+      const check = validateTestJson(responseContent);
+      if (!check.ok) {
+        return {
+          ok: false,
+          message: `Connected${modeNote}, but the model did not return valid JSON (categorization needs JSON). Preview: ${check.preview} Try a model that follows JSON instructions.`,
+          response: responseContent,
+        };
+      }
+      return {
+        ok: true,
+        message: `Connected to ${model} at ${endpoint} (${elapsed}ms) — valid JSON returned${modeNote}`,
+        response: responseContent,
+      };
+    }
+
     return {
       ok: true,
-      message: `Connected to ${model} at ${endpoint} (${elapsed}ms)`,
+      message: `Connected to ${model} at ${endpoint} (${elapsed}ms)${modeNote}`,
       response: responseContent,
     };
   } catch (err) {
@@ -177,6 +230,33 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
       return { ok: false, message: message };
     }
     return { ok: false, message };
+  }
+}
+
+/**
+ * Validate a test response as JSON using the same extraction production
+ * parsing uses (think-tag stripping, fences, balanced-object fallback).
+ */
+function validateTestJson(text: string): { ok: boolean; preview: string } {
+  const stripped = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .trim();
+  let candidate = stripped;
+  const fence = stripped.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) {
+    candidate = fence[1];
+  } else {
+    const extracted = extractJsonObject(stripped);
+    if (extracted) {
+      candidate = extracted;
+    }
+  }
+  try {
+    JSON.parse(candidate);
+    return { ok: true, preview: '' };
+  } catch {
+    return { ok: false, preview: stripped.slice(0, 200) || '(empty response)' };
   }
 }
 

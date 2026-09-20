@@ -43,7 +43,6 @@ export default function AiTab() {
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [jsonMode, setJsonMode] = useState(false);
   const [managed, setManaged] = useState(false);
 
   const [testing, setTesting] = useState(false);
@@ -142,7 +141,6 @@ export default function AiTab() {
           setEndpoint(single.endpoint ?? '');
           setModel(single.model ?? '');
           setHasApiKey(!!single.hasApiKey);
-          setJsonMode(!!single.jsonMode);
           setManaged(!!single.managed);
           if (single.model) {
             setIsCustomModel(false);
@@ -228,7 +226,6 @@ export default function AiTab() {
         body: JSON.stringify({
           endpoint: endpoint.trim(),
           model: model.trim(),
-          jsonMode,
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         }),
       });
@@ -262,7 +259,6 @@ export default function AiTab() {
         body: JSON.stringify({
           endpoint: endpoint.trim(),
           model: model.trim(),
-          jsonMode,
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
           ...(customPrompt ? { prompt: customPrompt } : {}),
         }),
@@ -318,9 +314,9 @@ export default function AiTab() {
         <p className="text-xs text-muted-foreground mb-4">
           Connect one OpenAI-compatible endpoint (OpenAI, Ollama, Open WebUI). For Open WebUI use the <span className="font-mono">…/api</span> base, not <span className="font-mono">…/api/v1</span>.
         </p>
-        {managed && (
+          {managed && (
           <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 mb-4">
-            Managed by the deployment: endpoint, model, and API key come from the server’s env vars and override any changes on save. JSON Mode can still be adjusted below.
+            Managed by the deployment: endpoint, model, and API key come from the server’s env vars and override any changes on save.
           </p>
         )}
 
@@ -416,20 +412,9 @@ export default function AiTab() {
             )}
           </div>
 
-          <label className="flex items-start gap-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={jsonMode}
-              onChange={(e) => setJsonMode(e.target.checked)}
-              className="mt-0.5 rounded border-border accent-primary"
-            />
-            <div className="flex-1">
-              <span className="text-xs font-medium text-foreground">Enable JSON Mode (response_format)</span>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                Forces the model to respond in JSON. Disable this for providers with FSM/grammar issues (like local vLLM).
-              </p>
-            </div>
-          </label>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            The app automatically requests constrained JSON first and falls back to plain mode when the provider rejects it — no setting needed.
+          </p>
 
           {saveResult && (
             <div className={`text-xs px-3 py-2 rounded-lg ${saveResult.ok ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
@@ -573,7 +558,7 @@ export default function AiTab() {
           <div className="flex-1 min-w-0">
             <SectionHeading>Test Prompt</SectionHeading>
             <p className="text-xs text-muted-foreground">
-              Customize the message sent when testing the provider connection. A short prompt speeds up the test.
+              Customize the message sent when testing the provider connection. A short prompt speeds up the test. The default prompt asks for a haiku in JSON, mimicking real categorization — the test passes only if the model returns valid JSON (custom prompts skip the JSON check).
             </p>
           </div>
           <button
