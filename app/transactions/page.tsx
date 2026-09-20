@@ -99,6 +99,9 @@ function TransactionsContent() {
   const [analysisProcessed, setAnalysisProcessed] = useState(0);
   const [analysisTotal, setAnalysisTotal] = useState(0);
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = usePersistentState<string[]>('finance:transactions:dismissedSuggestionIds', []);
+  // Ref mirror so the pending-fetch callback (stable deps) sees fresh values.
+  const dismissedIdsRef = useRef<string[]>([]);
+  dismissedIdsRef.current = dismissedSuggestionIds ?? [];
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
   const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
 
@@ -173,8 +176,14 @@ function TransactionsContent() {
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
+          const ids = data.map((p: any) => p.id);
           setPendingAiCount(data.length);
-          setPendingAiIds(data.map((p: any) => p.id));
+          setPendingAiIds(ids);
+          // A fresh run's proposals must reappear even if an older pill was
+          // dismissed earlier in the session.
+          if (ids.some((id: string) => !dismissedIdsRef.current.includes(id))) {
+            setAiSuggestionsDismissed(false);
+          }
         } else {
           setPendingAiCount(0);
           setPendingAiIds([]);
@@ -212,7 +221,10 @@ function TransactionsContent() {
   }, [fetchPendingAi]);
 
   // Poll analysis status so the toolbar slot shows "in progress" with a
-  // click-through to the live progress in the suggestions modal.
+  // click-through to the live progress in the suggestions modal. When a run
+  // finishes while the modal is closed, refresh counts/table so the
+  // suggestions pill appears (and auto-approved rows update).
+  const wasRunningRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
     const checkStatus = () => {
@@ -221,6 +233,11 @@ function TransactionsContent() {
         .then((data) => {
           if (cancelled || !data) return;
           const running = data.status === 'running';
+          if (wasRunningRef.current && !running) {
+            fetchPendingAi();
+            invalidateAfterTransactionChange(queryClient);
+          }
+          wasRunningRef.current = running;
           setAnalysisRunning(running);
           if (running) {
             setAnalysisProcessed(data.processedCount ?? 0);
@@ -235,7 +252,7 @@ function TransactionsContent() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [aiModalOpen]);
+  }, [aiModalOpen, fetchPendingAi, queryClient]);
 
   const handleApplyPreset = useCallback((preset: TransactionPreset) => {
     setFilters({
