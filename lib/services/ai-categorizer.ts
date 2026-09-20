@@ -656,7 +656,7 @@ function buildPrompt(
   prompt += 'Analyze the transactions above and suggest categorizations, new categories, and rules. ';
   prompt += 'For "categorize" suggestions, transactionIndex must be the 1-based Index matching the transaction from the table above. ';
   prompt += 'Use the category IDs from the table above when referencing existing categories. ';
-  prompt += 'Respond with valid JSON only.\n';
+  prompt += 'Output ONLY the JSON object — no reasoning, no preamble, no text outside the JSON.\n';
 
   return prompt;
 }
@@ -689,12 +689,61 @@ function cleanJsonString(content: string): string {
   return clean;
 }
 
+/**
+ * Extract the first balanced {...} JSON object from text that may contain
+ * prose before/after it. String- and escape-aware. Returns null if none.
+ */
+function extractJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+    } else {
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === '{') {
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          return text.slice(start, i + 1);
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function parseAiContent(content: string): AiResponse {
+  // Strip reasoning traces some models emit despite JSON-only instructions.
+  let stripped = content
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .trim();
+
   let parsed: AiResponse;
-  let jsonText = content;
-  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  let jsonText = stripped;
+  const jsonMatch = stripped.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) {
     jsonText = jsonMatch[1];
+  } else {
+    // Last resort: extract the largest balanced {...} block (handles
+    // preamble/postamble prose around the JSON object).
+    const extracted = extractJsonObject(stripped);
+    if (extracted) {
+      jsonText = extracted;
+    }
   }
 
   try {
@@ -787,6 +836,10 @@ export async function callAiApi(  endpoint: string,
     ],
     temperature: 0.1,
     stream: true,
+    // Hint for thinking/reasoning models (Qwen3, etc.): skip the thinking
+    // trace entirely. Unknown fields are ignored by servers that don't
+    // support them. The prompt text reinforces this for all models.
+    enable_thinking: false,
   };
 
   if (jsonMode) {

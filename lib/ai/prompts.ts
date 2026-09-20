@@ -54,7 +54,12 @@ For "categorize" suggestions:
 For "create_rule" suggestions:
 - "setCategoryName" must reference an existing category name or a newly proposed category name.
 - Only suggest rules for clear, repetitive patterns.
-- Condition operators: "contains" (substring match), "equals" (exact), "starts_with" (prefix), "ends_with" (suffix), "regex" (regular expression).`;
+- Condition operators: "contains" (substring match), "equals" (exact), "starts_with" (prefix), "ends_with" (suffix), "regex" (regular expression).
+
+CRITICAL OUTPUT RULES:
+- Do NOT show any reasoning, thinking, or deliberation. Do NOT write any preamble, explanation, or text outside the JSON.
+- Your ENTIRE response must be exactly one JSON object matching the schema above — nothing before it, nothing after it.
+- Do NOT wrap it in markdown fences or <think> tags.`;
 
 export const DEFAULT_TEST_PROMPT = 'Write a haiku about money, finance, retirement, investing, or financial freedom. Output ONLY the 3 line poem. Do not include any thinking, reasoning, explanation, or <think> tags.';
 export const TEST_PROMPT_STORAGE_KEY = 'ai_test_prompt';
