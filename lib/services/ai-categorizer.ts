@@ -837,6 +837,16 @@ export async function callAiApi(
   signal?: AbortSignal,
 ): Promise<AiResponse> {
   const url = `${endpoint.replace(/\/$/, '')}/chat/completions`;
+  // OpenRouter supports the `reasoning` parameter (reasoning tokens travel
+  // outside `content`, so JSON parsing is unaffected). Other backends get
+  // the `enable_thinking: false` hint instead; unknown fields are ignored
+  // by servers that don't support them.
+  let openRouterReasoning = false;
+  try {
+    openRouterReasoning = new URL(endpoint).hostname.toLowerCase().endsWith('openrouter.ai');
+  } catch {
+    /* leave false — endpoint validation happens in the caller */
+  }
   const baseBody: Record<string, any> = {
     model,
     messages: [
@@ -845,10 +855,9 @@ export async function callAiApi(
     ],
     temperature: 0.1,
     stream: true,
-    // Hint for thinking/reasoning models (Qwen3, etc.): skip the thinking
-    // trace entirely. Unknown fields are ignored by servers that don't
-    // support them. The prompt text reinforces this for all models.
-    enable_thinking: false,
+    ...(openRouterReasoning
+      ? { reasoning: { enabled: true } }
+      : { enable_thinking: false }),
   };
 
   const headers: Record<string, string> = {

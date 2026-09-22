@@ -21,13 +21,36 @@ export function buildModelsUrl(endpoint: string): string {
   return `${normalizeEndpoint(endpoint)}/models`;
 }
 
+/** True for hosts whose OpenAI-compatible API canonically lives under `/v1` (OpenRouter, OpenAI). */
+export function usesV1BasePath(endpoint: string): boolean {
+  try {
+    const host = new URL(normalizeEndpoint(endpoint)).hostname.toLowerCase();
+    return host.endsWith('openrouter.ai') || host.endsWith('openai.com');
+  } catch {
+    return false;
+  }
+}
+
+/** True for OpenRouter, which supports the `reasoning` request parameter. */
+export function isOpenRouterEndpoint(endpoint: string): boolean {
+  try {
+    return new URL(normalizeEndpoint(endpoint)).hostname.toLowerCase().endsWith('openrouter.ai');
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Hint when the user pasted an Open WebUI management-API base (`.../api/v1`
  * or `.../v1`). Open WebUI's OpenAI-compatible chat lives at
  * `POST {base}/api/chat/completions`, while `/api/v1/*` is the management
  * API and returns `405 {"detail":"Method Not Allowed"}` for chat posts.
+ * Skipped for hosts where `/v1` is correct (OpenRouter, OpenAI).
  */
 export function openWebUIBaseHint(endpoint: string): string | null {
+  if (usesV1BasePath(endpoint)) {
+    return null;
+  }
   try {
     const url = new URL(normalizeEndpoint(endpoint));
     const path = url.pathname.replace(/\/+$/, '');
@@ -103,6 +126,8 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.1,
+    // OpenRouter supports the `reasoning` parameter (see callAiApi).
+    ...(isOpenRouterEndpoint(endpoint) ? { reasoning: { enabled: true } } : {}),
   };
 
   try {

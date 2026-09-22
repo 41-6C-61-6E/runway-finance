@@ -20,6 +20,11 @@ function endpointHint(endpoint: string): string | null {
   const trimmed = endpoint.trim().replace(/\/+$/, '');
   try {
     const url = new URL(trimmed);
+    const host = url.hostname.toLowerCase();
+    // OpenRouter and OpenAI canonically use .../api/v1 — no warning there.
+    if (host.endsWith('openrouter.ai') || host.endsWith('openai.com')) {
+      return null;
+    }
     const path = url.pathname.replace(/\/+$/, '');
     if (/(^|\/)api\/v1$/.test(path)) {
       return `For Open WebUI use ${url.origin}${path.replace(/\/v1$/, '')} (remove the trailing /v1). Tests POST {endpoint}/chat/completions.`;
@@ -312,7 +317,7 @@ export default function AiTab() {
       <div className="p-5 bg-card border border-border rounded-xl">
         <SectionHeading>AI Provider</SectionHeading>
         <p className="text-xs text-muted-foreground mb-4">
-          Connect one OpenAI-compatible endpoint (OpenAI, Ollama, Open WebUI). For Open WebUI use the <span className="font-mono">…/api</span> base, not <span className="font-mono">…/api/v1</span>.
+          Connect one OpenAI-compatible endpoint. Open WebUI uses the <span className="font-mono">…/api</span> base (not <span className="font-mono">…/api/v1</span>); OpenRouter and OpenAI use <span className="font-mono">…/api/v1</span>.
         </p>
           {managed && (
           <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 mb-4">
