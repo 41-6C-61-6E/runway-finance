@@ -6,7 +6,7 @@ import { eq, asc } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 import { DEFAULT_TEST_PROMPT } from '@/lib/ai/prompts';
-import { isMaskedKey, testChatCompletion } from '@/lib/ai/openai-compat';
+import { isMaskedKey, parseStoredFallbacks, sanitizeFallbacks, testChatCompletion } from '@/lib/ai/openai-compat';
 import { readEnvProvider } from '@/lib/db/seed-ai-providers';
 
 /**
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  let body: { endpoint?: string; model?: string; apiKey?: string; prompt?: string };
+  let body: { endpoint?: string; model?: string; apiKey?: string; prompt?: string; fallbackModels?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -56,7 +56,11 @@ export async function POST(request: Request) {
   const model = (envProvider?.model ?? body.model ?? saved?.model ?? '').trim();
   const effectiveKey = envProvider?.apiKey ? envProvider.apiKey : apiKey;
   const prompt = body.prompt || DEFAULT_TEST_PROMPT;
+  const rawFallbacks = envProvider?.fallbacks !== undefined
+    ? envProvider.fallbacks
+    : (body.fallbackModels ?? parseStoredFallbacks(saved?.fallbackModels));
+  const fallbacks = sanitizeFallbacks(model, rawFallbacks);
 
-  const result = await testChatCompletion({ endpoint, model, apiKey: effectiveKey, prompt, expectJson: !body.prompt });
+  const result = await testChatCompletion({ endpoint, model, apiKey: effectiveKey, prompt, expectJson: !body.prompt, fallbacks });
   return NextResponse.json(result);
 }

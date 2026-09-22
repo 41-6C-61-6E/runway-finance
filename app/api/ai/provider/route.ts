@@ -9,7 +9,7 @@ import { decryptField, encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { seedUserAiProviders, readEnvProvider } from '@/lib/db/seed-ai-providers';
 import { validateEndpointUrl } from '@/lib/utils/ssrf';
-import { isMaskedKey, normalizeEndpoint } from '@/lib/ai/openai-compat';
+import { isMaskedKey, normalizeEndpoint, parseStoredFallbacks, sanitizeFallbacks } from '@/lib/ai/openai-compat';
 
 /**
  * Singular AI provider for the current user.
@@ -32,6 +32,7 @@ function toShape(row: any, hasApiKey: boolean) {
   return {
     endpoint: row.endpoint,
     model: row.model,
+    fallbackModels: parseStoredFallbacks(row.fallbackModels),
     hasApiKey,
     updatedAt: row.updatedAt ?? null,
     managed: !!readEnvProvider(),
@@ -56,7 +57,7 @@ export async function GET() {
 
   const row = await getSingleProvider(session.user.id);
   if (!row) {
-    return NextResponse.json({ endpoint: '', model: '', hasApiKey: false, updatedAt: null, managed: !!readEnvProvider() });
+    return NextResponse.json({ endpoint: '', model: '', fallbackModels: [], hasApiKey: false, updatedAt: null, managed: !!readEnvProvider() });
   }
 
   let hasApiKey = false;
@@ -76,7 +77,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  let body: { endpoint?: string; model?: string; apiKey?: string };
+  let body: { endpoint?: string; model?: string; apiKey?: string; fallbackModels?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -90,13 +91,17 @@ export async function PUT(request: Request) {
   }
 
   // When the deployment enforces a provider via env, endpoint/model/key
-  // always come from env.
+  // always come from env. Fallbacks come from env when set, else the body.
   const envProvider = readEnvProvider();
   const effectiveEndpointRaw = envProvider ? envProvider.endpoint : endpointRaw;
   const effectiveModel = envProvider ? envProvider.model : model;
   if (envProvider?.apiKey) {
     body.apiKey = envProvider.apiKey;
   }
+  const effectiveFallbacks = sanitizeFallbacks(
+    effectiveModel,
+    envProvider?.fallbacks !== undefined ? envProvider.fallbacks : body.fallbackModels ?? []
+  );
 
   const validated = await validateEndpointUrl(effectiveEndpointRaw);
   if (!validated.ok) {
@@ -129,6 +134,7 @@ export async function PUT(request: Request) {
           model: effectiveModel,
           apiKeyEncrypted: apiKeyEncrypted ?? null,
           isActive: true,
+          fallbackModels: effectiveFallbacks.length > 0 ? JSON.stringify(effectiveFallbacks) : null,
         })
         .returning();
       logger.info('[api/ai/provider] Created single provider', { userId: session.user.id });
@@ -140,6 +146,7 @@ export async function PUT(request: Request) {
       model: effectiveModel,
       isActive: true,
       updatedAt: new Date(),
+      fallbackModels: effectiveFallbacks.length > 0 ? JSON.stringify(effectiveFallbacks) : null,
     };
     if (envProvider) updates.name = envProvider.name;
     if (apiKeyEncrypted !== undefined) updates.apiKeyEncrypted = apiKeyEncrypted;

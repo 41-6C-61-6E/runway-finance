@@ -2,43 +2,30 @@ import { DEFAULT_TEST_PROMPT } from '@/lib/ai/prompts';
 import { logger } from '@/lib/logger';
 import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
 import { extractJsonObject, isJsonFormatRejection } from '@/lib/services/ai-categorizer';
+import {
+  normalizeEndpoint,
+  buildChatUrl,
+  buildModelsUrl,
+  usesV1BasePath,
+  isOpenRouterEndpoint,
+  buildModelParams,
+} from '@/lib/ai/endpoints';
+
+// Re-exported so existing import sites keep working.
+export {
+  normalizeEndpoint,
+  buildChatUrl,
+  buildModelsUrl,
+  usesV1BasePath,
+  isOpenRouterEndpoint,
+  MAX_FALLBACK_MODELS,
+  sanitizeFallbacks,
+  parseStoredFallbacks,
+  buildModelParams,
+} from '@/lib/ai/endpoints';
 
 export const TEST_TIMEOUT_MS = 45_000;
 export const MODELS_TIMEOUT_MS = 15_000;
-
-/** Normalize user input: trim + strip trailing slashes. */
-export function normalizeEndpoint(raw: string): string {
-  return raw.trim().replace(/\/+$/, '');
-}
-
-/** Build the chat-completions URL, preserving any base path (e.g. `/api`). */
-export function buildChatUrl(endpoint: string): string {
-  return `${normalizeEndpoint(endpoint)}/chat/completions`;
-}
-
-/** Build the models URL, preserving any base path. */
-export function buildModelsUrl(endpoint: string): string {
-  return `${normalizeEndpoint(endpoint)}/models`;
-}
-
-/** True for hosts whose OpenAI-compatible API canonically lives under `/v1` (OpenRouter, OpenAI). */
-export function usesV1BasePath(endpoint: string): boolean {
-  try {
-    const host = new URL(normalizeEndpoint(endpoint)).hostname.toLowerCase();
-    return host.endsWith('openrouter.ai') || host.endsWith('openai.com');
-  } catch {
-    return false;
-  }
-}
-
-/** True for OpenRouter, which supports the `reasoning` request parameter. */
-export function isOpenRouterEndpoint(endpoint: string): boolean {
-  try {
-    return new URL(normalizeEndpoint(endpoint)).hostname.toLowerCase().endsWith('openrouter.ai');
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Hint when the user pasted an Open WebUI management-API base (`.../api/v1`
@@ -77,6 +64,8 @@ type TestChatArgs = {
   apiKey?: string;
   prompt?: string;
   timeoutMs?: number;
+  /** OpenRouter failover list; ignored by other backends. */
+  fallbacks?: string[];
   /**
    * When true (default prompt), the response is validated as JSON the same
    * way production parsing does — the test then proves the model can do the
@@ -117,10 +106,11 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
   }
 
   const targetUrl = buildChatUrl(endpoint);
-  logger.info('Testing AI connection', { endpoint, model, hasKey: !!args.apiKey });
+  const modelParams = buildModelParams(endpoint, model, args.fallbacks);
+  logger.info('Testing AI connection', { endpoint, model, fallbacks: 'models' in modelParams ? (modelParams.models as string[]).slice(1) : [], hasKey: !!args.apiKey });
 
   const baseBody: Record<string, unknown> = {
-    model,
+    ...modelParams,
     messages: [
       { role: 'system', content: 'You are a helpful assistant. Respond directly and quickly.' },
       { role: 'user', content: userPrompt },
@@ -213,6 +203,9 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
       msg?.reasoning ||
       msg?.reasoning_content ||
       '(empty response)';
+    const servedBy = typeof data?.model === 'string' && data.model && data.model !== model
+      ? ` served by ${data.model}`
+      : '';
 
     // Mirror the real task: the default prompt demands JSON, so prove the
     // model returns parseable JSON rather than just connected chat.
@@ -228,14 +221,14 @@ export async function testChatCompletion(args: TestChatArgs): Promise<TestChatRe
       }
       return {
         ok: true,
-        message: `Connected to ${model} at ${endpoint} (${elapsed}ms) — valid JSON returned${modeNote}`,
+        message: `Connected to ${model} at ${endpoint} (${elapsed}ms) — valid JSON returned${modeNote}${servedBy}`,
         response: responseContent,
       };
     }
 
     return {
       ok: true,
-      message: `Connected to ${model} at ${endpoint} (${elapsed}ms)${modeNote}`,
+      message: `Connected to ${model} at ${endpoint} (${elapsed}ms)${modeNote}${servedBy}`,
       response: responseContent,
     };
   } catch (err) {

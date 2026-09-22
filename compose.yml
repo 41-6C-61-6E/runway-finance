@@ -82,6 +82,7 @@ services:
       - AI_PROVIDER_NAME=${AI_PROVIDER_NAME}        # Display name (e.g. "OpenAI", "Ollama")
       - AI_PROVIDER_ENDPOINT=${AI_PROVIDER_ENDPOINT} # Base URL (e.g. "https://api.openai.com/v1")
       - AI_PROVIDER_MODEL=${AI_PROVIDER_MODEL}      # Model identifier (e.g. "gpt-4o-mini")
+      - AI_PROVIDER_FALLBACK_MODELS=${AI_PROVIDER_FALLBACK_MODELS} # Comma-separated OpenRouter fallbacks, tried in order (optional)
       - AI_PROVIDER_API_KEY=${AI_PROVIDER_API_KEY}  # API key (encrypted per-user)
 
       - DATABASE_URL=${DATABASE_URL}

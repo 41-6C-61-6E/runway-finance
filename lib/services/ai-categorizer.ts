@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypto';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
+import { buildModelParams, isOpenRouterEndpoint, parseStoredFallbacks } from '@/lib/ai/endpoints';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { findDuplicateRule } from '@/lib/services/rules-engine';
 import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
@@ -63,6 +64,8 @@ type AiSuggestion =
 
 type AiResponse = {
   suggestions: AiSuggestion[];
+  /** Model that actually served the request (OpenRouter failover/reporting). */
+  servedModel?: string;
 };
 
 export async function analyzeUncategorized(
@@ -146,6 +149,7 @@ export async function analyzeUncategorized(
     }
     const endpoint = activeProvider.endpoint;
     const model = activeProvider.model;
+    const fallbacks = parseStoredFallbacks(activeProvider.fallbackModels);
 
     // Validate endpoint URL against SSRF
     const validation = await validateEndpointUrl(endpoint);
@@ -346,12 +350,13 @@ export async function analyzeUncategorized(
         const batchStart = Date.now();
         logger.info(`${LOG_TAG} Calling AI API (batch ${batchNum})`, { userId, endpoint, model, transactionCount: decryptedTxns.length, usingCustomPrompt: !!settings.aiSystemPrompt });
         onLog?.(`Batch ${batchNum}: Calling model (${model}). Waiting for response...`);
-        const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, batchAbortController.signal);
+        const aiResponse = await callAiApi(endpoint, model, apiKey, prompt, systemPrompt, batchAbortController.signal, fallbacks);
 
         const { suggestions } = aiResponse;
         const elapsed = ((Date.now() - batchStart) / 1000).toFixed(1);
-        onLog?.(`Batch ${batchNum}: Received response from ${model} in ${elapsed}s. Found ${suggestions.length} suggestion(s).`);
-        logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch ${batchNum})`, { userId });
+        const servedNote = aiResponse.servedModel && aiResponse.servedModel !== model ? ` served by ${aiResponse.servedModel}` : '';
+        onLog?.(`Batch ${batchNum}: Received response from ${model} in ${elapsed}s${servedNote}. Found ${suggestions.length} suggestion(s).`);
+        logger.info(`${LOG_TAG} Received ${suggestions.length} suggestions from AI (batch ${batchNum})`, { userId, servedModel: aiResponse.servedModel });
 
         let batchProposals = 0;
         let batchAutoApproved = 0;
@@ -587,6 +592,7 @@ export async function analyzeSingleTransaction(
       prompt,
       systemPrompt,
       controller.signal,
+      parseStoredFallbacks(provider.fallbackModels),
     );
   } finally {
     clearTimeout(timeoutId);
@@ -614,7 +620,7 @@ export async function analyzeSingleTransaction(
     })
     .returning({ id: aiProposals.id });
 
-  logger.info(`${LOG_TAG} Single-transaction suggestion created`, { userId, transactionId, type: suggestion.type });
+  logger.info(`${LOG_TAG} Single-transaction suggestion created`, { userId, transactionId, type: suggestion.type, servedModel: aiResponse.servedModel });
   return {
     proposalId: created.id,
     type: suggestion.type,
@@ -835,20 +841,16 @@ export async function callAiApi(
   prompt: string,
   systemPrompt: string,
   signal?: AbortSignal,
+  fallbacks: string[] = [],
 ): Promise<AiResponse> {
   const url = `${endpoint.replace(/\/$/, '')}/chat/completions`;
   // OpenRouter supports the `reasoning` parameter (reasoning tokens travel
   // outside `content`, so JSON parsing is unaffected). Other backends get
   // the `enable_thinking: false` hint instead; unknown fields are ignored
   // by servers that don't support them.
-  let openRouterReasoning = false;
-  try {
-    openRouterReasoning = new URL(endpoint).hostname.toLowerCase().endsWith('openrouter.ai');
-  } catch {
-    /* leave false — endpoint validation happens in the caller */
-  }
+  const openRouterReasoning = isOpenRouterEndpoint(endpoint);
   const baseBody: Record<string, any> = {
-    model,
+    ...buildModelParams(endpoint, model, fallbacks),
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: prompt },
@@ -953,7 +955,11 @@ async function callAiApiOnce(
             `AI API returned a non-streaming JSON response with no message content (model: ${model}). Raw keys: ${Object.keys(data ?? {}).join(',') || 'none'}`
           );
         }
-        return parseAiContent(direct);
+        const parsed = parseAiContent(direct);
+        if (typeof data?.model === 'string' && data.model) {
+          parsed.servedModel = data.model;
+        }
+        return parsed;
       }
 
       const decoder = new TextDecoder();
@@ -962,6 +968,7 @@ async function callAiApiOnce(
       let rawSnippet = '';
       let sawReasoningOnly = false;
       let completedSnapshot = '';
+      let servedModel: string | undefined;
       const seenEvents: string[] = [];
 
       try {
@@ -991,6 +998,9 @@ async function callAiApiOnce(
             if (cleanLine.startsWith('data: ')) {
               try {
                 const parsedChunk = JSON.parse(cleanLine.slice(6));
+                if (!servedModel && typeof parsedChunk?.model === 'string') {
+                  servedModel = parsedChunk.model;
+                }
                 const { text, reasoning, completedText } = extractStreamChunk(parsedChunk);
                 content += text;
                 if (completedText) {
@@ -1040,7 +1050,11 @@ async function callAiApiOnce(
         );
       }
 
-      return parseAiContent(content);
+      const parsed = parseAiContent(content);
+      if (servedModel) {
+        parsed.servedModel = servedModel;
+      }
+      return parsed;
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') throw err;
       const isNonRetryableHttp = err instanceof Error && /^AI API error: [4][0-9]{2}/.test(err.message);

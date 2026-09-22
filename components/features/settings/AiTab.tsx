@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
+import { sanitizeFallbacks } from '@/lib/ai/endpoints';
 import { DEFAULT_AI_SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from '@/config/defaults';
 import { Slider } from '@/components/ui/slider';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -46,6 +47,7 @@ export default function AiTab() {
   // Single provider form state
   const [endpoint, setEndpoint] = useState('');
   const [model, setModel] = useState('');
+  const [fallbackText, setFallbackText] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [hasApiKey, setHasApiKey] = useState(false);
   const [managed, setManaged] = useState(false);
@@ -145,6 +147,7 @@ export default function AiTab() {
         if (single) {
           setEndpoint(single.endpoint ?? '');
           setModel(single.model ?? '');
+          setFallbackText(((single.fallbackModels ?? []) as string[]).join(', '));
           setHasApiKey(!!single.hasApiKey);
           setManaged(!!single.managed);
           if (single.model) {
@@ -231,6 +234,7 @@ export default function AiTab() {
         body: JSON.stringify({
           endpoint: endpoint.trim(),
           model: model.trim(),
+          fallbackModels: fallbackText.split(',').map((s) => s.trim()).filter(Boolean),
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         }),
       });
@@ -264,6 +268,7 @@ export default function AiTab() {
         body: JSON.stringify({
           endpoint: endpoint.trim(),
           model: model.trim(),
+          fallbackModels: fallbackText.split(',').map((s) => s.trim()).filter(Boolean),
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
           ...(customPrompt ? { prompt: customPrompt } : {}),
         }),
@@ -310,6 +315,14 @@ export default function AiTab() {
 
   const hint = endpointHint(endpoint);
   const chatUrl = endpoint.trim() ? `${endpoint.trim().replace(/\/+$/, '')}/chat/completions` : null;
+  const isOpenRouter = (() => {
+    try {
+      return new URL(endpoint.trim()).hostname.toLowerCase().endsWith('openrouter.ai');
+    } catch {
+      return false;
+    }
+  })();
+  const fallbackPreview = sanitizeFallbacks(model, fallbackText);
 
   return (
     <div className="space-y-4">
@@ -414,6 +427,24 @@ export default function AiTab() {
                   </p>
                 )}
               </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1.5">Fallback Models (OpenRouter only)</label>
+            <input
+              value={fallbackText}
+              onChange={(e) => setFallbackText(e.target.value)}
+              className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="e.g. vendor/backup-model:free, vendor/other-model"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Comma-separated, tried in order if the primary fails (max 3). Ignored by non-OpenRouter backends.
+            </p>
+            {isOpenRouter && fallbackPreview.length > 0 && model.trim() && (
+              <p className="text-[10px] text-muted-foreground mt-1 font-mono">
+                Will send models: [{[model.trim(), ...fallbackPreview].join(', ')}]
+              </p>
             )}
           </div>
 

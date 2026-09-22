@@ -4,16 +4,18 @@ import { eq } from 'drizzle-orm';
 import { getServerDEK } from '@/lib/crypto-context';
 import { decryptField, encryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
+import { parseStoredFallbacks, sanitizeFallbacks } from '@/lib/ai/endpoints';
 
 /**
  * Read optional environment variables to define a default AI provider
  * that will be auto-seeded for every user.
  *
  * Env vars (all optional, all must be present to create a provider):
- *   AI_PROVIDER_NAME        — Display name (e.g. "OpenAI", "Ollama")
- *   AI_PROVIDER_ENDPOINT    — Base URL (e.g. "https://api.openai.com/v1")
- *   AI_PROVIDER_MODEL       — Model identifier (e.g. "gpt-4o-mini")
- *   AI_PROVIDER_API_KEY     — API key (encrypted per-user)
+ *   AI_PROVIDER_NAME             — Display name (e.g. "OpenAI", "Ollama")
+ *   AI_PROVIDER_ENDPOINT         — Base URL (e.g. "https://api.openai.com/v1")
+ *   AI_PROVIDER_MODEL            — Model identifier (e.g. "gpt-4o-mini")
+ *   AI_PROVIDER_API_KEY          — API key (encrypted per-user)
+ *   AI_PROVIDER_FALLBACK_MODELS  — Comma-separated OpenRouter fallback models
  */
 function cleanEnvValue(val?: string): string {
   if (!val) return '';
@@ -32,16 +34,25 @@ function cleanEnvValue(val?: string): string {
  * that will be auto-seeded for every user.
  *
  * Env vars:
- *   AI_PROVIDER_NAME        — Display name (e.g. "OpenAI", "Ollama") [required]
- *   AI_PROVIDER_ENDPOINT    — Base URL (e.g. "https://api.openai.com/v1") [required]
- *   AI_PROVIDER_MODEL       — Model identifier (e.g. "gpt-4o-mini") [required]
- *   AI_PROVIDER_API_KEY     — API key (optional for local providers like Ollama)
+ *   AI_PROVIDER_NAME             — Display name (e.g. "OpenAI", "Ollama") [required]
+ *   AI_PROVIDER_ENDPOINT         — Base URL (e.g. "https://api.openai.com/v1") [required]
+ *   AI_PROVIDER_MODEL            — Model identifier (e.g. "gpt-4o-mini") [required]
+ *   AI_PROVIDER_API_KEY          — API key (optional for local providers like Ollama)
+ *   AI_PROVIDER_FALLBACK_MODELS  — Comma-separated OpenRouter fallback models
+ *                                  (optional; absent/empty = keep user's saved list)
  */
 export function readEnvProvider() {
   const name = cleanEnvValue(process.env.AI_PROVIDER_NAME);
   const rawEndpoint = cleanEnvValue(process.env.AI_PROVIDER_ENDPOINT);
   const model = cleanEnvValue(process.env.AI_PROVIDER_MODEL);
   const apiKey = cleanEnvValue(process.env.AI_PROVIDER_API_KEY);
+  // Absent or empty var preserves the user's saved fallbacks (compose
+  // substitutes "" for unset vars, so empty also means "not configured").
+  // Set it to override; clear fallbacks via the settings UI instead.
+  const fallbacksVar = process.env.AI_PROVIDER_FALLBACK_MODELS;
+  const fallbacks = fallbacksVar === undefined || !cleanEnvValue(fallbacksVar)
+    ? undefined
+    : sanitizeFallbacks(model, cleanEnvValue(fallbacksVar));
 
   if (!name || !rawEndpoint || !model) {
     return null;
@@ -54,6 +65,7 @@ export function readEnvProvider() {
     endpoint,
     model,
     apiKey: apiKey || null,
+    fallbacks,
   };
 }
 
@@ -100,6 +112,7 @@ export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Pro
       model: envProvider.model,
       apiKeyEncrypted,
       isActive: true,
+      fallbackModels: envProvider.fallbacks?.length ? JSON.stringify(envProvider.fallbacks) : null,
     }).returning();
 
     await db
@@ -120,6 +133,7 @@ export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Pro
   // Env always overrides: bring the single row in line with the deployment.
   // The API key is replaced only when the env provides one that differs
   // from the saved key; when the env omits it, the user's key is kept.
+  // Same rule for fallbacks: env set → replace, env absent/empty → preserve.
   const updates: Record<string, any> = {
     name: envProvider.name,
     endpoint: envProvider.endpoint,
@@ -127,6 +141,16 @@ export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Pro
     isActive: true,
     updatedAt: new Date(),
   };
+  let fallbacksNeedUpdate = false;
+  if (envProvider.fallbacks !== undefined) {
+    const current = parseStoredFallbacks((single as any).fallbackModels);
+    const want = sanitizeFallbacks(envProvider.model, envProvider.fallbacks);
+    const same = current.length === want.length && current.every((m, i) => m === want[i]);
+    if (!same) {
+      updates.fallbackModels = want.length > 0 ? JSON.stringify(want) : null;
+      fallbacksNeedUpdate = true;
+    }
+  }
   let keyNeedsUpdate = false;
   if (envProvider.apiKey) {
     try {
@@ -145,7 +169,8 @@ export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Pro
     single.endpoint.replace(/\/+$/, '') !== envProvider.endpoint ||
     single.model !== envProvider.model ||
     single.isActive !== true ||
-    keyNeedsUpdate;
+    keyNeedsUpdate ||
+    fallbacksNeedUpdate;
 
   if (needsUpdate) {
     const [updated] = await db
@@ -165,6 +190,7 @@ export async function seedUserAiProviders(userId: string, dek?: Uint8Array): Pro
       endpoint: envProvider.endpoint,
       model: envProvider.model,
       keyReplaced: keyNeedsUpdate,
+      fallbacksReplaced: fallbacksNeedUpdate,
     });
   }
 

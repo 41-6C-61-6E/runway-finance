@@ -281,6 +281,7 @@ All variables are defined in `.env.example`. For local development copy it to `.
 | `AI_PROVIDER_NAME` | ❌ | — | Enforced AI provider name — overrides all users' saved provider |
 | `AI_PROVIDER_ENDPOINT` | ❌ | — | Enforced AI provider API base endpoint (Open WebUI: `.../api`, not `.../api/v1`; OpenRouter/OpenAI: `.../api/v1`) |
 | `AI_PROVIDER_MODEL` | ❌ | — | Enforced AI provider model ID (e.g. "gpt-4o-mini") |
+| `AI_PROVIDER_FALLBACK_MODELS` | ❌ | — | Comma-separated OpenRouter fallback models, tried in order (optional; max 3) |
 | `AI_PROVIDER_API_KEY` | ❌ | — | Enforced AI provider API key (when set, overrides all users' saved keys) |
 
 ---

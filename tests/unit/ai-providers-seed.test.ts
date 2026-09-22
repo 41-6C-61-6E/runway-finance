@@ -212,6 +212,62 @@ describe('AI Providers Seeding & Sanitization', () => {
       });
     });
 
+    it('overrides fallbacks when AI_PROVIDER_FALLBACK_MODELS is set', async () => {
+      state.aiProvidersRows = [
+        {
+          id: 'prov_existing',
+          userId: 'user1',
+          name: 'OpenRouter',
+          endpoint: 'https://openrouter.ai/api/v1',
+          model: 'primary/model',
+          apiKeyEncrypted: 'encrypted:sk-test',
+          isActive: true,
+          fallbackModels: null,
+        },
+      ];
+
+      process.env.AI_PROVIDER_NAME = 'OpenRouter';
+      process.env.AI_PROVIDER_ENDPOINT = 'https://openrouter.ai/api/v1';
+      process.env.AI_PROVIDER_MODEL = 'primary/model';
+      process.env.AI_PROVIDER_API_KEY = 'sk-test';
+      process.env.AI_PROVIDER_FALLBACK_MODELS = 'primary/model, backup/one, backup/two, backup/three, backup/four';
+
+      await seedUserAiProviders('user1');
+
+      expect(state.aiProvidersRows.length).toBe(1);
+      expect(JSON.parse(state.aiProvidersRows[0].fallbackModels)).toEqual([
+        'backup/one',
+        'backup/two',
+        'backup/three',
+      ]);
+    });
+
+    it('preserves saved fallbacks when AI_PROVIDER_FALLBACK_MODELS is absent', async () => {
+      state.aiProvidersRows = [
+        {
+          id: 'prov_existing',
+          userId: 'user1',
+          name: 'OpenRouter',
+          endpoint: 'https://openrouter.ai/api/v1',
+          model: 'primary/model',
+          apiKeyEncrypted: 'encrypted:sk-test',
+          isActive: true,
+          fallbackModels: JSON.stringify(['saved/backup']),
+        },
+      ];
+
+      process.env.AI_PROVIDER_NAME = 'OpenRouter';
+      process.env.AI_PROVIDER_ENDPOINT = 'https://openrouter.ai/api/v1';
+      process.env.AI_PROVIDER_MODEL = 'primary/model';
+      process.env.AI_PROVIDER_API_KEY = 'sk-test';
+      delete process.env.AI_PROVIDER_FALLBACK_MODELS;
+
+      await seedUserAiProviders('user1');
+
+      expect(state.aiProvidersRows.length).toBe(1);
+      expect(JSON.parse(state.aiProvidersRows[0].fallbackModels)).toEqual(['saved/backup']);
+    });
+
     it('is a no-op when already matching env (no rewrite churn)', async () => {
       state.aiProvidersRows = [
         {

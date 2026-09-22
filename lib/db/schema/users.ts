@@ -261,6 +261,8 @@ export const aiProviders = pgTable('ai_providers', {
   apiKeyEncrypted: text('api_key_encrypted'),
   isActive: boolean('is_active').notNull().default(false),
   jsonMode: boolean('json_mode').notNull().default(false),
+  // OpenRouter fallback models, stored as a JSON array string. Null/empty = none.
+  fallbackModels: text('fallback_models'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

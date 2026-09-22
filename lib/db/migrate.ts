@@ -135,7 +135,19 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
-    // 3b. Check if effective_from and effective_to columns exist on budgets
+    // 3b. Check if fallback_models column exists on ai_providers
+    const colCheck3b = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'ai_providers' AND column_name = 'fallback_models'
+    `);
+    if (colCheck3b.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Adding missing fallback_models column to ai_providers...');
+      await client.query(`
+        ALTER TABLE ai_providers
+        ADD COLUMN IF NOT EXISTS fallback_models TEXT
+      `);
+    }
+    // 3c. Check if effective_from and effective_to columns exist on budgets
     const budgetColCheck = await client.query(`
       SELECT column_name FROM information_schema.columns
       WHERE table_name = 'budgets' AND column_name IN ('effective_from', 'effective_to')
