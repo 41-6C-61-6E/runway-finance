@@ -124,6 +124,33 @@ describe('Crypto', () => {
     ]);
   });
 
+  it('decryptRow keeps scalar-looking plaintext as a string instead of coercing it', async () => {
+    // encryptRow writes strings with String(val), so plaintext that happens to be
+    // valid JSON ("12345", "true", "null") must round-trip back to a string.
+    // Coercing these broke `account.name.localeCompare(...)` downstream.
+    const row = { name: '12345', balance: '-1.5e3', institution: 'true', metadata: 'null' };
+    const encrypted = await encryptRow('accounts', row, testKey);
+
+    const decrypted = await decryptRow('accounts', encrypted, testKey);
+
+    expect(decrypted.name).toBe('12345');
+    expect(decrypted.balance).toBe('-1.5e3');
+    expect(decrypted.institution).toBe('true');
+    expect(decrypted.metadata).toBe('null');
+
+    // The exact operation that threw in the field.
+    expect(() => decrypted.name.localeCompare('2')).not.toThrow();
+    expect(() => '1'.localeCompare(decrypted.name)).not.toThrow();
+  });
+
+  it('decryptRow still parses JSON object and array fields back to their original type', async () => {
+    const row = { name: 'Acct', metadata: { plaid: 'abc-123', manual: true } };
+    const encrypted = await encryptRow('accounts', row, testKey);
+    const decrypted = await decryptRow('accounts', encrypted, testKey);
+
+    expect(decrypted.metadata).toEqual(row.metadata);
+  });
+
   it('unwrapKey throws when unwrapping with wrong KEK', async () => {
     const kek1 = hexToBytes('11'.repeat(32));
     const kek2 = hexToBytes('22'.repeat(32));

@@ -367,10 +367,15 @@ export async function decryptRow<T extends Record<string, any>>(table: string, r
     if (val != null && val !== '') {
       const payloadStr = typeof val === 'object' ? JSON.stringify(val) : String(val);
       const decrypted = await decryptField(payloadStr, key);
-      // Fields that store JSON objects were stringified before encryption;
-      // parse them back so the caller receives the original type.
+      // Fields that store JSON objects/arrays were stringified before encryption;
+      // parse them back so the caller receives the original type. Scalar results
+      // (numbers, booleans, null) are deliberately discarded: encryptRow wrote
+      // strings with String(val), so a plaintext like "12345" or "true" is a
+      // string that merely *looks* like JSON. Coercing it here turned account
+      // names into numbers and crashed `.localeCompare` / `.includes` callers.
       try {
-        val = JSON.parse(decrypted);
+        const parsed = JSON.parse(decrypted);
+        val = parsed !== null && typeof parsed === 'object' ? parsed : decrypted;
       } catch {
         val = decrypted;
       }

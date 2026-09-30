@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { issues } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { UpdateIssueStatusSchema } from '@/lib/validations/issue';
 import { logger } from '@/lib/logger';
 import { apiNotFound, apiUnauthorized, apiValidation, handleApiError } from '@/lib/api/response';
@@ -37,18 +37,14 @@ export async function PATCH(
   const { status } = parsed.data;
 
   try {
+    // Server-wide bug reports: any authenticated user can triage any report.
     const [updated] = await getDb()
       .update(issues)
       .set({
         status,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(issues.id, id),
-          eq(issues.userId, session.user.id)
-        )
-      )
+      .where(eq(issues.id, id))
       .returning();
 
     if (!updated) {
@@ -56,7 +52,7 @@ export async function PATCH(
     }
 
     logger.info('PATCH /api/bug-reporting/[id] - updated status', {
-      userId: session.user.id,
+      actorUserId: session.user.id,
       issueId: id,
       status,
     });
@@ -88,12 +84,7 @@ export async function DELETE(
   try {
     const [deleted] = await getDb()
       .delete(issues)
-      .where(
-        and(
-          eq(issues.id, id),
-          eq(issues.userId, session.user.id)
-        )
-      )
+      .where(eq(issues.id, id))
       .returning();
 
     if (!deleted) {
@@ -101,7 +92,7 @@ export async function DELETE(
     }
 
     logger.info('DELETE /api/bug-reporting/[id] - deleted', {
-      userId: session.user.id,
+      actorUserId: session.user.id,
       issueId: id,
     });
 

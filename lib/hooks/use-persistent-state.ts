@@ -3,6 +3,34 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUserSettings } from '@/components/user-settings-provider';
 
+/**
+ * Guards a value restored from the DB against a shape mismatch with the
+ * caller's declared type. `chartSelections` is a free-form JSONB map with no
+ * per-key schema, so a malformed or legacy value can survive the shallow merge
+ * in the user-settings PATCH handler indefinitely. A wrong shape surfaces far
+ * from its cause — e.g. a non-array `cf-chart:excluded-accounts` throws
+ * `e.includes is not a function` inside the income/expense chart — so we fall
+ * back to the caller's default instead of handing the bad value to the render.
+ *
+ * Only checks the container shape: a Set default expects an array from the DB
+ * (Sets are flattened to arrays on write), and an array default must not receive
+ * a non-array.
+ */
+function isRestoreValueUsable<T>(value: unknown, defaultValue: T): boolean {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(defaultValue)) return Array.isArray(value);
+  if (defaultValue instanceof Set) return Array.isArray(value);
+  if (typeof defaultValue === 'string') return typeof value === 'string';
+  if (typeof defaultValue === 'number') return typeof value === 'number';
+  if (typeof defaultValue === 'boolean') return typeof value === 'boolean';
+  // Object/other defaults: just require it isn't a primitive, which is never a
+  // valid object-shaped selection.
+  if (typeof defaultValue === 'object' && defaultValue !== null) {
+    return typeof value === 'object';
+  }
+  return true;
+}
+
 export function usePersistentState<T>(
   key: string,
   defaultValue: T,
@@ -69,6 +97,15 @@ export function usePersistentState<T>(
           console.warn(`Error deserializing DB value for key "${key}":`, e);
           parsed = defaultValue;
         }
+      } else if (!isRestoreValueUsable(dbValue, defaultValue)) {
+        console.warn(
+          `Ignoring persisted value for key "${key}": expected ${
+            Array.isArray(defaultValue) || defaultValue instanceof Set
+              ? 'an array'
+              : typeof defaultValue
+          }, got ${Array.isArray(dbValue) ? 'an array' : typeof dbValue}. Falling back to default.`
+        );
+        parsed = defaultValue;
       } else {
         parsed = dbValue as T;
       }
@@ -86,7 +123,7 @@ export function usePersistentState<T>(
       if (stored !== null) {
         const deserialize = optionsRef.current?.deserialize ?? JSON.parse;
         const parsed = deserialize(stored);
-        if (parsed !== null) {
+        if (parsed !== null && isRestoreValueUsable(parsed, defaultValue)) {
           setState(parsed);
           stateRef.current = parsed;
         }
@@ -108,6 +145,7 @@ export function usePersistentState<T>(
       try {
         const deserialize = optionsRef.current?.deserialize ?? JSON.parse;
         const parsed = deserialize(e.newValue) as T;
+        if (!isRestoreValueUsable(parsed, defaultValue)) return;
         if (JSON.stringify(parsed) !== JSON.stringify(stateRef.current)) {
           stateRef.current = parsed;
           setState(parsed);

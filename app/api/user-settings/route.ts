@@ -22,6 +22,54 @@ function ensureJsonObject(val: any, fallback: Record<string, any> = {}): Record<
   return fallback;
 }
 
+/**
+ * Strips values that can't survive a JSON round-trip and enforces a sane depth.
+ *
+ * `chartSelections` is an untyped key→value map merged shallowly into whatever is
+ * already stored, so a value of the wrong shape (e.g. a non-array for a key whose
+ * consumers call `.includes`) would otherwise persist indefinitely. There is no
+ * per-key schema to validate against, so we reject the structurally impossible
+ * rather than guess each key's type; `usePersistentState` also guards on restore.
+ */
+function sanitizeChartSelections(
+  input: Record<string, unknown>,
+  maxDepth = 8
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || typeof value === 'function' || typeof value === 'symbol') continue;
+
+    if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+      result[key] = value;
+      continue;
+    }
+
+    if (typeof value === 'number') {
+      if (Number.isFinite(value)) result[key] = value;
+      continue;
+    }
+
+    if (maxDepth <= 0) continue;
+
+    if (Array.isArray(value)) {
+      result[key] = value.filter(
+        (item) =>
+          item === null ||
+          ['boolean', 'string', 'number'].includes(typeof item) ||
+          (typeof item === 'object' && sanitizeChartSelections({ v: item }, maxDepth - 1).v !== undefined)
+      );
+      continue;
+    }
+
+    if (typeof value === 'object') {
+      result[key] = sanitizeChartSelections(value as Record<string, unknown>, maxDepth - 1);
+    }
+  }
+
+  return result;
+}
+
 export async function GET() {
   try {
     const session = await auth();
@@ -565,7 +613,7 @@ export async function PATCH(request: Request) {
         reduceTransparency: reduceTransparency ?? DEFAULTS.reduceTransparency,
         hideAccountSubheadings: hideAccountSubheadings ?? DEFAULTS.hideAccountSubheadings,
         hideAccountsSidebarByDefault: hideAccountsSidebarByDefault ?? DEFAULTS.hideAccountsSidebarByDefault,
-        chartSelections: chartSelections ?? DEFAULTS.chartSelections,
+        chartSelections: sanitizeChartSelections(chartSelections ?? {}),
         cardCollapsedStates: cardCollapsedStates ?? DEFAULTS.cardCollapsedStates,
         paystubEnabled: paystubEnabled ?? DEFAULTS.paystubEnabled,
         accountTagVisibility: accountTagVisibility ?? DEFAULTS.accountTagVisibility,
@@ -648,7 +696,10 @@ export async function PATCH(request: Request) {
   if (hideAccountsSidebarByDefault !== undefined) updates.hideAccountsSidebarByDefault = hideAccountsSidebarByDefault;
   if (chartSelections !== undefined) {
     const existingSelections = ensureJsonObject(settings[0].chartSelections, {});
-    updates.chartSelections = { ...existingSelections, ...chartSelections };
+    updates.chartSelections = sanitizeChartSelections({
+      ...existingSelections,
+      ...chartSelections,
+    });
   }
   if (cardCollapsedStates !== undefined) {
     const existingStates = ensureJsonObject(settings[0].cardCollapsedStates, {});

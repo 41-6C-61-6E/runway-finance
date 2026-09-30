@@ -19,6 +19,9 @@ export async function GET() {
   }
 
   try {
+    // Bug reports are server-wide: every user of an instance can see and triage
+    // every report filed on it. `session.user.id` is the username, which is what
+    // `issues.userId` stores (see lib/auth.ts), so the join below is by username.
     const rows = await getDb()
       .select({
         id: issues.id,
@@ -33,7 +36,6 @@ export async function GET() {
       })
       .from(issues)
       .leftJoin(users, eq(issues.userId, users.username))
-      .where(eq(issues.userId, session.user.id))
       .orderBy(desc(issues.createdAt));
 
     return NextResponse.json(rows);
