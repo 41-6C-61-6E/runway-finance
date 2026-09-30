@@ -52,7 +52,7 @@ const nextConfig = {
   turbopack: {
     root: "./",
   },
-  allowedDevOrigins: getLocalIPs(),
+  allowedDevOrigins: ['10.1.1.5', ...getLocalIPs()],
   output: "standalone",
   serverExternalPackages: ['pg', 'pg-pool', 'pg-hstore', 'pg-types', 'pg-int8', 'pg-connection-string', 'pgpass'],
   images: {
