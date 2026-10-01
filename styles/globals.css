@@ -744,18 +744,19 @@ button,
 
 /* ── Budget table fade-truncate (responsive, replaces ellipsis) ────────────── */
 .budget-fade {
-  white-space: nowrap;
   overflow: hidden;
-  /* fade last 28px to card bg; hover removes mask to reveal full name via tooltip/title */
-  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  text-overflow: ellipsis;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  box-orient: vertical;
+  box-line-clamp: 2;
 }
 .budget-fade:hover {
-  mask-image: none;
-  -webkit-mask-image: none;
-}
-@supports not (mask-image: linear-gradient(to right, black, transparent)) {
-  .budget-fade { text-overflow: ellipsis; }
+  -webkit-line-clamp: initial;
+  line-clamp: initial;
 }
 /* Progress bar prominent gradient — activated at spacious widths via inline style override */
 .budget-progress-track {

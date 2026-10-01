@@ -43,16 +43,15 @@ class WeeklyNetWorthScheduler extends BaseScheduler<string> {
           const userTz = settings.timezone || 'America/New_York';
           const alertDay = (settings.weeklyNetWorthAlertDay || 'sunday').toLowerCase();
 
-          const currentDay = new Date().toLocaleDateString('en-US', {
-            timeZone: userTz,
-            weekday: 'long',
-          }).toLowerCase();
+          // Use UTC-based day calculation for consistent cross-environment day detection
+          const now = new Date();
+          const utcDay = now.toLocaleDateString('en-US', { timeZone: userTz, weekday: 'long' }).toLowerCase();
 
           // If current day matches configured alert day (e.g. sunday), run the alert check.
           // Database deduplication (sentNotifications table) prevents duplicate notifications within the same period.
-          if (currentDay === alertDay) {
+          if (utcDay === alertDay) {
             const dek = await getServerDEK(settings.userId);
-            await checkWeeklyNetWorthChangeAndNotify(settings.userId, dek);
+            await checkWeeklyNetWorthChangeAndNotify(settings.userId, dek, userTz);
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);

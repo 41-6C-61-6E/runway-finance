@@ -434,7 +434,17 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
       ? (b.envelopePercentUsed ?? (total > 0 ? (spent / total) * 100 : 0))
       : (b.percentUsed ?? 0);
     const isOver = !isIncome && spent > total;
-    const fillClass = isOver ? 'bg-destructive' : pct > 85 ? 'bg-amber-500' : 'bg-primary';
+    const fillClass = isOver
+      ? 'bg-destructive'
+      : pct > 95
+        ? 'bg-red-500'
+        : pct > 85
+          ? 'bg-amber-500'
+          : pct > 70
+            ? 'bg-amber-400'
+            : pct > 50
+              ? 'bg-primary'
+              : 'bg-primary/20';
 
     return (
       <div className="space-y-1.5 pt-0.5">
@@ -637,7 +647,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       <Link
                         href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
                         title={b.categoryName}
-                        className="text-foreground font-medium text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch] max-w-[22ch]"
+                        className="text-foreground font-medium text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch]"
                       >
                         {b.categoryName}
                       </Link>
@@ -688,7 +698,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                           b.categoryId
                         )}
                         title={b.categoryName}
-                        className="text-foreground font-semibold text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch] max-w-[22ch]"
+                        className="text-foreground font-semibold text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch]"
                       >
                         {b.categoryName}
                       </Link>
@@ -830,9 +840,10 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               }
               let estimatedCategoryPx = Math.ceil(maxCategoryLen * 6.6 + BASE_PAD);
               if (hasEnvelopeAny) estimatedCategoryPx += 10;
-              const categoryMinPx = 150;
-              const categoryMaxPx = isSpacious ? 268 : 210;
-              let categoryWidthPx = Math.max(categoryMinPx, Math.min(categoryMaxPx, estimatedCategoryPx));
+              const categoryMinPx = 120;
+              // Remove hard max - let category width grow fluidly with container
+              // Use 80% of container width as soft cap, but allow overflow via text-wrap
+              let categoryWidthPx = Math.max(categoryMinPx, Math.floor(estimatedCategoryPx * 1.2));
 
               let budgetedW = isSpacious ? 96 : 86;
               let actualW = hasEnvelopeAny ? (isSpacious ? 150 : 132) : budgetedW;
@@ -866,9 +877,10 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                 showProgressCol = false;
                 idealWithProgressMin = fixedWithoutProgress;
               }
-              // 4) Shrink category (truncate name) to fit
+              // 4) Shrink category to fit if total exceeds container (so other cols don't disappear)
               if (idealWithProgressMin > containerWidth) {
                 const otherFixed = budgetedW + actualW + varianceW + accountW + actionsW + 8;
+                // Soft cap: leave room for other columns but allow category to grow
                 const maxCatFit = Math.max(96, containerWidth - otherFixed - (showProgressCol ? progressMinPx : 0));
                 if (categoryWidthPx > maxCatFit) {
                   categoryWidthPx = maxCatFit;
@@ -965,7 +977,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       const envSub = envelopeSubText(b);
                       return (
                         <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
-                          <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ width: categoryWidthPx, maxWidth: categoryWidthPx }}>
+                          <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ width: categoryWidthPx }}>
                             <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                               <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor }} />
                               <Link
@@ -1009,7 +1021,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ width: progressWidthPx, minWidth: progressMinPx }}>
                               <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                                 <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
-                                  <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill shadow-sm' : isTargetMet ? 'bg-primary' : 'bg-amber-500'}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                  <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill shadow-sm' : b.percentUsed > 95 ? 'bg-red-500' : b.percentUsed > 85 ? 'bg-amber-500' : b.percentUsed > 70 ? 'bg-amber-400' : b.percentUsed > 50 ? 'bg-primary' : 'bg-primary/20'}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                                 </div>
                                 <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${isTargetMet ? 'text-primary' : 'text-muted-foreground'}`}>
                                   {(b.percentUsed || 0).toFixed(0)}%
@@ -1050,7 +1062,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       return (
                         <Fragment key={b.id}>
                           <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
-                            <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ width: categoryWidthPx, maxWidth: categoryWidthPx }}>
+<td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ width: categoryWidthPx }}>
                               <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap">
                                 <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                                 <Link

@@ -182,7 +182,7 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
     }
   }, [selectedIds, selectAllMatching, filters, onClear, confirmDelete]);
 
-  const parents = categories.filter((c) => !c.parentId);
+  const parents = categories.filter((c) => !c.parentId || c.parentId === null);
   const getChildren = (parentId: string) =>
     categories.filter((c) => c.parentId === parentId);
   const matches = (name: string) =>

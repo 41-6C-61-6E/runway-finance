@@ -460,7 +460,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
   const { text } = transaction ? formatAmount(transaction.amount) : { text: '' };
 
-  const parents = categories.filter((c) => !c.parentId);
+  const parents = categories.filter((c) => !c.parentId || c.parentId === null);
   const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
 
   const selectedCat = categoryId ? categories.find((c) => c.id === categoryId) : null;

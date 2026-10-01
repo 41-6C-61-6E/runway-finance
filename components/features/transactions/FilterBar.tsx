@@ -389,7 +389,7 @@ export default function FilterBar({
     onChange('endDate', end || null);
   };
 
-  const parents = categories.filter((c) => !c.parentId);
+  const parents = categories.filter((c) => !c.parentId || c.parentId === null);
   const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
 
   const selectedAccountIds = useMemo(() => {

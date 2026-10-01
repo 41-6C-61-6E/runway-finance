@@ -631,7 +631,7 @@ export async function checkNetWorthMilestonesAndNotify(userId: string, dek: Uint
   }
 }
 
-export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Uint8Array) {
+export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Uint8Array, userTz?: string) {
   try {
     const db = getDb();
     const [settings] = await db
@@ -642,13 +642,13 @@ export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Ui
 
     if (!settings || !settings.notifyWeeklyNetWorthChange) return;
 
+    // Use provided timezone or fall back to settings timezone
+    const tz = userTz || (settings.timezone || 'America/New_York');
+
     // Gate on the user's preferred alert day (default sunday)
     const alertDay = (settings.weeklyNetWorthAlertDay || 'sunday').toLowerCase();
-    const userTz = settings.timezone || 'America/New_York';
-    const currentDay = new Date().toLocaleDateString('en-US', {
-      timeZone: userTz,
-      weekday: 'long',
-    }).toLowerCase();
+    const userTzDate = new Date();
+    const currentDay = userTzDate.toLocaleDateString('en-US', { timeZone: tz, weekday: 'long' }).toLowerCase();
 
     if (currentDay !== alertDay) {
       logger.debug('[notifications-service] Skipping weekly net worth change alert: not configured alert day', {
@@ -657,6 +657,28 @@ export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Ui
         currentDay,
       });
       return;
+    }
+
+    // R14: cheap dedup check before the expensive wealth-flow computation.
+    // The key is stable per alert day (e.g. "sunday"), so if we already alerted
+    // for this alert day we can skip the full flow calculation entirely.
+    // Uses the locale-independent day name to avoid timezone/dst inconsistencies.
+    const weeklyKey = `weekly_net_worth_change:${alertDay}`;
+    try {
+      const [alreadySent] = await db
+        .select({ id: sentNotifications.id })
+        .from(sentNotifications)
+        .where(and(eq(sentNotifications.userId, userId), eq(sentNotifications.key, weeklyKey)))
+        .limit(1);
+      if (alreadySent) {
+        logger.debug('[notifications-service] Weekly net worth change already alerted for alert day, skipping.', {
+          userId,
+          key: weeklyKey,
+        });
+        return;
+      }
+    } catch (dedupErr) {
+      logger.debug('[notifications-service] Weekly dedup pre-check failed, continuing:', dedupErr);
     }
 
     // Fetch the 2 most recent snapshots
@@ -676,27 +698,6 @@ export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Ui
     const snapshotDate = new Date(snapshotDateStr + 'T00:00:00Z');
     const startDateDate = new Date(snapshotDate.getTime() - 7 * 24 * 60 * 60 * 1000);
     const startDateStr = startDateDate.toISOString().split('T')[0];
-
-    // R14: cheap dedup check before the expensive wealth-flow computation.
-    // The key is stable per snapshot date, so if we already alerted for this
-    // snapshot we can skip the full flow calculation entirely.
-    const weeklyKey = `weekly_net_worth_change:${snapshotDateStr}`;
-    try {
-      const [alreadySent] = await db
-        .select({ id: sentNotifications.id })
-        .from(sentNotifications)
-        .where(and(eq(sentNotifications.userId, userId), eq(sentNotifications.key, weeklyKey)))
-        .limit(1);
-      if (alreadySent) {
-        logger.debug('[notifications-service] Weekly net worth change already alerted for snapshot, skipping.', {
-          userId,
-          key: weeklyKey,
-        });
-        return;
-      }
-    } catch (dedupErr) {
-      logger.debug('[notifications-service] Weekly dedup pre-check failed, continuing:', dedupErr);
-    }
 
     const flowData = await calculateWealthFlow(userId, startDateStr, snapshotDateStr, dek, [], '7d_discrete');
     const diff = flowData.summary.netWorthChange;

@@ -1257,7 +1257,7 @@ export default function TransactionTable({
         cell: ({ row }) => {
           const tx = row.original;
           const isOpen = openCategoryTx === tx.id;
-          const parents = categories.filter((c) => !c.parentId);
+          const parents = categories.filter((c) => !c.parentId || c.parentId === null);
           const getChildren = (parentId: string) =>
             categories.filter((c) => c.parentId === parentId);
 

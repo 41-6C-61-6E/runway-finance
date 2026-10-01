@@ -192,6 +192,20 @@ function TransactionsContent() {
       .catch(() => {});
   }, []);
 
+  // Auto-trigger AI suggestions when new uncategorized proposals appear after sync
+  useEffect(() => {
+    if (pendingAiIds.length > 0 && pendingAiIds.some(id => !dismissedIdsRef.current.includes(id))) {
+      setAiSuggestionsDismissed(false);
+    }
+  }, [pendingAiIds, dismissedIdsRef, setAiSuggestionsDismissed]);
+
+  // When pending AI IDs change, open the suggestions modal if there are new uncategorized proposals
+  useEffect(() => {
+    if (pendingAiIds.length > 0) {
+      setAiModalOpen(true);
+    }
+  }, [pendingAiIds, setAiModalOpen]);
+
   const handleProposalsUpdated = useCallback(() => {
     setRefreshKey((k) => k + 1);
     invalidateAfterTransactionChange(queryClient);
