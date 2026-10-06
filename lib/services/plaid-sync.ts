@@ -783,7 +783,7 @@ export async function syncPlaidConnection(
       }
 
       // Auto AI Analysis
-      if (!dekOverride && uncategorized.length > 0) {
+      if (uncategorized.length > 0) {
         try {
           const [settingsRow] = await getDb()
             .select()

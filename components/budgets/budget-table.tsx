@@ -977,13 +977,13 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       const envSub = envelopeSubText(b);
                       return (
                         <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
-                          <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ width: categoryWidthPx }}>
+                          <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
                             <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                               <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor }} />
                               <Link
                                 href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
                                 title={b.categoryName}
-                                className="text-foreground font-medium truncate hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
+                                className="text-foreground font-medium hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
                               >
                                 {b.categoryName}
                               </Link>
@@ -1004,8 +1004,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               )}
                             </div>
                           </td>
-                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" style={{ width: budgetedW }}>{renderBudgetCell(b)}</td>
-                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" style={{ width: actualW }}>
+                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" >{renderBudgetCell(b)}</td>
+                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" >
                             {isEnvelope(b) && envSub ? (
                               <span className="text-[10px] font-sans text-muted-foreground block truncate" title={envSub ?? undefined}>{envSub}</span>
                             ) : (
@@ -1062,7 +1062,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       return (
                         <Fragment key={b.id}>
                           <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
-<td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} style={{ width: categoryWidthPx }}>
+<td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} >
                               <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap">
                                 <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                                 <Link
@@ -1073,7 +1073,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                     b.categoryId
                                   )}
                                   title={b.categoryName}
-                                  className="text-foreground font-semibold truncate hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
+                                  className="text-foreground font-semibold hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
                                 >
                                   {b.categoryName}
                                 </Link>
@@ -1201,7 +1201,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                             />
                                             <Link
                                               href={getTxUrl(undefined, item.categoryId)}
-                                              className="font-medium text-foreground text-sm truncate hover:text-primary hover:underline transition-colors min-w-0 block"
+className="font-medium text-foreground text-sm hover:text-primary hover:underline transition-colors min-w-0 block"
                                               title={item.categoryName}
                                             >
                                               {item.categoryName}

@@ -1227,8 +1227,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         logger.debug(`${LOG_TAG} No uncategorized transactions to apply rules to`, { connectionId });
       }
 
-      // Auto-trigger AI analysis if user has it enabled (only for user-initiated syncs)
-      if (!dekOverride && uncategorized.length > 0) {
+      // Auto-trigger AI analysis if user has it enabled
+      if (uncategorized.length > 0) {
         try {
           const userSettingsRow = await getDb()
             .select()

@@ -19,6 +19,7 @@ import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 import PageContent from '@/components/page-content';
 import { PageHeader } from '@/components/page-header';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+import { logger } from '@/lib/logger';
 
 export type FilterState = {
   accountId: string | null;
@@ -215,17 +216,22 @@ function TransactionsContent() {
 
   // Single AI provider configured? Gates the per-transaction "Ask AI" buttons.
   const [aiConfigured, setAiConfigured] = useState(false);
-  useEffect(() => {
-    fetch('/api/ai/provider', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
+useEffect(() => {
+    async function fetchProvider() {
+      try {
+        const res = await fetch('/api/ai/provider', { credentials: 'include' });
+        const data = await res.json();
         const single = Array.isArray(data)
           ? (data.find((p: any) => p.isActive) ?? data[0] ?? null)
           : data;
         setAiConfigured(!!single?.endpoint);
-      })
-      .catch(() => {});
-  }, []);
+      } catch (err) {
+        logger.error('[ai] Failed to fetch AI provider config', { error: err instanceof Error ? err.message : String(err) });
+        setAiConfigured(false);
+      }
+    }
+    fetchProvider();
+}, []);
 
   // A per-transaction AI suggestion was created: refresh counts and open the
   // suggestions modal so the user can review it immediately.
