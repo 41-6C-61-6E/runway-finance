@@ -548,7 +548,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               </Tooltip>
             </TooltipProvider>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap shrink-0">
+          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
             {isMobile && budgets.length > 0 && (
               <Select
                 className="h-8 text-xs bg-muted/50 border-border px-2"
