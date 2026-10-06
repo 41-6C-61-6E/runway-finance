@@ -517,7 +517,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     <>
       <div className="bg-card border border-border rounded-xl shadow-sm">
         <div className="p-3 sm:p-5 pb-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <SectionHeading>Budget Items</SectionHeading>
             <TooltipProvider delayDuration={150}>
               <Tooltip>
