@@ -108,7 +108,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const [showDirectOnly, setShowDirectOnly] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    const checkMobile = () => setIsMobile(window.innerWidth < 650);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -820,12 +820,12 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
             })}
           </div>
         ) : (
-          <div ref={containerRef} className="w-full overflow-hidden min-w-0">
+          <div ref={containerRef} className="w-full min-w-0" style={{ overflowX: containerWidth < 850 ? 'auto' : 'hidden' }}>
             {(() => {
               let showProgressCol = containerWidth >= 650;
               let showVarianceCol = containerWidth >= 850;
               let showAccountCol = containerWidth >= 1050 && hasAnyAccount;
-              const isSpacious = containerWidth >= 900;
+              const isSpacious = containerWidth > 800; // spacious mode at > 800px (was 900px hard breakpoint)
               const barH = Math.round(Math.min(10, Math.max(6, containerWidth * 0.0075)));
 
               // ── Dynamic fit: measure content, not container % ────────────────
@@ -840,25 +840,65 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               }
               let estimatedCategoryPx = Math.ceil(maxCategoryLen * 6.6 + BASE_PAD);
               if (hasEnvelopeAny) estimatedCategoryPx += 10;
-              const categoryMinPx = 120;
-              // Remove hard max - let category width grow fluidly with container
-              // Use 80% of container width as soft cap, but allow overflow via text-wrap
-              let categoryWidthPx = Math.max(categoryMinPx, Math.floor(estimatedCategoryPx * 1.2));
+              // Category width: scale with content but cap at 25% of container,
+              // with a soft floor that shrinks below 120px when space is tight
+const categoryMinPx = 96;
+              const categoryMaxPx = Math.floor(containerWidth * 0.25);
+              let categoryWidthPx;
+              categoryWidthPx = Math.min(
+                Math.max(categoryMinPx, Math.ceil(estimatedCategoryPx * 1.2)),
+                categoryMaxPx
+              );
 
               let budgetedW = isSpacious ? 96 : 86;
               let actualW = hasEnvelopeAny ? (isSpacious ? 150 : 132) : budgetedW;
               let varianceW = !showVarianceCol ? 0 : budgetedW;
               let accountW = showAccountCol ? 86 : 0;
-              const actionsW = isSpacious ? 76 : 68;
+              let actionsW = isSpacious ? 76 : 68;
               const progressMinPx = isSpacious ? 140 : 96;
               const progressMaxPx = 200;
 
               // Never allow horizontal scroll: shrink / drop columns to fit containerWidth
               const calcFixed = () => categoryWidthPx + budgetedW + actualW + varianceW + accountW + actionsW + 8;
+              const totalFixed = calcFixed();
+
+              // 0) Proportional shrinking: shrink ALL columns proportionally before dropping any
+              if (totalFixed > containerWidth) {
+                const shrinkFactor = containerWidth / totalFixed;
+                const shrunkCategory = Math.max(categoryMinPx, Math.ceil(categoryWidthPx * shrinkFactor));
+                const shrunkBudgeted = Math.max(68, Math.ceil(budgetedW * shrinkFactor));
+                const shrunkActual = Math.max(68, Math.ceil(actualW * shrinkFactor));
+                const shrunkVariance = Math.max(0, Math.ceil(varianceW * shrinkFactor));
+                const shrunkAccount = Math.max(0, Math.ceil(accountW * shrinkFactor));
+                const shrunkActions = Math.max(68, Math.ceil(actionsW * shrinkFactor));
+
+                // Only apply shrunk widths if they still leave reasonable space;
+                // otherwise fall through to dropping/hard shrink below
+                const shrunkFixed =
+                  shrunkCategory +
+                  shrunkBudgeted +
+                  shrunkActual +
+                  shrunkVariance +
+                  shrunkAccount +
+                  shrunkActions +
+                  8;
+
+                // If proportional shrink brings us within container, use shrunk widths
+                if (shrunkFixed <= containerWidth) {
+                  categoryWidthPx = shrunkCategory;
+                  budgetedW = shrunkBudgeted;
+                  actualW = shrunkActual;
+                  varianceW = shrunkVariance;
+                  accountW = shrunkAccount;
+                  actionsW = shrunkActions;
+                }
+              }
+
+              // After proportional attempt, if still tight, apply dropping logic
               let fixedWithoutProgress = calcFixed();
               let idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
 
-              // 1) Drop variance if not enough space (even if breakpoint said show)
+              // 1) Drop variance if still not enough space
               if (idealWithProgressMin > containerWidth && showVarianceCol) {
                 showVarianceCol = false;
                 varianceW = 0;
@@ -880,8 +920,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               // 4) Shrink category to fit if total exceeds container (so other cols don't disappear)
               if (idealWithProgressMin > containerWidth) {
                 const otherFixed = budgetedW + actualW + varianceW + accountW + actionsW + 8;
-                // Soft cap: leave room for other columns but allow category to grow
-                const maxCatFit = Math.max(96, containerWidth - otherFixed - (showProgressCol ? progressMinPx : 0));
+                const maxCatFit = Math.max(categoryMinPx, containerWidth - otherFixed - (showProgressCol ? progressMinPx : 0));
                 if (categoryWidthPx > maxCatFit) {
                   categoryWidthPx = maxCatFit;
                   fixedWithoutProgress = calcFixed();
@@ -924,15 +963,16 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               }
               const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
               // When content fits, let table be content width (right whitespace, no inter-col gap)
-              // When tight, table fills container (no scroll)
-              const tableWidthPx = showProgressCol ? containerWidth : Math.min(fixedWithoutProgress, containerWidth);
+              // When tight, table fills container—but allow overflow via horizontal scroll
+              const tableWidthPx = fixedWithoutProgress;
               const tableStyle: React.CSSProperties = {
                 width: tableWidthPx,
-                maxWidth: '100%',
+                maxWidth: 'none',
+                overflowX: fixedWithoutProgress > containerWidth ? 'auto' : 'hidden',
               };
 
               return (
-                <table className="table-fixed text-xs sm:text-sm border-collapse" style={tableStyle}>
+                <table className="table-fixed text-xs sm:text-sm border-collapse table-layout-fixed" style={tableStyle}>
                   <colgroup>
                     <col style={{ width: categoryWidthPx }} />
                     <col style={{ width: budgetedW }} />
