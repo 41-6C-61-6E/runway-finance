@@ -108,7 +108,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const [showDirectOnly, setShowDirectOnly] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 650);
+    const checkMobile = () => setIsMobile(window.innerWidth < 600);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -820,12 +820,12 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
             })}
           </div>
         ) : (
-          <div ref={containerRef} className="w-full min-w-0" style={{ overflowX: containerWidth < 850 ? 'auto' : 'hidden' }}>
+          <div ref={containerRef} className="w-full min-w-0" style={{ overflowX: 'auto' }}>
             {(() => {
-              let showProgressCol = containerWidth >= 650;
+              let showProgressCol = containerWidth >= 600;
               let showVarianceCol = containerWidth >= 850;
               let showAccountCol = containerWidth >= 1050 && hasAnyAccount;
-              const isSpacious = containerWidth > 800; // spacious mode at > 800px (was 900px hard breakpoint)
+              const isSpacious = containerWidth > 700; // spacious mode at > 700px (was 800px hard threshold, now ratio-based at 700px)
               const barH = Math.round(Math.min(10, Math.max(6, containerWidth * 0.0075)));
 
               // ── Dynamic fit: measure content, not container % ────────────────
@@ -855,7 +855,7 @@ const categoryMinPx = 96;
               let varianceW = !showVarianceCol ? 0 : budgetedW;
               let accountW = showAccountCol ? 86 : 0;
               let actionsW = isSpacious ? 76 : 68;
-              const progressMinPx = isSpacious ? 140 : 96;
+              const progressMinPx = isSpacious ? 140 : 80;
               const progressMaxPx = 200;
 
               // Never allow horizontal scroll: shrink / drop columns to fit containerWidth
@@ -872,8 +872,6 @@ const categoryMinPx = 96;
                 const shrunkAccount = Math.max(0, Math.ceil(accountW * shrinkFactor));
                 const shrunkActions = Math.max(68, Math.ceil(actionsW * shrinkFactor));
 
-                // Only apply shrunk widths if they still leave reasonable space;
-                // otherwise fall through to dropping/hard shrink below
                 const shrunkFixed =
                   shrunkCategory +
                   shrunkBudgeted +
@@ -884,6 +882,7 @@ const categoryMinPx = 96;
                   8;
 
                 // If proportional shrink brings us within container, use shrunk widths
+                // and skip column-dropping entirely
                 if (shrunkFixed <= containerWidth) {
                   categoryWidthPx = shrunkCategory;
                   budgetedW = shrunkBudgeted;
@@ -892,32 +891,24 @@ const categoryMinPx = 96;
                   accountW = shrunkAccount;
                   actionsW = shrunkActions;
                 }
+                // If proportional shrink alone isn't enough, drop variance as last resort
+                // before allowing horizontal scroll (never drop progress or account)
+                else if (showVarianceCol) {
+                  showVarianceCol = false;
+                  varianceW = 0;
+                }
+                // If variance was already hidden or dropping variance still isn't enough,
+                // we fall through — horizontal scroll will handle it
               }
 
-              // After proportional attempt, if still tight, apply dropping logic
+              // After proportional attempt (and possible variance drop), calculate final state
               let fixedWithoutProgress = calcFixed();
               let idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
 
-              // 1) Drop variance if still not enough space
-              if (idealWithProgressMin > containerWidth && showVarianceCol) {
-                showVarianceCol = false;
-                varianceW = 0;
-                fixedWithoutProgress = calcFixed();
-                idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
-              }
-              // 2) Drop account if still tight
-              if (idealWithProgressMin > containerWidth && showAccountCol) {
-                showAccountCol = false;
-                accountW = 0;
-                fixedWithoutProgress = calcFixed();
-                idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
-              }
-              // 3) Drop progress if still tight
-              if (idealWithProgressMin > containerWidth && showProgressCol) {
-                showProgressCol = false;
-                idealWithProgressMin = fixedWithoutProgress;
-              }
-              // 4) Shrink category to fit if total exceeds container (so other cols don't disappear)
+              // If we dropped variance above, recalculate fixedWithoutProgress
+              if (!showVarianceCol) varianceW = 0;
+
+              // 1) Shrink category to fit if total exceeds container (so other cols don't disappear)
               if (idealWithProgressMin > containerWidth) {
                 const otherFixed = budgetedW + actualW + varianceW + accountW + actionsW + 8;
                 const maxCatFit = Math.max(categoryMinPx, containerWidth - otherFixed - (showProgressCol ? progressMinPx : 0));
@@ -927,7 +918,7 @@ const categoryMinPx = 96;
                   idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
                 }
               }
-              // 5) As last resort shrink amount cols (truncate currency) down to 68px min
+              // 2) As last resort: shrink amount cols (truncate currency) down to 68px min
               if (idealWithProgressMin > containerWidth) {
                 const minAmt = 68;
                 let overflow = idealWithProgressMin - containerWidth;
@@ -946,11 +937,7 @@ const categoryMinPx = 96;
                   fixedWithoutProgress = calcFixed();
                   idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
                 }
-                if (varianceW > minAmt && overflow > 0) {
-                  const reduce = Math.min(varianceW - minAmt, overflow);
-                  varianceW -= reduce;
-                  // overflow not needed further
-                }
+                // Note: varianceW shrink removed — horizontal scroll is preferred fallback
                 fixedWithoutProgress = calcFixed();
               }
 
@@ -968,7 +955,7 @@ const categoryMinPx = 96;
               const tableStyle: React.CSSProperties = {
                 width: tableWidthPx,
                 maxWidth: 'none',
-                overflowX: fixedWithoutProgress > containerWidth ? 'auto' : 'hidden',
+                overflowX: 'auto',
               };
 
               return (
