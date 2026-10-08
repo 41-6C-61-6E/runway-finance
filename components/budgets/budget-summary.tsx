@@ -625,11 +625,11 @@ export function BudgetSummary() {
                       <span className="blur-number font-bold">{formatCurrency(totalExpenseActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalExpenseBudgeted)}</span>
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
+                  <div className="w-full h-2 budget-progress-track rounded-full overflow-hidden">
                     <div
                       className={cn(
                         'h-full transition-all duration-500 rounded-full',
-                        expensePercent > 100 ? 'bg-destructive' : expensePercent > 85 ? 'bg-amber-500' : 'bg-primary'
+                        expensePercent > 100 ? 'bg-destructive' : expensePercent > 85 ? 'bg-amber-500' : 'budget-progress-fill'
                       )}
                       style={{ width: `${Math.min(expensePercent, 100)}%` }}
                     />
@@ -646,16 +646,19 @@ export function BudgetSummary() {
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="flex items-center gap-1 text-foreground font-semibold">
-                      <TrendingUp className="w-3.5 h-3.5 text-chart-1 shrink-0" />
+                      <TrendingUp className="w-3.5 h-3.5 text-primary shrink-0" />
                     Income Budget
                     </span>
                     <span className="font-mono text-xs text-foreground">
                       <span className="blur-number font-bold">{formatCurrency(totalIncomeActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalIncomeBudgeted)}</span>
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden">
+                  <div className="w-full h-2 budget-progress-track rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-chart-1 transition-all duration-500 rounded-full"
+                      className={cn(
+                        'h-full transition-all duration-500 rounded-full',
+                        incomePercent >= 100 ? 'budget-progress-fill' : 'bg-amber-500'
+                      )}
                       style={{ width: `${Math.min(incomePercent, 100)}%` }}
                     />
                   </div>

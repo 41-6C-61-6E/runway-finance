@@ -118,7 +118,7 @@ describe('Budget Progress Bar Coloring matches Progress State', () => {
       expect(fillBar?.className).not.toContain('bg-destructive');
     });
 
-    it('colors on-track (<=85%) expense items with budget-progress-fill when spacious', () => {
+    it('colors on-track (<=85%) expense items with budget-progress-fill consistently across all widths', () => {
       currentMockBudgets = [
         {
           id: 'b-ok',

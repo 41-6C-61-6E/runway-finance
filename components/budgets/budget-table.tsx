@@ -739,7 +739,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       {!isEE && b.rollover && b.rolloverCarryover !== undefined && b.rolloverCarryover > 0 && (
                         <span
                           title={`Base: ${formatCurrency(b.budgeted)} + Rollover: ${formatCurrency(b.rolloverCarryover)} = Total Available: ${formatCurrency(b.availableBudget || b.budgeted)}`}
-                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded shrink-0"
+                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-constructive/10 text-constructive border border-constructive/20 rounded shrink-0"
                         >
                           +{formatCurrency(b.rolloverCarryover)} rollover
                         </span>
@@ -841,7 +841,6 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
           <TableScroll className="border-t border-border">
             {(() => {
               const effectiveWidth = containerWidth || 1000;
-              const isSpacious = effectiveWidth >= 680;
               const showProgressCol = effectiveWidth >= 500;
               const showVarianceCol = effectiveWidth >= 640;
               const showAccountCol = effectiveWidth >= 850 && hasAnyAccount;
@@ -871,7 +870,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                     {showAccountCol && <col className="w-[88px] sm:w-[105px]" />}
                     <col className="w-[64px]" />
                   </colgroup>
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-card">
                     <tr className="border-b border-border/80 bg-muted/20">
                       <th className="text-left px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
                       <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
@@ -908,7 +907,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       const incomeProgressColor = envMeta
                         ? envMeta.barClass
                         : isTargetMet
-                          ? (isSpacious ? 'budget-progress-fill' : 'bg-primary')
+                          ? 'budget-progress-fill'
                           : 'bg-amber-500';
                       return (
                         <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
@@ -963,9 +962,9 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                   aria-valuenow={Math.min(Math.max(Math.round(b.percentUsed || 0), 0), 100)}
                                   aria-label={`${b.categoryName}: ${Math.round(b.percentUsed || 0)}% earned`}
                                 >
-                                  <div className={`h-full rounded-full transition-all duration-400 ${incomeProgressColor}${isSpacious ? ' shadow-sm' : ''}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                  <div className={`h-full rounded-full transition-all duration-400 ${incomeProgressColor}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                                 </div>
-                                <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${isTargetMet ? 'text-primary' : 'text-muted-foreground'}`}>
+                                <span className={`font-mono shrink-0 text-[11px] font-medium ${isTargetMet ? 'text-primary' : 'text-muted-foreground'}`}>
                                   {(b.percentUsed || 0).toFixed(0)}%
                                 </span>
                               </div>
@@ -1003,9 +1002,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                         ? 'bg-destructive'
                         : b.percentUsed > 85
                           ? 'bg-amber-500'
-                          : isSpacious
-                            ? 'budget-progress-fill'
-                            : 'bg-primary';
+                          : 'budget-progress-fill';
                       const envSub = envelopeSubText(b);
                       const envMeta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
                       const envBarClass = envMeta?.barClass ?? (isOver ? 'bg-destructive' : 'bg-primary');
@@ -1046,7 +1043,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                 {!isEE && b.rollover && b.rolloverCarryover !== undefined && b.rolloverCarryover > 0 && (
                                   <span
                                     title={`Base: ${formatCurrency(b.budgeted)} + Rollover: ${formatCurrency(b.rolloverCarryover)} = Total Available: ${formatCurrency(b.availableBudget || b.budgeted)}`}
-                                    className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded shrink-0"
+                                    className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-constructive/10 text-constructive border border-constructive/20 rounded shrink-0"
                                   >
                                     +{formatCurrency(b.rolloverCarryover)} rollover
                                   </span>
@@ -1092,9 +1089,9 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                       aria-valuenow={Math.min(Math.max(Math.round(b.envelopePercentUsed ?? 0), 0), 100)}
                                       aria-label={`${b.categoryName}: ${Math.round(b.envelopePercentUsed ?? 0)}% used`}
                                     >
-                                      <div className={`h-full rounded-full transition-all duration-400 ${envBarClass}${isSpacious ? ' shadow-sm' : ''}`} style={{ width: `${Math.min(Math.max(b.envelopePercentUsed ?? 0, 0), 100)}%` }} />
+                                      <div className={`h-full rounded-full transition-all duration-400 ${envBarClass}`} style={{ width: `${Math.min(Math.max(b.envelopePercentUsed ?? 0, 0), 100)}%` }} />
                                     </div>
-                                    <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${envMeta?.textClass ?? 'text-muted-foreground'}`}>
+                                    <span className={`font-mono shrink-0 text-[11px] font-medium ${envMeta?.textClass ?? 'text-muted-foreground'}`}>
                                       {Math.round(b.envelopePercentUsed ?? 0)}%/{b.nativePeriodType === 'quarterly' ? 'Q' : 'yr'}
                                     </span>
                                   </div>
@@ -1108,9 +1105,9 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                       aria-valuenow={Math.min(Math.max(Math.round(b.percentUsed || 0), 0), 100)}
                                       aria-label={`${b.categoryName}: ${Math.round(b.percentUsed || 0)}% used`}
                                     >
-                                      <div className={`h-full rounded-full transition-all duration-400 ${progressColor}${isSpacious ? ' shadow-sm' : ''}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                      <div className={`h-full rounded-full transition-all duration-400 ${progressColor}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                                     </div>
-                                    <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${isOver ? 'text-destructive' : b.percentUsed > 85 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                                    <span className={`font-mono shrink-0 text-[11px] font-medium ${isOver ? 'text-destructive' : b.percentUsed > 85 ? 'text-amber-500' : 'text-muted-foreground'}`}>
                                       {(b.percentUsed || 0).toFixed(0)}%
                                     </span>
                                   </div>

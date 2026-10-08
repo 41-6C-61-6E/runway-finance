@@ -86,10 +86,6 @@ function BudgetsContent() {
 
   const mainContent = (
     <div className="space-y-6">
-      {/* On mobile, selector appears inside the main view content below swipe indicator */}
-      <div className="lg:hidden">
-        <BudgetPeriodSelector hideTypeTabsOnMobile />
-      </div>
       <EnvelopeInfoBanner />
       {showTable && (
         <Suspense fallback={<LoadingSpinner category="summary" />}>
@@ -101,9 +97,6 @@ function BudgetsContent() {
 
   const summaryContent = (
     <div className="space-y-6">
-      <div className="lg:hidden">
-        <BudgetPeriodSelector hideTypeTabsOnMobile />
-      </div>
       <Suspense fallback={<LoadingSpinner category="summary" />}>
         <BudgetSummary />
       </Suspense>
@@ -124,6 +117,10 @@ function BudgetsContent() {
           activeTabId={periodType}
           onTabChange={(tabId) => setPeriodType(tabId as PeriodType)}
         >
+          {/* On mobile, selector appears once below the period tabs */}
+          <div className="lg:hidden mb-3">
+            <BudgetPeriodSelector hideTypeTabsOnMobile />
+          </div>
           {showSummary ? (
             <MobileViewSwitcher
               desktopHeader={<BudgetPeriodSelector hideTypeTabsOnMobile />}
