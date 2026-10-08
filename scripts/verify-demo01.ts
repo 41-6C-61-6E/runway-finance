@@ -103,7 +103,7 @@ async function main() {
 
   console.log('\n--- FIRE PLAN ---');
   if (decPlans.length > 0) {
-    console.log(`- Plan: ${decPlans[0].name}, Retirement Age: ${decPlans[0].retirementAge}, Annual Spend: $${Number(decPlans[0].annualExpenses).toLocaleString()}`);
+    console.log(`- Plan: ${decPlans[0].name}, Retirement Age: ${decPlans[0].retirementAge}, Primary Salary: $${Number(decPlans[0].primarySalary).toLocaleString()}`);
   }
 
   console.log('\nVERIFICATION COMPLETE');

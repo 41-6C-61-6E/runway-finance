@@ -33,6 +33,11 @@ pnpm-debug.log*
 *.tsbuildinfo
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+.playwright-mcp/
+.opencode/node_modules/
+.opencode/package-lock.json
 
 # Database dumps and local storage
 *.db
