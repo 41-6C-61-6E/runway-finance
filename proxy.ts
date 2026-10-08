@@ -1,15 +1,45 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { checkRateLimit, checkGlobalRateLimit, getClientIp } from "@/lib/rate-limit";
 
-const authHandler = NextAuth(authConfig).auth(async (request) => {
+// Delegate page-level authentication and routing to NextAuth
+const authHandler = NextAuth(authConfig).auth(async () => {
+  return NextResponse.next();
+});
+
+export default async function proxy(request: NextRequest, event?: any) {
   const { pathname } = request.nextUrl;
 
-  // 1. Centralized CSRF check for state-changing operations on API routes.
-  // Exclude internal Auth.js endpoints under /api/auth which manage their own CSRF checks.
+  // 1. Dedicated handling for /api/auth/* endpoints.
+  // NextAuth Route Handlers (/api/auth/*) manage their own session and CSRF lifecycle.
+  // We must NOT invoke NextAuth(authConfig).auth() middleware on these endpoints because
+  // NextAuth middleware executes getSession() on every request, which generates competing
+  // CSRF tokens and corrupts the double-submit cookie verification during credentials signin.
+  // Rate limiting for auth endpoints is enforced here directly.
+  if (pathname.startsWith('/api/auth')) {
+    if (
+      !pathname.startsWith('/api/auth/session') &&
+      !pathname.startsWith('/api/auth/csrf') &&
+      !pathname.startsWith('/api/auth/providers')
+    ) {
+      const ip = getClientIp(request);
+      if (
+        !(await checkRateLimit(`rl:${pathname}:${ip}`, 10, 60_000)) ||
+        !(await checkGlobalRateLimit('auth:auth', 60, 60_000))
+      ) {
+        return new NextResponse(
+          JSON.stringify({ error: "Too many requests" }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    return NextResponse.next();
+  }
+
+  // 2. Centralized CSRF check for state-changing operations on API routes.
   if (
     pathname.startsWith('/api/') &&
-    !pathname.startsWith('/api/auth/') &&
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)
   ) {
     const origin = request.headers.get('origin');
@@ -89,7 +119,7 @@ const authHandler = NextAuth(authConfig).auth(async (request) => {
     }
   }
 
-  // 2. Server-side body-size cap for large upload endpoints (defense in depth —
+  // 3. Server-side body-size cap for large upload endpoints (defense in depth —
   // the client also enforces its own limits). Rejects oversized payloads early,
   // before they reach the route handler and consume memory/CPU.
   if (
@@ -128,11 +158,11 @@ const authHandler = NextAuth(authConfig).auth(async (request) => {
     }
   }
 
-  return NextResponse.next();
-});
+  // 4. Delegate page routing and session authorization to NextAuth middleware
+  return (authHandler as any)(request, event);
+}
 
-export default authHandler;
-export const proxy = authHandler;
+export { proxy };
 
 export const config = {
   // Run on all paths except static files, but explicitly including api routes

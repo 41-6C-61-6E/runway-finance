@@ -22,6 +22,7 @@ import { useUserSettings } from '@/components/user-settings-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Select } from '@/components/ui/select';
+import { TableScroll } from '@/components/ui/table-scroll';
 
 type SortField = 'category' | 'budgeted' | 'actual' | 'variance' | 'progress' | 'account';
 type SortDirection = 'asc' | 'desc';
@@ -114,19 +115,6 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const target = containerRef.current.parentElement || containerRef.current;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
-          setContainerWidth(entry.contentRect.width);
-        }
-      }
-    });
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, []);
 
   // Notification deep-linking: when a budget-alert notification lands us here
   // with ?categoryId=<id>, scroll the matching row into view and flash it.
@@ -173,6 +161,31 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const accounts = accountsData ?? [];
   const loading = budgetsLoading || accountsLoading;
   const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current && containerRef.current.clientWidth > 0) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+    updateWidth();
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = entry.contentRect.width || (entry.target as HTMLElement).clientWidth;
+        if (width > 0) {
+          setContainerWidth(Math.round(width));
+        }
+      }
+    });
+    observer.observe(el);
+    window.addEventListener('resize', updateWidth);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [loading, budgets.length]);
 
   const [showForm, setShowForm] = useState(false);
   const [showAutoBudget, setShowAutoBudget] = useState(false);
@@ -433,18 +446,23 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     const pct = envelope
       ? (b.envelopePercentUsed ?? (total > 0 ? (spent / total) * 100 : 0))
       : (b.percentUsed ?? 0);
-    const isOver = !isIncome && spent > total;
-    const fillClass = isOver
-      ? 'bg-destructive'
-      : pct > 95
-        ? 'bg-red-500'
-        : pct > 85
-          ? 'bg-amber-500'
-          : pct > 70
-            ? 'bg-amber-400'
-            : pct > 50
-              ? 'bg-primary'
-              : 'bg-primary/20';
+
+    let fillClass: string;
+    let textClass: string;
+
+    if (envelope) {
+      const meta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
+      fillClass = meta?.barClass ?? (spent > total ? 'bg-destructive' : 'bg-primary');
+      textClass = meta?.textClass ?? (spent > total ? 'text-destructive' : 'text-muted-foreground');
+    } else if (isIncome) {
+      const isTargetMet = b.remaining >= 0;
+      fillClass = isTargetMet ? 'budget-progress-fill' : 'bg-amber-500';
+      textClass = isTargetMet ? 'text-primary' : 'text-muted-foreground';
+    } else {
+      const isOver = b.remaining < 0 || spent > total;
+      fillClass = isOver ? 'bg-destructive' : pct > 85 ? 'bg-amber-500' : 'budget-progress-fill';
+      textClass = isOver ? 'text-destructive' : pct > 85 ? 'text-amber-500' : 'text-muted-foreground';
+    }
 
     return (
       <div className="space-y-1.5 pt-0.5">
@@ -452,7 +470,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
           <span className="text-muted-foreground blur-number">
             {formatCurrency(spent)} <span className="text-muted-foreground/60">of</span> {formatCurrency(total)}
           </span>
-          <span className={cn('shrink-0 font-medium', isOver ? 'text-destructive' : pct > 85 ? 'text-amber-500' : 'text-muted-foreground')}>
+          <span className={cn('shrink-0 font-medium', textClass)}>
             {Math.round(pct)}%
           </span>
         </div>
@@ -464,7 +482,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
           aria-valuenow={Math.min(Math.max(Math.round(pct), 0), 100)}
           aria-label={`${formatCurrency(spent)} of ${formatCurrency(total)} used`}
         >
-          <div className={`h-full rounded-full transition-all duration-400 ${fillClass === 'bg-primary' ? 'budget-progress-fill' : fillClass}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
+          <div className={`h-full rounded-full transition-all duration-400 ${fillClass}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
         </div>
       </div>
     );
@@ -495,7 +513,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div ref={containerRef} className="bg-card border border-border rounded-xl shadow-sm">
         <div className="p-3 sm:p-5 pb-2 flex items-center justify-between">
           <SectionHeading>Budget Items</SectionHeading>
         </div>
@@ -506,7 +524,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-xl shadow-sm p-3 sm:p-5">
+      <div ref={containerRef} className="bg-card border border-border rounded-xl shadow-sm p-3 sm:p-5">
         <SectionHeading className="mb-3">Budget Items</SectionHeading>
         <ChartEmptyState variant="error" error={error} />
       </div>
@@ -515,7 +533,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
 
   return (
     <>
-      <div className="bg-card border border-border rounded-xl shadow-sm">
+      <div ref={containerRef} className="bg-card border border-border rounded-xl shadow-sm">
         <div className="p-3 sm:p-5 pb-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-2 flex-1">
             <SectionHeading>Budget Items</SectionHeading>
@@ -820,170 +838,54 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
             })}
           </div>
         ) : (
-          <div ref={containerRef} className="w-full min-w-0" style={{ overflowX: 'auto' }}>
+          <TableScroll className="border-t border-border">
             {(() => {
-              let showProgressCol = containerWidth >= 600;
-              let showVarianceCol = containerWidth >= 850;
-              let showAccountCol = containerWidth >= 1050 && hasAnyAccount;
-              const isSpacious = containerWidth > 700; // spacious mode at > 700px (was 800px hard threshold, now ratio-based at 700px)
-              const barH = Math.round(Math.min(10, Math.max(6, containerWidth * 0.0075)));
-
-              // ── Dynamic fit: measure content, not container % ────────────────
-              const BASE_PAD = 38;
-              let maxCategoryLen = 10;
-              let hasEnvelopeAny = false;
-              const allBudgetsForMeasure: BudgetData[] = [...incomeBudgets, ...expenseBudgets] as BudgetData[];
-              for (const b of allBudgetsForMeasure) {
-                const len = (b.categoryName || '').length;
-                if (len > maxCategoryLen) maxCategoryLen = len;
-                if (isEnvelope(b)) hasEnvelopeAny = true;
-              }
-              let estimatedCategoryPx = Math.ceil(maxCategoryLen * 6.6 + BASE_PAD);
-              if (hasEnvelopeAny) estimatedCategoryPx += 10;
-              // Category width: scale with content but cap at 25% of container,
-              // with a soft floor that shrinks below 120px when space is tight
-const categoryMinPx = 96;
-              const categoryMaxPx = Math.floor(containerWidth * 0.25);
-              let categoryWidthPx;
-              categoryWidthPx = Math.min(
-                Math.max(categoryMinPx, Math.ceil(estimatedCategoryPx * 1.2)),
-                categoryMaxPx
-              );
-
-              let budgetedW = isSpacious ? 96 : 86;
-              let actualW = hasEnvelopeAny ? (isSpacious ? 150 : 132) : budgetedW;
-              let varianceW = !showVarianceCol ? 0 : budgetedW;
-              let accountW = showAccountCol ? 86 : 0;
-              let actionsW = isSpacious ? 76 : 68;
-              const progressMinPx = isSpacious ? 140 : 80;
-              const progressMaxPx = 200;
-
-              // Never allow horizontal scroll: shrink / drop columns to fit containerWidth
-              const calcFixed = () => categoryWidthPx + budgetedW + actualW + varianceW + accountW + actionsW + 8;
-              const totalFixed = calcFixed();
-
-              // 0) Proportional shrinking: shrink ALL columns proportionally before dropping any
-              if (totalFixed > containerWidth) {
-                const shrinkFactor = containerWidth / totalFixed;
-                const shrunkCategory = Math.max(categoryMinPx, Math.ceil(categoryWidthPx * shrinkFactor));
-                const shrunkBudgeted = Math.max(68, Math.ceil(budgetedW * shrinkFactor));
-                const shrunkActual = Math.max(68, Math.ceil(actualW * shrinkFactor));
-                const shrunkVariance = Math.max(0, Math.ceil(varianceW * shrinkFactor));
-                const shrunkAccount = Math.max(0, Math.ceil(accountW * shrinkFactor));
-                const shrunkActions = Math.max(68, Math.ceil(actionsW * shrinkFactor));
-
-                const shrunkFixed =
-                  shrunkCategory +
-                  shrunkBudgeted +
-                  shrunkActual +
-                  shrunkVariance +
-                  shrunkAccount +
-                  shrunkActions +
-                  8;
-
-                // If proportional shrink brings us within container, use shrunk widths
-                // and skip column-dropping entirely
-                if (shrunkFixed <= containerWidth) {
-                  categoryWidthPx = shrunkCategory;
-                  budgetedW = shrunkBudgeted;
-                  actualW = shrunkActual;
-                  varianceW = shrunkVariance;
-                  accountW = shrunkAccount;
-                  actionsW = shrunkActions;
-                }
-                // If proportional shrink alone isn't enough, drop variance as last resort
-                // before allowing horizontal scroll (never drop progress or account)
-                else if (showVarianceCol) {
-                  showVarianceCol = false;
-                  varianceW = 0;
-                }
-                // If variance was already hidden or dropping variance still isn't enough,
-                // we fall through — horizontal scroll will handle it
-              }
-
-              // After proportional attempt (and possible variance drop), calculate final state
-              let fixedWithoutProgress = calcFixed();
-              let idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
-
-              // If we dropped variance above, recalculate fixedWithoutProgress
-              if (!showVarianceCol) varianceW = 0;
-
-              // 1) Shrink category to fit if total exceeds container (so other cols don't disappear)
-              if (idealWithProgressMin > containerWidth) {
-                const otherFixed = budgetedW + actualW + varianceW + accountW + actionsW + 8;
-                const maxCatFit = Math.max(categoryMinPx, containerWidth - otherFixed - (showProgressCol ? progressMinPx : 0));
-                if (categoryWidthPx > maxCatFit) {
-                  categoryWidthPx = maxCatFit;
-                  fixedWithoutProgress = calcFixed();
-                  idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
-                }
-              }
-              // 2) As last resort: shrink amount cols (truncate currency) down to 68px min
-              if (idealWithProgressMin > containerWidth) {
-                const minAmt = 68;
-                let overflow = idealWithProgressMin - containerWidth;
-                // Try shrinking actual first (it may be wide due to envelope)
-                if (actualW > minAmt && overflow > 0) {
-                  const reduce = Math.min(actualW - minAmt, overflow);
-                  actualW -= reduce;
-                  overflow -= reduce;
-                  fixedWithoutProgress = calcFixed();
-                  idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
-                }
-                if (budgetedW > minAmt && overflow > 0) {
-                  const reduce = Math.min(budgetedW - minAmt, overflow);
-                  budgetedW -= reduce;
-                  overflow -= reduce;
-                  fixedWithoutProgress = calcFixed();
-                  idealWithProgressMin = fixedWithoutProgress + (showProgressCol ? progressMinPx : 0);
-                }
-                // Note: varianceW shrink removed — horizontal scroll is preferred fallback
-                fixedWithoutProgress = calcFixed();
-              }
-
-              let progressWidthPx = 0;
-              if (showProgressCol) {
-                const avail = containerWidth - fixedWithoutProgress;
-                // avail is >= progressMinPx due to steps above; clamp to max
-                progressWidthPx = Math.max(progressMinPx, Math.min(progressMaxPx, avail));
-                // If avail < min due to rounding, progress already hidden above
-              }
+              const effectiveWidth = containerWidth || 1000;
+              const isSpacious = effectiveWidth >= 680;
+              const showProgressCol = effectiveWidth >= 500;
+              const showVarianceCol = effectiveWidth >= 640;
+              const showAccountCol = effectiveWidth >= 850 && hasAnyAccount;
               const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
-              // When content fits, let table be content width (right whitespace, no inter-col gap)
-              // When tight, table fills container—but allow overflow via horizontal scroll
-              const tableWidthPx = fixedWithoutProgress;
-              const tableStyle: React.CSSProperties = {
-                width: tableWidthPx,
-                maxWidth: 'none',
-                overflowX: 'auto',
-              };
+
+              // Safe minimum width for table content to prevent number squishing while enabling fluid expansion
+              const minTableWidth =
+                170 + // Category minimum
+                88 +  // Budgeted
+                98 +  // Actual
+                (showVarianceCol ? 88 : 0) +
+                (showProgressCol ? 120 : 0) +
+                (showAccountCol ? 84 : 0) +
+                64;   // Actions
 
               return (
-                <table className="table-fixed text-xs sm:text-sm border-collapse table-layout-fixed" style={tableStyle}>
+                <table
+                  className="w-full text-xs sm:text-sm border-collapse"
+                  style={{ minWidth: `${minTableWidth}px` }}
+                >
                   <colgroup>
-                    <col style={{ width: categoryWidthPx }} />
-                    <col style={{ width: budgetedW }} />
-                    <col style={{ width: actualW }} />
-                    {showVarianceCol && <col style={{ width: varianceW }} />}
-                    {showProgressCol && <col style={{ width: progressWidthPx }} />}
-                    {showAccountCol && <col style={{ width: accountW }} />}
-                    <col style={{ width: actionsW }} />
+                    <col className="w-auto" />
+                    <col className="w-[88px] sm:w-[104px]" />
+                    <col className="w-[98px] sm:w-[120px]" />
+                    {showVarianceCol && <col className="w-[88px] sm:w-[104px]" />}
+                    {showProgressCol && <col className="w-[125px] sm:w-[160px] lg:w-[190px]" />}
+                    {showAccountCol && <col className="w-[88px] sm:w-[105px]" />}
+                    <col className="w-[64px]" />
                   </colgroup>
                   <thead>
-                    <tr className="border-t border-border">
-                      <th className="text-left px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground" style={{ width: categoryWidthPx }}>{renderSortHeader('category', 'Category', 'left')}</th>
-                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: budgetedW }}>{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
-                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: actualW }}>{renderSortHeader('actual', 'Actual', 'right')}</th>
+                    <tr className="border-b border-border/80 bg-muted/20">
+                      <th className="text-left px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
+                      <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
+                      <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
                       {showVarianceCol && (
-                        <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: varianceW }}>{renderSortHeader('variance', 'Variance', 'right')}</th>
+                        <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('variance', 'Variance', 'right')}</th>
                       )}
                       {showProgressCol && (
-                        <th className="text-left px-2 sm:px-2.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: progressWidthPx, minWidth: progressMinPx }}>{renderSortHeader('progress', 'Progress', 'left')}</th>
+                        <th className="text-left px-2.5 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('progress', 'Progress', 'left')}</th>
                       )}
                       {showAccountCol && (
-                        <th className="text-left px-2 sm:px-2.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground truncate" style={{ width: accountW }}>{renderSortHeader('account', 'Account', 'left')}</th>
+                        <th className="text-left px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('account', 'Account', 'left')}</th>
                       )}
-                      <th className="text-right px-1 sm:px-1.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap" style={{ width: actionsW }}>
+                      <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
                         Actions
                       </th>
                     </tr>
@@ -1002,15 +904,21 @@ const categoryMinPx = 96;
                     {incomeBudgets.map((b) => {
                       const isTargetMet = b.remaining >= 0;
                       const envSub = envelopeSubText(b);
+                      const envMeta = isEnvelope(b) && b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
+                      const incomeProgressColor = envMeta
+                        ? envMeta.barClass
+                        : isTargetMet
+                          ? (isSpacious ? 'budget-progress-fill' : 'bg-primary')
+                          : 'bg-amber-500';
                       return (
                         <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
-                          <td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
-                            <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                              <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor }} />
+                          <td className={`px-3 sm:px-4 py-2 sm:py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
+                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-wrap">
+                              <div className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor }} />
                               <Link
                                 href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
                                 title={b.categoryName}
-                                className="text-foreground font-medium hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
+                                className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate max-w-[200px] sm:max-w-xs md:max-w-none"
                               >
                                 {b.categoryName}
                               </Link>
@@ -1031,8 +939,8 @@ const categoryMinPx = 96;
                               )}
                             </div>
                           </td>
-                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" >{renderBudgetCell(b)}</td>
-                          <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" >
+                          <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm">
                             {isEnvelope(b) && envSub ? (
                               <span className="text-[10px] font-sans text-muted-foreground block truncate" title={envSub ?? undefined}>{envSub}</span>
                             ) : (
@@ -1040,15 +948,22 @@ const categoryMinPx = 96;
                             )}
                           </td>
                           {showVarianceCol && (
-                            <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap overflow-hidden text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`} style={{ width: varianceW }}>
+                            <td className={`px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
                               {isEnvelope(b) && envSub ? null : <>{b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}</>}
                             </td>
                           )}
                           {showProgressCol && (
-                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ width: progressWidthPx, minWidth: progressMinPx }}>
+                            <td className="px-2.5 sm:px-3 py-2 sm:py-2.5 whitespace-nowrap">
                               <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                                <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
-                                  <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill shadow-sm' : b.percentUsed > 95 ? 'bg-red-500' : b.percentUsed > 85 ? 'bg-amber-500' : b.percentUsed > 70 ? 'bg-amber-400' : b.percentUsed > 50 ? 'bg-primary' : 'bg-primary/20'}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                <div
+                                  className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px] h-2 sm:h-2.5"
+                                  role="progressbar"
+                                  aria-valuemin={0}
+                                  aria-valuemax={100}
+                                  aria-valuenow={Math.min(Math.max(Math.round(b.percentUsed || 0), 0), 100)}
+                                  aria-label={`${b.categoryName}: ${Math.round(b.percentUsed || 0)}% earned`}
+                                >
+                                  <div className={`h-full rounded-full transition-all duration-400 ${incomeProgressColor}${isSpacious ? ' shadow-sm' : ''}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                                 </div>
                                 <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${isTargetMet ? 'text-primary' : 'text-muted-foreground'}`}>
                                   {(b.percentUsed || 0).toFixed(0)}%
@@ -1057,12 +972,12 @@ const categoryMinPx = 96;
                             </td>
                           )}
                           {showAccountCol && (
-                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground/50 truncate" style={{ width: accountW }}>
-                              &mdash;
+                            <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-xs text-muted-foreground truncate">
+                              {getAccountName(b.fundingAccountId) || <span className="text-muted-foreground/40">&mdash;</span>}
                             </td>
                           )}
-                          <td className="px-1 sm:px-1 py-2 sm:py-2.5 text-right whitespace-nowrap" style={{ width: actionsW }}>
-                            <div className="flex items-center justify-end gap-0.5">
+                          <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
                               <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
                               <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                             </div>
@@ -1084,12 +999,20 @@ const categoryMinPx = 96;
                     {expenseBudgets.map((b) => {
                       const isOver = b.remaining < 0;
                       const isEE = b.isEverythingElse || b.isCatchAll || (b.categoryName || '').toLowerCase() === 'everything else';
-                      const progressColor = isOver ? 'bg-destructive' : b.percentUsed > 85 ? 'bg-amber-500' : 'bg-primary';
+                      const progressColor = isOver
+                        ? 'bg-destructive'
+                        : b.percentUsed > 85
+                          ? 'bg-amber-500'
+                          : isSpacious
+                            ? 'budget-progress-fill'
+                            : 'bg-primary';
                       const envSub = envelopeSubText(b);
+                      const envMeta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
+                      const envBarClass = envMeta?.barClass ?? (isOver ? 'bg-destructive' : 'bg-primary');
                       return (
                         <Fragment key={b.id}>
                           <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
-<td className={`px-2 sm:px-3 py-2 sm:py-2.5 min-w-0 overflow-hidden ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`} >
+                            <td className={`px-3 sm:px-4 py-2 sm:py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
                               <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap">
                                 <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
                                 <Link
@@ -1100,7 +1023,7 @@ const categoryMinPx = 96;
                                     b.categoryId
                                   )}
                                   title={b.categoryName}
-                                  className="text-foreground font-semibold hover:text-primary hover:underline transition-colors flex-1 min-w-0 block"
+                                  className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate max-w-[200px] sm:max-w-xs md:max-w-none"
                                 >
                                   {b.categoryName}
                                 </Link>
@@ -1144,8 +1067,8 @@ const categoryMinPx = 96;
                               </div>
                               {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
                             </td>
-                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" style={{ width: budgetedW }}>{renderBudgetCell(b)}</td>
-                            <td className="px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap overflow-hidden text-xs sm:text-sm" style={{ width: actualW }}>
+                            <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
+                            <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm">
                               {isEnvelope(b) && envSub ? (
                                 <span className="text-[10px] font-sans text-muted-foreground block truncate" title={envSub ?? undefined}>{envSub}</span>
                               ) : (
@@ -1153,27 +1076,41 @@ const categoryMinPx = 96;
                               )}
                             </td>
                             {showVarianceCol && (
-                              <td className={`px-1 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap overflow-hidden text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`} style={{ width: varianceW }}>
+                              <td className={`px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
                                 {isEnvelope(b) && envSub ? null : formatCurrency(b.remaining)}
                               </td>
                             )}
                             {showProgressCol && (
-                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden" style={{ width: progressWidthPx, minWidth: progressMinPx }}>
+                              <td className="px-2.5 sm:px-3 py-2 sm:py-2.5 whitespace-nowrap">
                                 {isEnvelope(b) ? (
                                   <div className="flex items-center gap-1.5 sm:gap-2 min-w-0" title={`${Math.round(b.envelopePercentUsed ?? 0)}% of ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} envelope`}>
-                                    <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
-                                      <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill' : (ENVELOPE_STATUS_META[b.envelopeStatus ?? 'within']?.barClass ?? 'bg-primary')}`} style={{ width: `${Math.min(Math.max(b.envelopePercentUsed ?? 0, 0), 100)}%` }} />
+                                    <div
+                                      className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px] h-2 sm:h-2.5"
+                                      role="progressbar"
+                                      aria-valuemin={0}
+                                      aria-valuemax={100}
+                                      aria-valuenow={Math.min(Math.max(Math.round(b.envelopePercentUsed ?? 0), 0), 100)}
+                                      aria-label={`${b.categoryName}: ${Math.round(b.envelopePercentUsed ?? 0)}% used`}
+                                    >
+                                      <div className={`h-full rounded-full transition-all duration-400 ${envBarClass}${isSpacious ? ' shadow-sm' : ''}`} style={{ width: `${Math.min(Math.max(b.envelopePercentUsed ?? 0, 0), 100)}%` }} />
                                     </div>
-                                    <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${ENVELOPE_STATUS_META[b.envelopeStatus ?? 'within']?.textClass ?? 'text-muted-foreground'}`}>
+                                    <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${envMeta?.textClass ?? 'text-muted-foreground'}`}>
                                       {Math.round(b.envelopePercentUsed ?? 0)}%/{b.nativePeriodType === 'quarterly' ? 'Q' : 'yr'}
                                     </span>
                                   </div>
                                 ) : (
                                   <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                                    <div className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px]" style={{ height: barH }}>
-                                      <div className={`h-full rounded-full transition-all duration-400 ${isSpacious ? 'budget-progress-fill shadow-sm' : progressColor}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
+                                    <div
+                                      className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px] h-2 sm:h-2.5"
+                                      role="progressbar"
+                                      aria-valuemin={0}
+                                      aria-valuemax={100}
+                                      aria-valuenow={Math.min(Math.max(Math.round(b.percentUsed || 0), 0), 100)}
+                                      aria-label={`${b.categoryName}: ${Math.round(b.percentUsed || 0)}% used`}
+                                    >
+                                      <div className={`h-full rounded-full transition-all duration-400 ${progressColor}${isSpacious ? ' shadow-sm' : ''}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                                     </div>
-                                    <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${isOver ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                    <span className={`font-mono shrink-0 ${isSpacious ? 'text-[11px] font-semibold' : 'text-[10px]'} ${isOver ? 'text-destructive' : b.percentUsed > 85 ? 'text-amber-500' : 'text-muted-foreground'}`}>
                                       {(b.percentUsed || 0).toFixed(0)}%
                                     </span>
                                   </div>
@@ -1181,12 +1118,12 @@ const categoryMinPx = 96;
                               </td>
                             )}
                             {showAccountCol && (
-                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground/50 truncate" style={{ width: accountW }}>
-                                &mdash;
+                              <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-xs text-muted-foreground truncate">
+                                {getAccountName(b.fundingAccountId) || <span className="text-muted-foreground/40">&mdash;</span>}
                               </td>
                             )}
-                            <td className="px-1 sm:px-1 py-2 sm:py-2.5 text-right whitespace-nowrap" style={{ width: actionsW }}>
-                              <div className="flex items-center justify-end gap-0.5">
+                            <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1">
                                 <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
                                 <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                               </div>
@@ -1282,7 +1219,7 @@ className="font-medium text-foreground text-sm hover:text-primary hover:underlin
             </table>
           );
         })()}
-          </div>
+          </TableScroll>
         )}
       </div>
 

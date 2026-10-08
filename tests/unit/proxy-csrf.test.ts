@@ -116,4 +116,23 @@ describe('Proxy CSRF middleware', () => {
     const body = await res.json();
     expect(body.error).toBe('CSRF_ERROR');
   });
+
+  it('should pass /api/auth/csrf directly to route handlers without getSession wrapping', async () => {
+    const req = new NextRequest('http://localhost:3000/api/auth/csrf', {
+      method: 'GET',
+    });
+    const res = await (proxyHandler as any)(req);
+    expect(res.status).not.toBe(403);
+  });
+
+  it('should pass /api/auth/callback/credentials directly to route handlers', async () => {
+    const req = new NextRequest('http://localhost:3000/api/auth/callback/credentials', {
+      method: 'POST',
+      headers: {
+        host: 'localhost:3000',
+      },
+    });
+    const res = await (proxyHandler as any)(req);
+    expect(res.status).not.toBe(403);
+  });
 });
