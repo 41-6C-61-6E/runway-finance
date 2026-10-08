@@ -17,6 +17,10 @@ temp/
 
 # Local-only security review (contains sensitive findings, not for publication)
 SECURITY_REVIEW.md
+*_REVIEW.md
+*_REPORT.md
+*_TEST.md
+
 
 # Build outputs & Logs
 out/

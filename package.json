@@ -10,6 +10,9 @@
   "scripts": {
     "generate-colors": "node scripts/generate-css-from-palette.mjs",
     "dev": "node scripts/generate-css-from-palette.mjs && node scripts/generate-sw.mjs && DISABLE_WORKER_THREADS=true NODE_OPTIONS='--max-old-space-size=8192' next dev -H 0.0.0.0 --turbo -p 3001",
+    "stop": "node scripts/stop-dev.mjs",
+    "restart": "node scripts/restart-dev.mjs",
+    "dev:restart": "node scripts/restart-dev.mjs",
     "build": "node scripts/generate-css-from-palette.mjs && node scripts/generate-sw.mjs && next build",
     "start": "next start -p 3000",
     "preview": "next start -p 3000",
