@@ -229,16 +229,18 @@ export default function InvestmentsPage() {
             <MobileTabSwipeContainer
               tabs={INVESTMENT_TABS}
               activeTabId={activeTab}
-                  onTabChange={(tabId) => setActiveTab(tabId as InvestmentTabId)}
+              onTabChange={(tabId) => setActiveTab(tabId as InvestmentTabId)}
+              header={
+                <div className="mb-3 sm:mb-3.5">
+                  <AppTabs
+                    tabs={INVESTMENT_TABS}
+                    activeTab={activeTab}
+                    onChange={(tabId) => setActiveTab(tabId as InvestmentTabId)}
+                    variant="underline"
+                  />
+                </div>
+              }
             >
-              <div className="hidden md:block mb-3 sm:mb-3.5">
-                <AppTabs
-                  tabs={INVESTMENT_TABS}
-                  activeTab={activeTab}
-                  onChange={(tabId) => setActiveTab(tabId as InvestmentTabId)}
-                  variant="underline"
-                />
-              </div>
 
               {/* ── Overview Tab Content ── */}
               {activeTab === 'overview' && (

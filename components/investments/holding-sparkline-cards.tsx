@@ -140,7 +140,7 @@ function HoldingCard({ holding, history, quote, index, onClick }: HoldingCardPro
         </div>
         <div className="h-14 w-full -mx-0.5">
           {hasHistory ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 56 }}>
               <AreaChart data={history} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
                 <defs>
                   <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">

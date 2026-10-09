@@ -393,7 +393,7 @@ export default function GroupDetailPanel({
                   className="relative flex-shrink-0"
                   style={{ width: 130, height: 130 }}
                 >
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 130, height: 130 }}>
                     <PieChart>
                       <Pie
                         data={composition}

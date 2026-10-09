@@ -579,7 +579,7 @@ export function BudgetSummary() {
               <>
               <div className="flex items-center justify-center relative py-1">
                 <div className="w-36 h-36 relative flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 144, height: 144 }}>
                     <PieChart>
                       <Pie
                         data={chartData}

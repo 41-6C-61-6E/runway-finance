@@ -42,7 +42,6 @@ import { AppTabs } from '@/components/ui/app-tabs';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { EngineRulesView } from './engine-rules-view';
 import { PlanDetailsTab } from './plan-details-tab';
-import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
 interface SettingsTabProps {
   plan: any;
@@ -310,17 +309,12 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
   ];
 
   return (
-    <MobileTabSwipeContainer
-      desktopHeader={desktopHeader}
-      tabs={settingsSubTabs}
-      activeTabId={subTab}
-      onTabChange={(tabId) => setSubTab(tabId as any)}
-      priority={1}
-    >
+    <div className="w-full space-y-5">
+      {desktopHeader && <div className="hidden md:block mb-3 sm:mb-3.5">{desktopHeader}</div>}
       {subHeader && <div className="lg:hidden">{subHeader}</div>}
 
-      {/* Desktop Sub-Tab Bar */}
-      <div className="hidden lg:block">
+      {/* Settings Sub-Tab Bar */}
+      <div className="mb-4">
         <AppTabs
           tabs={settingsSubTabs}
           activeTab={subTab}
@@ -1476,6 +1470,6 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
           filingStatus={filingStatus}
         />
       )}
-    </MobileTabSwipeContainer>
+    </div>
   );
 }

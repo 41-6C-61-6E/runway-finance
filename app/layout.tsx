@@ -6,11 +6,13 @@ import { AuthenticatedLayout } from "@/components/authenticated-layout";
 import "../styles/globals.css";
 
 
+const isDev = process.env.NODE_ENV !== "production";
+
 export const metadata: Metadata = {
   title: "Personal Finance",
   description: "Self-hosted personal finance tracking and planning.",
   icons: {
-    icon: "/favicon.svg",
+    icon: isDev ? "/favicon-dev.svg" : "/favicon.svg",
     apple: "/icons/apple-touch-icon.png",
   },
   manifest: "/manifest.json",
@@ -29,6 +31,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 

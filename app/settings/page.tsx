@@ -16,6 +16,8 @@ import {
   ShieldAlert,
   Users2,
   Bell,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
@@ -37,7 +39,6 @@ import NotificationsTab from '@/components/features/settings/NotificationsTab';
 import AiTab from '@/components/features/settings/AiTab';
 import ImportExportTab from '@/components/features/settings/ImportExportTab';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { MobileTabStrip } from '@/components/ui/mobile-tab-strip';
 import PayrollTab from '@/components/features/settings/PayrollTab';
 
 
@@ -153,19 +154,67 @@ function SettingsPageBody() {
           <OnboardingChecklist />
         </div>
 
-        {/* Mobile: in-page tab switcher (desktop uses the sidebar aside) */}
-        <div className="w-full mb-3 lg:hidden">
-          <MobileTabStrip
-            tabs={SETTINGS_TABS.map((t) => ({ id: t.id, label: t.label }))}
-            activeTab={activeTab}
-            onChange={(tabId) => goToTab(tabId as typeof activeTab)}
-            fullWidth={false}
-            aria-label="Settings sections"
-            className="px-1"
-          />
-        </div>
+        {/* Mobile Settings Hub: Clean vertical drill-down list when no tab selected */}
+        {!urlTab && (
+          <div className="w-full lg:hidden space-y-2 mb-6">
+            <div className="px-1 mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">Settings Categories</h2>
+            </div>
+            <div className="divide-y divide-border/30 bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+              {SETTINGS_TABS.map((tab) => {
+                const TabIcon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => goToTab(tab.id)}
+                    className="w-full flex items-center justify-between p-3.5 text-left transition-colors hover:bg-muted/50 active:bg-muted/80 group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0 transition-transform group-hover:scale-105">
+                        <TabIcon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-foreground truncate">{tab.label}</div>
+                        <div className="text-xs text-muted-foreground truncate">{tab.description}</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0 ml-2 group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-        <div className="flex flex-col lg:flex-row gap-5 lg:gap-8 items-start w-full">
+        {/* Mobile Drill-Down Back Header when a tab is active */}
+        {urlTab && (
+          <div className="w-full lg:hidden mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete('tab');
+                params.delete('sub');
+                router.replace(`/settings?${params.toString()}`, { scroll: false });
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all active:scale-95 cursor-pointer"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>All Settings</span>
+            </button>
+            <div className="mt-2.5">
+              <h2 className="text-lg font-semibold text-foreground">
+                {SETTINGS_TABS.find((t) => t.id === activeTab)?.label}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {SETTINGS_TABS.find((t) => t.id === activeTab)?.description}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className={`flex-col lg:flex-row gap-5 lg:gap-8 items-start w-full ${urlTab ? 'flex' : 'hidden lg:flex'}`}>
           {/* Desktop Navigation Sidebar */}
           <aside className="hidden lg:flex flex-col w-72 shrink-0 space-y-0.5 sticky top-24 bg-sidebar/45 backdrop-blur-md border border-border p-2 rounded-xl shadow-sm">
             <div className="px-2 pb-1.5 border-b border-border/60">

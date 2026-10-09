@@ -7,8 +7,9 @@ import UserDropdown from '@/components/user-dropdown';
 import BugReportingDropdown from '@/components/bug-reporting-dropdown';
 import NotificationsDropdown from '@/components/notifications-dropdown';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
-import { EyeOff } from 'lucide-react';
-import { glassBar } from '@/components/ui/seg-pill';
+import Link from 'next/link';
+import { EyeOff, Settings } from 'lucide-react';
+import { glassBar, glassIconButton, glassItemInactive } from '@/components/ui/seg-pill';
 
 interface PageHeaderProps {
   title: string;
@@ -25,10 +26,9 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
   const [isBugOpen, setIsBugOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isUserOpen, setIsUserOpen] = useState(false);
 
-  const isAnyDropdownOpen = isBugOpen || isNotificationsOpen || isSettingsOpen || isUserOpen;
+  const isAnyDropdownOpen = isBugOpen || isNotificationsOpen || isUserOpen;
   const isAnyDropdownOpenRef = useRef(false);
   
   useEffect(() => {
@@ -83,7 +83,13 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         )}
         <BugReportingDropdown onOpenChange={setIsBugOpen} />
         <NotificationsDropdown onOpenChange={setIsNotificationsOpen} />
-        <SettingsDropdown onOpenChange={setIsSettingsOpen} />
+        <Link
+          href="/settings"
+          className={`${glassIconButton} ${glassItemInactive}`}
+          aria-label="Settings"
+        >
+          <Settings className="w-5 h-5" />
+        </Link>
         <UserDropdown onOpenChange={setIsUserOpen} />
       </div>
 

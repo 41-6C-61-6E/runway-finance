@@ -118,6 +118,15 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    const isProd = process.env.NODE_ENV === "production";
+    return [
+      {
+        source: "/favicon.ico",
+        destination: isProd ? "/favicon.svg" : "/favicon-dev.svg",
+      },
+    ];
+  },
   async redirects() {
     return [
       {

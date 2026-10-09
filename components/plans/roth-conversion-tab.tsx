@@ -418,7 +418,7 @@ export function RothConversionTab({
             </div>
 
             <div className="h-80 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                   <XAxis dataKey="age" stroke="#888888" fontSize={11} tickLine={false} />

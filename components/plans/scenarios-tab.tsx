@@ -38,7 +38,6 @@ import { RothConversionTab } from '@/components/plans/roth-conversion-tab';
 import { IrmaaTab } from '@/components/plans/irmaa-tab';
 
 import { ProjectionOptionsPopover } from './projection-options-popover';
-import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 import { TableScroll } from '@/components/ui/table-scroll';
 
 interface ScenariosTabProps {
@@ -293,17 +292,12 @@ export function ScenariosTab({
   };
 
   return (
-    <MobileTabSwipeContainer
-      desktopHeader={desktopHeader}
-      tabs={subTabs}
-      activeTabId={activeSubTab}
-      onTabChange={(tabId) => setActiveSubTab(tabId as any)}
-      priority={1}
-    >
+    <div className="w-full space-y-5">
+      {desktopHeader && <div className="hidden md:block mb-3 sm:mb-3.5">{desktopHeader}</div>}
       {subHeader && <div className="lg:hidden">{subHeader}</div>}
 
-      {/* Desktop Scenarios Sub-Tab Navigation Bar */}
-      <div className="hidden lg:block">
+      {/* Scenarios Sub-Tab Navigation Bar */}
+      <div className="mb-4">
         <AppTabs
           tabs={subTabs}
           activeTab={activeSubTab}
@@ -350,7 +344,7 @@ export function ScenariosTab({
                     <span className="text-[11px] text-muted-foreground">Projections to Age {primaryEnginePlan.lifeExpectancyAge}</span>
                   </div>
                   <div className="h-72 w-full pt-2">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
                       <LineChart data={strategyChartData}>
                         <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                         <XAxis dataKey="age" stroke="#888888" fontSize={11} tickLine={false} />
@@ -627,7 +621,7 @@ export function ScenariosTab({
           onToggleViewMode={onToggleViewMode}
         />
       )}
-    </MobileTabSwipeContainer>
+    </div>
   );
 }
 

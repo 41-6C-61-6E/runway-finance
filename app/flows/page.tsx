@@ -48,17 +48,19 @@ function FlowsContent() {
             tabs={availableTabs}
             activeTabId={activeTab}
             onTabChange={(tabId) => setActiveTab(tabId as Tab)}
+            header={
+              availableTabs.length > 1 ? (
+                <div className="mb-3 sm:mb-3.5">
+                  <AppTabs
+                    tabs={availableTabs}
+                    activeTab={activeTab}
+                    onChange={(tabId) => setActiveTab(tabId as Tab)}
+                    variant="underline"
+                  />
+                </div>
+              ) : undefined
+            }
           >
-            {availableTabs.length > 1 && (
-              <div className="hidden md:block mb-3 sm:mb-3.5">
-                <AppTabs
-                  tabs={availableTabs}
-                  activeTab={activeTab}
-                  onChange={(tabId) => setActiveTab(tabId as Tab)}
-                  variant="underline"
-                />
-              </div>
-            )}
 
             {activeTab === 'wealth' && showWealth && (
               <Suspense fallback={<LoadingSpinner category="chart" />}>

@@ -113,15 +113,17 @@ function SpendingContent() {
           tabs={availableTabs}
           activeTabId={activeTab}
           onTabChange={(tabId) => handleTabChange(tabId)}
+          header={
+            <div className="mb-3 sm:mb-3.5">
+              <AppTabs
+                tabs={availableTabs}
+                activeTab={activeTab}
+                onChange={(tabId) => handleTabChange(tabId)}
+                variant="underline"
+              />
+            </div>
+          }
         >
-          <div className="hidden md:block mb-3 sm:mb-3.5">
-            <AppTabs
-              tabs={availableTabs}
-              activeTab={activeTab}
-              onChange={(tabId) => handleTabChange(tabId)}
-              variant="underline"
-            />
-          </div>
 
           {activeTab === 'spending' &&
             (isVisible('spendingBreakdown') ? (

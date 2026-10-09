@@ -193,21 +193,18 @@ export function BudgetItemTransactionsIcon({
         e.preventDefault();
         return;
       }
-      const elapsed = touchStartRef.current ? Date.now() - touchStartRef.current.time : 0;
-      // If short tap (< 350ms) and tooltip is closed, show tooltip instead of immediately navigating
-      if (elapsed < 350 && !open) {
-        e.preventDefault();
-        setOpen(true);
-        return;
-      }
-      // If long tap (> 350ms), allow navigation to proceed
+      // On mobile views, navigate directly without showing a tooltip
+      return;
     }
     setOpen(false);
   };
 
   return (
     <TooltipProvider delayDuration={150}>
-      <Tooltip open={open} onOpenChange={setOpen}>
+      <Tooltip open={open} onOpenChange={(next) => {
+        if (typeof window !== 'undefined' && window.innerWidth < 768) return;
+        setOpen(next);
+      }}>
         <TooltipTrigger asChild>
           <Link
             href={targetUrl}
@@ -233,7 +230,7 @@ export function BudgetItemTransactionsIcon({
           align="start"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          className="w-72 sm:w-80 p-0 overflow-hidden bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl z-[100]"
+          className="hidden md:block w-72 sm:w-80 p-0 overflow-hidden bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl z-[100]"
         >
           {/* Header */}
           <div className="px-3.5 py-2.5 bg-muted/40 border-b border-border">

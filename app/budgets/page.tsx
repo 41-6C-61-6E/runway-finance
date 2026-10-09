@@ -10,7 +10,7 @@ import { Wallet, Info, X } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
-import { MobileTabSwipeContainer, MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
+import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
 const ENVELOPE_BANNER_KEY = 'finance:budgets:envelope-info-dismissed';
 
@@ -108,37 +108,27 @@ function BudgetsContent() {
       {/* ── Page Header ── */}
       <PageHeader title="Budgets" icon={Wallet} />
       <PageContent>
-        <MobileTabSwipeContainer
-          tabs={[
-            { id: 'monthly', label: 'Monthly' },
-            { id: 'quarterly', label: 'Quarterly' },
-            { id: 'yearly', label: 'Yearly' },
-          ]}
-          activeTabId={periodType}
-          onTabChange={(tabId) => setPeriodType(tabId as PeriodType)}
-        >
-          {/* On mobile, selector appears once below the period tabs */}
-          <div className="lg:hidden mb-3">
-            <BudgetPeriodSelector hideTypeTabsOnMobile />
-          </div>
-          {showSummary ? (
-            <MobileViewSwitcher
-              desktopHeader={<BudgetPeriodSelector hideTypeTabsOnMobile />}
-              main={mainContent}
-              summary={summaryContent}
-              mainLabel="Table"
-              summaryLabel="Overview"
-              summaryCardId="budgetSummary"
-            />
-          ) : (
-            <div className="space-y-6">
-              <div className="hidden lg:block">
-                <BudgetPeriodSelector hideTypeTabsOnMobile />
-              </div>
-              {mainContent}
+        {/* On mobile, selector appears at the top above the content */}
+        <div className="md:hidden mb-3">
+          <BudgetPeriodSelector />
+        </div>
+        {showSummary ? (
+          <MobileViewSwitcher
+            desktopHeader={<BudgetPeriodSelector />}
+            main={mainContent}
+            summary={summaryContent}
+            mainLabel="Table"
+            summaryLabel="Overview"
+            summaryCardId="budgetSummary"
+          />
+        ) : (
+          <div className="space-y-6">
+            <div className="hidden md:block">
+              <BudgetPeriodSelector />
             </div>
-          )}
-        </MobileTabSwipeContainer>
+            {mainContent}
+          </div>
+        )}
       </PageContent>
     </div>
   );

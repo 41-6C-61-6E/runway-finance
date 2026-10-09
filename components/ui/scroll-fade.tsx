@@ -102,10 +102,11 @@ function FadeEdge({ side, visible, className }: { side: 'left' | 'right'; visibl
 }
 
 export function ScrollFadeOverlays({ left, right, className }: ScrollFadeOverlaysProps) {
+  if (!left && !right) return null;
   return (
     <>
-      <FadeEdge side="left" visible={left} className={className} />
-      <FadeEdge side="right" visible={right} className={className} />
+      {left && <FadeEdge side="left" visible={left} className={className} />}
+      {right && <FadeEdge side="right" visible={right} className={className} />}
     </>
   );
 }

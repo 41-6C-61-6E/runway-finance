@@ -28,6 +28,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Activity, ArrowUpRight, ArrowDownRight, DollarSign, Percent, Info } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { AppTabs } from '@/components/ui/app-tabs';
 
 interface HistoryPoint {
   date: string;
@@ -366,26 +367,18 @@ export function PerformanceChart() {
               {/* Display mode */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Mode</span>
-                <div className="flex bg-muted/65 border border-border rounded-lg p-0.5">
-                  {([
-                    { value: 'dollar' as DisplayMode, icon: DollarSign, label: '$' },
-                    { value: 'percent' as DisplayMode, icon: Percent, label: '%' },
-                    { value: 'twr' as DisplayMode, icon: Percent, label: 'TWR' },
-                  ]).map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setDisplayMode(opt.value)}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                        displayMode === opt.value
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <opt.icon className="w-3 h-3" />
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+                <AppTabs
+                  tabs={[
+                    { id: 'dollar', label: '$', icon: DollarSign },
+                    { id: 'percent', label: '%', icon: Percent },
+                    { id: 'twr', label: 'TWR', icon: Percent },
+                  ]}
+                  activeTab={displayMode}
+                  onChange={(id) => setDisplayMode(id as DisplayMode)}
+                  variant="pills"
+                  size="sm"
+                  aria-label="Performance display mode"
+                />
               </div>
 
               {/* Benchmark toggle */}

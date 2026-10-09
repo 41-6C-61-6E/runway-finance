@@ -390,7 +390,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
       </Tooltip>
 
       {open && (
-        <div className="absolute right-[-80px] sm:right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 bg-popover border border-border rounded-xl shadow-xl z-50 flex flex-col overflow-hidden max-h-[420px] text-foreground">
+        <div className="fixed inset-x-4 top-16 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-80 bg-popover border border-border rounded-xl shadow-xl z-50 flex flex-col overflow-hidden max-h-[420px] text-foreground">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
             <span className="font-semibold text-sm">Notifications</span>

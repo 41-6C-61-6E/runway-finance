@@ -347,7 +347,7 @@ export function DebtBreakdown() {
           <div>
             <div className="relative h-[240px] rounded-lg overflow-hidden">
               {treemapData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
                   <Treemap
                     data={treemapData}
                     dataKey="value"

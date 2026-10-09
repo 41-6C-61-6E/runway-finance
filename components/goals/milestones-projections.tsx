@@ -523,7 +523,7 @@ export function MilestonesProjections() {
           {/* Projection Chart — single sawtooth line per account */}
           <div className="h-[200px] sm:h-[300px] w-full">
             {chartData && chartData.length > 0 && (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
                 <LineChart data={chartData} margin={{ top: 24, right: 8, left: -8, bottom: 0 }}>
                   <CartesianGrid
                     strokeDasharray="3 3"

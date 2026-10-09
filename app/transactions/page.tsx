@@ -561,15 +561,17 @@ useEffect(() => {
           tabs={availableTabs}
           activeTabId={activeView}
           onTabChange={(tabId) => handleViewChange(tabId)}
+          header={
+            <div className="mb-3 sm:mb-3.5">
+              <AppTabs
+                tabs={availableTabs}
+                activeTab={activeView}
+                onChange={(tabId) => handleViewChange(tabId)}
+                variant="underline"
+              />
+            </div>
+          }
         >
-          <div className="hidden md:block mb-3 sm:mb-3.5">
-            <AppTabs
-              tabs={availableTabs}
-              activeTab={activeView}
-              onChange={(tabId) => handleViewChange(tabId)}
-              variant="underline"
-            />
-          </div>
 
           {activeView === 'recurring' ? (
             <RecurringView

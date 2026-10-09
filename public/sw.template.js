@@ -61,7 +61,8 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/icons/") ||
     url.pathname === "/manifest.json" ||
     url.pathname === "/sw.js" ||
-    url.pathname === "/favicon.svg"
+    url.pathname === "/favicon.svg" ||
+    url.pathname === "/favicon-dev.svg"
   ) {
     event.respondWith(cacheFirst(request));
     return;

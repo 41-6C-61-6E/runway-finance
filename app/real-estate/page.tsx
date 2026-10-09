@@ -32,30 +32,17 @@ function RealEstateContent() {
   }, [activeTab, availableTabs]);
 
   const mainContent = (
-    <div>
-      {availableTabs.length > 1 && (
-        <div className="hidden md:block mb-3 sm:mb-3.5">
-          <AppTabs
-            tabs={availableTabs}
-            activeTab={activeTab}
-            onChange={(tab) => setActiveTab(tab as RealEstateTab)}
-            size="sm"
-          />
-        </div>
+    <div className="space-y-5 sm:space-y-6">
+      {activeTab === 'equity' && showEquity && (
+        <Suspense fallback={<LoadingSpinner category="chart" />}>
+          <EquityOverTimeChart />
+        </Suspense>
       )}
-
-      <div className="space-y-5 sm:space-y-6">
-        {activeTab === 'equity' && showEquity && (
-          <Suspense fallback={<LoadingSpinner category="chart" />}>
-            <EquityOverTimeChart />
-          </Suspense>
-        )}
-        {activeTab === 'properties' && showProperties && (
-          <Suspense fallback={<LoadingSpinner category="chart" />}>
-            <PropertyCards />
-          </Suspense>
-        )}
-      </div>
+      {activeTab === 'properties' && showProperties && (
+        <Suspense fallback={<LoadingSpinner category="chart" />}>
+          <PropertyCards />
+        </Suspense>
+      )}
     </div>
   );
 
@@ -63,16 +50,6 @@ function RealEstateContent() {
     <Suspense fallback={<LoadingSpinner category="chart" />}>
       <PortfolioAllocationChart />
     </Suspense>
-  );
-
-  const mobileTabsContent = (
-    <MobileTabSwipeContainer
-      tabs={availableTabs}
-      activeTabId={activeTab}
-      onTabChange={(tab) => setActiveTab(tab as RealEstateTab)}
-    >
-      {mainContent}
-    </MobileTabSwipeContainer>
   );
 
   return (
@@ -84,15 +61,32 @@ function RealEstateContent() {
           <MobileViewSwitcher
             main={mainContent}
             summary={summaryContent}
-            mainLabel={activeTab === 'equity' ? 'Equity' : 'Properties'}
             summaryLabel="Overview"
             summaryCardId="portfolioAllocationChart"
-            mainTabs={availableTabs.length > 1 ? availableTabs : undefined}
+            mainTabs={availableTabs.length > 0 ? availableTabs : undefined}
             activeMainTab={activeTab}
             onMainTabChange={(tab) => setActiveTab(tab as RealEstateTab)}
           />
+        ) : availableTabs.length > 1 ? (
+          <MobileTabSwipeContainer
+            tabs={availableTabs}
+            activeTabId={activeTab}
+            onTabChange={(tab) => setActiveTab(tab as RealEstateTab)}
+            header={
+              <div className="mb-3 sm:mb-3.5">
+                <AppTabs
+                  tabs={availableTabs}
+                  activeTab={activeTab}
+                  onChange={(tab) => setActiveTab(tab as RealEstateTab)}
+                  variant="underline"
+                />
+              </div>
+            }
+          >
+            {mainContent}
+          </MobileTabSwipeContainer>
         ) : (
-          availableTabs.length > 1 ? mobileTabsContent : mainContent
+          mainContent
         )}
       </PageContent>
     </div>

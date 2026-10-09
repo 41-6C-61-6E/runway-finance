@@ -300,7 +300,7 @@ export function SpendingBreakdown() {
                     </div>
                   );
                 })() : view === 'treemap' ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
                     <Treemap data={treemapData} dataKey="value" nameKey="name" stroke="var(--card)" animationDuration={280} animationEasing="ease-out"
                       content={(props: any) => {
                         const { x, y, width, height, index } = props;

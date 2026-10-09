@@ -166,5 +166,5 @@ export { proxy };
 
 export const config = {
   // Run on all paths except static files, but explicitly including api routes
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.json).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|favicon.svg|favicon-dev.svg|robots.txt|sitemap.xml|manifest.json).*)"],
 };

@@ -1,11 +1,18 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo, useId, type ReactNode } from 'react';
+import React, { useState, useRef, useId, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { haptic } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { useMobileSubNav } from '@/components/mobile-subnav-context';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { PaginationDots } from '@/components/ui/pagination-dots';
+import { AppTabs } from '@/components/ui/app-tabs';
+
+interface TabInfo {
+  id: string;
+  label: string;
+}
 
 interface MobileViewSwitcherProps {
   main: ReactNode;
@@ -16,24 +23,22 @@ interface MobileViewSwitcherProps {
   desktopHeader?: ReactNode;
   desktopLayout?: 'grid' | 'stacked';
   summaryCardId?: string;
-  /**
-   * Optional sub-tabs for the main pane (e.g. Net Worth's History /
-   * Breakdown). On mobile they join the sub-nav capsule alongside the
-   * summary view — the same way tab pages (Spending, Investments) expose
-   * their tabs — so the capsule switches between History, Breakdown and
-   * Overview. The desktop layout is unaffected; the page renders its own
-   * tab row there.
-   */
-  mainTabs?: { id: string; label: string }[];
+  mainTabs?: TabInfo[];
   activeMainTab?: string;
   onMainTabChange?: (id: string) => void;
 }
 
+/**
+ * Responsive layout container for desktop sidebars and summaries.
+ * On desktop (md+): Renders side-by-side grid or stacked layout with expand/collapse.
+ * On mobile (<md): Renders an in-page underline tab bar (e.g. History | Breakdown | Overview or Table | Overview)
+ * with horizontal swiping, clean transitions, and pagination dots.
+ */
 export function MobileViewSwitcher({
   main,
   summary,
   mainLabel = 'Main',
-  summaryLabel = 'Summary',
+  summaryLabel = 'Overview',
   className = '',
   desktopHeader,
   desktopLayout = 'grid',
@@ -42,136 +47,83 @@ export function MobileViewSwitcher({
   activeMainTab,
   onMainTabChange,
 }: MobileViewSwitcherProps) {
-  const [activeTab, setActiveTab] = useState<'main' | 'summary'>('main');
-  const { registerSubNav } = useMobileSubNav();
-  const subNavOwnerId = useId();
   const [isSummaryCollapsed, setIsSummaryCollapsed] = useCardCollapsed(summaryCardId || '_none_', false);
-
   const isHorizontalCollapseEnabled = Boolean(summaryCardId) && isSummaryCollapsed;
 
-  const startXRef = useRef<number | null>(null);
-  const startYRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0);
-
-  // On mobile the sub-nav capsule mirrors the page structure: one entry per
-  // main sub-tab (when provided), plus the summary view at the end.
-  const subNavTabs = useMemo(() => {
-    const tabs = (mainTabs && mainTabs.length > 0 ? mainTabs : [{ id: 'main', label: mainLabel }])
-      .map((t) => ({ id: t.id, label: t.label }));
-    tabs.push({ id: 'summary', label: summaryLabel });
-    return tabs;
+  // Build the combined tab list for mobile
+  const mobileTabs = useMemo<TabInfo[]>(() => {
+    if (mainTabs && mainTabs.length > 0) {
+      return [...mainTabs, { id: 'summary', label: summaryLabel }];
+    }
+    return [
+      { id: 'main', label: mainLabel },
+      { id: 'summary', label: summaryLabel },
+    ];
   }, [mainTabs, mainLabel, summaryLabel]);
 
-  // Which sub-nav entry is highlighted: the active main sub-tab, or the
-  // summary view (falling back to the first main entry in the meantime).
-  const subNavActiveId =
-    activeTab === 'summary'
-      ? 'summary'
-      : (mainTabs && mainTabs.length > 0 ? (activeMainTab ?? mainTabs[0].id) : 'main');
+  // Track active mobile tab
+  const [internalTab, setInternalTab] = useState<string>(() => {
+    if (mainTabs && mainTabs.length > 0) {
+      return activeMainTab || mainTabs[0].id;
+    }
+    return 'main';
+  });
 
-  const handleSelectMainTab = (id: string) => {
-    onMainTabChange?.(id);
-    setActiveTab('main');
-  };
-
+  // Keep internal tab in sync if parent changes activeMainTab
   useEffect(() => {
-    const unregister = registerSubNav(subNavTabs, subNavActiveId, (id) => {
-      if (id === 'summary') {
-        setActiveTab('summary');
-      } else {
-        handleSelectMainTab(id);
-      }
-    }, subNavOwnerId, 1);
-    return () => {
-      unregister();
-    };
-  }, [subNavTabs, subNavActiveId, mainTabs, onMainTabChange, registerSubNav, subNavOwnerId]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    const target = e.target as HTMLElement;
-
-    // Safety checks: ignore swipes initiated on controls/inputs/charts/dialogs
-    if (
-      target.closest('.touch-pan-y') ||
-      target.closest('.scroll-contain-x') ||
-      target.closest('input') ||
-      target.closest('textarea') ||
-      target.closest('select') ||
-      target.closest('[role="dialog"]') ||
-      target.closest('[role="tooltip"]') ||
-      target.closest('.no-swipe') ||
-      target.closest('.recharts-wrapper') ||
-      target.closest('.recharts-tooltip-wrapper')
-    ) {
-      startXRef.current = null;
-      startYRef.current = null;
-      return;
+    if (activeMainTab && internalTab !== 'summary') {
+      setInternalTab(activeMainTab);
     }
+  }, [activeMainTab, internalTab]);
 
-    startXRef.current = touch.clientX;
-    startYRef.current = touch.clientY;
-    startTimeRef.current = Date.now();
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (startXRef.current === null || startYRef.current === null) return;
-
-    const touch = e.changedTouches[0];
-    const duration = Date.now() - startTimeRef.current;
-    const dX = touch.clientX - startXRef.current;
-    const dY = touch.clientY - startYRef.current;
-
-    startXRef.current = null;
-    startYRef.current = null;
-
-    if (duration > 400 || Math.abs(dY) > 60 || Math.abs(dX) < 50) {
-      return;
+  const handleMobileTabChange = useCallback((tabId: string) => {
+    setInternalTab(tabId);
+    if (tabId !== 'summary') {
+      onMainTabChange?.(tabId);
     }
+  }, [onMainTabChange]);
 
-      // Swipe sequence on mobile: main sub-tabs (left→right), then the
-      // summary view at the end.
-      const viewSequence = (mainTabs && mainTabs.length > 0 ? mainTabs.map((t) => t.id) : ['main']).concat(['summary']);
-      const currentView = activeTab === 'summary' ? 'summary' : (mainTabs && mainTabs.length > 0 ? (activeMainTab ?? viewSequence[0]) : 'main');
-      const idx = viewSequence.indexOf(currentView);
-
-      if (dX < -50 && idx !== -1 && idx < viewSequence.length - 1) {
-        // Swipe Left -> next view
-      haptic.light();
-        if (viewSequence[idx + 1] === 'summary') {
-          setActiveTab('summary');
-        } else {
-          handleSelectMainTab(viewSequence[idx + 1]);
-        }
-      } else if (dX > 50 && idx !== -1 && idx > 0) {
-        // Swipe Right -> previous view
-      haptic.light();
-        if (viewSequence[idx - 1] === 'summary') {
-          setActiveTab('summary');
-        } else {
-          handleSelectMainTab(viewSequence[idx - 1]);
-        }
-    }
-  };
+  const isSummaryActive = internalTab === 'summary';
 
   return (
     <div className={cn("w-full", className)}>
-      {/* ── Desktop View (lg and up): Choice of Grid or Stacked Layout ── */}
-      <div className="hidden lg:block space-y-6">
+      {/* ── Desktop View (md and up): Choice of Grid or Stacked Layout ── */}
+      <div className="hidden md:block space-y-6">
         {desktopHeader}
         {desktopLayout === 'stacked' ? (
           <div className="space-y-6">
+            {mainTabs && mainTabs.length > 1 && (
+              <div className="mb-3 sm:mb-3.5">
+                <AppTabs
+                  tabs={mainTabs}
+                  activeTab={activeMainTab || internalTab}
+                  onChange={(tabId) => onMainTabChange?.(tabId)}
+                  variant="underline"
+                />
+              </div>
+            )}
             {main}
             {summary}
           </div>
         ) : isHorizontalCollapseEnabled ? (
           <div className="grid grid-cols-12 gap-6 items-start">
-            <div className="col-span-11 space-y-6 transition-all duration-300">{main}</div>
+            <div className="col-span-11 space-y-6 transition-all duration-300">
+              {mainTabs && mainTabs.length > 1 && (
+                <div className="mb-3 sm:mb-3.5">
+                  <AppTabs
+                    tabs={mainTabs}
+                    activeTab={activeMainTab || internalTab}
+                    onChange={(tabId) => onMainTabChange?.(tabId)}
+                    variant="underline"
+                  />
+                </div>
+              )}
+              {main}
+            </div>
             <div className="col-span-1 flex justify-end sticky top-[84px] transition-all duration-300">
               <button
                 onClick={() => setIsSummaryCollapsed(false)}
-                className="flex flex-col items-center gap-3 py-4 px-2.5 bg-sidebar border border-sidebar-border/80 hover:bg-sidebar/90 rounded-2xl shadow-sm text-sidebar-foreground transition-all cursor-pointer group"
+                className="flex flex-col items-center gap-3 py-4 px-2.5 bg-sidebar border border-sidebar-border/80 hover:bg-sidebar/90 rounded-2xl shadow-xs text-sidebar-foreground transition-all cursor-pointer group"
                 title={`Expand ${summaryLabel}`}
                 type="button"
               >
@@ -184,37 +136,48 @@ export function MobileViewSwitcher({
           </div>
         ) : (
           <div className="grid grid-cols-12 gap-6 items-start">
-            <div className="col-span-8 space-y-6 transition-all duration-300">{main}</div>
+            <div className="col-span-8 space-y-6 transition-all duration-300">
+              {mainTabs && mainTabs.length > 1 && (
+                <div className="mb-3 sm:mb-3.5">
+                  <AppTabs
+                    tabs={mainTabs}
+                    activeTab={activeMainTab || internalTab}
+                    onChange={(tabId) => onMainTabChange?.(tabId)}
+                    variant="underline"
+                  />
+                </div>
+              )}
+              {main}
+            </div>
             <div className="col-span-4 sticky top-[84px] transition-all duration-300">{summary}</div>
           </div>
         )}
       </div>
 
-      {/* ── Mobile View (< lg): Swipeable View Container ── */}
-      <div className="lg:hidden w-full flex flex-col">
-        <div
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          className="w-full relative transition-all duration-200 min-h-[300px]"
+      {/* ── Mobile View (< md): First-class Underline Tabs & Swipe Navigation ── */}
+      <div className="md:hidden w-full">
+        <MobileTabSwipeContainer
+          tabs={mobileTabs}
+          activeTabId={internalTab}
+          onTabChange={handleMobileTabChange}
+          header={
+            <div className="mb-3 sm:mb-3.5">
+              <AppTabs
+                tabs={mobileTabs}
+                activeTab={internalTab}
+                onChange={handleMobileTabChange}
+                variant="underline"
+              />
+            </div>
+          }
         >
-          {activeTab === 'main' ? (
-            <div className="space-y-5 sm:space-y-6 animate-in fade-in-50 duration-150">
-              {main}
-            </div>
-          ) : (
-            <div className="space-y-5 sm:space-y-6 animate-in fade-in-50 duration-150">
-              {summary}
-            </div>
-          )}
-        </div>
+          <div className="space-y-5 sm:space-y-6">
+            {isSummaryActive ? summary : main}
+          </div>
+        </MobileTabSwipeContainer>
       </div>
     </div>
   );
-}
-
-interface TabInfo {
-  id: string;
-  label: string;
 }
 
 interface MobileTabSwipeContainerProps {
@@ -224,9 +187,17 @@ interface MobileTabSwipeContainerProps {
   children: ReactNode;
   className?: string;
   desktopHeader?: ReactNode;
+  header?: ReactNode;
   priority?: number;
+  showDots?: boolean;
 }
 
+/**
+ * Mobile tab swipe container.
+ * Detects horizontal swipes cleanly without rubber-band translation bouncing.
+ * Transitions directly to adjacent tab with subtle haptic feedback and clean fade in.
+ * Handles edge-to-edge swipes so browser back/forward history navigation is prevented.
+ */
 export function MobileTabSwipeContainer({
   tabs,
   activeTabId,
@@ -234,7 +205,9 @@ export function MobileTabSwipeContainer({
   children,
   className = '',
   desktopHeader,
+  header,
   priority = 0,
+  showDots = true,
 }: MobileTabSwipeContainerProps) {
   const { registerSubNav } = useMobileSubNav();
   const subNavOwnerId = useId();
@@ -242,6 +215,7 @@ export function MobileTabSwipeContainer({
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
+  const directionLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
 
   const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
 
@@ -259,17 +233,17 @@ export function MobileTabSwipeContainer({
     const touch = e.touches[0];
     const target = e.target as HTMLElement;
 
+    // Exclude form controls, dialogs, sliders, horizontal tables, and marked elements
     if (
-      target.closest('.touch-pan-y') ||
-      target.closest('.scroll-contain-x') ||
       target.closest('input') ||
       target.closest('textarea') ||
       target.closest('select') ||
+      target.closest('[role="slider"]') ||
       target.closest('[role="dialog"]') ||
-      target.closest('[role="tooltip"]') ||
+      target.closest('[data-no-swipe]') ||
       target.closest('.no-swipe') ||
-      target.closest('.recharts-wrapper') ||
-      target.closest('.recharts-tooltip-wrapper')
+      target.closest('.scroll-contain-x') ||
+      target.closest('table')
     ) {
       startXRef.current = null;
       startYRef.current = null;
@@ -279,46 +253,113 @@ export function MobileTabSwipeContainer({
     startXRef.current = touch.clientX;
     startYRef.current = touch.clientY;
     startTimeRef.current = Date.now();
+    directionLockedRef.current = null;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startXRef.current === null || startYRef.current === null) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - startXRef.current;
+    const dy = touch.clientY - startYRef.current;
+
+    // Direction intent locking: require clear horizontal intent (> 1.2x dy and displacement > 10px)
+    if (!directionLockedRef.current) {
+      if (Math.hypot(dx, dy) < 10) return;
+      if (Math.abs(dy) >= Math.abs(dx)) {
+        directionLockedRef.current = 'vertical';
+        return;
+      }
+      if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+        directionLockedRef.current = 'horizontal';
+      }
+    }
+
+    if (directionLockedRef.current === 'horizontal') {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+      e.stopPropagation();
+    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (startXRef.current === null || startYRef.current === null) return;
-
     const touch = e.changedTouches[0];
+    const dx = touch ? touch.clientX - startXRef.current : 0;
     const duration = Date.now() - startTimeRef.current;
-    const dX = touch.clientX - startXRef.current;
-    const dY = touch.clientY - startYRef.current;
+    const velocity = Math.abs(dx) / Math.max(duration, 1);
+
+    const isHorizontal = directionLockedRef.current === 'horizontal';
 
     startXRef.current = null;
     startYRef.current = null;
+    directionLockedRef.current = null;
 
-    if (duration > 400 || Math.abs(dY) > 60 || Math.abs(dX) < 50) {
-      return;
-    }
+    if (isHorizontal) {
+      e.stopPropagation();
 
-    if (dX < -50 && currentIndex !== -1 && currentIndex < tabs.length - 1) {
-      // Swipe Left -> next sub-tab
-      haptic.light();
-      onTabChange(tabs[currentIndex + 1].id);
-    } else if (dX > 50 && currentIndex > 0) {
-      // Swipe Right -> previous sub-tab
-      haptic.light();
-      onTabChange(tabs[currentIndex - 1].id);
+      const shouldSwitch = Math.abs(dx) > 35 || (velocity > 0.3 && Math.abs(dx) > 20);
+
+      if (shouldSwitch) {
+        if (dx < -20 && currentIndex !== -1 && currentIndex < tabs.length - 1) {
+          // Swipe Left -> next tab
+          haptic.light();
+          onTabChange(tabs[currentIndex + 1].id);
+        } else if (dx > 20 && currentIndex > 0) {
+          // Swipe Right -> previous tab
+          haptic.light();
+          onTabChange(tabs[currentIndex - 1].id);
+        }
+      }
     }
+  };
+
+  const handleTouchCancel = () => {
+    startXRef.current = null;
+    startYRef.current = null;
+    directionLockedRef.current = null;
   };
 
   return (
     <div className={cn("w-full", className)}>
-      {desktopHeader && <div className="hidden lg:block mb-3 sm:mb-3.5">{desktopHeader}</div>}
+      {desktopHeader && <div className="hidden md:block mb-3 sm:mb-3.5">{desktopHeader}</div>}
+      {header && <div className="mb-3 sm:mb-3.5">{header}</div>}
       
-      {/* Touch Swipe Container */}
+      {/* Touch Swipe Container with clean fade transition and no rubber-band bounce */}
       <div
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
         className="w-full"
       >
-        {children}
+        <div key={activeTabId} className="w-full animate-in fade-in-50 duration-150">
+          {children}
+        </div>
       </div>
+
+      {/* Pagination dots indicator for tabs on mobile: static and fixed above the main bottom nav */}
+      {showDots && tabs.length > 1 && (
+        <div
+          className="fixed left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden fixed-pagination-dots transition-all duration-300"
+          style={{
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)',
+          }}
+        >
+          <div className="pointer-events-auto">
+            <PaginationDots
+              total={tabs.length}
+              activeIndex={Math.max(0, currentIndex)}
+              labels={tabs.map((t) => t.label)}
+              onChange={(idx) => {
+                if (tabs[idx]) {
+                  onTabChange(tabs[idx].id);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

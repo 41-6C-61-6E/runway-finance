@@ -27,6 +27,8 @@ body,
   height: 100%;
   /* Use dynamic viewport height on iOS to prevent toolbar resize issues */
   min-height: 100dvh;
+  /* Prevent browser-level horizontal edge swipe back/forward history navigation */
+  overscroll-behavior-x: none;
 }
 
 /* Text Size Scaling Settings */
@@ -517,7 +519,8 @@ html.text-size-lg {
 }
 
 /* Hide mobile bottom navigation bar when keyboard is open (i.e. an input is focused) to prevent it from covering content on iOS */
-body:has(input:focus, textarea:focus, select:focus) nav.fixed {
+body:has(input:focus, textarea:focus, select:focus) nav.fixed,
+body:has(input:focus, textarea:focus, select:focus) .fixed-pagination-dots {
   display: none !important;
 }
 
@@ -551,6 +554,22 @@ body:has(input:focus, textarea:focus, select:focus) nav.fixed {
   }
   .hover\:bg-muted\/50:hover {
     background-color: transparent !important;
+  }
+}
+
+/* ── Complete Mobile Tooltip Suppression (< 768px and touch/coarse devices) ── */
+@media (max-width: 767px), (hover: none), (pointer: coarse) {
+  [data-radix-tooltip-content],
+  [role="tooltip"],
+  .chart-tooltip,
+  .recharts-tooltip-wrapper,
+  .recharts-default-tooltip,
+  [data-radix-popper-content-wrapper]:has([role="tooltip"]),
+  [data-radix-popper-content-wrapper]:has([data-radix-tooltip-content]) {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
   }
 }
 

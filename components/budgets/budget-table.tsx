@@ -108,7 +108,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const [showDirectOnly, setShowDirectOnly] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 600);
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);

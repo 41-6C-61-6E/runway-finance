@@ -29,11 +29,16 @@ import {
 } from 'lucide-react';
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { haptic } from '@/lib/haptics';
-import { useMobileSubNav } from '@/components/mobile-subnav-context';
-import type { SubNavLevel } from '@/components/mobile-subnav-context';
 import { useQuery } from '@tanstack/react-query';
-import { glassBar, glassSurface, glassItemBase, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
-import { useScrollFades, ScrollFadeOverlays } from '@/components/ui/scroll-fade';
+import { glassBar, glassItemBase, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
+
+export type NavCategory = 'finances' | 'planning' | 'tools';
+
+export const NAV_CATEGORIES = [
+  { id: 'finances' as const, label: 'Daily Finances' },
+  { id: 'planning' as const, label: 'Planning & Wealth' },
+  { id: 'tools' as const, label: 'Tools & Settings' },
+];
 
 interface NavItem {
   id: string;
@@ -41,29 +46,29 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<any>;
   pageKey?: string;
-  category: 'finances' | 'planning';
+  category: NavCategory;
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
+  // Daily Finances
   { id: 'net-worth', href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth', category: 'finances' },
   { id: 'accounts', href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'accounts', category: 'finances' },
   { id: 'transactions', href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions', category: 'finances' },
   { id: 'flows', href: '/flows', label: 'Flows', icon: ArrowLeftRight, pageKey: 'flows', category: 'finances' },
   { id: 'spending', href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending', category: 'finances' },
   { id: 'budgets', href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets', category: 'finances' },
-  { id: 'real-estate', href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate', category: 'finances' },
-  { id: 'investments', href: '/investments', label: 'Investments', icon: CandlestickChart, pageKey: 'investments', category: 'finances' },
-  { id: 'goals', href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals', category: 'finances' },
-  { id: 'financial-logic', href: '/financial-logic', label: 'Financial Logic Explorer', icon: Calculator, pageKey: 'financialLogic', category: 'finances' },
-  { id: 'data-explorer', href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer', category: 'finances' },
+
+  // Planning & Wealth
+  { id: 'investments', href: '/investments', label: 'Investments', icon: CandlestickChart, pageKey: 'investments', category: 'planning' },
+  { id: 'real-estate', href: '/real-estate', label: 'Real Estate', icon: Home, pageKey: 'realEstate', category: 'planning' },
+  { id: 'goals', href: '/goals', label: 'Goals', icon: Target, pageKey: 'goals', category: 'planning' },
   { id: 'plans', href: '/plans', label: 'FIRE', icon: Flame, pageKey: 'plans', category: 'planning' },
-  {
-    id: 'offline',
-    href: '/offline',
-    label: 'Offline mode (preview)',
-    icon: WifiOff,
-    category: 'planning',
-  },
+
+  // Tools & Settings
+  { id: 'data-explorer', href: '/data', label: 'Data Explorer', icon: Database, pageKey: 'dataExplorer', category: 'tools' },
+  { id: 'financial-logic', href: '/financial-logic', label: 'Financial Logic Explorer', icon: Calculator, pageKey: 'financialLogic', category: 'tools' },
+  { id: 'offline', href: '/offline', label: 'Offline mode (preview)', icon: WifiOff, category: 'tools' },
+  { id: 'settings', href: '/settings', label: 'Settings', icon: Settings, pageKey: 'settings', category: 'tools' },
 ];
 
 const MD_BREAKPOINT_PX = 768;
@@ -85,30 +90,6 @@ export function MobileNav() {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const { isHidden } = useHiddenPages();
 
-  const { tabs, activeTabId, navLevels, selectTabAtLevel, activeTabIndex, nextTab, prevTab } = useMobileSubNav();
-  const hasSubNav = tabs.length > 0;
-
-  // Scroll detection state for floating subnav smart auto-dimming
-  const [isScrollingDown, setIsScrollingDown] = useState(false);
-  const lastScrollYRef = useRef(0);
-  const subNavTouchStartXRef = useRef<number | null>(null);
-  const subNavTouchStartYRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollYRef.current + 15 && currentScrollY > 60) {
-        setIsScrollingDown(true);
-      } else if (currentScrollY < lastScrollYRef.current - 15 || currentScrollY < 30) {
-        setIsScrollingDown(false);
-      }
-      lastScrollYRef.current = currentScrollY;
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   // Auto-close the drawer when crossing to desktop breakpoint where
   // the left sidebar takes over navigation.
   useEffect(() => {
@@ -121,36 +102,9 @@ export function MobileNav() {
     return () => window.removeEventListener('resize', handleResize);
   }, [isOpen]);
 
-  const handleSubNavTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      subNavTouchStartXRef.current = e.touches[0].clientX;
-      subNavTouchStartYRef.current = e.touches[0].clientY;
-    }
-  };
-
-  const handleSubNavTouchEnd = (e: React.TouchEvent) => {
-    if (subNavTouchStartXRef.current === null || subNavTouchStartYRef.current === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    const deltaX = touchEndX - subNavTouchStartXRef.current;
-    const deltaY = touchEndY - subNavTouchStartYRef.current;
-    subNavTouchStartXRef.current = null;
-    subNavTouchStartYRef.current = null;
-
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 35) {
-      if (deltaX < -35) {
-        haptic.light();
-        nextTab();
-      } else if (deltaX > 35) {
-        haptic.light();
-        prevTab();
-      }
-    }
-  };
-
 
   // Custom home items (minimized bottom nav items)
-  const [homeItemIds, setHomeItemIds] = useState<string[]>(['net-worth', 'accounts', 'transactions', 'cash-flow']);
+  const [homeItemIds, setHomeItemIds] = useState<string[]>(['net-worth', 'accounts', 'transactions', 'flows']);
   const [isEditing, setIsEditing] = useState(false);
   
   // Default pages the user explicitly removed in Edit Layout mode — the
@@ -232,7 +186,11 @@ export function MobileNav() {
     setIsDragging(true);
     startYRef.current = e.clientY;
     currentYRef.current = e.clientY;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore if pointer capture fails
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -249,7 +207,13 @@ export function MobileNav() {
   const handlePointerUp = (e: React.PointerEvent) => {
     if (!isDragging) return;
     setIsDragging(false);
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Ignore if releasePointerCapture fails
+    }
     if (dragOffset > 100) {
       setIsOpen(false);
     } else {
@@ -327,6 +291,7 @@ export function MobileNav() {
   const defaultHomeFill: NavItem[] = ALL_NAV_ITEMS.filter(
     (item) =>
       item.id !== 'offline' &&
+      item.id !== 'settings' &&
       !(item.pageKey && (DEV_MODE_PAGE_KEYS as readonly string[]).includes(item.pageKey))
   );
 
@@ -558,41 +523,11 @@ export function MobileNav() {
         }
       ` }} />
 
-      {/* Decoupled Floating Sub-Navigation Capsule (View & Swipe Control) */}
-      {hasSubNav && !isOpen && (
-        <div
-          className={`fixed left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden transition-all duration-300 ${
-            isScrollingDown ? 'opacity-55 hover:opacity-100 scale-95' : 'opacity-100 scale-100'
-          }`}
-          style={{
-            bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 68px)',
-          }}
-        >
-          <div
-            onTouchStart={handleSubNavTouchStart}
-            onTouchEnd={handleSubNavTouchEnd}
-            className="pointer-events-auto flex items-center justify-center gap-1 max-w-[92vw] w-[calc(100vw-1rem)] select-none"
-          >
-            {/* Nested sub-navigation: parent menu > child menu. */}
-            <div className="flex items-center justify-center gap-1 min-w-0 w-full">
-              {navLevels.map((level, levelIndex) => (
-                <React.Fragment key={level.id}>
-                  {levelIndex > 0 && (
-                    <ChevronRight className="w-3 h-3 shrink-0 text-sidebar-foreground/55" aria-hidden="true" />
-                  )}
-                  <SubNavCapsule level={level} onSelect={(tabId) => selectTabAtLevel(level.id, tabId)} />
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Single-Row Floating Bottom Navigation Bar */}
       <nav
           className={`fixed bottom-2 left-4 right-4 z-40 flex items-center gap-2 md:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
         style={{
-          bottom: 'calc(env(safe-area-inset-bottom) * 0.3 + 8px)',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
         }}
         >
         {shownHomeNavItems.map((item) => {
@@ -742,49 +677,75 @@ export function MobileNav() {
           </>
         )}
 
-        {/* Main Section (Includes all visible nav items: Net Worth, Accounts, Transactions, Flows, Spending, Budgets, Real Estate, Investments, Goals, Logic, Data, FIRE) */}
-        <div className="grid grid-cols-4 gap-y-3 gap-x-2">
-          {ALL_NAV_ITEMS.filter(item => isItemVisible(item)).map((item) => {
-            const Icon = item.icon;
-            const active = pendingHref ? pendingHref === item.href : isActive(item.href);
-            const globalIndex = ALL_NAV_ITEMS.findIndex(i => i.id === item.id);
-            const isCurrentlyDragged = draggedItem?.id === item.id;
+        {/* Main Section grouped into clear categories */}
+        <div className="space-y-4">
+          {NAV_CATEGORIES.map((cat) => {
+            const categoryItems = ALL_NAV_ITEMS.filter(
+              (item) => item.category === cat.id && isItemVisible(item)
+            );
+            if (categoryItems.length === 0) return null;
 
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                draggable="false"
-                onClick={(e) => {
-                  if (isEditing) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return;
-                  }
-                  setPendingHref(item.href);
-                  setIsOpen(false);
-                }}
-                onPointerDown={handleItemPointerDown(item)}
-                onPointerMove={handleItemPointerMove}
-                onPointerUp={handleItemPointerUp}
-                onPointerCancel={handleItemPointerCancel}
-                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none cursor-grab ${
-                  isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-                } ${getWiggleClass(globalIndex)}`}
-                style={{
-                  opacity: isCurrentlyDragged ? 0.3 : 1,
-                  touchAction: isEditing ? 'none' : 'pan-y'
-                }}
-              >
-                <div className={`p-3 rounded-2xl transition-colors ${
-                  active ? 'bg-primary/20 text-primary' : 'bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
-                }`}>
-                  <Icon className="h-5 w-5 flex-shrink-0" />
+              <div key={cat.id} className="space-y-1.5">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 select-none">
+                  {cat.label}
                 </div>
-                <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${
-                  active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
-                }`}>{item.label}</span>
-              </Link>
+                <div className="grid grid-cols-4 gap-y-2.5 gap-x-2">
+                  {categoryItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = pendingHref ? pendingHref === item.href : isActive(item.href);
+                    const globalIndex = ALL_NAV_ITEMS.findIndex((i) => i.id === item.id);
+                    const isCurrentlyDragged = draggedItem?.id === item.id;
+
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        draggable="false"
+                        onClick={(e) => {
+                          if (isEditing) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            return;
+                          }
+                          setPendingHref(item.href);
+                          setIsOpen(false);
+                        }}
+                        onPointerDown={handleItemPointerDown(item)}
+                        onPointerMove={handleItemPointerMove}
+                        onPointerUp={handleItemPointerUp}
+                        onPointerCancel={handleItemPointerCancel}
+                        className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none cursor-grab ${
+                          isEditing ? 'cursor-grab active:cursor-grabbing' : ''
+                        } ${getWiggleClass(globalIndex)}`}
+                        style={{
+                          opacity: isCurrentlyDragged ? 0.3 : 1,
+                          touchAction: isEditing ? 'none' : 'pan-y',
+                        }}
+                      >
+                        <div
+                          className={`p-3 rounded-2xl transition-colors ${
+                            active
+                              ? 'bg-primary/20 text-primary'
+                              : 'bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
+                          }`}
+                        >
+                          <Icon className="h-5 w-5 flex-shrink-0" />
+                        </div>
+                        <span
+                          className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${
+                            active
+                              ? 'text-primary font-semibold'
+                              : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </div>
@@ -810,58 +771,4 @@ export function MobileNav() {
   );
 }
 
-/**
- * One scrollable level of the floating sub-nav.
- *
- * Each level is a single-row glass capsule whose items never shrink or
- * truncate — when the row exceeds the available width it scrolls, and the
- * shared edge fades (see `scroll-fade`) hint that it can be dragged.
- */
-function SubNavCapsule({ level, onSelect }: { level: SubNavLevel; onSelect: (tabId: string) => void }) {
-  const { fadeRef, fades, update } = useScrollFades<HTMLDivElement>();
 
-  // Keep the active tab visible when it isn't the current scroll anchor.
-  React.useLayoutEffect(() => {
-    const scroller = fadeRef.current;
-    if (!scroller) return;
-    const active = scroller.querySelector<HTMLButtonElement>('[data-active="true"]');
-    if (!active) return;
-    const start = active.offsetLeft - scroller.scrollLeft;
-    if (start < 0 || start > scroller.clientWidth - active.offsetWidth) {
-      active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    }
-  }, [level.activeTabId]);
-
-  return (
-    <div className="relative min-w-0 shrink max-w-full">
-      <div
-        ref={fadeRef}
-        onScroll={update}
-        className={`flex items-center gap-1 p-1 overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x rounded-full max-w-full w-fit ${glassSurface}`}
-      >
-        {level.tabs.map((tab) => {
-          const isActiveTab = tab.id === level.activeTabId;
-          return (
-            <button
-              key={`${level.id}-${tab.id}`}
-              type="button"
-              data-active={isActiveTab || undefined}
-              onClick={() => {
-                if (!isActiveTab) {
-                  haptic.light();
-                  onSelect(tab.id);
-                }
-              }}
-              className={`flex shrink-0 items-center justify-center gap-1.5 py-1 px-2 min-h-9 text-xs whitespace-nowrap ${glassItemBase} ${
-                isActiveTab ? glassItemActive : glassItemInactive
-              }`}
-            >
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-      <ScrollFadeOverlays {...fades} />
-    </div>
-  );
-}

@@ -112,16 +112,17 @@ function AccountsContent() {
           tabs={availableTabs}
           activeTabId={activeTab}
           onTabChange={(tabId) => setActiveTab(tabId as Tab)}
+          header={
+            <div className="mb-3 sm:mb-3.5">
+              <AppTabs
+                tabs={availableTabs}
+                activeTab={activeTab}
+                onChange={(tabId) => setActiveTab(tabId as Tab)}
+                variant="underline"
+              />
+            </div>
+          }
         >
-          <div className="hidden md:block mb-3 sm:mb-3.5">
-            <AppTabs
-              tabs={availableTabs}
-              activeTab={activeTab}
-              onChange={(tabId) => setActiveTab(tabId as Tab)}
-              variant="underline"
-            />
-          </div>
-
           {activeTab === 'list' && (
             <AccountHierarchyTree
               filteredAllAccounts={filteredAllAccounts}

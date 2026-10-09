@@ -376,7 +376,7 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
                   )}
                 </div>
                 <div className="h-[260px] sm:h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
                     <BarChart
                       data={chartData}
                       stackOffset="sign"

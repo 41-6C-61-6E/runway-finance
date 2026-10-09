@@ -400,7 +400,7 @@ export function HoldingsAllocation({ holdings, accounts, mode }: HoldingsAllocat
                         {formatCompactCurrency(totalValue)}
                       </span>
                     </div>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
                       <PieChart>
                         <Pie
                           data={chartData}

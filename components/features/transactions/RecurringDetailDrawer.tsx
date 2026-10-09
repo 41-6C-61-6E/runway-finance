@@ -295,7 +295,7 @@ export default function RecurringDetailDrawer({
                 <span className="text-[11px] text-muted-foreground">Last {sparkline.length} cycles</span>
               </div>
               <div className="h-28 w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
                   <LineChart data={sparkline} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
                     <XAxis

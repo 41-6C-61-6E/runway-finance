@@ -44,3 +44,5 @@ Personal finance dashboard for tracking net worth, cash flow, investments, budge
 4. **Port Number**: The dev server binds to port `3001` (not `3000`).
 5. **UI Ratchet**: The lint step (`pnpm lint`) includes a UI ratchet check (`scripts/ui-ratchet.mjs`). Maintain existing Radix UI and Tailwind patterns without adding superfluous styling dependencies.
 6. **Verification**: Always execute `pnpm typecheck` and `pnpm test` before concluding tasks involving code changes.
+7. **Security**: Never commit secrets or sensitive information to the repository. Always use environment variables for sensitive configuration. Code with security best practices
+7. **Pirimitives**: Always use the existing primitives in `components/ui/*` for UI components. Do not create new ones unless necessary. Follw existing styling patterns.

@@ -670,7 +670,6 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
       <MobileViewSwitcher
         main={mainContent}
         summary={summaryContent}
-        mainLabel="Subscriptions"
         summaryLabel="Overview"
         summaryCardId="recurringSummary"
       />

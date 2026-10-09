@@ -11,7 +11,7 @@ import { ChartSkeleton, StatCardSkeleton } from '@/components/ui/skeleton-loader
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { AppTabs, type TabItem } from '@/components/ui/app-tabs';
-import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
+import { MobileViewSwitcher, MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 type ChartTab = 'history' | 'breakdown';
 
 const CHART_TABS: TabItem[] = [
@@ -56,19 +56,6 @@ function NetWorthContent() {
 
   const mainContent = (
     <div>
-      {/* Desktop / tablet: tab row at the top of the main column, above the
-          active chart card (hidden on mobile, where the floating sub-nav
-          capsule carries the same tabs — same as the other tabbed pages). */}
-      {visibleTabs.length > 0 && (
-        <div className="hidden md:block mb-3 sm:mb-3.5">
-          <AppTabs
-            tabs={visibleTabs}
-            activeTab={activeChartTab}
-            onChange={(tabId) => setActiveChartTab(tabId as ChartTab)}
-          />
-        </div>
-      )}
-
       {visibleTabs.length > 0 ? (
         activeChartTab === 'history'
           ? showChart ? (
@@ -110,13 +97,30 @@ function NetWorthContent() {
           <MobileViewSwitcher
             main={mainContent}
             summary={summaryContent}
-            mainLabel="Charts"
             summaryLabel="Overview"
             summaryCardId="netWorthSidePanel"
             mainTabs={visibleTabs.length > 0 ? visibleTabs : undefined}
             activeMainTab={activeChartTab}
             onMainTabChange={(tabId) => setActiveChartTab(tabId as ChartTab)}
           />
+        ) : visibleTabs.length > 1 ? (
+          <MobileTabSwipeContainer
+            tabs={visibleTabs}
+            activeTabId={activeChartTab}
+            onTabChange={(tabId) => setActiveChartTab(tabId as ChartTab)}
+            header={
+              <div className="mb-3 sm:mb-3.5">
+                <AppTabs
+                  tabs={visibleTabs}
+                  activeTab={activeChartTab}
+                  onChange={(tabId) => setActiveChartTab(tabId as ChartTab)}
+                  variant="underline"
+                />
+              </div>
+            }
+          >
+            {mainContent}
+          </MobileTabSwipeContainer>
         ) : (
           mainContent
         )}

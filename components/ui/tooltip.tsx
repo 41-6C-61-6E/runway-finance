@@ -2,20 +2,39 @@
 
 import * as React from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-
 import { cn } from '@/lib/utils';
 
 interface TooltipContextType {
   open: boolean;
   setOpen: (open: boolean) => void;
+  isMobile: boolean;
 }
 
 const TooltipContext = React.createContext<TooltipContextType>({
   open: false,
   setOpen: () => {},
+  isMobile: false,
 });
 
 const TooltipProvider = TooltipPrimitive.Provider;
+
+function useIsMobileOrTouch() {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const check = () => {
+      setIsMobile(
+        typeof window !== 'undefined' &&
+        (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window)
+      );
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  return isMobile;
+}
 
 function Tooltip({
   open: controlledOpen,
@@ -23,16 +42,21 @@ function Tooltip({
   children,
   ...props
 }: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Root>) {
+  const isMobile = useIsMobileOrTouch();
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
   const isControlled = controlledOpen !== undefined;
-  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  // On mobile (< 768px) and touch devices, tooltips are NEVER open
+  const open = isMobile ? false : (isControlled ? controlledOpen : uncontrolledOpen);
 
   const handleOpenChange = React.useCallback((nextOpen: boolean) => {
+    if (isMobile) {
+      return;
+    }
     if (!isControlled) {
       setUncontrolledOpen(nextOpen);
     }
     onOpenChange?.(nextOpen);
-  }, [isControlled, onOpenChange]);
+  }, [isControlled, isMobile, onOpenChange]);
 
   const setOpen = React.useCallback((nextOpen: boolean) => {
     handleOpenChange(nextOpen);
@@ -43,18 +67,14 @@ function Tooltip({
     if (!open) return;
 
     const handleGlobalScroll = () => {
-      if (typeof window !== 'undefined' && (window.innerWidth < 768 || 'ontouchstart' in window)) {
-        setOpen(false);
-      }
+      setOpen(false);
     };
 
     window.addEventListener('scroll', handleGlobalScroll, { passive: true, capture: true });
 
     const timer = setTimeout(() => {
       const handleGlobalDismiss = () => {
-        if (typeof window !== 'undefined' && (window.innerWidth < 768 || 'ontouchstart' in window)) {
-          setOpen(false);
-        }
+        setOpen(false);
       };
 
       window.addEventListener('pointerdown', handleGlobalDismiss, { capture: true, once: true });
@@ -69,7 +89,7 @@ function Tooltip({
 
   return (
     <TooltipPrimitive.Provider delayDuration={200}>
-      <TooltipContext.Provider value={{ open, setOpen }}>
+      <TooltipContext.Provider value={{ open, setOpen, isMobile }}>
         <TooltipPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props}>
           {children}
         </TooltipPrimitive.Root>
@@ -82,43 +102,19 @@ const TooltipTrigger = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Trigger>
 >(({ onTouchStart, onTouchMove, onTouchEnd, onClick, ...props }, ref) => {
-  const { open, setOpen } = React.useContext(TooltipContext);
-  const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
-  const isDraggingRef = React.useRef(false);
+  const { setOpen, isMobile } = React.useContext(TooltipContext);
+
+  const handleClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (isMobile) {
+      setOpen(false);
+    }
+    onClick?.(e as any);
+  };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLElement>) => {
     onTouchStart?.(e as any);
-    if (e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
-    isDraggingRef.current = false;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLElement>) => {
-    onTouchMove?.(e as any);
-    if (!touchStartRef.current || e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - touchStartRef.current.x;
-    const dy = touch.clientY - touchStartRef.current.y;
-    if (Math.hypot(dx, dy) > 8) {
-      isDraggingRef.current = true;
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLElement>) => {
-    onTouchEnd?.(e as any);
-    if (!touchStartRef.current) return;
-    const elapsed = Date.now() - touchStartRef.current.time;
-    const wasDragging = isDraggingRef.current;
-    touchStartRef.current = null;
-    isDraggingRef.current = false;
-
-    // If user dragged to scroll, don't toggle tooltip
-    if (wasDragging) return;
-
-    // Short tap (< 300ms) toggles tooltip on mobile
-    if (elapsed < 300 && typeof window !== 'undefined' && (window.innerWidth < 768 || 'ontouchstart' in window)) {
-      setOpen(!open);
+    if (isMobile) {
+      setOpen(false);
     }
   };
 
@@ -126,9 +122,9 @@ const TooltipTrigger = React.forwardRef<
     <TooltipPrimitive.Trigger
       ref={ref}
       onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onClick={onClick}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onClick={handleClick}
       {...props}
     />
   );
@@ -139,20 +135,21 @@ const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
 >(({ className, sideOffset = 6, collisionPadding = 12, onClick, onPointerDown, ...props }, ref) => {
-  const { setOpen } = React.useContext(TooltipContext);
+  const { setOpen, isMobile } = React.useContext(TooltipContext);
+
+  // In mobile views (< 768px) and touch devices, never render any tooltip content
+  if (isMobile) {
+    return null;
+  }
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     onClick?.(e);
-    // Clicking/tapping directly on an open tooltip clears it immediately
     setOpen(false);
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     onPointerDown?.(e);
-    // On mobile touch view, pointerdown directly on tooltip content dismisses it immediately
-    if (typeof window !== 'undefined' && (window.innerWidth < 768 || e.pointerType === 'touch')) {
-      setOpen(false);
-    }
+    setOpen(false);
   };
 
   return (
@@ -169,7 +166,7 @@ const TooltipContent = React.forwardRef<
           setOpen(false);
         }}
         className={cn(
-          "z-[100] max-w-[calc(100vw-24px)] sm:max-w-xs overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl cursor-pointer select-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 break-words",
+          "hidden md:block [@media(hover:hover)]:block z-[100] max-w-[calc(100vw-24px)] sm:max-w-xs overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl cursor-pointer select-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 break-words",
           className
         )}
         {...props}

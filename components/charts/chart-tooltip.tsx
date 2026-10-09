@@ -28,8 +28,22 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const isCustomPositioned = typeof x === 'number' && typeof y === 'number';
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      setIsMobile(
+        typeof window !== 'undefined' &&
+        (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window)
+      );
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useIsomorphicLayoutEffect(() => {
+    if (isMobile) return;
     const el = ref.current;
     const container = containerRef?.current;
     setPosition(null);
@@ -104,6 +118,10 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
       {children}
     </div>
   );
+
+  if (isMobile) {
+    return null;
+  }
 
   if (containerRef && typeof window !== 'undefined') {
     return createPortal(tooltipContent, document.body);

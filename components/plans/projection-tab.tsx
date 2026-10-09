@@ -770,7 +770,7 @@ export function ProjectionTab({
 
         {/* Dynamic Chart */}
         <div className="h-80 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
             {viewMode === 'deterministic' ? (
               <AreaChart data={chartData} margin={{ top: 25, right: 25, left: 10, bottom: 0 }}>
                 <defs>
@@ -1034,7 +1034,7 @@ export function ProjectionTab({
           <div className="p-5">
 
         <div className="h-80 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
             <ComposedChart data={chartData} maxBarSize={40} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" strokeOpacity={0.3} vertical={false} />
               <XAxis dataKey="age" stroke="currentColor" className="text-xs text-muted-foreground" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} tickLine={false} />
@@ -1324,7 +1324,6 @@ export function ProjectionTab({
         desktopHeader={desktopHeader}
         main={mainContent}
         summary={summaryContent}
-        mainLabel="Forecast"
         summaryLabel="Scorecard"
         summaryCardId="fireProjectionsSidePanel"
       />

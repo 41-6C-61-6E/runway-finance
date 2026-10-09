@@ -43,12 +43,15 @@ function AppTabsInner({
   'aria-label': ariaLabel,
 }: AppTabsInnerProps) {
   const pillsRef = React.useRef<HTMLDivElement>(null);
+  const underlineRef = React.useRef<HTMLDivElement>(null);
   const { fadeRef, fades, update } = useScrollFades<HTMLDivElement>();
-  // Keep the active pill visible in a horizontal scroller (mobile chip rows).
+  // Keep the active tab visible in horizontal scrollers (mobile tab bars).
   React.useLayoutEffect(() => {
-    const scroller = pillsRef.current;
-    if (!scroller || variant !== 'pills') return;
-    const active = scroller.querySelector<HTMLButtonElement>('[data-active="true"]');
+    const scroller = variant === 'pills' ? pillsRef.current : underlineRef.current;
+    if (!scroller) return;
+    const active = scroller.querySelector<HTMLButtonElement>(
+      variant === 'pills' ? '[data-active="true"]' : '[aria-selected="true"]'
+    );
     if (active) active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [activeTab, variant, tabs.length]);
 
@@ -146,9 +149,10 @@ function AppTabsInner({
   // Underline variant
   return (
     <div
+      ref={underlineRef}
       className={cn(
-        'flex items-center border-b border-border/40 overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x',
-        fullWidth ? 'w-full gap-2 sm:gap-4' : 'gap-4 md:gap-6',
+        'flex items-center border-b border-border/60 overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x w-full',
+        fullWidth ? 'gap-2 sm:gap-4' : 'gap-4 md:gap-6',
         className
       )}
       role="tablist"
@@ -169,12 +173,12 @@ function AppTabsInner({
             disabled={tab.disabled}
             onClick={() => !tab.disabled && onChange(tab.id)}
             className={cn(
-              'inline-flex items-center gap-2 font-medium border-b-2 transition-all duration-150 whitespace-nowrap focus:outline-none touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none -mb-px pb-1.5 pt-0.5 min-h-[34px]',
-              fullWidth && 'flex-1 justify-center text-center',
-              size === 'sm' ? 'text-xs' : 'text-sm',
+              'relative inline-flex items-center gap-2 font-medium border-b-2 transition-all duration-150 whitespace-nowrap focus:outline-none focus-visible:ring-1 focus-visible:ring-ring touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none -mb-[2px]',
+              fullWidth ? 'flex-1 justify-center text-center' : 'shrink-0',
+              size === 'sm' ? 'text-xs pb-2 pt-0.5 min-h-[34px]' : 'text-sm pb-2.5 pt-1 min-h-[38px]',
               isActive
                 ? 'border-primary text-primary font-semibold'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border/60'
             )}
           >
             {Icon && <Icon className={cn('shrink-0', size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4')} />}
@@ -183,7 +187,7 @@ function AppTabsInner({
               <span
                 className={cn(
                   'px-1.5 py-0.5 rounded-full text-[10px] font-semibold',
-                  isActive ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+                  isActive ? 'bg-primary/15 text-primary font-bold' : 'bg-muted text-muted-foreground'
                 )}
               >
                 {tab.count}
