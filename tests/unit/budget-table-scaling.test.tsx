@@ -132,10 +132,11 @@ describe('Budget Items Table Dynamic Scaling and Auto-Sizing', () => {
     // Verify account name is rendered
     expect(screen.getAllByText('Main Checking').length).toBeGreaterThan(0);
 
-    // Verify TableScroll wrapper exists and wraps the table
+    // Verify table uses table-fixed and 100% width
     const table = container.querySelector('table');
     expect(table).toBeTruthy();
     expect(table?.className).toContain('w-full');
+    expect(table?.className).toContain('table-fixed');
   });
 
   it('hides Account column gracefully when container width is between 640px and 849px', () => {
@@ -219,5 +220,37 @@ describe('Budget Items Table Dynamic Scaling and Auto-Sizing', () => {
     }
     expect(screen.getByRole('columnheader', { name: /account/i })).toBeTruthy();
     expect(screen.getByRole('columnheader', { name: /variance/i })).toBeTruthy();
+  });
+
+  it('always renders the Actions column and edit/delete buttons, and never horizontally scrolls', () => {
+    const { container } = render(<BudgetTable />);
+
+    // Test at very narrow container width (400px)
+    if (resizeCallback) {
+      act(() => {
+        resizeCallback!([{ contentRect: { width: 400 } }]);
+      });
+    }
+
+    // Actions header must always be present
+    expect(screen.getByRole('columnheader', { name: /actions/i })).toBeTruthy();
+
+    // Action buttons (edit and delete) must always be present
+    const editButtons = screen.getAllByRole('button', { name: /edit budget/i });
+    expect(editButtons.length).toBeGreaterThan(0);
+    const deleteButtons = screen.getAllByRole('button', { name: /delete budget/i });
+    expect(deleteButtons.length).toBeGreaterThan(0);
+
+    // Table element must use table-fixed and 100% width, without minWidth inline style
+    const table = container.querySelector('table');
+    expect(table).toBeTruthy();
+    expect(table?.className).toContain('table-fixed');
+    expect(table?.className).toContain('w-full');
+    expect(table?.style.minWidth).toBe('');
+
+    // Table container must have overflow-hidden and never overflow-x-auto
+    const tableWrapper = table?.parentElement;
+    expect(tableWrapper?.className).toContain('overflow-hidden');
+    expect(tableWrapper?.className).not.toContain('overflow-x-auto');
   });
 });

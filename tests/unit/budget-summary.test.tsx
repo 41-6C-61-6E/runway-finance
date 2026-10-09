@@ -23,52 +23,55 @@ vi.mock('@/lib/hooks/use-card-collapsed', () => ({
   },
 }));
 
+let mockPeriodKey = '2026-08';
 vi.mock('@/components/budgets/budget-period-selector', () => ({
   useBudgetPeriod: () => ({
     periodType: 'monthly',
-    periodKey: '2026-08',
+    periodKey: mockPeriodKey,
     setPeriodType: vi.fn(),
     setPeriodKey: vi.fn(),
   }),
 }));
 
+let mockBudgets: any[] = [
+  {
+    id: 'b1',
+    categoryId: 'c1',
+    categoryName: 'Groceries',
+    budgeted: 500,
+    actual: 200,
+    remaining: 300,
+    percentUsed: 40,
+    type: 'expense',
+    isDiscretionary: true,
+  },
+  {
+    id: 'b2',
+    categoryId: 'c2',
+    categoryName: 'Rent',
+    budgeted: 1500,
+    actual: 1500,
+    remaining: 0,
+    percentUsed: 100,
+    type: 'expense',
+    isDiscretionary: false,
+  },
+  {
+    id: 'b3',
+    categoryId: 'c3',
+    categoryName: 'Salary',
+    budgeted: 3000,
+    actual: 3000,
+    remaining: 0,
+    percentUsed: 100,
+    type: 'income',
+  },
+];
+
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({
     data: {
-      budgets: [
-        {
-          id: 'b1',
-          categoryId: 'c1',
-          categoryName: 'Groceries',
-          budgeted: 500,
-          actual: 200,
-          remaining: 300,
-          percentUsed: 40,
-          type: 'expense',
-          isDiscretionary: true,
-        },
-        {
-          id: 'b2',
-          categoryId: 'c2',
-          categoryName: 'Rent',
-          budgeted: 1500,
-          actual: 1500,
-          remaining: 0,
-          percentUsed: 100,
-          type: 'expense',
-          isDiscretionary: false,
-        },
-        {
-          id: 'b3',
-          categoryId: 'c3',
-          categoryName: 'Salary',
-          budgeted: 3000,
-          actual: 3000,
-          remaining: 0,
-          percentUsed: 100,
-          type: 'income',
-        },
-      ],
+      budgets: mockBudgets,
     },
     isLoading: false,
   }),
@@ -134,5 +137,81 @@ describe('BudgetSummary Component', () => {
     // Actual savings rate: (3000 - 1700) / 3000 = 43%
     expect(screen.getByText('43%')).toBeDefined();
     expect(screen.getByText('/ 33% target')).toBeDefined();
+  });
+
+  it('does not mark the entire budget Over Budget when an item is only projected to be exceeded', () => {
+    // Current period 2026-10 with active days elapsed
+    mockPeriodKey = '2026-10';
+    mockBudgets = [
+      {
+        id: 'b-rent',
+        categoryId: 'c-rent',
+        categoryName: 'Rent',
+        budgeted: 1000,
+        actual: 1000,
+        remaining: 0,
+        percentUsed: 100,
+        type: 'expense',
+        isDiscretionary: false,
+      },
+      {
+        id: 'b-groceries',
+        categoryId: 'c-groceries',
+        categoryName: 'Groceries',
+        budgeted: 500,
+        // Early spending that at daily pace will project over 500, but actual spending (250) is still within budget!
+        actual: 250,
+        remaining: 250,
+        percentUsed: 50,
+        type: 'expense',
+        isDiscretionary: true,
+      },
+    ];
+
+    // Expand pacing details
+    mockCollapsedState.budgetPacingDetails = false;
+    render(<BudgetSummary />);
+
+    // The status pill must NOT show "Over Budget"
+    const statusPill = screen.getByRole('button', { name: /collapse budget pacing details/i });
+    expect(statusPill.textContent).not.toContain('Over Budget');
+
+    // It should show a friendly Pacing Note instead of making the entire budget over
+    expect(screen.getByText(/Pacing Note:/i)).toBeDefined();
+    expect(screen.getAllByText(/Actual spending is currently within budget/i).length).toBeGreaterThan(0);
+  });
+
+  it('marks the budget Over Budget when actual spending strictly exceeds total budget', () => {
+    mockPeriodKey = '2026-10';
+    mockBudgets = [
+      {
+        id: 'b-rent',
+        categoryId: 'c-rent',
+        categoryName: 'Rent',
+        budgeted: 1000,
+        actual: 1200,
+        remaining: -200,
+        percentUsed: 120,
+        type: 'expense',
+        isDiscretionary: false,
+      },
+      {
+        id: 'b-groceries',
+        categoryId: 'c-groceries',
+        categoryName: 'Groceries',
+        budgeted: 500,
+        actual: 600,
+        remaining: -100,
+        percentUsed: 120,
+        type: 'expense',
+        isDiscretionary: true,
+      },
+    ];
+
+    render(<BudgetSummary />);
+
+    // Total actual (1800) > total budgeted (1500), so actual status is Over Budget
+    const statusPill = screen.getByRole('button', { name: /expand budget pacing details/i });
+    expect(statusPill.textContent).toContain('Over Budget');
   });
 });

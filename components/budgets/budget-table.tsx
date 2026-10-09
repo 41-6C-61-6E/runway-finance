@@ -22,7 +22,6 @@ import { useUserSettings } from '@/components/user-settings-provider';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Select } from '@/components/ui/select';
-import { TableScroll } from '@/components/ui/table-scroll';
 
 type SortField = 'category' | 'budgeted' | 'actual' | 'variance' | 'progress' | 'account';
 type SortDirection = 'asc' | 'desc';
@@ -838,7 +837,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
             })}
           </div>
         ) : (
-          <TableScroll className="border-t border-border">
+          <div className="w-full border-t border-border overflow-hidden">
             {(() => {
               const effectiveWidth = containerWidth || 1000;
               const showProgressCol = effectiveWidth >= 500;
@@ -846,45 +845,32 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
               const showAccountCol = effectiveWidth >= 850 && hasAnyAccount;
               const activeColCount = 3 + (showVarianceCol ? 1 : 0) + (showProgressCol ? 1 : 0) + (showAccountCol ? 1 : 0) + 1;
 
-              // Safe minimum width for table content to prevent number squishing while enabling fluid expansion
-              const minTableWidth =
-                170 + // Category minimum
-                88 +  // Budgeted
-                98 +  // Actual
-                (showVarianceCol ? 88 : 0) +
-                (showProgressCol ? 120 : 0) +
-                (showAccountCol ? 84 : 0) +
-                64;   // Actions
-
               return (
-                <table
-                  className="w-full text-xs sm:text-sm border-collapse"
-                  style={{ minWidth: `${minTableWidth}px` }}
-                >
+                <table className="w-full text-xs sm:text-sm border-collapse table-fixed">
                   <colgroup>
                     <col className="w-auto" />
-                    <col className="w-[88px] sm:w-[104px]" />
-                    <col className="w-[98px] sm:w-[120px]" />
-                    {showVarianceCol && <col className="w-[88px] sm:w-[104px]" />}
-                    {showProgressCol && <col className="w-[125px] sm:w-[160px] lg:w-[190px]" />}
-                    {showAccountCol && <col className="w-[88px] sm:w-[105px]" />}
-                    <col className="w-[64px]" />
+                    <col className="w-[74px] sm:w-[84px] md:w-[92px]" />
+                    <col className="w-[78px] sm:w-[88px] md:w-[96px]" />
+                    {showVarianceCol && <col className="w-[76px] sm:w-[86px] md:w-[94px]" />}
+                    {showProgressCol && <col className="w-[105px] sm:w-[125px] lg:w-[150px]" />}
+                    {showAccountCol && <col className="w-[84px] sm:w-[96px]" />}
+                    <col className="w-[56px] sm:w-[60px]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-card">
                     <tr className="border-b border-border/80 bg-muted/20">
-                      <th className="text-left px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground">{renderSortHeader('category', 'Category', 'left')}</th>
-                      <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
-                      <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
+                      <th className="text-left px-2.5 sm:px-3.5 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('category', 'Category', 'left')}</th>
+                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('budgeted', 'Budgeted', 'right')}</th>
+                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('actual', 'Actual', 'right')}</th>
                       {showVarianceCol && (
-                        <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('variance', 'Variance', 'right')}</th>
+                        <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('variance', 'Variance', 'right')}</th>
                       )}
                       {showProgressCol && (
-                        <th className="text-left px-2.5 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('progress', 'Progress', 'left')}</th>
+                        <th className="text-left px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">{renderSortHeader('progress', 'Progress', 'left')}</th>
                       )}
                       {showAccountCol && (
-                        <th className="text-left px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('account', 'Account', 'left')}</th>
+                        <th className="text-left px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground truncate">{renderSortHeader('account', 'Account', 'left')}</th>
                       )}
-                      <th className="text-right px-2 sm:px-3 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      <th className="text-right px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
                         Actions
                       </th>
                     </tr>
@@ -917,7 +903,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               <Link
                                 href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
                                 title={b.categoryName}
-                                className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate max-w-[200px] sm:max-w-xs md:max-w-none"
+                                className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate"
                               >
                                 {b.categoryName}
                               </Link>
@@ -938,8 +924,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               )}
                             </div>
                           </td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm">
+                          <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
+                          <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm">
                             {isEnvelope(b) && envSub ? (
                               <span className="text-[10px] font-sans text-muted-foreground block truncate" title={envSub ?? undefined}>{envSub}</span>
                             ) : (
@@ -947,15 +933,15 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             )}
                           </td>
                           {showVarianceCol && (
-                            <td className={`px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
+                            <td className={`px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isTargetMet ? 'text-constructive' : 'text-amber-500'}`}>
                               {isEnvelope(b) && envSub ? null : <>{b.remaining >= 0 ? '+' : ''}{formatCurrency(b.remaining)}</>}
                             </td>
                           )}
                           {showProgressCol && (
-                            <td className="px-2.5 sm:px-3 py-2 sm:py-2.5 whitespace-nowrap">
-                              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden">
+                              <div className="flex items-center gap-1.5 min-w-0">
                                 <div
-                                  className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px] h-2 sm:h-2.5"
+                                  className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[36px] max-w-[200px] h-2 sm:h-2.5"
                                   role="progressbar"
                                   aria-valuemin={0}
                                   aria-valuemax={100}
@@ -964,19 +950,19 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                 >
                                   <div className={`h-full rounded-full transition-all duration-400 ${incomeProgressColor}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                                 </div>
-                                <span className={`font-mono shrink-0 text-[11px] font-medium ${isTargetMet ? 'text-primary' : 'text-muted-foreground'}`}>
+                                <span className={`font-mono shrink-0 text-[10px] sm:text-[11px] font-medium ${isTargetMet ? 'text-primary' : 'text-muted-foreground'}`}>
                                   {(b.percentUsed || 0).toFixed(0)}%
                                 </span>
                               </div>
                             </td>
                           )}
                           {showAccountCol && (
-                            <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-xs text-muted-foreground truncate">
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground truncate">
                               {getAccountName(b.fundingAccountId) || <span className="text-muted-foreground/40">&mdash;</span>}
                             </td>
                           )}
-                          <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
+                          <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                               <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
                               <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                             </div>
@@ -1020,7 +1006,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                     b.categoryId
                                   )}
                                   title={b.categoryName}
-                                  className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate max-w-[200px] sm:max-w-xs md:max-w-none"
+                                  className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate"
                                 >
                                   {b.categoryName}
                                 </Link>
@@ -1064,8 +1050,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               </div>
                               {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
                             </td>
-                            <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
-                            <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm">
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm">
                               {isEnvelope(b) && envSub ? (
                                 <span className="text-[10px] font-sans text-muted-foreground block truncate" title={envSub ?? undefined}>{envSub}</span>
                               ) : (
@@ -1073,16 +1059,16 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               )}
                             </td>
                             {showVarianceCol && (
-                              <td className={`px-2 sm:px-3 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
+                              <td className={`px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number font-medium whitespace-nowrap text-xs sm:text-sm ${isEnvelope(b) && envSub ? 'text-muted-foreground/30' : isOver ? 'text-destructive' : b.remaining > 0 ? 'text-constructive' : 'text-muted-foreground'}`}>
                                 {isEnvelope(b) && envSub ? null : formatCurrency(b.remaining)}
                               </td>
                             )}
                             {showProgressCol && (
-                              <td className="px-2.5 sm:px-3 py-2 sm:py-2.5 whitespace-nowrap">
+                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 whitespace-nowrap overflow-hidden">
                                 {isEnvelope(b) ? (
-                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0" title={`${Math.round(b.envelopePercentUsed ?? 0)}% of ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} envelope`}>
+                                  <div className="flex items-center gap-1.5 min-w-0" title={`${Math.round(b.envelopePercentUsed ?? 0)}% of ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} envelope`}>
                                     <div
-                                      className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px] h-2 sm:h-2.5"
+                                      className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[36px] max-w-[200px] h-2 sm:h-2.5"
                                       role="progressbar"
                                       aria-valuemin={0}
                                       aria-valuemax={100}
@@ -1091,14 +1077,14 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                     >
                                       <div className={`h-full rounded-full transition-all duration-400 ${envBarClass}`} style={{ width: `${Math.min(Math.max(b.envelopePercentUsed ?? 0, 0), 100)}%` }} />
                                     </div>
-                                    <span className={`font-mono shrink-0 text-[11px] font-medium ${envMeta?.textClass ?? 'text-muted-foreground'}`}>
+                                    <span className={`font-mono shrink-0 text-[10px] sm:text-[11px] font-medium ${envMeta?.textClass ?? 'text-muted-foreground'}`}>
                                       {Math.round(b.envelopePercentUsed ?? 0)}%/{b.nativePeriodType === 'quarterly' ? 'Q' : 'yr'}
                                     </span>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                  <div className="flex items-center gap-1.5 min-w-0">
                                     <div
-                                      className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[48px] max-w-[200px] h-2 sm:h-2.5"
+                                      className="budget-progress-track rounded-full overflow-hidden flex-1 min-w-[36px] max-w-[200px] h-2 sm:h-2.5"
                                       role="progressbar"
                                       aria-valuemin={0}
                                       aria-valuemax={100}
@@ -1107,7 +1093,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                     >
                                       <div className={`h-full rounded-full transition-all duration-400 ${progressColor}`} style={{ width: `${Math.min(Math.max(b.percentUsed || 0, 0), 100)}%` }} />
                                     </div>
-                                    <span className={`font-mono shrink-0 text-[11px] font-medium ${isOver ? 'text-destructive' : b.percentUsed > 85 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                                    <span className={`font-mono shrink-0 text-[10px] sm:text-[11px] font-medium ${isOver ? 'text-destructive' : b.percentUsed > 85 ? 'text-amber-500' : 'text-muted-foreground'}`}>
                                       {(b.percentUsed || 0).toFixed(0)}%
                                     </span>
                                   </div>
@@ -1115,12 +1101,12 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               </td>
                             )}
                             {showAccountCol && (
-                              <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-xs text-muted-foreground truncate">
+                              <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-xs text-muted-foreground truncate">
                                 {getAccountName(b.fundingAccountId) || <span className="text-muted-foreground/40">&mdash;</span>}
                               </td>
                             )}
-                            <td className="px-2 sm:px-3 py-2 sm:py-2.5 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1">
+                            <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                                 <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
                                 <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                               </div>
@@ -1216,7 +1202,7 @@ className="font-medium text-foreground text-sm hover:text-primary hover:underlin
             </table>
           );
         })()}
-          </TableScroll>
+          </div>
         )}
       </div>
 

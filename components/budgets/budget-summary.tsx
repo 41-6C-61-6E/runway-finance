@@ -8,7 +8,7 @@ import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle, PiggyBank } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle, PiggyBank, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
@@ -275,12 +275,15 @@ export function BudgetSummary() {
   const finishLabel = isPast ? 'Final finish' : `Projected ${periodConfig.endNoun} finish`;
   const finishTotal = isPast ? totalExpenseActual : projectedExpenseTotal;
   const surplusOrDeficit = isPast ? (totalExpenseBudgeted - totalExpenseActual) : projectedSurplusOrDeficit;
+  const isProjectedOver = !isPast && !isFuture && projectedExpenseTotal > totalExpenseBudgeted + toleranceBuffer;
 
   const onTrackDescription = minorOverBudgets.length > 0 && totalExpenseCushion > 0
-    ? `${minorOverBudgets.length} small over-budget categor${minorOverBudgets.length === 1 ? 'y is' : 'ies are'} absorbed by remaining budget cushion. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} deficit`}).`
+    ? `${minorOverBudgets.length} small over-budget categor${minorOverBudgets.length === 1 ? 'y is' : 'ies are'} absorbed by remaining budget cushion. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} projected deficit`}).`
     : isFuture
       ? `Overall budget is planned and on track for upcoming ${periodConfig.noun}.`
-      : `Overall budget is healthy. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} deficit`}).`;
+      : isProjectedOver
+        ? `Current actual spending is within budget (${formatCurrency(totalExpenseCushion)} cushion remaining). Variable pace projects a ${formatCurrency(Math.abs(surplusOrDeficit))} deficit by end of ${periodConfig.noun} if current rate continues.`
+        : `Overall budget is healthy. ${finishLabel}: ${formatCurrency(finishTotal)} (${surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)} surplus` : `${formatCurrency(Math.abs(surplusOrDeficit))} deficit`}).`;
 
   let healthStatus = {
     label: 'On Track',
@@ -289,13 +292,13 @@ export function BudgetSummary() {
     description: onTrackDescription,
   };
 
-  // Rule 1: Major Over Budget (Red) — core budgets only.
+  // Rule 1: Actual Over Budget (Red) — core budgets only.
   // Longer-period envelope budgets (yearly/quarterly viewed in a shorter period)
   // are intentionally excluded here: they are shown row-level and in the
   // "Excludes X envelope" footnote, but must not influence this period's status.
   if (totalExpenseActual > totalExpenseBudgeted || significantOverBudgets.length > 0) {
     healthStatus = {
-      label: 'Major Over Budget',
+      label: totalExpenseActual > totalExpenseBudgeted ? 'Over Budget' : 'Major Over Budget',
       badgeClass: 'bg-destructive/10 text-destructive border-destructive/20',
       icon: AlertTriangle,
       description: totalExpenseActual > totalExpenseBudgeted
@@ -303,22 +306,13 @@ export function BudgetSummary() {
         : `${significantOverBudgets.length} expense ${significantOverBudgets.length === 1 ? 'budget is' : 'budgets are'} more than 200% used or more than ${formatCurrency(overBudgetThreshold)} over budget.`,
     };
   }
-  // Rule 2: Over Budget (Orange) — projected pace of core budgets only.
-  else if (!isPast && !isFuture && projectedExpenseTotal > totalExpenseBudgeted + toleranceBuffer) {
-    healthStatus = {
-      label: 'Over Budget',
-      badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
-      icon: TrendingUp,
-      description: `Based on daily variable spending pace (${formatCurrency(variableDailyRate)}/day), projected ${periodConfig.endNoun} spending (${formatCurrency(projectedExpenseTotal)}) exceeds the overall budget.`,
-    };
-  }
-  // Rule 3: Watch Budget Pace (Amber)
+  // Rule 2: Watch Budget Pace (Amber) — discretionary spending is pacing ahead of schedule
   else if (!isPast && !isFuture && daysElapsed < totalDays && (variableBudgeted > 0 ? (variableActual / variableBudgeted) * 100 > timePercent + 15 : false)) {
     healthStatus = {
       label: 'Watch Budget Pace',
       badgeClass: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
       icon: AlertTriangle,
-      description: `Discretionary spending is pacing ahead of schedule (${((variableActual / (variableBudgeted || 1)) * 100).toFixed(0)}% spent vs ${timePercent.toFixed(0)}% of ${periodConfig.noun}).`,
+      description: `Discretionary spending is pacing ahead of schedule (${((variableActual / (variableBudgeted || 1)) * 100).toFixed(0)}% spent vs ${timePercent.toFixed(0)}% of ${periodConfig.noun}). Actual spending is currently within budget with ${formatCurrency(totalExpenseCushion)} cushion remaining.`,
     };
   }
 
@@ -347,7 +341,11 @@ export function BudgetSummary() {
 
   // Envelope budgets (longer-period) are excluded from status/alerts here.
   // They are visible row-level and via the "Excludes X envelope" footnote.
-  if (significantOverBudgets.length === 1) {
+  if (totalExpenseActual > totalExpenseBudgeted) {
+    alertText = `Overall spending has exceeded total budget by ${formatCurrency(totalExpenseActual - totalExpenseBudgeted)}`;
+    alertHref = `/budgets`;
+    alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
+  } else if (significantOverBudgets.length === 1) {
     alertText = `1 category over budget (${significantOverBudgets[0].categoryName})`;
     alertHref = getTxUrl(undefined, significantOverBudgets[0].categoryId);
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
@@ -355,10 +353,6 @@ export function BudgetSummary() {
     alertText = `${significantOverBudgets.length} categories over budget`;
     alertHref = getTxUrl(significantOverBudgets.map((b) => b.categoryId));
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
-  } else if (healthStatus.label === 'Over Budget') {
-    alertText = `Projected spending exceeds the budget by end of ${periodConfig.noun}`;
-    alertHref = `/budgets`;
-    alertClass = 'text-orange-500 bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15';
   } else if (healthStatus.label === 'Watch Budget Pace') {
     alertText = `Discretionary spending is ahead of its budget pace`;
     alertHref = `/budgets`;
@@ -437,6 +431,14 @@ export function BudgetSummary() {
             {formatCurrency(finishTotal)} ({surplusOrDeficit >= 0 ? `+${formatCurrency(surplusOrDeficit)}` : `-${formatCurrency(Math.abs(surplusOrDeficit))}`})
           </span>
         </div>
+        {isProjectedOver && (
+          <div className="flex items-start gap-1.5 pt-1.5 border-t border-border/40 text-[10px] text-muted-foreground leading-relaxed">
+            <Info className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <span>
+              <strong className="text-foreground font-semibold">Pacing Note:</strong> At current variable rate ({formatCurrency(variableDailyRate)}/day), spending is projected to exceed budget by {formatCurrency(Math.abs(projectedSurplusOrDeficit))}. Actual spending is currently within budget ({formatCurrency(totalExpenseCushion)} cushion remaining).
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between items-center text-[11px] font-mono pt-0.5">
