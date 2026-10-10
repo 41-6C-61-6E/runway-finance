@@ -17,6 +17,7 @@ Personal finance dashboard for tracking net worth, cash flow, investments, budge
 - **Unit & Integration Tests**: `pnpm test` (Vitest)
 - **E2E Tests**: `pnpm test:e2e` (Playwright)
 - **CI Suite**: `pnpm ci` (Lint, typecheck, test, and build)
+- **Production Deploymets**: external and not reachable from this dev server
 
 ## Database & ORM Workflows
 - **Connection**: Requires `DATABASE_URL` (configured in `.env` / `.env.local`). Docker service runs via `compose.yml` on port `5432`.
