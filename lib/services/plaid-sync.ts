@@ -20,6 +20,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { getPlaidClient } from '@/lib/plaid';
 import { logger } from '@/lib/logger';
 import { resolveDataUserId } from '@/lib/sharing';
+import { parseProviderBalance, resolveEffectiveBalance } from '@/lib/utils/balance-source';
 import {
   createAccountSnapshots,
   createNetWorthSnapshot,
@@ -299,15 +300,29 @@ export async function syncPlaidConnection(
         logger.debug(`${LOG_TAG} Skipping sync-disabled Plaid account: ${plaidAcc.name} (${plaidAcc.account_id})`);
         continue;
       }
-      const rawBalance = plaidAcc.balances.current != null ? parseFloat(String(plaidAcc.balances.current)) : 0;
-      const balance = formatToCents(isNaN(rawBalance) ? 0 : rawBalance);
+      const currentNum = parseProviderBalance(plaidAcc.balances.current) ?? 0;
+      const availableNum = parseProviderBalance(plaidAcc.balances.available);
       const balanceDate = new Date();
 
       const [existingAccount] = await getDb()
-        .select({ id: accounts.id, metadata: accounts.metadata })
+        .select({ id: accounts.id, metadata: accounts.metadata, type: accounts.type })
         .from(accounts)
         .where(and(eq(accounts.userId, dataUserId), eq(accounts.externalId, plaidAcc.account_id)))
         .limit(1);
+
+      // Prefer the stored (possibly user-edited) type over Plaid's type/subtype.
+      const accountType = existingAccount?.type ?? inferPlaidAccountType(plaidAcc.type, plaidAcc.subtype);
+      const { value: effectiveNum } = resolveEffectiveBalance({
+        current: currentNum,
+        available: availableNum,
+        accountType,
+        source: connection.balanceSource,
+      });
+      const balance = formatToCents(effectiveNum);
+      const encryptedCurrentBalance = await encryptField(formatToCents(currentNum), dek);
+      const encryptedAvailableBalance = availableNum !== null
+        ? await encryptField(formatToCents(availableNum), dek)
+        : null;
 
       const [orphanedAccount] = await getDb()
         .select({ id: accounts.id, metadata: accounts.metadata })
@@ -349,6 +364,8 @@ export async function syncPlaidConnection(
             plaidConnectionId: connectionId,
             balance: await encryptField(balance, dek),
             balanceDate,
+            currentBalance: encryptedCurrentBalance,
+            availableBalance: encryptedAvailableBalance,
             institution: await encryptField(connection.institutionName || 'Plaid Bank', dek),
             metadata: encryptedMetadata,
             updatedAt: new Date(),
@@ -366,6 +383,8 @@ export async function syncPlaidConnection(
             currency: plaidAcc.balances.iso_currency_code || 'USD',
             balance: await encryptField(balance, dek),
             balanceDate,
+            currentBalance: encryptedCurrentBalance,
+            availableBalance: encryptedAvailableBalance,
             type: inferPlaidAccountType(plaidAcc.type, plaidAcc.subtype),
             institution: await encryptField(connection.institutionName || 'Plaid Bank', dek),
             metadata: encryptedMetadata,
@@ -378,6 +397,8 @@ export async function syncPlaidConnection(
             set: {
               balance: await encryptField(balance, dek),
               balanceDate,
+              currentBalance: encryptedCurrentBalance,
+              availableBalance: encryptedAvailableBalance,
               institution: await encryptField(connection.institutionName || 'Plaid Bank', dek),
               metadata: encryptedMetadata,
               updatedAt: new Date(),

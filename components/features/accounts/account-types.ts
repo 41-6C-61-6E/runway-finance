@@ -8,6 +8,8 @@ export interface Account {
   name: string;
   type: string;
   balance: number;
+  currentBalance?: number | null;
+  availableBalance?: number | null;
   currency: string;
   institution: string | null;
   isHidden: boolean;

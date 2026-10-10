@@ -108,6 +108,8 @@ export async function POST(
       connectionId: null,
       plaidConnectionId: null,
       externalId: manualId,
+      currentBalance: null,
+      availableBalance: null,
       updatedAt: new Date(),
     })
     .where(eq(accounts.id, id));

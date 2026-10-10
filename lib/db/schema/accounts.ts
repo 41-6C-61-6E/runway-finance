@@ -46,8 +46,15 @@ export const accounts = pgTable(
     externalId: text('external_id').notNull(),
     name: text('name').notNull(),
     currency: text('currency').notNull().default('USD'),
+    // Effective balance used everywhere (net worth, snapshots, alerts). For
+    // synced accounts this is either the provider's current or available
+    // balance depending on the connection's `balanceSource`.
     balance: text('balance').notNull(),
     balanceDate: timestamp('balance_date', { withTimezone: true }),
+    // Raw provider-reported balances (encrypted). Null for manual accounts or
+    // when the provider did not report the value.
+    currentBalance: text('current_balance'),
+    availableBalance: text('available_balance'),
     type: text('type').notNull(),
     metadata: text('metadata'),
     institution: text('institution'),

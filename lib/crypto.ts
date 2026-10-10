@@ -300,7 +300,7 @@ export async function decryptField(payload: string | number, key: Uint8Array): P
 
 export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   transactions: ['description', 'payee', 'memo', 'notes', 'amount'],
-  accounts: ['name', 'balance', 'institution', 'metadata'],
+  accounts: ['name', 'balance', 'currentBalance', 'availableBalance', 'institution', 'metadata'],
   categories: ['name'],
   category_rules: ['name', 'conditionValue', 'setPayee', 'conditions'],
   tags: ['name', 'description'],

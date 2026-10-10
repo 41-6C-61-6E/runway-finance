@@ -17,6 +17,8 @@ type Account = {
   name: string;
   type: string;
   balance: string;
+  currentBalance?: string | null;
+  availableBalance?: string | null;
   currency: string;
   institution: string | null;
   isHidden: boolean;
@@ -492,16 +494,31 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
           {/* Balance display */}
           <div className="p-4 bg-card border border-border rounded-xl">
             <div className="flex items-center justify-between">
-              <div className="text-xs text-muted-foreground">Current Balance</div>
-              {account.connectionId && (
-                <span className="text-[10px] text-chart-1 font-medium bg-chart-1/10 px-1.5 py-0.5 rounded">SimpleFIN synced</span>
-              )}
-              {account.plaidConnectionId && (
-                <span className="text-[10px] text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded">Plaid synced</span>
-              )}
+              <div className="text-xs text-muted-foreground">
+                {account.availableBalance && account.availableBalance === account.balance
+                  ? 'Effective Balance (Available)'
+                  : 'Current Balance'}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {account.connectionId && (
+                  <span className="text-[10px] text-chart-1 font-medium bg-chart-1/10 px-1.5 py-0.5 rounded">SimpleFIN synced</span>
+                )}
+                {account.plaidConnectionId && (
+                  <span className="text-[10px] text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded">Plaid synced</span>
+                )}
+              </div>
             </div>
             <div className={`font-mono text-2xl font-bold mt-1 text-foreground financial-value`}>{text}</div>
-            <div className="text-xs text-muted-foreground mt-1">{account.currency}</div>
+            <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+              <span>{account.currency}</span>
+              {account.availableBalance && account.currentBalance && account.availableBalance !== account.currentBalance && (
+                <span className="text-[11px] font-mono text-muted-foreground/90">
+                  {account.balance === account.availableBalance
+                    ? `Posted ledger: ${formatBalance(account.currentBalance, account.currency).text}`
+                    : `Available: ${formatBalance(account.availableBalance, account.currency).text}`}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Sync Health & Actions */}

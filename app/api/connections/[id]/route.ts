@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
+import { isBalanceSource } from '@/lib/utils/balance-source';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -54,7 +55,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  let body: { label?: string; syncFrequency?: string; disabledAccounts?: string[]; setupToken?: string; accessUrl?: string };
+  let body: { label?: string; syncFrequency?: string; disabledAccounts?: string[]; setupToken?: string; accessUrl?: string; balanceSource?: string };
   try {
     body = await request.json();
   } catch {
@@ -95,6 +96,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       );
     }
     updateData.disabledAccounts = body.disabledAccounts;
+  }
+
+  if ('balanceSource' in body && body.balanceSource !== undefined) {
+    if (!isBalanceSource(body.balanceSource)) {
+      return NextResponse.json(
+        { error: 'validation_error', message: 'Invalid balance source' },
+        { status: 400 }
+      );
+    }
+    updateData.balanceSource = body.balanceSource;
   }
 
   if (('setupToken' in body && body.setupToken) || ('accessUrl' in body && body.accessUrl)) {
@@ -177,6 +188,35 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   logger.info('Connection updated', { connectionId: id, updateData, isSimplefin });
+
+  // Re-derive effective balances from the raw values stored at the last sync,
+  // then refresh today's snapshots so dashboards reflect the change now.
+  if ('balanceSource' in updateData && updateData.balanceSource !== connection.balanceSource) {
+    try {
+      const { applyBalanceSourceToConnection } = await import('@/lib/services/balance-source');
+      const updatedCount = await applyBalanceSourceToConnection({
+        connectionId: id,
+        provider: isSimplefin ? 'simplefin' : 'plaid',
+        source: updateData.balanceSource,
+      });
+
+      const { getSessionDEK } = await import('@/lib/crypto-context');
+      const { createAccountSnapshots, createNetWorthSnapshot } = await import('@/lib/services/sync');
+      const dek = await getSessionDEK();
+      const today = new Date().toISOString().split('T')[0];
+      await createAccountSnapshots(connectionDataUserId, dek, today);
+      await createNetWorthSnapshot(connectionDataUserId, dek, today, { skipNotifications: true });
+
+      logger.info('Connection balance source applied', { connectionId: id, balanceSource: updateData.balanceSource, updatedCount });
+    } catch (err) {
+      // The preference is saved; the next sync will apply it even if this fails.
+      logger.error('Failed to apply balance source change', {
+        connectionId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   await syncScheduler.schedule(id, updated.syncFrequency, updated.lastSyncAt, connection.userId);
   return NextResponse.json(updated);
 }

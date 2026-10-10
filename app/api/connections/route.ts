@@ -24,6 +24,7 @@ export async function GET() {
       id: simplifinConnections.id,
       label: simplifinConnections.label,
       syncFrequency: simplifinConnections.syncFrequency,
+      balanceSource: simplifinConnections.balanceSource,
       lastSyncAt: simplifinConnections.lastSyncAt,
       lastSyncStatus: simplifinConnections.lastSyncStatus,
       lastSyncError: simplifinConnections.lastSyncError,
@@ -39,6 +40,7 @@ export async function GET() {
       id: plaidConnections.id,
       label: plaidConnections.label,
       syncFrequency: plaidConnections.syncFrequency,
+      balanceSource: plaidConnections.balanceSource,
       lastSyncAt: plaidConnections.lastSyncAt,
       lastSyncStatus: plaidConnections.lastSyncStatus,
       lastSyncError: plaidConnections.lastSyncError,
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { setupToken, label } = parsed.data;
+  const { setupToken, label, balanceSource = 'current' } = parsed.data;
   const syncFrequency = body.syncFrequency || 'manual';
 
   // Claim access URL from SimpleFIN
@@ -148,6 +150,7 @@ export async function POST(request: Request) {
       accessUrlTag: '',
       label,
       syncFrequency,
+      balanceSource,
     })
     .returning();
 

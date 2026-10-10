@@ -19,6 +19,8 @@ export const simplifinConnections = pgTable('simplefin_connections', {
   lastSyncStatus: text('last_sync_status').notNull().default('pending'),
   lastSyncError: text('last_sync_error'),
   disabledAccounts: jsonb('disabled_accounts').default([]).$type<string[]>(),
+  // 'current' | 'available' — see lib/utils/balance-source.ts
+  balanceSource: text('balance_source').notNull().default('current'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -39,6 +41,8 @@ export const plaidConnections = pgTable('plaid_connections', {
   lastSyncStatus: text('last_sync_status').notNull().default('pending'),
   lastSyncError: text('last_sync_error'),
   disabledAccounts: jsonb('disabled_accounts').default([]).$type<string[]>(),
+  // 'current' | 'available' — see lib/utils/balance-source.ts
+  balanceSource: text('balance_source').notNull().default('current'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

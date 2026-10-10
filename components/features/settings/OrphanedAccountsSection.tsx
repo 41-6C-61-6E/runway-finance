@@ -13,6 +13,8 @@ export type SettingsAccount = {
   name: string;
   type: string;
   balance: string;
+  currentBalance?: string | null;
+  availableBalance?: string | null;
   currency: string;
   institution: string | null;
   connectionId: string | null;
@@ -30,6 +32,7 @@ export type SettingsConnection = {
   id: string;
   label: string;
   syncFrequency: string;
+  balanceSource?: string;
   lastSyncAt: string | null;
   lastSyncStatus: string;
   lastSyncError: string | null;

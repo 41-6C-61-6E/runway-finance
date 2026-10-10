@@ -11,6 +11,7 @@ import { getSessionDEK, getServerDEK } from '@/lib/crypto-context';
 import { fetchAccounts, SimpleFINError } from '@/lib/simplefin';
 import { logger } from '@/lib/logger';
 import { toCashFlowAmount, computeNetWorthTotals, computeCategoryBreakdown } from '@/lib/utils/account-scope';
+import { parseProviderBalance, resolveEffectiveBalance } from '@/lib/utils/balance-source';
 
 import { isSimilarDescription } from '@/lib/utils/description-matching';
 import { resolveDataUserId } from '@/lib/sharing';
@@ -867,13 +868,14 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         logger.debug(`${LOG_TAG} Skipping sync-disabled SimpleFIN account: ${sfAccount.name} (${sfAccount.id})`);
         continue;
       }
-      const balanceNum = parseFloat(sfAccount.balance);
-
       const [existingAccount] = await getDb()
         .select({
           id: accounts.id,
           balance: accounts.balance,
           balanceDate: accounts.balanceDate,
+          currentBalance: accounts.currentBalance,
+          availableBalance: accounts.availableBalance,
+          type: accounts.type,
         })
         .from(accounts)
         .where(
@@ -884,14 +886,31 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         )
         .limit(1);
 
+      // Raw provider balances. `available-balance` is optional in the protocol
+      // (omitted when equal to `balance`, or when MX/the bank doesn't report it).
+      const currentNum = parseProviderBalance(sfAccount.balance) ?? 0;
+      const availableNum = parseProviderBalance(sfAccount['available-balance']);
+      // Prefer the stored (possibly user-edited) type over name inference.
+      const accountType = existingAccount?.type ?? inferAccountType(sfAccount);
+      const { value: balanceNum } = resolveEffectiveBalance({
+        current: currentNum,
+        available: availableNum,
+        accountType,
+        source: connection.balanceSource,
+      });
+
       let skipBalanceUpdate = false;
-      let targetBalance = await encryptField(formatToCents(parseFloat(sfAccount.balance) || 0), dek);
+      let targetBalance = await encryptField(formatToCents(balanceNum), dek);
       let targetBalanceDate = new Date(sfAccount['balance-date'] * 1000);
+      let targetCurrentBalance: string | null = await encryptField(formatToCents(currentNum), dek);
+      let targetAvailableBalance: string | null = availableNum !== null
+        ? await encryptField(formatToCents(availableNum), dek)
+        : null;
 
       if (existingAccount) {
         const oldBalanceStr = await decryptField(existingAccount.balance, dek);
         const oldBalanceNum = parseFloat(oldBalanceStr);
-        const newBalanceNum = parseFloat(sfAccount.balance);
+        const newBalanceNum = balanceNum;
 
         if (
           !isNaN(oldBalanceNum) &&
@@ -936,6 +955,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             skipBalanceUpdate = true;
             targetBalance = existingAccount.balance;
             targetBalanceDate = existingAccount.balanceDate || new Date();
+            targetCurrentBalance = existingAccount.currentBalance;
+            targetAvailableBalance = existingAccount.availableBalance;
           }
         }
       }
@@ -961,6 +982,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             connectionId,
             balance: targetBalance,
             balanceDate: targetBalanceDate,
+            currentBalance: targetCurrentBalance,
+            availableBalance: targetAvailableBalance,
             institution: await encryptField(sfAccount.org.name, dek),
             updatedAt: now,
           })
@@ -977,6 +1000,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             currency: sfAccount.currency,
             balance: targetBalance,
             balanceDate: targetBalanceDate,
+            currentBalance: targetCurrentBalance,
+            availableBalance: targetAvailableBalance,
             type: inferAccountType(sfAccount),
             institution: await encryptField(sfAccount.org.name, dek),
             isHidden: false,
@@ -988,6 +1013,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             set: {
               balance: targetBalance,
               balanceDate: targetBalanceDate,
+              currentBalance: targetCurrentBalance,
+              availableBalance: targetAvailableBalance,
               institution: await encryptField(sfAccount.org.name, dek),
               updatedAt: now,
             },
@@ -1023,7 +1050,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         name: sfAccount.name,
         type: inferAccountType(sfAccount),
         currency: sfAccount.currency,
-        balance: formatToCents(parseFloat(sfAccount.balance) || 0),
+        balance: formatToCents(balanceNum),
         transactionsFetched: sfAccount.transactions?.length ?? 0,
         transactionsNew: 0,
         transactionsPending: 0,

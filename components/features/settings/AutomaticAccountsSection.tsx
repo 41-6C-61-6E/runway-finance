@@ -459,6 +459,24 @@ export default function AutomaticAccountsSection({
     } catch {}
   }, [fetchConnections]);
 
+  const handleBalanceSourceChange = useCallback(async (connectionId: string, source: string) => {
+    try {
+      const res = await fetch(`/api/connections/${connectionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ balanceSource: source }),
+      });
+      if (res.ok) {
+        await fetchConnections();
+        await fetchAccounts();
+        invalidateAllFinanceQueries();
+      }
+    } catch (err) {
+      console.error('Failed to update balance source', err);
+    }
+  }, [fetchConnections, fetchAccounts, invalidateAllFinanceQueries]);
+
   const handleSync = async (connId: string) => {
     setSyncingId(connId);
     setSyncResult(null);
@@ -1139,6 +1157,25 @@ export default function AutomaticAccountsSection({
                         )}
                       </div>
                     </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-border/40 gap-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Balance type:</label>
+                        <Select
+                          className="h-7 text-xs"
+                          value={conn.balanceSource || 'current'}
+                          disabled={currentUserId !== undefined && conn.userId !== currentUserId}
+                          onChange={(e) => handleBalanceSourceChange(conn.id, e.target.value)}
+                        >
+                          <option value="current">Current / Ledger</option>
+                          <option value="available">Available (Pending-adjusted)</option>
+                        </Select>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {conn.balanceSource === 'available'
+                          ? 'Checking & savings use available balance when reported'
+                          : 'Accounts use posted ledger balance'}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -1289,6 +1326,15 @@ export default function AutomaticAccountsSection({
                           <div className="text-right">
                             <div className="font-mono text-[11px] sm:text-sm text-foreground blur-number">{formatted}</div>
                             <div className="text-[10px] sm:text-xs text-muted-foreground/60">{account.currency}</div>
+                            {account.availableBalance && account.currentBalance && account.availableBalance !== account.currentBalance && (
+                              <div className="text-[10px] text-muted-foreground/80 font-mono mt-0.5">
+                                Avail: {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: account.currency || 'USD',
+                                  minimumFractionDigits: 2,
+                                }).format(parseFloat(account.availableBalance))}
+                              </div>
+                            )}
                           </div>
                           <button
                             onClick={(e) => {
@@ -1480,6 +1526,12 @@ export default function AutomaticAccountsSection({
                 <div>
                   <label className="text-xs text-muted-foreground font-medium">Sync Frequency</label>
                   <div className="mt-1 text-foreground text-sm capitalize">{detailsConn.syncFrequency}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground font-medium">Balance Preference</label>
+                  <div className="mt-1 text-foreground text-sm">
+                    {detailsConn.balanceSource === 'available' ? 'Available Balance (Pending-adjusted)' : 'Current Balance (Ledger)'}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground font-medium">Last Sync</label>

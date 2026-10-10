@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const CreateConnectionSchema = z.object({
   setupToken: z.string().min(1),
   label: z.string().max(100).default('Primary'),
+  balanceSource: z.enum(['current', 'available']).optional(),
 });
 
 export const UpdateConnectionSchema = z.object({
@@ -11,4 +12,5 @@ export const UpdateConnectionSchema = z.object({
   disabledAccounts: z.array(z.string()).optional(),
   setupToken: z.string().min(1).optional(),
   accessUrl: z.string().min(1).optional(),
+  balanceSource: z.enum(['current', 'available']).optional(),
 });

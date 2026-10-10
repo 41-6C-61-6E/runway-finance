@@ -21,6 +21,8 @@ export type SimpleFINAccount = {
   name: string;
   currency: string;
   balance: string;
+  /** Optional per the SimpleFIN protocol — omitted when equal to `balance`. */
+  'available-balance'?: string;
   'balance-date': number;
   org: { name: string };
   transactions?: SimpleFINTransaction[];
