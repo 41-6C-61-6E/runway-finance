@@ -8,7 +8,7 @@ import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle, PiggyBank, Info } from 'lucide-react';
+import { ChartBar, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle, PiggyBank, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
@@ -500,7 +500,7 @@ export function BudgetSummary() {
         showMobileToggle={false}
         title={
           <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-primary shrink-0" />
+            <ChartBar className="w-4 h-4 text-primary shrink-0" />
             <span className="font-bold text-foreground">Overview</span>
           </div>
         }

@@ -65,7 +65,7 @@ interface RecurringDetailDrawerProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  categories: { id: string; name: string; color: string }[];
+  categories: { id: string; name: string; color: string; isDiscretionary?: boolean }[];
 }
 
 export default function RecurringDetailDrawer({
@@ -397,6 +397,23 @@ export default function RecurringDetailDrawer({
                   </option>
                 ))}
               </Select>
+              {categoryId && (
+                <div className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <span>Classification:</span>
+                  <span
+                    className={cn(
+                      'font-medium text-micro px-1.5 py-0.2 rounded border',
+                      categories.find((c) => c.id === categoryId)?.isDiscretionary !== false
+                        ? 'bg-primary/10 text-primary border-primary/20'
+                        : 'bg-muted text-muted-foreground border-border/40'
+                    )}
+                  >
+                    {categories.find((c) => c.id === categoryId)?.isDiscretionary !== false
+                      ? 'Discretionary (Subscription)'
+                      : 'Fixed (Non-Discretionary)'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {item.accountId && (

@@ -105,4 +105,62 @@ describe('TaxBreakdown Component', () => {
     expect(screen.getByText('Tax-Deferred')).toBeDefined();
     expect(screen.getByText('$7,000')).toBeDefined();
   });
+
+  it('renders scorecard style conventions including hero metrics, pill badges, and distribution', () => {
+    const mockAccounts = [
+      {
+        id: 'acc_1',
+        name: '401(k)',
+        type: '401k',
+        balance: 60000,
+        institution: 'Fidelity',
+      },
+      {
+        id: 'acc_2',
+        name: 'Roth IRA',
+        type: 'rothira',
+        balance: 40000,
+        institution: 'Vanguard',
+      },
+      {
+        id: 'acc_3',
+        name: 'Brokerage',
+        type: 'brokerage',
+        balance: 100000,
+        institution: 'Schwab',
+      },
+    ];
+
+    const { container } = render(<TaxBreakdown accounts={mockAccounts} />);
+
+    // Verify scorecard styling class conventions on root container
+    const rootEl = container.firstChild as HTMLElement;
+    expect(rootEl.className).toContain('bg-sidebar');
+    expect(rootEl.className).toContain('border-sidebar-border');
+    expect(rootEl.className).toContain('rounded-2xl');
+
+    // Verify Scorecard header
+    expect(screen.getByText('Scorecard')).toBeDefined();
+
+    // Total = $200,000; Tax-Advantaged (401k + Roth) = $100,000 (50%); Brokerage = $100,000
+    expect(screen.getByText('Tax-Advantaged Assets')).toBeDefined();
+    expect(screen.getAllByText('$100,000').length).toBe(2);
+    expect(screen.getAllByText(/50%/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Sheltered')).toBeDefined();
+
+    // Verify Wrapper Distribution section and Wrapper Breakdown section
+    expect(screen.getByText('Wrapper Distribution')).toBeDefined();
+    expect(screen.getByText('Wrapper Breakdown')).toBeDefined();
+    expect(screen.getByText('Majority of your portfolio is sheltered in tax-free & tax-deferred accounts.')).toBeDefined();
+  });
+
+  it('supports custom title prop', () => {
+    const mockAccounts = [
+      { id: 'acc_1', name: '401k', type: '401k', balance: 5000, institution: null },
+    ];
+
+    render(<TaxBreakdown accounts={mockAccounts} title={<span>Custom Tax Overview</span>} />);
+    expect(screen.getByText('Custom Tax Overview')).toBeDefined();
+  });
 });
+

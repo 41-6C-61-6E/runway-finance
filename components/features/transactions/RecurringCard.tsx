@@ -37,6 +37,7 @@ export interface RecurringItem {
   categoryId: string | null;
   categoryName: string | null;
   categoryColor: string;
+  isDiscretionary?: boolean;
   frequency: FrequencyType;
   averageAmount: number;
   lastAmount: number;
@@ -212,14 +213,14 @@ export default function RecurringCard({
           }
         }}
         className={cn(
-          '@container relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-4 sm:p-5 cursor-pointer flex flex-col justify-between gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'group @container relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-3.5 sm:p-4 cursor-pointer flex flex-col justify-between gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           selected && 'ring-2 ring-primary border-primary',
           item.isPaused && 'opacity-60'
         )}
       >
         {/* ── Top Row: Checkbox, Icon, Merchant & Category, Status & Action Icons ── */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             {/* Checkbox (subtle until hover/selected) */}
             {onToggleSelect && (
               <button
@@ -264,11 +265,26 @@ export default function RecurringCard({
               <h4 className="font-semibold text-sm text-foreground truncate leading-tight">
                 {item.displayName}
               </h4>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 truncate">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 min-w-0">
                 {item.categoryName ? (
                   <span className="truncate">{item.categoryName}</span>
                 ) : (
                   <span className="italic opacity-60">Uncategorized</span>
+                )}
+                {item.flowType === 'expense' && (
+                  <span className="text-muted-foreground/40 shrink-0">·</span>
+                )}
+                {item.flowType === 'expense' && (
+                  <span
+                    className={cn(
+                      'text-micro font-medium shrink-0',
+                      item.isDiscretionary !== false
+                        ? 'text-primary'
+                        : 'text-muted-foreground'
+                    )}
+                  >
+                    {item.isDiscretionary !== false ? 'Subscription' : 'Fixed'}
+                  </span>
                 )}
               </div>
             </div>
@@ -456,13 +472,13 @@ export default function RecurringCard({
             <TooltipTrigger asChild>
               <div
                 className={cn(
-                  'text-lg sm:text-xl font-bold font-mono tracking-tight',
+                  'text-base sm:text-lg font-bold font-mono tracking-tight',
                   isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground',
                   privacyMode && 'blur-xs select-none'
                 )}
               >
                 {isIncome ? '+' : '-'}
-                {formatCurrency(item.averageAmount)}
+                {formatCurrency(Math.abs(item.averageAmount))}
                 <span className="text-xs font-normal text-muted-foreground ml-1">
                   {formatFrequencyUnit(item.frequency)}
                 </span>

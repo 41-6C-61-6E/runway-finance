@@ -17,6 +17,8 @@ import {
   SlidersHorizontal,
   TrendingDown,
   TrendingUp,
+  Receipt,
+  CreditCard,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { formatCurrency } from '@/lib/utils/format';
 import { toast } from 'sonner';
 import { Select } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 interface RecurringViewProps {
   onSelectTransaction?: (txId: string) => void;
@@ -59,13 +62,14 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
 
   // Notification deep-linking: honor ?search=<name> from notification urlPath
   const searchParams = useSearchParams();
-  const [categories, setCategories] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; color: string; isDiscretionary?: boolean }[]>([]);
   const [accountsList, setAccountsList] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
 
   // Filters & Search
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'needs_review' | 'paused' | 'dismissed'>('all');
+  const [expenseSubView, setExpenseSubView] = useState<'all' | 'subscriptions' | 'fixed'>('all');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState<'amount' | 'name' | 'nextDate'>('amount');
   const [showOptions, setShowOptions] = useState(false);
@@ -95,7 +99,12 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         if (Array.isArray(data)) {
-          setCategories(data.map((c: any) => ({ id: c.id, name: c.name, color: c.color || '#6366f1' })));
+          setCategories(data.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            color: c.color || '#6366f1',
+            isDiscretionary: c.isDiscretionary ?? true,
+          })));
         }
       })
       .catch(() => {});
@@ -324,16 +333,33 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
     return displayedItems.filter((i) => i.flowType === 'expense').sort(sortComparator);
   }, [displayedItems, sortComparator]);
 
+  // Break expenses into Subscriptions (discretionary) and Fixed bills (non-discretionary)
+  const subscriptionItems = useMemo(() => {
+    return expenseItems.filter((i) => i.isDiscretionary !== false);
+  }, [expenseItems]);
+
+  const fixedItems = useMemo(() => {
+    return expenseItems.filter((i) => i.isDiscretionary === false);
+  }, [expenseItems]);
+
   const incomeItems = useMemo(() => {
     return displayedItems.filter((i) => i.flowType === 'income').sort(sortComparator);
   }, [displayedItems, sortComparator]);
 
   const totalExpenseMonthly = useMemo(() => {
-    return expenseItems.reduce((sum, i) => sum + i.monthlyAmount, 0);
+    return expenseItems.reduce((sum, i) => sum + Math.abs(i.monthlyAmount), 0);
   }, [expenseItems]);
 
+  const totalSubscriptionMonthly = useMemo(() => {
+    return subscriptionItems.reduce((sum, i) => sum + Math.abs(i.monthlyAmount), 0);
+  }, [subscriptionItems]);
+
+  const totalFixedMonthly = useMemo(() => {
+    return fixedItems.reduce((sum, i) => sum + Math.abs(i.monthlyAmount), 0);
+  }, [fixedItems]);
+
   const totalIncomeMonthly = useMemo(() => {
-    return incomeItems.reduce((sum, i) => sum + i.monthlyAmount, 0);
+    return incomeItems.reduce((sum, i) => sum + Math.abs(i.monthlyAmount), 0);
   }, [incomeItems]);
 
   // Bulk confirm all needs review
@@ -577,66 +603,208 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* ── Column 1: Expenses & Bills (Highest Amount First) ── */}
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 items-start">
+          {/* ── Column 1: Expenses & Bills (Broken into Subscriptions vs Fixed Bills) ── */}
+          <div className="space-y-3.5">
+            {/* Master Expenses Header */}
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-xs" />
+                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-xs shrink-0" />
                 <h3 className="font-bold text-xs sm:text-sm text-foreground uppercase tracking-wider">
                   Expenses ({expenseItems.length})
                 </h3>
               </div>
-              <span className="text-xs font-mono font-bold text-muted-foreground">
-                -{formatCurrency(totalExpenseMonthly)}/mo
+              <span className="text-xs font-mono font-bold text-foreground">
+                -{formatCurrency(Math.abs(totalExpenseMonthly))}/mo
               </span>
             </div>
+
+            {/* Sub-view switcher for Expenses: Clean full-width segmented control */}
+            {expenseItems.length > 0 && (
+              <div className="grid grid-cols-3 gap-1 bg-muted/60 p-1 rounded-xl border border-border/40">
+                <button
+                  type="button"
+                  onClick={() => setExpenseSubView('all')}
+                  className={cn(
+                    'py-1 px-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer text-center',
+                    expenseSubView === 'all'
+                      ? 'bg-background text-foreground shadow-xs font-semibold'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  All ({expenseItems.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExpenseSubView('subscriptions')}
+                  className={cn(
+                    'py-1 px-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5',
+                    expenseSubView === 'subscriptions'
+                      ? 'bg-background text-foreground shadow-xs font-semibold'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <CreditCard className="w-3 h-3 text-primary" />
+                  Subs ({subscriptionItems.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExpenseSubView('fixed')}
+                  className={cn(
+                    'py-1 px-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5',
+                    expenseSubView === 'fixed'
+                      ? 'bg-background text-foreground shadow-xs font-semibold'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Receipt className="w-3 h-3 text-muted-foreground" />
+                  Fixed ({fixedItems.length})
+                </button>
+              </div>
+            )}
 
             {expenseItems.length === 0 ? (
               <div className="p-6 text-center rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground">
                 No recurring expenses in this filter.
               </div>
             ) : (
-              <div className="space-y-3">
-                {expenseItems.map((item) => (
-                  <RecurringCard
-                    key={item.id}
-                    item={item}
-                    selected={selectedIds.includes(item.id)}
-                    onToggleSelect={handleToggleSelect}
-                    onOpenDetail={(i) => {
-                      setSelectedItem(i);
-                      setDrawerOpen(true);
-                    }}
-                    onUpdate={handleUpdate}
-                    onDelete={handleDelete}
-                    onMergeRequest={(i) => setMergeModalItem(i)}
-                  />
-                ))}
+              <div className="space-y-4">
+                {/* ── Subscriptions Section (Discretionary) ── */}
+                {(expenseSubView === 'all' || expenseSubView === 'subscriptions') && (
+                  <div className="space-y-2.5">
+                    {expenseSubView === 'all' && (
+                      <div className="flex items-center justify-between px-0.5 pt-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <CreditCard className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <h4 className="font-semibold text-xs sm:text-sm text-foreground">
+                            Subscriptions
+                          </h4>
+                          <span className="text-[10px] font-medium px-1.5 py-0.25 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            Discretionary
+                          </span>
+                          <span className="text-xs text-muted-foreground font-mono">
+                            ({subscriptionItems.length})
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono font-semibold text-primary shrink-0 whitespace-nowrap">
+                          -{formatCurrency(Math.abs(totalSubscriptionMonthly))}/mo
+                        </span>
+                      </div>
+                    )}
+
+                    {subscriptionItems.length === 0 ? (
+                      <div className="p-4 text-center rounded-xl border border-dashed border-border/50 text-xs text-muted-foreground bg-muted/20">
+                        No discretionary subscriptions in this filter.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {subscriptionItems.map((item) => (
+                          <RecurringCard
+                            key={item.id}
+                            item={item}
+                            selected={selectedIds.includes(item.id)}
+                            onToggleSelect={handleToggleSelect}
+                            onOpenDetail={(i) => {
+                              setSelectedItem(i);
+                              setDrawerOpen(true);
+                            }}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            onMergeRequest={(i) => setMergeModalItem(i)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Fixed Recurring Bills Section (Non-Discretionary) ── */}
+                {(expenseSubView === 'all' || expenseSubView === 'fixed') && (
+                  <div className="space-y-2.5">
+                    {expenseSubView === 'all' && (
+                      <div className="flex items-center justify-between px-0.5 pt-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Receipt className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <h4 className="font-semibold text-xs sm:text-sm text-foreground">
+                            Fixed Recurring
+                          </h4>
+                          <span className="text-[10px] font-medium px-1.5 py-0.25 rounded-full bg-muted text-muted-foreground border border-border/40">
+                            Essential
+                          </span>
+                          <span className="text-xs text-muted-foreground font-mono">
+                            ({fixedItems.length})
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono font-semibold text-muted-foreground shrink-0 whitespace-nowrap">
+                          -{formatCurrency(Math.abs(totalFixedMonthly))}/mo
+                        </span>
+                      </div>
+                    )}
+
+                    {fixedItems.length === 0 ? (
+                      <div className="p-4 text-center rounded-xl border border-dashed border-border/50 text-xs text-muted-foreground bg-muted/20">
+                        No fixed non-discretionary recurring bills in this filter.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {fixedItems.map((item) => (
+                          <RecurringCard
+                            key={item.id}
+                            item={item}
+                            selected={selectedIds.includes(item.id)}
+                            onToggleSelect={handleToggleSelect}
+                            onOpenDetail={(i) => {
+                              setSelectedItem(i);
+                              setDrawerOpen(true);
+                            }}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            onMergeRequest={(i) => setMergeModalItem(i)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* ── Column 2: Recurring Income (Highest Amount First) ── */}
-          <div className="space-y-3">
+          {/* ── Column 2: Recurring Income Section ── */}
+          <div className="space-y-3.5">
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs" />
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs shrink-0" />
                 <h3 className="font-bold text-xs sm:text-sm text-foreground uppercase tracking-wider">
                   Income ({incomeItems.length})
                 </h3>
               </div>
-              <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                +{formatCurrency(totalIncomeMonthly)}/mo
+              <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                +{formatCurrency(Math.abs(totalIncomeMonthly))}/mo
               </span>
             </div>
 
             {incomeItems.length === 0 ? (
-              <div className="p-6 text-center rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground">
-                No recurring income in this filter.
+              <div className="p-6 text-center rounded-2xl border border-dashed border-border/60 bg-muted/20 flex flex-col items-center justify-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+                <p className="text-xs font-semibold text-foreground">No recurring income</p>
+                <p className="text-[11px] text-muted-foreground max-w-xs leading-relaxed">
+                  Track paychecks or recurring deposits to monitor income coverage and runway.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs mt-1 cursor-pointer"
+                  onClick={() => setCreateModalOpen(true)}
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Add Income
+                </Button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {incomeItems.map((item) => (
                   <RecurringCard
                     key={item.id}
@@ -661,7 +829,7 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
   );
 
   const summaryContent = (
-    <RecurringSidePanel summary={summary} />
+    <RecurringSidePanel summary={summary} items={items} />
   );
 
   return (

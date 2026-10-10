@@ -646,6 +646,7 @@ export interface RecurringItem {
   categoryId: string | null;
   categoryName: string | null;
   categoryColor: string;
+  isDiscretionary?: boolean;
   frequency: FrequencyType;
   averageAmount: number;
   lastAmount: number;
@@ -766,8 +767,8 @@ export async function getRecurringTransactions(
 
   // 3. Transform and filter
   const results: RecurringItem[] = decrypted.map((item) => {
-    const avgAmt = parseFloat(item.averageAmount || '0') || 0;
-    const lastAmt = parseFloat(item.lastAmount || '0') || 0;
+    const avgAmt = Math.abs(parseFloat(item.averageAmount || '0') || 0);
+    const lastAmt = Math.abs(parseFloat(item.lastAmount || '0') || 0);
     const cat = item.categoryId ? catMap.get(item.categoryId) : undefined;
     const acc = item.accountId ? accMap.get(item.accountId) : undefined;
 
@@ -802,6 +803,7 @@ export async function getRecurringTransactions(
       categoryId: item.categoryId,
       categoryName: cat?.name || null,
       categoryColor: cat?.color || '#6366f1',
+      isDiscretionary: cat ? cat.isDiscretionary !== false : true,
       frequency: item.frequency as FrequencyType,
       averageAmount: avgAmt,
       lastAmount: lastAmt,
@@ -893,8 +895,8 @@ export async function getRecurringTransactionById(id: string, userId: string, de
 
   return {
     ...decrypted,
-    averageAmount: parseFloat(decrypted.averageAmount || '0') || 0,
-    lastAmount: parseFloat(decrypted.lastAmount || '0') || 0,
+    averageAmount: Math.abs(parseFloat(decrypted.averageAmount || '0') || 0),
+    lastAmount: Math.abs(parseFloat(decrypted.lastAmount || '0') || 0),
     history,
     sparkline,
     totalSpentLifetime: Math.round(totalSpentLifetime * 100) / 100,
@@ -1299,14 +1301,35 @@ export function computeRecurringSummaryFromItems(items: RecurringItem[]) {
   let expenseCount = 0;
   let incomeCount = 0;
 
+  let monthlySubscriptions = 0;
+  let annualSubscriptions = 0;
+  let subscriptionCount = 0;
+
+  let monthlyFixed = 0;
+  let annualFixed = 0;
+  let fixedCount = 0;
+
   for (const item of active) {
+    const monthly = Math.abs(item.monthlyAmount);
+    const annual = Math.abs(item.annualAmount);
+
     if (item.flowType === 'expense') {
-      monthlyExpenses += item.monthlyAmount;
-      annualExpenses += item.annualAmount;
+      monthlyExpenses += monthly;
+      annualExpenses += annual;
       expenseCount++;
+
+      if (item.isDiscretionary !== false) {
+        monthlySubscriptions += monthly;
+        annualSubscriptions += annual;
+        subscriptionCount++;
+      } else {
+        monthlyFixed += monthly;
+        annualFixed += annual;
+        fixedCount++;
+      }
     } else {
-      monthlyIncome += item.monthlyAmount;
-      annualIncome += item.annualAmount;
+      monthlyIncome += monthly;
+      annualIncome += annual;
       incomeCount++;
     }
   }
@@ -1316,6 +1339,12 @@ export function computeRecurringSummaryFromItems(items: RecurringItem[]) {
     monthlyIncome: Math.round(monthlyIncome * 100) / 100,
     annualExpenses: Math.round(annualExpenses * 100) / 100,
     annualIncome: Math.round(annualIncome * 100) / 100,
+    monthlySubscriptions: Math.round(monthlySubscriptions * 100) / 100,
+    annualSubscriptions: Math.round(annualSubscriptions * 100) / 100,
+    subscriptionCount,
+    monthlyFixed: Math.round(monthlyFixed * 100) / 100,
+    annualFixed: Math.round(annualFixed * 100) / 100,
+    fixedCount,
     activeCount: active.length,
     expenseCount,
     incomeCount,

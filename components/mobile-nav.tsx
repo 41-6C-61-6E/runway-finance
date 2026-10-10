@@ -6,11 +6,11 @@ import Link from 'next/link';
 import { 
   Landmark, 
   Receipt, 
-  DollarSign, 
+  CreditCard, 
   Menu, 
   X,
   ChartSpline,
-  Wallet,
+  ChartBar,
   Home,
   Target,
   Calculator,
@@ -55,8 +55,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: 'accounts', href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'accounts', category: 'finances' },
   { id: 'transactions', href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions', category: 'finances' },
   { id: 'flows', href: '/flows', label: 'Flows', icon: ArrowLeftRight, pageKey: 'flows', category: 'finances' },
-  { id: 'spending', href: '/spending', label: 'Spending', icon: DollarSign, pageKey: 'spending', category: 'finances' },
-  { id: 'budgets', href: '/budgets', label: 'Budgets', icon: Wallet, pageKey: 'budgets', category: 'finances' },
+  { id: 'spending', href: '/spending', label: 'Spending', icon: CreditCard, pageKey: 'spending', category: 'finances' },
+  { id: 'budgets', href: '/budgets', label: 'Budgets', icon: ChartBar, pageKey: 'budgets', category: 'finances' },
 
   // Planning & Wealth
   { id: 'investments', href: '/investments', label: 'Investments', icon: CandlestickChart, pageKey: 'investments', category: 'planning' },

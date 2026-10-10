@@ -6,7 +6,7 @@ import { BudgetPeriodProvider, BudgetPeriodSelector, useBudgetPeriod, type Perio
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 import { BudgetTable } from '@/components/budgets/budget-table';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
-import { Wallet, Info, X } from 'lucide-react';
+import { ChartBar, Info, X } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
@@ -106,7 +106,7 @@ function BudgetsContent() {
   return (
     <div className="min-h-screen w-full page-transition-enter">
       {/* ── Page Header ── */}
-      <PageHeader title="Budgets" icon={Wallet} />
+      <PageHeader title="Budgets" icon={ChartBar} />
       <PageContent>
         {/* On mobile, selector appears at the top above the content */}
         <div className="md:hidden mb-3">

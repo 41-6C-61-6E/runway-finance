@@ -4,7 +4,8 @@ import { useMemo } from 'react';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, PieChart, Layers } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Account {
   id: string;
@@ -17,6 +18,7 @@ interface Account {
 
 interface TaxBreakdownProps {
   accounts: Account[];
+  title?: React.ReactNode;
 }
 
 type TaxWrapper = 'Tax-Free' | 'Tax-Deferred' | 'Taxable' | 'Other';
@@ -50,12 +52,12 @@ const WRAPPER_DESCRIPTIONS: Record<TaxWrapper, string> = {
   'Tax-Free':     'Roth IRA, HSA — contributions after-tax, growth & withdrawals tax-free',
   'Tax-Deferred': '401(k), Traditional IRA — contributions pre-tax, taxed on withdrawal',
   'Taxable':      'Brokerage — taxed on dividends and capital gains annually',
-  'Other':        '529, etc.',
+  'Other':        '529, education & other accounts',
 };
 
 const WRAPPER_ORDER: TaxWrapper[] = ['Tax-Free', 'Tax-Deferred', 'Taxable', 'Other'];
 
-export function TaxBreakdown({ accounts }: TaxBreakdownProps) {
+export function TaxBreakdown({ accounts, title }: TaxBreakdownProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('taxBreakdown');
 
   const wrapperTotals = useMemo(() => {
@@ -95,90 +97,166 @@ export function TaxBreakdown({ accounts }: TaxBreakdownProps) {
     [wrapperTotals]
   );
 
+  const advantagedTotal = useMemo(
+    () => (wrapperTotals['Tax-Free'] ?? 0) + (wrapperTotals['Tax-Deferred'] ?? 0),
+    [wrapperTotals]
+  );
+
   const advantagedPct = useMemo(() => {
-    const adv = (wrapperTotals['Tax-Free'] ?? 0) + (wrapperTotals['Tax-Deferred'] ?? 0);
-    return total > 0 ? (adv / total) * 100 : 0;
-  }, [wrapperTotals, total]);
+    return total > 0 ? (advantagedTotal / total) * 100 : 0;
+  }, [advantagedTotal, total]);
 
   const activeWrappers = WRAPPER_ORDER.filter((w) => (wrapperTotals[w] ?? 0) > 0);
 
   if (accounts.length === 0) return null;
 
   return (
-    <div className="bg-card border border-border rounded-xl shadow-sm h-full">
+    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
       <CollapsibleCardHeader
         isCollapsed={isCollapsed}
         onToggle={setIsCollapsed}
+        collapseDirection="horizontal"
+        showMobileToggle={false}
         title={
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
-            <span>Tax Wrapper Breakdown</span>
-          </div>
+          title ?? (
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
+              <span className="font-bold text-foreground">Scorecard</span>
+            </div>
+          )
         }
+        actions={
+          total > 0 ? (
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold border font-mono bg-chart-1/10 text-chart-1 border-chart-1/20 shrink-0">
+                <span className="blur-number">{Math.round(advantagedPct)}%</span> Sheltered
+              </span>
+            </div>
+          ) : null
+        }
+        className="border-b border-sidebar-border/60 bg-sidebar"
       />
 
       {!isCollapsed && (
-        <div className="p-4 sm:p-5 space-y-4">
-          {/* Callout */}
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-chart-1/10 border border-chart-1/20">
-            <ShieldCheck className="w-4 h-4 text-chart-1 shrink-0" />
-            <p className="text-xs text-foreground">
-              <span className="font-bold blur-number">{advantagedPct.toFixed(0)}%</span>
-              <span className="text-muted-foreground"> of your portfolio is in tax-advantaged accounts</span>
+        <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
+          {/* Section 1: Hero Tax-Advantaged Position */}
+          <div className="py-4 first:pt-0 last:pb-0 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+                Tax-Advantaged Assets
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                {activeWrappers.length} {activeWrappers.length === 1 ? 'wrapper' : 'wrappers'}
+              </span>
+            </div>
+
+            <div className="flex flex-col">
+              <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
+                {formatCurrency(advantagedTotal)}
+              </span>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border font-mono bg-chart-1/10 text-chart-1 border-chart-1/20">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span className="blur-number">{Math.round(advantagedPct)}%</span>
+                  <span className="opacity-80">sheltered</span>
+                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  of <span className="font-mono blur-number">{formatCurrency(total)}</span> total
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground leading-relaxed pt-0.5">
+              {advantagedPct >= 50
+                ? 'Majority of your portfolio is sheltered in tax-free & tax-deferred accounts.'
+                : 'Majority of your investments are held in taxable investment accounts.'}
             </p>
           </div>
 
-          {/* Stacked progress bar */}
-          <div className="space-y-1.5">
-            <div className="h-3 flex rounded-full overflow-hidden gap-px bg-muted/30">
-              {activeWrappers.map((wrapper) => {
-                const pct = total > 0 ? ((wrapperTotals[wrapper] ?? 0) / total) * 100 : 0;
-                return (
-                  <div
-                    key={wrapper}
-                    style={{ width: `${pct}%`, background: WRAPPER_COLORS[wrapper] }}
-                    className="transition-all duration-500 first:rounded-l-full last:rounded-r-full"
-                    title={`${wrapper}: ${formatPlainPercent(pct)}`}
-                  />
-                );
-              })}
+          {/* Section 2: Stacked Progress Bar / Wrapper Distribution */}
+          <div className="py-4 first:pt-0 last:pb-0 space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-foreground flex items-center gap-1.5">
+                <PieChart className="w-3.5 h-3.5 text-primary shrink-0" />
+                Wrapper Distribution
+              </span>
+              <span className="text-muted-foreground font-mono text-[11px] blur-number">
+                {formatCurrency(total)}
+              </span>
             </div>
-            {/* % labels */}
-            <div className="flex justify-between text-micro text-muted-foreground/60">
-              {activeWrappers.map((wrapper) => {
-                const pct = total > 0 ? ((wrapperTotals[wrapper] ?? 0) / total) * 100 : 0;
-                if (pct < 5) return null;
-                return <span key={wrapper}>{pct.toFixed(0)}%</span>;
-              })}
+
+            <div className="space-y-1.5">
+              <div className="h-2.5 flex rounded-full overflow-hidden gap-px bg-muted/30">
+                {activeWrappers.map((wrapper) => {
+                  const pct = total > 0 ? ((wrapperTotals[wrapper] ?? 0) / total) * 100 : 0;
+                  return (
+                    <div
+                      key={wrapper}
+                      style={{ width: `${pct}%`, background: WRAPPER_COLORS[wrapper] }}
+                      className="transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                      title={`${wrapper}: ${formatPlainPercent(pct)}`}
+                    />
+                  );
+                })}
+              </div>
+              {/* % labels */}
+              <div className="flex justify-between text-micro text-muted-foreground/60 font-mono">
+                {activeWrappers.map((wrapper) => {
+                  const pct = total > 0 ? ((wrapperTotals[wrapper] ?? 0) / total) * 100 : 0;
+                  if (pct < 5) return null;
+                  return <span key={wrapper}>{Math.round(pct)}%</span>;
+                })}
+              </div>
             </div>
           </div>
 
-          {/* Wrapper rows */}
-          <div className="space-y-3">
-            {activeWrappers.map((wrapper) => {
-              const value = wrapperTotals[wrapper] ?? 0;
-              const pct = total > 0 ? (value / total) * 100 : 0;
-              return (
-                <div key={wrapper} className="flex items-center gap-3">
-                  <div
-                    className="w-2.5 h-2.5 rounded-sm shrink-0"
-                    style={{ background: WRAPPER_COLORS[wrapper] }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <span className="text-xs font-semibold text-foreground">{wrapper}</span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs font-mono font-bold text-foreground blur-number">{formatCurrency(value)}</span>
-                        <span className="text-[10px] text-muted-foreground/70 w-9 text-right tabular-nums">{formatPlainPercent(pct)}</span>
+          {/* Section 3: Wrapper Breakdown Rows */}
+          <div className="py-4 first:pt-0 last:pb-0 space-y-3">
+            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-primary shrink-0" />
+              Wrapper Breakdown
+            </span>
+            <div className="space-y-3">
+              {activeWrappers.map((wrapper) => {
+                const value = wrapperTotals[wrapper] ?? 0;
+                const pct = total > 0 ? (value / total) * 100 : 0;
+                return (
+                  <div key={wrapper} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ background: WRAPPER_COLORS[wrapper] }}
+                        />
+                        <span className="font-semibold text-foreground truncate">{wrapper}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 font-mono">
+                        <span className="text-xs font-bold text-foreground blur-number">
+                          {formatCurrency(value)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground w-11 text-right tabular-nums">
+                          {formatPlainPercent(pct)}
+                        </span>
                       </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground/70 leading-relaxed truncate" title={WRAPPER_DESCRIPTIONS[wrapper]}>
+                    {/* Subtle progress track */}
+                    <div className="w-full bg-muted/30 rounded-full h-1 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, background: WRAPPER_COLORS[wrapper] }}
+                      />
+                    </div>
+                    <p
+                      className="text-[10px] text-muted-foreground/70 leading-relaxed truncate"
+                      title={WRAPPER_DESCRIPTIONS[wrapper]}
+                    >
                       {WRAPPER_DESCRIPTIONS[wrapper]}
                     </p>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

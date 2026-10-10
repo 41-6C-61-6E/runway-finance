@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
+import { MobileTabSwipeContainer, MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
 const INVESTMENT_TABS = [
   { id: 'overview', label: 'Overview' },
@@ -244,20 +244,19 @@ export default function InvestmentsPage() {
               {/* ── Overview Tab Content ── */}
               {activeTab === 'overview' && (
                 <div className="space-y-5 sm:space-y-6">
-                  {(isVisible('performanceChart') || isVisible('taxBreakdown')) && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
-                      {isVisible('performanceChart') && (
-                        <div className={isVisible('taxBreakdown') ? 'lg:col-span-2' : 'lg:col-span-3'}>
-                          <PerformanceChart totalBalance={data.summary.totalBalance} />
-                        </div>
-                      )}
-                      {isVisible('taxBreakdown') && (
-                        <div className="lg:col-span-1">
-                          <TaxBreakdown accounts={data.accounts} />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {isVisible('performanceChart') && isVisible('taxBreakdown') ? (
+                    <MobileViewSwitcher
+                      main={<PerformanceChart totalBalance={data.summary.totalBalance} />}
+                      summary={<TaxBreakdown accounts={data.accounts} />}
+                      mainLabel="Performance"
+                      summaryLabel="Scorecard"
+                      summaryCardId="taxBreakdown"
+                    />
+                  ) : isVisible('performanceChart') ? (
+                    <PerformanceChart totalBalance={data.summary.totalBalance} />
+                  ) : isVisible('taxBreakdown') ? (
+                    <TaxBreakdown accounts={data.accounts} />
+                  ) : null}
                 </div>
               )}
 

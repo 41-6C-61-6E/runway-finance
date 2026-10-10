@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCircle2, Circle, Landmark, Target, UserCheck, Wallet, X } from 'lucide-react';
+import { CheckCircle2, Circle, Landmark, Target, UserCheck, ChartBar, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type ChecklistState = {
@@ -94,7 +94,7 @@ export function OnboardingChecklist() {
     },
     {
       done: state.budgets > 0,
-      icon: Wallet,
+      icon: ChartBar,
       title: 'Create budgets',
       text: 'Set targets for recurring income and spending.',
       href: '/budgets',
