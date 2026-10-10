@@ -25,7 +25,7 @@ function useIsMobileOrTouch() {
     const check = () => {
       setIsMobile(
         typeof window !== 'undefined' &&
-        (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window)
+        (window.innerWidth < 768 || (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window)
       );
     };
     check();

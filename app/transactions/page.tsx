@@ -200,12 +200,6 @@ function TransactionsContent() {
     }
   }, [pendingAiIds, dismissedIdsRef, setAiSuggestionsDismissed]);
 
-  // When pending AI IDs change, open the suggestions modal if there are new uncategorized proposals
-  useEffect(() => {
-    if (pendingAiIds.length > 0) {
-      setAiModalOpen(true);
-    }
-  }, [pendingAiIds, setAiModalOpen]);
 
   const handleProposalsUpdated = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -332,6 +326,15 @@ useEffect(() => {
       setDismissedSuggestionIds((prev) => Array.from(new Set([...(prev || []), ...pendingAiIds])));
     }
   }, [pendingAiIds, setDismissedSuggestionIds]);
+
+  const handleAiModalOpenChange = useCallback((open: boolean) => {
+    setAiModalOpen(open);
+    if (!open && searchParams.get('aiSuggestions') === 'true') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('aiSuggestions');
+      router.replace(`/transactions${params.toString() ? '?' + params.toString() : ''}`, { scroll: false });
+    }
+  }, [router, searchParams]);
 
   const hasNewSuggestions = pendingAiIds.length > 0 && pendingAiIds.some(id => !dismissedSuggestionIds.includes(id));
   const isSuggestionsDismissed = aiSuggestionsDismissed || !hasNewSuggestions;
@@ -644,7 +647,7 @@ useEffect(() => {
                 )}
                 <AiSuggestionsModal
                   open={aiModalOpen}
-                  onOpenChange={setAiModalOpen}
+                  onOpenChange={handleAiModalOpenChange}
                   onProposalsUpdated={handleProposalsUpdated}
                 />
               </div>

@@ -73,29 +73,27 @@ const mockAccounts = [
   },
 ];
 
-describe('HoldingsAllocation Navigation Redesign', () => {
+describe('HoldingsAllocation Component', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('renders primary view tabs (Allocation and Rebalance) with Allocation active by default', () => {
+  it('renders allocation view controls (Group by) with Asset active by default, and no Rebalance tab', () => {
     render(<HoldingsAllocation holdings={mockHoldings} accounts={mockAccounts} />);
-
-    // Primary view tabs
-    const allocationTab = screen.getByRole('tab', { name: /^allocation$/i });
-    const rebalanceTab = screen.getByRole('tab', { name: /^rebalance$/i });
-
-    expect(allocationTab).toBeDefined();
-    expect(rebalanceTab).toBeDefined();
-    expect(allocationTab.getAttribute('aria-selected')).toBe('true');
-    expect(rebalanceTab.getAttribute('aria-selected')).toBe('false');
 
     // Allocation view content is visible
     expect(screen.getByText(/group by/i)).toBeDefined();
-    expect(screen.getByRole('tab', { name: /^asset$/i })).toBeDefined();
+    const assetTab = screen.getByRole('tab', { name: /^asset$/i });
+    expect(assetTab).toBeDefined();
+    expect(assetTab.getAttribute('aria-selected')).toBe('true');
+
     expect(screen.getByRole('tab', { name: /^account$/i })).toBeDefined();
     expect(screen.getByRole('tab', { name: /^class$/i })).toBeDefined();
     expect(screen.getByRole('tab', { name: /^wrapper$/i })).toBeDefined();
+
+    // Rebalance tab and strategy controls should NOT exist
+    expect(screen.queryByRole('tab', { name: /^rebalance$/i })).toBeNull();
+    expect(screen.queryByText(/target strategy/i)).toBeNull();
   });
 
   it('allows switching the "Group by" dimension in the allocation view', async () => {
@@ -113,56 +111,38 @@ describe('HoldingsAllocation Navigation Redesign', () => {
     expect(screen.getByText('Fixed Income')).toBeDefined();
   });
 
-  it('switches to Rebalance view with target strategy pills and comparison table', async () => {
+  it('renders and toggles Show all holdings button when more than 7 holdings exist', async () => {
     const user = userEvent.setup();
-    render(<HoldingsAllocation holdings={mockHoldings} accounts={mockAccounts} />);
+    const manyHoldings = Array.from({ length: 10 }, (_, i) => ({
+      accountId: 'acc-1',
+      accountName: 'Roth IRA',
+      institutionName: 'Vanguard',
+      securityId: `sec-${i}`,
+      ticker: `TCK${i}`,
+      name: `Fund ${i}`,
+      quantity: 10,
+      price: 100,
+      value: 1000 * (10 - i),
+      costBasis: 900 * (10 - i),
+      unrealizedGainLoss: 100 * (10 - i),
+      unrealizedReturnPct: 10,
+      portfolioWeight: 10,
+      currency: 'USD',
+    }));
 
-    const rebalanceTab = screen.getByRole('tab', { name: /^rebalance$/i });
-    await user.click(rebalanceTab);
+    render(<HoldingsAllocation holdings={manyHoldings} accounts={mockAccounts} />);
 
-    expect(rebalanceTab.getAttribute('aria-selected')).toBe('true');
+    // Check "Show all 10 holdings" button is visible
+    const showAllBtn = screen.getByRole('button', { name: /show all 10 holdings/i });
+    expect(showAllBtn).toBeDefined();
 
-    // Rebalance view controls
-    expect(screen.getByText(/target strategy/i)).toBeDefined();
-    expect(screen.getByRole('tab', { name: /three-fund/i })).toBeDefined();
-    expect(screen.getByRole('tab', { name: /classic balanced/i })).toBeDefined();
-    expect(screen.getByRole('tab', { name: /aggressive growth/i })).toBeDefined();
-    expect(screen.getByRole('tab', { name: /capital preservation/i })).toBeDefined();
+    // Click to expand
+    await user.click(showAllBtn);
+    expect(screen.getByRole('button', { name: /show less/i })).toBeDefined();
 
-    // Rebalancing table columns
-    expect(screen.getByText('Asset Class')).toBeDefined();
-    expect(screen.getByText('Action Needed')).toBeDefined();
-
-    // "Group by" should NOT be visible in rebalance view
-    expect(screen.queryByText(/group by/i)).toBeNull();
-  });
-
-  it('updates selected target strategy model in Rebalance view', async () => {
-    const user = userEvent.setup();
-    render(<HoldingsAllocation holdings={mockHoldings} accounts={mockAccounts} />);
-
-    const rebalanceTab = screen.getByRole('tab', { name: /^rebalance$/i });
-    await user.click(rebalanceTab);
-
-    const aggressiveTab = screen.getByRole('tab', { name: /aggressive growth/i });
-    expect(aggressiveTab.getAttribute('aria-selected')).toBe('false');
-
-    await user.click(aggressiveTab);
-    expect(aggressiveTab.getAttribute('aria-selected')).toBe('true');
-  });
-
-  it('can navigate back from Rebalance to Allocation view', async () => {
-    const user = userEvent.setup();
-    render(<HoldingsAllocation holdings={mockHoldings} accounts={mockAccounts} />);
-
-    const rebalanceTab = screen.getByRole('tab', { name: /^rebalance$/i });
-    await user.click(rebalanceTab);
-    expect(screen.getByText(/target strategy/i)).toBeDefined();
-
-    const allocationTab = screen.getByRole('tab', { name: /^allocation$/i });
-    await user.click(allocationTab);
-    expect(screen.getByText(/group by/i)).toBeDefined();
-    expect(screen.queryByText(/target strategy/i)).toBeNull();
+    // Click to collapse back
+    await user.click(screen.getByRole('button', { name: /show less/i }));
+    expect(screen.getByRole('button', { name: /show all 10 holdings/i })).toBeDefined();
   });
 });
 

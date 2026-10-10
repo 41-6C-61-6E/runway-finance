@@ -61,7 +61,6 @@ export const CHARTS = {
       taxBreakdown: 'Tax Wrapper Breakdown',
       topHoldings: 'Top Holdings Sparkline Cards',
       holdingsAllocationChart: 'Holdings Allocation Chart',
-      rebalanceAssist: 'Rebalancing Assistant',
       incomeDividends: 'Dividend & Interest Income',
       holdingsTable: 'Holdings Table',
       recentActivity: 'Recent Activity',

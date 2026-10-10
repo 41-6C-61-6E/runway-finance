@@ -11,7 +11,6 @@ const INVESTMENT_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'holdings', label: 'Holdings' },
   { id: 'allocation', label: 'Allocation' },
-  { id: 'rebalance', label: 'Rebalance' },
   { id: 'income', label: 'Activity' },
 ];
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
@@ -249,7 +248,7 @@ export default function InvestmentsPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
                       {isVisible('performanceChart') && (
                         <div className={isVisible('taxBreakdown') ? 'lg:col-span-2' : 'lg:col-span-3'}>
-                          <PerformanceChart />
+                          <PerformanceChart totalBalance={data.summary.totalBalance} />
                         </div>
                       )}
                       {isVisible('taxBreakdown') && (
@@ -266,16 +265,7 @@ export default function InvestmentsPage() {
               {activeTab === 'allocation' && (
                 <div className="space-y-5 sm:space-y-6">
                   {isVisible('holdingsAllocationChart') && (
-                    <HoldingsAllocation mode="allocation" holdings={data.holdings} accounts={data.accounts} />
-                  )}
-                </div>
-              )}
-
-              {/* ── Rebalance Tab Content ── */}
-              {activeTab === 'rebalance' && (
-                <div className="space-y-5 sm:space-y-6">
-                  {isVisible('rebalanceAssist') && (
-                    <HoldingsAllocation mode="rebalance" holdings={data.holdings} accounts={data.accounts} />
+                    <HoldingsAllocation holdings={data.holdings} accounts={data.accounts} />
                   )}
                 </div>
               )}

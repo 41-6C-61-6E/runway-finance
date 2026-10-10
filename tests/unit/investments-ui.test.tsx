@@ -30,6 +30,18 @@ vi.mock('recharts', async () => {
 describe('Investments UI Enhancements', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    delete (window as any).ontouchstart;
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 });
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
   });
 
   it('renders InvestmentsSummary with hidden md:block classes to exclude it on mobile screens', () => {
@@ -82,9 +94,11 @@ describe('Investments UI Enhancements', () => {
 
     // Wait for performance chart to finish loading data
     await waitFor(() => {
+      expect(screen.getByText('Portfolio Balance')).toBeDefined();
       expect(screen.getByText('Portfolio TWR:')).toBeDefined();
     });
 
+    expect(screen.getByText('1Y Change')).toBeDefined();
     expect(screen.getByText('+10.00%')).toBeDefined();
 
     // Verify tooltip button trigger has descriptive aria-label
@@ -104,5 +118,37 @@ describe('Investments UI Enhancements', () => {
       expect(screen.getByText(/Positive \(\+%\)/i)).toBeDefined();
       expect(screen.getByText(/Negative \(-\%\)/i)).toBeDefined();
     });
+  });
+
+  it('renders total portfolio balance when passed via totalBalance prop', async () => {
+    const mockHistoryResponse = {
+      data: [
+        { date: '2026-01-01', value: 10000, twr: 0 },
+        { date: '2026-02-01', value: 11000, twr: 10 },
+      ],
+      summary: {
+        current: 11000,
+        previous: 10000,
+        change: 1000,
+        percentChange: 10,
+        twrPct: 10.0,
+      },
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockHistoryResponse,
+    });
+
+    render(<PerformanceChart totalBalance={50000} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Portfolio Balance')).toBeDefined();
+    });
+
+    // Check that custom totalBalance is displayed in hero and header
+    const balances = screen.getAllByText('$50,000');
+    expect(balances.length).toBeGreaterThan(0);
+    expect(screen.getByText('1Y Change')).toBeDefined();
   });
 });

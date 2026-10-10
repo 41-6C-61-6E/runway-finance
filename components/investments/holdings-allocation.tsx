@@ -41,11 +41,6 @@ interface Account {
 interface HoldingsAllocationProps {
   holdings: Holding[];
   accounts: Account[];
-  /**
-   * When set, this view is forced and the internal Allocation/Rebalance
-   * sub-tabs are hidden (used when each is exposed as its own main page tab).
-   */
-  mode?: ViewMode;
 }
 
 type GroupByOption = 'security' | 'account' | 'taxCategory' | 'assetClass';
@@ -118,13 +113,6 @@ const WRAPPER_COLORS: Record<TaxWrapper, string> = {
   'Other':        'var(--color-muted-foreground)',
 };
 
-const WRAPPER_DESCRIPTIONS: Record<string, string> = {
-  'Tax-Free':     'Roth IRA, HSA — contributions after-tax, growth & withdrawals tax-free',
-  'Tax-Deferred': '401(k), Traditional IRA — contributions pre-tax, taxed on withdrawal',
-  'Taxable':      'Brokerage — taxed on dividends and capital gains annually',
-  'Other':        '529, etc.',
-};
-
 const getTaxWrapper = (type: string, name: string = '', metadata?: any): TaxWrapper => {
   const t = (type || '').toLowerCase();
   const n = (name || '').toLowerCase();
@@ -152,35 +140,10 @@ const getTaxWrapper = (type: string, name: string = '', metadata?: any): TaxWrap
   return TAX_WRAPPER_MAP[t] ?? (t.includes('roth') ? 'Tax-Free' : 'Taxable');
 };
 
-type ViewMode = 'allocation' | 'rebalance';
-
-const PRESET_MODELS: Record<string, { label: string; targets: Record<string, number> }> = {
-  'aggressive': {
-    label: 'Aggressive Growth (90/10)',
-    targets: { 'Equities': 90, 'Fixed Income': 10, 'Cash': 0, 'Real Estate': 0, 'Commodities': 0 },
-  },
-  'three-fund': {
-    label: 'Three-Fund (70/20/10)',
-    targets: { 'Equities': 70, 'Fixed Income': 20, 'Cash': 10, 'Real Estate': 0, 'Commodities': 0 },
-  },
-  'balanced': {
-    label: 'Classic Balanced (60/40)',
-    targets: { 'Equities': 60, 'Fixed Income': 35, 'Cash': 5, 'Real Estate': 0, 'Commodities': 0 },
-  },
-  'conservative': {
-    label: 'Capital Preservation (40/50/10)',
-    targets: { 'Equities': 40, 'Fixed Income': 50, 'Cash': 10, 'Real Estate': 0, 'Commodities': 0 },
-  },
-};
-
-export function HoldingsAllocation({ holdings, accounts, mode }: HoldingsAllocationProps) {
+export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('holdingsAllocationChart');
-  const [internalViewMode, setInternalViewMode] = useState<ViewMode>('allocation');
-  const viewMode: ViewMode = mode ?? internalViewMode;
   const [groupBy, setGroupBy] = useState<GroupByOption>('security');
   const [showAll, setShowAll] = useState(false);
-  const [activeModel, setActiveModel] = useState<string>('three-fund');
-  const [customTargets, setCustomTargets] = useState<Record<string, number>>(PRESET_MODELS['three-fund'].targets);
 
   const accountMap = useMemo(() => {
     const m = new Map<string, Account>();
@@ -191,22 +154,6 @@ export function HoldingsAllocation({ holdings, accounts, mode }: HoldingsAllocat
   }, [accounts]);
 
   const totalValue = useMemo(() => holdings.reduce((sum, h) => sum + h.value, 0), [holdings]);
-
-  // Asset class breakdown for rebalancing
-  const assetClassBreakdown = useMemo(() => {
-    const map: Record<string, number> = {
-      'Equities': 0,
-      'Fixed Income': 0,
-      'Real Estate': 0,
-      'Cash': 0,
-      'Commodities': 0,
-    };
-    for (const h of holdings) {
-      const cls = getAssetClass(getDisplayTicker(h), h.name);
-      map[cls] = (map[cls] || 0) + h.value;
-    }
-    return map;
-  }, [holdings]);
 
   const chartData = useMemo((): ChartItem[] => {
     if (holdings.length === 0 || totalValue <= 0) return [];
@@ -347,208 +294,123 @@ export function HoldingsAllocation({ holdings, accounts, mode }: HoldingsAllocat
         title={
           <div className="flex items-center gap-2">
             <PieIcon className="w-4 h-4 text-primary shrink-0" />
-            <span>{mode === 'rebalance' ? 'Rebalancing Assistant' : 'Asset Allocation'}</span>
+            <span>Asset Allocation</span>
           </div>
         }
       />
 
       {!isCollapsed && (
-        <div className="flex-1 flex flex-col">
-          {/* Primary View Navigation: Allocation vs Rebalance */}
-          {!mode && (
-          <div className="px-4 sm:px-5">
-            <AppTabs
-              tabs={[
-                { id: 'allocation', label: 'Allocation' },
-                { id: 'rebalance', label: 'Rebalance' },
-              ]}
-              activeTab={viewMode}
-              onChange={(tabId) => setInternalViewMode(tabId as ViewMode)}
-              variant="underline"
-              size="sm"
-              aria-label="Asset allocation view"
-            />
-          </div>
-          )}
-
-          <div className="flex-1 flex flex-col p-4 sm:p-5">
-            {viewMode === 'allocation' ? (
-              <>
-                {/* Secondary Controls: Grouping Filter */}
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none">
-                      Group by
-                    </span>
-                    <AppTabs
-                      tabs={groupOptions.map((opt) => ({ id: opt.value, label: opt.label }))}
-                      activeTab={groupBy}
-                      onChange={(tabId) => setGroupBy(tabId as GroupByOption)}
-                      variant="pills"
-                      size="sm"
-                      aria-label="Group holdings by"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-4 min-h-[240px]">
-                  {/* Donut Chart */}
-                  <div className="w-52 h-52 shrink-0 relative">
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</span>
-                      <span className="text-sm font-bold text-foreground blur-number">
-                        {formatCompactCurrency(totalValue)}
-                      </span>
-                    </div>
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
-                      <PieChart>
-                        <Pie
-                          data={chartData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius="65%"
-                          outerRadius="85%"
-                          paddingAngle={1}
-                          cornerRadius={3}
-                          stroke="none"
-                        >
-                          {chartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload || !payload.length) return null;
-                            const d = payload[0].payload as ChartItem;
-                            return (
-                              <ChartTooltip>
-                                <TooltipHeader>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
-                                    <span>{d.name}</span>
-                                  </div>
-                                </TooltipHeader>
-                                <TooltipRow label="Value" value={formatCurrency(d.value)} />
-                                <TooltipRow label="Portfolio %" value={formatPlainPercent(d.percentage)} />
-                              </ChartTooltip>
-                            );
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* Legend Details */}
-                  <div className="flex-1 w-full space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                    {chartData.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs py-0.5 border-b border-border/10">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: item.color }} />
-                          {groupBy === 'security' ? (
-                            item.ticker ? (
-                              <span className="flex items-center gap-1.5 min-w-0" title={`${item.fundName ?? ''} (${item.ticker})`.trim()}>
-                                <span className="font-semibold font-mono text-foreground shrink-0">{item.ticker}</span>
-                                {item.fundName && item.fundName !== item.ticker ? (
-                                  <span className="truncate text-foreground/80">{item.fundName}</span>
-                                ) : null}
-                              </span>
-                            ) : (
-                              <span className="truncate text-foreground/80" title={item.fundName ?? item.name}>{item.fundName ?? item.name}</span>
-                            )
-                          ) : (
-                            <span className="text-muted-foreground truncate" title={item.name}>{item.name}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0 ml-2 font-medium">
-                          <span className="text-foreground font-mono tabular-nums blur-number">{formatCurrency(item.value)}</span>
-                          <span className="text-muted-foreground/80 font-mono w-10 text-right tabular-nums">{formatPlainPercent(item.percentage)}</span>
-                        </div>
-                      </div>
-                    ))}
-                    {groupBy === 'security' || groupBy === 'account' ? (
-                      holdings.length > 7 && (
-                        <button
-                          onClick={() => setShowAll(!showAll)}
-                          className="mt-1 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors w-full text-center py-1"
-                        >
-                          {showAll ? 'Show less' : `Show all ${holdings.length} holdings`}
-                        </button>
-                      )
-                    ) : null}
-                  </div>
-                </div>
-              </>
-            ) : (
-              /* Rebalancing Assistant View */
-              <div className="space-y-4">
-                {/* Secondary Controls: Target Strategy Selector */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-muted/20 border border-border/50">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none">
-                    Target Strategy
-                  </span>
-                  <AppTabs
-                    tabs={Object.entries(PRESET_MODELS).map(([key, model]) => ({
-                      id: key,
-                      label: model.label,
-                    }))}
-                    activeTab={activeModel}
-                    onChange={(key) => {
-                      setActiveModel(key);
-                      setCustomTargets(PRESET_MODELS[key].targets);
-                    }}
-                    variant="pills"
-                    size="sm"
-                    aria-label="Target strategy"
-                  />
-                </div>
-
-              {/* Rebalancing Comparison Table */}
-              <div className="border border-border/60 rounded-xl overflow-hidden divide-y divide-border/40 text-xs">
-                <div className="grid grid-cols-5 p-2.5 bg-muted/20 font-semibold text-muted-foreground text-[10px] uppercase tracking-wider">
-                  <div className="col-span-2">Asset Class</div>
-                  <div className="text-right">Current</div>
-                  <div className="text-right">Target</div>
-                  <div className="text-right">Action Needed</div>
-                </div>
-
-                {['Equities', 'Fixed Income', 'Real Estate', 'Cash', 'Commodities'].map((cls) => {
-                  const currVal = assetClassBreakdown[cls] || 0;
-                  const currPct = totalValue > 0 ? (currVal / totalValue) * 100 : 0;
-                  const targetPct = customTargets[cls] || 0;
-                  const targetVal = (totalValue * targetPct) / 100;
-                  const diffVal = targetVal - currVal;
-
-                  return (
-                    <div key={cls} className="grid grid-cols-5 p-2.5 items-center hover:bg-muted/10">
-                      <div className="col-span-2 font-semibold text-foreground flex items-center gap-1.5">
-                        <span>{cls}</span>
-                      </div>
-                      <div className="text-right font-mono blur-number">
-                        <div>{formatCurrency(currVal)}</div>
-                        <div className="text-[10px] text-muted-foreground">{formatPlainPercent(currPct)}</div>
-                      </div>
-                      <div className="text-right font-mono blur-number">
-                        <div>{formatCurrency(targetVal)}</div>
-                        <div className="text-[10px] text-muted-foreground">{targetPct}%</div>
-                      </div>
-                      <div className="text-right font-mono font-bold blur-number">
-                        {Math.abs(diffVal) < 50 ? (
-                          <span className="text-muted-foreground font-normal">Balanced</span>
-                        ) : diffVal > 0 ? (
-                          <span className="text-chart-1">+Buy {formatCurrency(diffVal)}</span>
-                        ) : (
-                          <span className="text-destructive">-Sell {formatCurrency(Math.abs(diffVal))}</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+        <div className="flex-1 flex flex-col p-4 sm:p-5">
+          {/* Secondary Controls: Grouping Filter */}
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none">
+                Group by
+              </span>
+              <AppTabs
+                tabs={groupOptions.map((opt) => ({ id: opt.value, label: opt.label }))}
+                activeTab={groupBy}
+                onChange={(tabId) => setGroupBy(tabId as GroupByOption)}
+                variant="pills"
+                size="sm"
+                aria-label="Group holdings by"
+              />
             </div>
-          )}
-        </div>
+          </div>
+
+          <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-4 min-h-[240px]">
+            {/* Donut Chart */}
+            <div className="w-52 h-52 shrink-0 relative">
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</span>
+                <span className="text-sm font-bold text-foreground blur-number">
+                  {formatCompactCurrency(totalValue)}
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}>
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius="65%"
+                    outerRadius="85%"
+                    paddingAngle={1}
+                    cornerRadius={3}
+                    stroke="none"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload || !payload.length) return null;
+                      const d = payload[0].payload as ChartItem;
+                      return (
+                        <ChartTooltip>
+                          <TooltipHeader>
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                              <span>{d.name}</span>
+                            </div>
+                          </TooltipHeader>
+                          <TooltipRow label="Value" value={formatCurrency(d.value)} />
+                          <TooltipRow label="Portfolio %" value={formatPlainPercent(d.percentage)} />
+                        </ChartTooltip>
+                      );
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Legend Details */}
+            <div className="flex-1 w-full flex flex-col justify-center min-w-0">
+              <div className="space-y-2 max-h-[200px] sm:max-h-[220px] overflow-y-auto pr-1">
+                {chartData.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs py-0.5 border-b border-border/10">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: item.color }} />
+                      {groupBy === 'security' ? (
+                        item.ticker ? (
+                          <span className="flex items-center gap-1.5 min-w-0" title={`${item.fundName ?? ''} (${item.ticker})`.trim()}>
+                            <span className="font-semibold font-mono text-foreground shrink-0">{item.ticker}</span>
+                            {item.fundName && item.fundName !== item.ticker ? (
+                              <span className="truncate text-foreground/80">{item.fundName}</span>
+                            ) : null}
+                          </span>
+                        ) : (
+                          <span className="truncate text-foreground/80" title={item.fundName ?? item.name}>{item.fundName ?? item.name}</span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground truncate" title={item.name}>{item.name}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-2 font-medium">
+                      <span className="text-foreground font-mono tabular-nums blur-number">{formatCurrency(item.value)}</span>
+                      <span className="text-muted-foreground/80 font-mono w-10 text-right tabular-nums">{formatPlainPercent(item.percentage)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {groupBy === 'security' || groupBy === 'account' ? (
+                holdings.length > 7 && (
+                  <div className="pt-2 mt-1 border-t border-border/30 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowAll(!showAll)}
+                      className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors w-full text-center py-1 rounded hover:bg-primary/5 cursor-pointer"
+                    >
+                      {showAll ? 'Show less' : `Show all ${holdings.length} holdings`}
+                    </button>
+                  </div>
+                )
+              ) : null}
+            </div>
+          </div>
         </div>
       )}
     </div>

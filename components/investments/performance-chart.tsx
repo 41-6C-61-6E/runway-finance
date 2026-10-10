@@ -76,7 +76,11 @@ async function fetchBenchmark(timeframe: TimeRange): Promise<BenchmarkPoint[]> {
   }
 }
 
-export function PerformanceChart() {
+export interface PerformanceChartProps {
+  totalBalance?: number;
+}
+
+export function PerformanceChart({ totalBalance: propTotalBalance }: PerformanceChartProps = {}) {
   const { privacyMode } = usePrivacyMode();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('performanceChart');
   const [timeframe, setTimeframe] = useState<TimeRange>('1y');
@@ -298,6 +302,7 @@ export function PerformanceChart() {
   }, [displayMode, showBenchmark]);
 
   const isChangePositive = summary ? summary.change >= 0 : false;
+  const effectiveTotalBalance = propTotalBalance ?? summary?.current ?? 0;
 
   const headerEl = (
     <div className="flex items-center gap-2">
@@ -310,8 +315,8 @@ export function PerformanceChart() {
     if (!summary) return '';
     const isChangePositive = summary.change >= 0;
     const direction = isChangePositive ? 'increased' : 'decreased';
-    return `Portfolio value is currently ${formatCurrency(summary.current)} as of latest. Over the selected ${timeframe} timeframe, it has ${direction} by ${formatCurrency(Math.abs(summary.change))} (${summary.percentChange.toFixed(2)}%), starting from ${formatCurrency(summary.previous)}.`;
-  }, [summary, timeframe]);
+    return `Total portfolio balance is currently ${formatCurrency(effectiveTotalBalance)} as of latest. Over the selected ${timeframe} timeframe, it has ${direction} by ${formatCurrency(Math.abs(summary.change))} (${summary.percentChange.toFixed(2)}%), starting from ${formatCurrency(summary.previous)}.`;
+  }, [summary, timeframe, effectiveTotalBalance]);
 
   if (loading) {
     return (
@@ -355,7 +360,21 @@ export function PerformanceChart() {
           {srSummary}
         </div>
       )}
-      <CollapsibleCardHeader isCollapsed={isCollapsed} onToggle={setIsCollapsed} title={headerEl} />
+      <CollapsibleCardHeader
+        isCollapsed={isCollapsed}
+        onToggle={setIsCollapsed}
+        title={headerEl}
+        actions={
+          summary && effectiveTotalBalance > 0 ? (
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <span className="text-muted-foreground hidden sm:inline">Portfolio:</span>
+              <span className="text-foreground font-mono font-bold text-sm sm:text-base financial-value blur-number">
+                {formatCurrency(effectiveTotalBalance)}
+              </span>
+            </div>
+          ) : null
+        }
+      />
       {!isCollapsed && (
         <>
           <CollapsibleFilterPanel
@@ -480,11 +499,22 @@ export function PerformanceChart() {
             {/* Stats Panel */}
             {summary && (
               <div className="w-full md:w-60 shrink-0 p-3 sm:p-5 flex flex-col justify-center space-y-4">
+                {/* Total Portfolio Balance */}
                 <div>
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                    Portfolio Balance
+                  </span>
+                  <div className="font-bold text-2xl sm:text-3xl text-foreground font-mono tracking-tight financial-value blur-number">
+                    {formatCurrency(effectiveTotalBalance)}
+                  </div>
+                </div>
+
+                {/* Timeframe Change */}
+                <div className="border-t border-border/60 pt-3.5">
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
                     {timeframe === '1d_discrete' ? '1D' : (timeframe === '7d_discrete' ? '7D' : timeframe.toUpperCase())} Change
                   </span>
-                  <div className={`flex items-baseline gap-1 font-bold text-2xl ${isChangePositive ? 'text-chart-1' : 'text-destructive'}`}>
+                  <div className={`flex items-baseline gap-1 font-bold text-xl sm:text-2xl ${isChangePositive ? 'text-chart-1' : 'text-destructive'}`}>
                     <span>{isChangePositive ? '+' : ''}</span>
                     <span className="financial-value blur-number">{formatCurrency(summary.change)}</span>
                   </div>

@@ -175,72 +175,69 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
         ) : undefined}
         className="bg-card/30 border-0"
       />
-      <div className="px-2 sm:px-3 pb-4 sm:pb-5 space-y-5">
-        {/* Balance History Chart — same box style as GroupDetailPanel combined chart */}
-        <div className="rounded-2xl border border-sidebar-border bg-card/50 shadow-sm overflow-hidden">
-          <div className="p-3 sm:p-4">
-            <div className="h-[240px] w-full relative overflow-hidden flex items-center justify-center">
-              {visibleMiniData.length === 0 ? (
-                <span className="text-[10px] sm:text-xs text-muted-foreground/60 italic">No data for this time period</span>
-              ) : visibleMiniData.length < 2 ? (
-                <span className="text-[10px] sm:text-xs text-muted-foreground/60 italic">Insufficient historical data for this account</span>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                  <AreaChart data={visibleMiniData} margin={{ top: 15, right: 5, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id={`gradient-mini-${accountId}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
-                        <stop offset="95%" stopColor={chartColor} stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.25} />
-                    <XAxis
-                      dataKey="date"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
-                      ticks={miniTicks}
-                      tickFormatter={(d) => formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' })}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
-                      domain={[minVal, maxVal]}
-                      ticks={miniYTicks}
-                      tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
-                    />
-                    <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} wrapperStyle={{ zIndex: 50 }} />
-                    <Area
-                      type="monotone"
-                      dataKey="balance"
-                      stroke={chartColor}
-                      strokeWidth={1.5}
-                      fill={`url(#gradient-mini-${accountId})`}
-                      dot={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
+      <div className="px-4 sm:px-5 pb-5 sm:pb-6 space-y-5">
+        {/* Balance History Chart */}
+        <div>
+          <div className="h-[240px] w-full relative overflow-hidden flex items-center justify-center">
+            {visibleMiniData.length === 0 ? (
+              <span className="text-[10px] sm:text-xs text-muted-foreground/60 italic">No data for this time period</span>
+            ) : visibleMiniData.length < 2 ? (
+              <span className="text-[10px] sm:text-xs text-muted-foreground/60 italic">Insufficient historical data for this account</span>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                <AreaChart data={visibleMiniData} margin={{ top: 15, right: 5, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={`gradient-mini-${accountId}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={chartColor} stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.25} />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                    ticks={miniTicks}
+                    tickFormatter={(d) => formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' })}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                    domain={[minVal, maxVal]}
+                    ticks={miniYTicks}
+                    tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}
+                  />
+                  <RechartsTooltip content={<MiniTooltip />} cursor={{ stroke: chartColor, strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }} wrapperStyle={{ zIndex: 50 }} />
+                  <Area
+                    type="monotone"
+                    dataKey="balance"
+                    stroke={chartColor}
+                    strokeWidth={1.5}
+                    fill={`url(#gradient-mini-${accountId})`}
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        {/* Recent Transactions — same box style as GroupDetailPanel composition */}
-        <div className="rounded-2xl border border-sidebar-border bg-card/50 shadow-sm overflow-hidden">
-          <div className="p-3 sm:p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent activity</h3>
-              <Link
-                href={`/transactions?accountId=${accountId}`}
-                className="text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer"
-              >
-                <Receipt className="w-3.5 h-3.5" />
-                <span>See all</span>
-                <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-              </Link>
-            </div>
-            <div className="flex-1 flex flex-col justify-center min-h-[140px]">
+        {/* Recent Transactions */}
+        <div className="space-y-3 pt-5 border-t border-sidebar-border/60">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Recent activity</h3>
+            <Link
+              href={`/transactions?accountId=${accountId}`}
+              className="text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 group cursor-pointer"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>See all</span>
+              <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+          <div className="flex-1 flex flex-col justify-center min-h-[140px]">
               {isLoading ? (
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-full" />
@@ -248,19 +245,19 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
                   <Skeleton className="h-4 w-full" />
                 </div>
               ) : error || !txData ? (
-                <div className="text-[10px] sm:text-xs text-destructive text-center py-4 bg-card/25 rounded-lg border border-border/20">
+                <div className="text-[10px] sm:text-xs text-destructive text-center py-4">
                   Failed to load transactions.
                 </div>
               ) : txs.length === 0 ? (
-                <div className="text-[10px] sm:text-xs text-muted-foreground/60 italic text-center py-8 bg-card/25 rounded-lg border border-border/20">
+                <div className="text-[10px] sm:text-xs text-muted-foreground/60 italic text-center py-6">
                   No recent activity found.
                 </div>
               ) : (
-                <div className="divide-y divide-border/20 border border-border/30 rounded-lg overflow-hidden bg-card/40">
+                <div className="space-y-0.5">
                   {txs.map((tx: any) => {
                     const { text } = formatTransactionAmount(tx.amount);
                     return (
-                      <div key={tx.id} className="py-2 flex items-center justify-between text-xs hover:bg-muted/30 px-3 transition-colors">
+                      <div key={tx.id} className="py-2 flex items-center justify-between text-xs hover:bg-muted/30 px-2 rounded-lg transition-colors">
                         <div className="min-w-0 flex-1 pr-4">
                           <p className="font-medium text-foreground truncate text-xs sm:text-sm">{tx.payee || tx.description || 'Unidentified Transaction'}</p>
                           <div className="flex items-center gap-2 mt-0.5">
@@ -285,7 +282,6 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
                 </div>
               )}
             </div>
-          </div>
         </div>
       </div>
     </div>
