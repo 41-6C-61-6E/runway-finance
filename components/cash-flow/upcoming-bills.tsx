@@ -253,42 +253,50 @@ export function UpcomingBills() {
     <div className="w-full space-y-3">
       {/* ── Persistent Navigation & View Controls Bar (Always Visible!) ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 py-1">
-        {/* Left: Today Button, Chevrons & Month Title */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleToday}
-            className="text-xs h-8 px-3 font-semibold rounded-lg border-border/80 hover:bg-muted/70 transition-colors"
-          >
-            Today
-          </Button>
+        {/* Left: Today Button, Chevrons & Month Title (only in Calendar view) */}
+        {viewMode === 'calendar' ? (
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToday}
+              className="text-xs h-8 px-3 font-semibold rounded-lg border-border/80 hover:bg-muted/70 transition-colors"
+            >
+              Today
+            </Button>
 
-          <div className="flex items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handlePrevMonth}
-              className="h-8 w-8 rounded-full hover:bg-muted"
-              aria-label="Previous Month"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleNextMonth}
-              className="h-8 w-8 rounded-full hover:bg-muted"
-              aria-label="Next Month"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handlePrevMonth}
+                className="h-8 w-8 rounded-full hover:bg-muted"
+                aria-label="Previous Month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNextMonth}
+                className="h-8 w-8 rounded-full hover:bg-muted"
+                aria-label="Next Month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground tracking-tight">
+              {monthName}
+            </h2>
           </div>
-
-          <h2 className="text-lg sm:text-xl font-semibold text-foreground tracking-tight">
-            {monthName}
-          </h2>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground tracking-tight">
+              Timeline
+            </h2>
+          </div>
+        )}
 
         {/* Right: Flow Filters, Search & View Toggles */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">

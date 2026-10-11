@@ -335,7 +335,7 @@ export default function TagsTab() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5 pr-4">
               <label className="text-xs font-medium text-foreground">Show in Transaction Register</label>
-              <p className="text-[10px] text-muted-foreground">Display indicators in transactions list and detail drawer</p>
+              <p className="text-[10px] text-muted-foreground">Display tags and indicators in transactions list and detail drawer</p>
             </div>
             <Switch
               checked={visibilitySettings.transactions !== false}

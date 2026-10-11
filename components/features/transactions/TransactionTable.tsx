@@ -235,7 +235,8 @@ export default function TransactionTable({
 }: TransactionTableProps) {
   const queryClient = useQueryClient();
   const settingsContext = useUserSettings();
-  const showAccountTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
+  const showRegisterTags = settingsContext?.settings?.accountTagVisibility?.transactions !== false;
+  const showAccountTags = showRegisterTags;
 
   // Force compact (card) view on mobile — full table is unusable on small screens
   const [isMobile, setIsMobile] = useState(false);
@@ -341,6 +342,7 @@ export default function TransactionTable({
     category: true,
     postedDate: false,
     ai: false,
+    tags: showRegisterTags,
   });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const columnMenuRef = useRef<HTMLDivElement>(null);
@@ -398,6 +400,16 @@ export default function TransactionTable({
       }));
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      return;
+    }
+    setColumnVisibility((prev) => ({
+      ...prev,
+      tags: showRegisterTags,
+    }));
+  }, [showRegisterTags]);
 
   // Default compact view on mobile (first visit only)
   useEffect(() => {
@@ -903,12 +915,12 @@ export default function TransactionTable({
   }, [rowSelection]);
 
   useEffect(() => {
-    onSelectAll(Array.from(selectedIds));
+    onSelectAll?.(Array.from(selectedIds));
   }, [selectedIds, onSelectAll]);
 
   useEffect(() => {
     const currentSentinel = sentinelRef.current;
-    if (!currentSentinel) return;
+    if (!currentSentinel || typeof IntersectionObserver === 'undefined') return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1103,11 +1115,10 @@ export default function TransactionTable({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span
-                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-micro font-semibold rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
+                          className="inline-flex items-center p-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
                           aria-label={`Recurring transaction: ${match.name}`}
                         >
                           <Repeat className="w-2.5 h-2.5" />
-                          <span className="capitalize hidden sm:inline">{match.frequency}</span>
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
@@ -1598,6 +1609,7 @@ export default function TransactionTable({
         header: 'Tags',
         enableSorting: false,
         cell: ({ row }) => {
+          if (!showRegisterTags) return null;
           const txTags = row.original.tags ?? [];
           if (txTags.length === 0) return null;
           return (
@@ -1637,7 +1649,7 @@ export default function TransactionTable({
       newCategoryIsIncome,
       creatingCategoryLoading,
       handleCreateCategory,
-      showAccountTags,
+      showRegisterTags,
     ],
   );
 
@@ -1903,11 +1915,10 @@ export default function TransactionTable({
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span
-                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-micro font-semibold rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
+                                  className="inline-flex items-center p-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0 cursor-help"
                                   aria-label={`Recurring: ${match.name}`}
                                 >
                                   <Repeat className="w-2.5 h-2.5" />
-                                  <span className="capitalize text-micro">{match.frequency}</span>
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="text-xs">
@@ -1948,7 +1959,7 @@ export default function TransactionTable({
                             </TooltipContent>
                           </Tooltip>
                         )}
-                        {txTags.length > 0 && (
+                        {showRegisterTags && txTags.length > 0 && (
                           <div className="flex items-center gap-1 min-w-0 overflow-hidden shrink-0">
                             {txTags.map((tag) => (
                               <Tooltip key={tag.id}>
