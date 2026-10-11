@@ -256,11 +256,12 @@ export default function GroupDetailPanel({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-muted/60 transition-colors flex-shrink-0 ml-2"
             aria-label="Close group details"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer shrink-0"
           >
-            <X className="w-4 h-4 text-muted-foreground" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -295,19 +296,17 @@ export default function GroupDetailPanel({
         className="bg-card/30 border-0"
       />
 
-      <div className="px-2 sm:px-3 pb-4 sm:pb-5 space-y-5">
+      <div className="px-4 sm:px-5 pb-5 sm:pb-6 space-y-5">
         {/* Combined group history chart (stacked by account) */}
-        <div className="rounded-2xl border border-sidebar-border bg-card/50 shadow-sm overflow-hidden">
-          <div className="p-3 sm:p-4">
+        <div>
+          <div className="h-[240px] w-full relative overflow-hidden flex items-center justify-center">
             {chartData.length < 2 ? (
-              <div className="h-[180px]">
-                <ChartEmptyState variant="insufficient" />
-              </div>
+              <ChartEmptyState variant="insufficient" />
             ) : (
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
                 <AreaChart
                   data={chartData}
-                  margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+                  margin={{ top: 15, right: 8, bottom: 0, left: -10 }}
                 >
                   <defs>
                     {chartAccounts.map((acc) => {
@@ -331,12 +330,13 @@ export default function GroupDetailPanel({
                     strokeDasharray="3 3"
                     stroke="var(--color-border)"
                     vertical={false}
+                    opacity={0.25}
                   />
                   <XAxis
                     dataKey="date"
                     tickLine={false}
-                    axisLine={{ stroke: 'var(--color-border)' }}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+                    axisLine={false}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
                     ticks={xAxisTicks as any}
                     tickFormatter={(d: string) =>
                       formatChartXAxisDate(d, hierarchyTimeframe, {
@@ -349,18 +349,18 @@ export default function GroupDetailPanel({
                     width={48}
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
                     domain={[0, maxStackedTotal]}
                     tickFormatter={(v: number) =>
                       formatChartYAxisCurrency(v, 0, maxStackedTotal)
                     }
                   />
-                  <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1} />
                   <Tooltip
                     content={
                       <GroupTooltip timeframe={hierarchyTimeframe} colors={colorByAccount} />
                     }
-                    cursor={{ stroke: 'var(--color-border)', opacity: 0.5 }}
+                    cursor={{ stroke: 'var(--color-border)', strokeWidth: 1, strokeDasharray: '2 2', opacity: 0.5 }}
+                    wrapperStyle={{ zIndex: 50 }}
                   />
                   {chartAccounts.map((acc) => (
                     <Area
@@ -383,77 +383,75 @@ export default function GroupDetailPanel({
 
         {/* Per-account composition */}
         {composition.length > 1 && (
-          <div className="rounded-2xl border border-sidebar-border bg-card/50 shadow-sm">
-            <div className="p-3 sm:p-4 space-y-3">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {isLiab ? 'Debt breakdown' : 'Balance breakdown'}
-              </h3>
-              <div className="flex items-center gap-4 sm:gap-5">
-                <div
-                  className="relative flex-shrink-0"
-                  style={{ width: 130, height: 130 }}
-                >
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 130, height: 130 }}>
-                    <PieChart>
-                      <Pie
-                        data={composition}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius="65%"
-                        outerRadius="95%"
-                        paddingAngle={2}
-                        cornerRadius={3}
-                        startAngle={90}
-                        endAngle={-270}
-                        stroke="none"
-                      >
-                        {composition.map((entry) => (
-                          <Cell key={entry.name} fill={entry.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-2">
-                    <p className="font-mono text-[11px] font-bold text-sidebar-foreground blur-number text-center leading-tight">
-                      {formatCurrency(compositionTotal)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0 space-y-2">
-                  {composition.slice(0, 5).map((entry) => (
-                    <div
-                      key={entry.name}
-                      className="flex items-center gap-2 text-xs min-w-0"
+          <div className="space-y-3 pt-5 border-t border-sidebar-border/60">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {isLiab ? 'Debt breakdown' : 'Balance breakdown'}
+            </h3>
+            <div className="flex items-center gap-4 sm:gap-5">
+              <div
+                className="relative flex-shrink-0"
+                style={{ width: 130, height: 130 }}
+              >
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 130, height: 130 }}>
+                  <PieChart>
+                    <Pie
+                      data={composition}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="65%"
+                      outerRadius="95%"
+                      paddingAngle={2}
+                      cornerRadius={3}
+                      startAngle={90}
+                      endAngle={-270}
+                      stroke="none"
                     >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: entry.color }}
-                      />
-                      <span
-                        className="truncate text-sidebar-foreground flex-1 min-w-0"
-                        title={entry.name}
-                      >
-                        {entry.name}
-                      </span>
-                      <span className="font-mono text-muted-foreground flex-shrink-0 blur-number">
-                        {formatCurrency(entry.value)}
-                      </span>
-                      <span className="w-9 text-right text-muted-foreground flex-shrink-0">
-                        {compositionTotal
-                          ? Math.round((entry.value / compositionTotal) * 100)
-                          : 0}
-                        %
-                      </span>
-                    </div>
-                  ))}
-                  {composition.length > 5 && (
-                    <p className="text-[11px] text-muted-foreground">
-                      +{composition.length - 5} more
-                    </p>
-                  )}
+                      {composition.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-2">
+                  <p className="font-mono text-[11px] font-bold text-sidebar-foreground blur-number text-center leading-tight">
+                    {formatCurrency(compositionTotal)}
+                  </p>
                 </div>
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                {composition.slice(0, 5).map((entry) => (
+                  <div
+                    key={entry.name}
+                    className="flex items-center gap-2 text-xs min-w-0"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: entry.color }}
+                    />
+                    <span
+                      className="truncate text-sidebar-foreground flex-1 min-w-0"
+                      title={entry.name}
+                    >
+                      {entry.name}
+                    </span>
+                    <span className="font-mono text-muted-foreground flex-shrink-0 blur-number">
+                      {formatCurrency(entry.value)}
+                    </span>
+                    <span className="w-9 text-right text-muted-foreground flex-shrink-0">
+                      {compositionTotal
+                        ? Math.round((entry.value / compositionTotal) * 100)
+                        : 0}
+                      %
+                    </span>
+                  </div>
+                ))}
+                {composition.length > 5 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    +{composition.length - 5} more
+                  </p>
+                )}
               </div>
             </div>
           </div>
