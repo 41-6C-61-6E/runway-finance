@@ -1,67 +1,89 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   CalendarClock,
   AlertCircle,
-  CheckCircle2,
-  HelpCircle,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
   LayoutGrid,
   List,
+  Search,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
-import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { formatCurrency } from '@/lib/utils/format';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { cn } from '@/lib/utils';
 import type { UpcomingBill } from '@/lib/services/recurring-detection';
+import type { RecurringItem } from '@/components/features/transactions/RecurringCard';
 import { formatFrequencyLabel } from '@/components/features/transactions/RecurringCard';
 import { BillCalendarGrid } from '@/components/cash-flow/bill-calendar-grid';
-import { Select } from '@/components/ui/select';
+import RecurringDetailDrawer from '@/components/features/transactions/RecurringDetailDrawer';
+import { formatCurrency } from '@/lib/utils/format';
 
-const CENTS: Intl.NumberFormatOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+const formatNoCents = (amount: number) =>
+  formatCurrency(Math.round(Number.isFinite(amount) ? amount : 0), 'USD', 'en-US');
 
 const localDateStr = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export function UpcomingBills() {
   const { privacyMode } = usePrivacyMode();
-  const [collapsed, setCollapsed] = useCardCollapsed('upcomingBillsSummary', false);
 
   const [bills, setBills] = useState<UpcomingBill[]>([]);
-  const [stats, setStats] = useState<{
-    dueThisWeek: number;
-    dueThisMonth: number;
-    paidThisMonth: number;
-    totalUpcoming: number;
-    incomeThisWeek?: number;
-    incomeThisMonth?: number;
-    totalUpcomingIncome?: number;
-    netThisMonth?: number;
-  }>({
-    dueThisWeek: 0,
-    dueThisMonth: 0,
-    paidThisMonth: 0,
-    totalUpcoming: 0,
-    incomeThisWeek: 0,
-    incomeThisMonth: 0,
-    totalUpcomingIncome: 0,
-    netThisMonth: 0,
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const [viewMode, setViewMode] = useState<'calendar' | 'timeline'>('calendar');
   const [flowFilter, setFlowFilter] = useState<'all' | 'expense' | 'income'>('all');
   const [daysHorizon, setDaysHorizon] = useState<number>(60);
-  const [showOptions, setShowOptions] = useState(false);
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchUpcoming = async () => {
+  // Recurring drawer detail state
+  const [selectedRecurringItem, setSelectedRecurringItem] = useState<RecurringItem | null>(null);
+  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
+  const [categories, setCategories] = useState<{ id: string; name: string; color: string; isDiscretionary?: boolean }[]>([]);
+
+  // Month navigation helpers
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+
+  const handleToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  // Fetch categories on mount
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCategories(
+            data.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              color: c.color || '#6366f1',
+              isDiscretionary: c.isDiscretionary ?? true,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchUpcoming = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
@@ -69,7 +91,6 @@ export function UpcomingBills() {
       if (res.ok) {
         const data = await res.json();
         setBills(data.bills || []);
-        setStats(data.stats || { dueThisWeek: 0, dueThisMonth: 0, paidThisMonth: 0, totalUpcoming: 0 });
       } else {
         setError(true);
       }
@@ -79,11 +100,76 @@ export function UpcomingBills() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [daysHorizon, flowFilter]);
 
   useEffect(() => {
     fetchUpcoming();
-  }, [daysHorizon, flowFilter]);
+  }, [fetchUpcoming]);
+
+  // Filter bills by search query
+  const filteredBills = useMemo(() => {
+    if (!searchQuery.trim()) return bills;
+    const q = searchQuery.toLowerCase().trim();
+    return bills.filter(
+      (b) =>
+        b.displayName?.toLowerCase().includes(q) ||
+        b.merchantName?.toLowerCase().includes(q) ||
+        b.categoryName?.toLowerCase().includes(q) ||
+        b.accountName?.toLowerCase().includes(q)
+    );
+  }, [bills, searchQuery]);
+
+  // Open recurring drawer when a bill is selected
+  const handleOpenBillDetails = async (bill: UpcomingBill) => {
+    try {
+      const res = await fetch(`/api/recurring/${bill.recurringId}`);
+      if (res.ok) {
+        const item = await res.json();
+        setSelectedRecurringItem(item);
+        setDetailDrawerOpen(true);
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to fetch recurring details', e);
+    }
+
+    // Fallback: construct lightweight RecurringItem from UpcomingBill
+    setSelectedRecurringItem({
+      id: bill.recurringId,
+      userId: '',
+      merchantName: bill.merchantName,
+      displayName: bill.displayName,
+      customName: null,
+      notes: null,
+      accountId: null,
+      accountName: bill.accountName,
+      categoryId: null,
+      categoryName: bill.categoryName,
+      categoryColor: bill.categoryColor,
+      frequency: bill.frequency,
+      averageAmount: bill.amount,
+      lastAmount: bill.amount,
+      monthlyAmount: bill.amount,
+      annualAmount: bill.amount,
+      lastDate: bill.expectedDate,
+      nextExpectedDate: bill.expectedDate,
+      daysUntilNext: bill.daysUntil,
+      isOverdue: bill.isOverdue,
+      flowType: bill.flowType,
+      isConfirmed: true,
+      isDismissed: false,
+      isPaused: false,
+      occurrenceCount: 1,
+      confidence: 100,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    setDetailDrawerOpen(true);
+  };
+
+  const handleDrawerSuccess = () => {
+    fetchUpcoming();
+  };
 
   // Group bills chronologically for Timeline view
   const groupedTimeline = useMemo(() => {
@@ -101,22 +187,22 @@ export function UpcomingBills() {
 
     const groups: { title: string; subtitle?: string; badge?: string; isAlert?: boolean; items: UpcomingBill[] }[] = [];
 
-    const overdue = bills.filter((b) => b.isOverdue);
-    const todayBills = bills.filter((b) => !b.isOverdue && b.expectedDate === todayStr);
-    const tomorrowBills = bills.filter((b) => !b.isOverdue && b.expectedDate === tomorrowStr);
-    const thisWeekBills = bills.filter(
+    const overdue = filteredBills.filter((b) => b.isOverdue);
+    const todayBills = filteredBills.filter((b) => !b.isOverdue && b.expectedDate === todayStr);
+    const tomorrowBills = filteredBills.filter((b) => !b.isOverdue && b.expectedDate === tomorrowStr);
+    const thisWeekBills = filteredBills.filter(
       (b) => !b.isOverdue && b.expectedDate > tomorrowStr && b.expectedDate <= endOfWeekStr
     );
-    const thisMonthBills = bills.filter(
+    const thisMonthBills = filteredBills.filter(
       (b) => !b.isOverdue && b.expectedDate > endOfWeekStr && b.expectedDate.startsWith(currentMonth)
     );
-    const futureBills = bills.filter(
+    const futureBills = filteredBills.filter(
       (b) => !b.isOverdue && b.expectedDate > endOfWeekStr && !b.expectedDate.startsWith(currentMonth)
     );
 
     if (overdue.length > 0) {
       groups.push({
-        title: 'Overdue / Expected Past Date',
+        title: 'Overdue / Past Expected',
         badge: `${overdue.length} overdue`,
         isAlert: true,
         items: overdue,
@@ -161,158 +247,161 @@ export function UpcomingBills() {
     }
 
     return groups;
-  }, [bills]);
+  }, [filteredBills]);
 
-  // Main Calendar / Timeline content
-  const mainContent = (
-    <div className="space-y-6">
+  return (
+    <div className="w-full space-y-3">
+      {/* ── Persistent Navigation & View Controls Bar (Always Visible!) ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 py-1">
+        {/* Left: Today Button, Chevrons & Month Title */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleToday}
+            className="text-xs h-8 px-3 font-semibold rounded-lg border-border/80 hover:bg-muted/70 transition-colors"
+          >
+            Today
+          </Button>
+
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handlePrevMonth}
+              className="h-8 w-8 rounded-full hover:bg-muted"
+              aria-label="Previous Month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleNextMonth}
+              className="h-8 w-8 rounded-full hover:bg-muted"
+              aria-label="Next Month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <h2 className="text-lg sm:text-xl font-semibold text-foreground tracking-tight">
+            {monthName}
+          </h2>
+        </div>
+
+        {/* Right: Flow Filters, Search & View Toggles */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {/* Flow Filter Pills */}
+          <div className="flex items-center">
+            <AppTabs
+              tabs={[
+                { id: 'all', label: 'All' },
+                { id: 'expense', label: 'Bills' },
+                { id: 'income', label: 'Income' },
+              ]}
+              activeTab={flowFilter}
+              onChange={(tab) => setFlowFilter(tab as any)}
+              variant="pills"
+              size="sm"
+            />
+          </div>
+
+          {/* Search Input */}
+          <div className="relative flex-1 sm:w-44 min-w-[120px]">
+            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-8 pr-7 bg-muted/40 hover:bg-muted/70 focus:bg-background border border-border/60 rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* View Mode Toggle: Calendar <-> Timeline (Always Accessible!) */}
+          <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/50">
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={cn(
+                'p-1.5 px-2 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5',
+                viewMode === 'calendar'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              title="Month Calendar View"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Calendar</span>
+            </button>
+            <button
+              onClick={() => setViewMode('timeline')}
+              className={cn(
+                'p-1.5 px-2 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5',
+                viewMode === 'timeline'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              title="Timeline List View"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Timeline</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main View (Calendar or Timeline) ── */}
       {loading ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">
+        <div className="py-20 text-center text-sm text-muted-foreground bg-card border border-border/60 rounded-2xl p-8">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-primary opacity-60" />
-          Loading bill calendar...
+          Loading calendar...
         </div>
       ) : error ? (
-        <div className="py-16 text-center rounded-2xl border border-dashed border-border/80 p-8 space-y-3">
+        <div className="py-16 text-center rounded-2xl border border-dashed border-border/80 p-8 space-y-3 bg-card">
           <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
             <AlertCircle className="w-6 h-6" />
           </div>
-          <h3 className="font-semibold text-base text-foreground">Failed to load your bill calendar</h3>
+          <h3 className="font-semibold text-base text-foreground">Failed to load calendar schedule</h3>
           <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-            Something went wrong while fetching your recurring bills.
+            Something went wrong while fetching recurring projections.
           </p>
           <div className="pt-1 flex justify-center">
             <Button variant="outline" size="sm" onClick={fetchUpcoming}>
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="w-3.5 h-3.5 mr-1" />
               Retry
             </Button>
           </div>
         </div>
       ) : viewMode === 'calendar' ? (
-        /* Monthly Calendar Grid View */
+        /* Full-Width Month Calendar Grid View */
         <BillCalendarGrid
-          bills={bills}
-          flowFilter={flowFilter}
-          onFlowFilterChange={setFlowFilter}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onRefresh={fetchUpcoming}
+          bills={filteredBills}
+          currentDate={currentDate}
+          onCurrentDateChange={setCurrentDate}
+          onSelectBill={handleOpenBillDetails}
         />
       ) : (
         /* Chronological Timeline List View */
         <div className="space-y-6">
-          {/* Timeline Header Bar */}
-          <div className="bg-muted hover:bg-muted/85 border border-border rounded-xl transition-all duration-200 overflow-visible">
-            <CollapsibleFilterPanel
-              isOpen={showOptions}
-              onToggle={() => setShowOptions((v) => !v)}
-              activeFilterCount={
-                (flowFilter !== 'all' ? 1 : 0) + (daysHorizon !== 60 ? 1 : 0)
-              }
-              feedbackItems={
-                flowFilter !== 'all' || daysHorizon !== 60 ? [
-                  <div key="chips" className="flex items-center gap-2 flex-wrap">
-                    {flowFilter !== 'all' && (
-                      <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider animate-in fade-in duration-150">
-                        {flowFilter === 'expense' ? 'Bills' : 'Income'}
-                      </span>
-                    )}
-                    {daysHorizon !== 60 && (
-                      <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider animate-in fade-in duration-150">
-                        Next {daysHorizon}d
-                      </span>
-                    )}
-                  </div>,
-                ] : undefined
-              }
-              actions={
-                flowFilter !== 'all' || daysHorizon !== 60 ? (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="h-6 px-2 flex items-center rounded-md bg-primary/10 text-primary border border-primary/20 text-[10px] font-semibold uppercase tracking-wider">
-                      Filtered
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFlowFilter('all');
-                        setDaysHorizon(60);
-                      }}
-                      className="h-6 px-2 flex items-center gap-1 rounded-md bg-background hover:bg-muted border border-border text-muted-foreground hover:text-foreground text-[10px] font-semibold uppercase tracking-wider transition-colors cursor-pointer"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                ) : undefined
-              }
-              rightActions={
-                <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/50">
-                  <button
-                    onClick={() => setViewMode('calendar')}
-                    className="p-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                    title="Month Grid View"
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">Calendar</span>
-                  </button>
-                  <button
-                    onClick={() => setViewMode('timeline')}
-                    className="p-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 bg-background text-foreground shadow-xs"
-                    title="Timeline List View"
-                  >
-                    <List className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">Timeline</span>
-                  </button>
-                </div>
-              }
-              className="border-b-0 bg-transparent px-3 sm:px-4 py-2"
-            >
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/20 border border-border/20 rounded-xl">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mr-1 select-none">
-                    <CalendarClock className="w-3 h-3" />
-                    Flow
-                  </span>
-                  <AppTabs
-                    tabs={[
-                      { id: 'all', label: 'All' },
-                      { id: 'expense', label: 'Bills' },
-                      { id: 'income', label: 'Income' },
-                    ]}
-                    activeTab={flowFilter}
-                    onChange={(tab) => setFlowFilter(tab as any)}
-                    variant="pills"
-                    size="sm"
-                  />
-                </div>
-                <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/20 border border-border/20 rounded-xl">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mr-1 select-none">
-                    <CalendarClock className="w-3 h-3" />
-                    Horizon
-                  </span>
-                  <Select
-                    className="h-8 rounded-xl text-xs font-medium"
-                    value={daysHorizon}
-                    onChange={(e) => setDaysHorizon(Number(e.target.value))}
-                  >
-                    <option value={7}>Next 7 days</option>
-                    <option value={14}>Next 14 days</option>
-                    <option value={30}>Next 30 days</option>
-                    <option value={60}>Next 60 days</option>
-                    <option value={90}>Next 90 days</option>
-                  </Select>
-                </div>
-              </div>
-            </CollapsibleFilterPanel>
-          </div>
-
-          {/* Timeline List Stream */}
-          {bills.length === 0 ? (
-            <div className="py-16 text-center rounded-2xl border border-dashed border-border/80 p-8 space-y-3">
+          {/* Timeline Stream */}
+          {filteredBills.length === 0 ? (
+            <div className="py-16 text-center rounded-2xl border border-dashed border-border/80 p-8 space-y-3 bg-card">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
                 <CalendarClock className="w-6 h-6" />
               </div>
-              <h3 className="font-semibold text-base text-foreground">No upcoming bills in this window</h3>
+              <h3 className="font-semibold text-base text-foreground">No upcoming bills found</h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                No recurring bills or income projected for the selected timeframe.
+                No recurring bills or income match your current filter.
               </p>
             </div>
           ) : (
@@ -355,8 +444,9 @@ export function UpcomingBills() {
                       return (
                         <div
                           key={bill.id}
+                          onClick={() => handleOpenBillDetails(bill)}
                           className={cn(
-                            'p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors',
+                            'p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors cursor-pointer',
                             bill.isOverdue && 'bg-amber-500/[0.03]'
                           )}
                         >
@@ -411,7 +501,7 @@ export function UpcomingBills() {
                               )}
                             >
                               {isIncome ? '+' : '-'}
-                              {formatCurrency(Number.isFinite(bill.amount) ? bill.amount : 0, 'USD', 'en-US', CENTS)}
+                              {formatNoCents(bill.amount)}
                             </div>
 
                             <div className="flex items-center justify-end gap-1.5 mt-0.5">
@@ -439,157 +529,17 @@ export function UpcomingBills() {
           )}
         </div>
       )}
-    </div>
-  );
 
-  // Standardized Summary Side Panel
-  const summaryContent = (
-    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
-      <CollapsibleCardHeader
-        isCollapsed={collapsed}
-        onToggle={setCollapsed}
-        collapseDirection="horizontal"
-        showMobileToggle={false}
-        title={
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-foreground">Overview</span>
-          </div>
-        }
-        className="border-b border-sidebar-border/60 bg-sidebar"
-      />
-
-      {!collapsed && (
-        <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
-          {/* Section 1: Next 7 Days Rollups */}
-          <div className="py-4 first:pt-0 last:pb-0 space-y-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-              Due in Next 7 Days
-            </span>
-            <div className="flex items-baseline justify-between gap-2">
-              <div
-                className={cn(
-                  'text-xl sm:text-2xl font-extrabold font-mono text-foreground tracking-tight',
-                  privacyMode && 'blur-sm select-none'
-                )}
-              >
-                -{formatCurrency(stats.dueThisWeek)}
-              </div>
-              {(stats.incomeThisWeek || 0) > 0 && (
-                <div
-                  className={cn(
-                    'text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400',
-                    privacyMode && 'blur-xs select-none'
-                  )}
-                >
-                  +{formatCurrency(stats.incomeThisWeek || 0)} in
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Section 2: Month Stats */}
-          <div className="py-4 first:pt-0 last:pb-0 space-y-3">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-              Current Month Breakdown
-            </span>
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="p-2.5 rounded-xl bg-card border border-border/60 space-y-0.5">
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Outflow</span>
-                <div
-                  className={cn(
-                    'text-sm sm:text-base font-bold font-mono text-foreground',
-                    privacyMode && 'blur-xs select-none'
-                  )}
-                >
-                  -{formatCurrency(stats.dueThisMonth)}
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-card border border-border/60 space-y-0.5">
-                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wider">Inflow</span>
-                <div
-                  className={cn(
-                    'text-sm sm:text-base font-bold font-mono text-emerald-600 dark:text-emerald-400',
-                    privacyMode && 'blur-xs select-none'
-                  )}
-                >
-                  +{formatCurrency(stats.incomeThisMonth || 0)}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground font-medium">Net Monthly Flow:</span>
-              <span
-                className={cn(
-                  'font-bold font-mono',
-                  (stats.netThisMonth || 0) >= 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-rose-600 dark:text-rose-400',
-                  privacyMode && 'blur-xs select-none'
-                )}
-              >
-                {(stats.netThisMonth || 0) >= 0 ? '+' : ''}
-                {formatCurrency(stats.netThisMonth || 0)}
-              </span>
-            </div>
-          </div>
-
-          {/* Section 3: Total in Horizon */}
-          <div className="py-4 first:pt-0 last:pb-0 space-y-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-              Total in Horizon ({daysHorizon}d)
-            </span>
-            <div className="space-y-1.5 text-xs font-mono">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground font-sans">Upcoming Outflows:</span>
-                <span
-                  className={cn(
-                    'font-bold text-foreground',
-                    privacyMode && 'blur-xs select-none'
-                  )}
-                >
-                  -{formatCurrency(stats.totalUpcoming)}
-                </span>
-              </div>
-              {(stats.totalUpcomingIncome || 0) > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground font-sans">Upcoming Inflows:</span>
-                  <span
-                    className={cn(
-                      'font-bold text-emerald-600 dark:text-emerald-400',
-                      privacyMode && 'blur-xs select-none'
-                    )}
-                  >
-                    +{formatCurrency(stats.totalUpcomingIncome || 0)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Section 4: Projections vs Cleared explanation */}
-          <div className="py-4 first:pt-0 last:pb-0 space-y-2 text-xs text-muted-foreground">
-            <div className="font-semibold text-foreground flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5 text-primary" />
-              Projections vs Cleared
-            </div>
-            <p className="leading-relaxed">
-              Projections are computed from your recurring schedules. Actual cleared transactions automatically reconcile against future dates.
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="w-full">
-      <MobileViewSwitcher
-        main={mainContent}
-        summary={summaryContent}
-        summaryLabel="Overview"
-        summaryCardId="upcomingBillsSummary"
+      {/* ── Connected Recurring Detail Drawer ── */}
+      <RecurringDetailDrawer
+        item={selectedRecurringItem}
+        open={detailDrawerOpen}
+        onClose={() => {
+          setDetailDrawerOpen(false);
+          setSelectedRecurringItem(null);
+        }}
+        onSuccess={handleDrawerSuccess}
+        categories={categories}
       />
     </div>
   );
