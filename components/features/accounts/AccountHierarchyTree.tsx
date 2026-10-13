@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { 
   ChevronRight, 
   ChevronDown, 
-
+  Layers,
   Plus, 
   AlertCircle, 
   AlertTriangle,
@@ -20,12 +20,13 @@ import { Sparkline } from '@/components/ui/sparkline';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { useUserSettings } from '@/components/user-settings-provider';
-import { isLiabilityAccount } from '@/lib/utils/account-scope';
+import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
 import { AccountTransactions } from '@/components/features/accounts/AccountTransactions';
 import AccountDetailPanel from '@/components/features/accounts/AccountDetailPanel';
 import GroupDetailPanel from '@/components/features/accounts/GroupDetailPanel';
+import AllAccountsDetailPanel from '@/components/features/accounts/AllAccountsDetailPanel';
 import {
   type Account,
   type TagItem,
@@ -63,7 +64,7 @@ export default function AccountHierarchyTree({
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expandedSubgroups, setExpandedSubgroups] = useState<Record<string, boolean>>({});
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>('All Accounts');
 
   const [hierarchySelectedGroups, setHierarchySelectedGroups] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedGroups', new Set(), setOptions);
   const [hierarchySelectedTypes, setHierarchySelectedTypes] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedTypes', new Set(), setOptions);
@@ -317,15 +318,115 @@ export default function AccountHierarchyTree({
     return filteredAllAccounts.find((a) => a.id === selectedId) || null;
   }, [expandedAccounts, filteredAllAccounts]);
 
+    // Flat list of all accounts currently visible in the tree hierarchy
+    const allVisibleAccounts = useMemo(() => {
+      const list: Account[] = [];
+      for (const subMap of treeHierarchy.values()) {
+        for (const accs of subMap.values()) {
+          list.push(...accs);
+        }
+      }
+      return list;
+    }, [treeHierarchy]);
+
     // Selected group — drives the desktop side panel (mutually exclusive with account selection)
     const selectedGroupAccounts = useMemo(() => {
-      if (!selectedGroup) return null;
+      if (!selectedGroup || selectedGroup === 'All Accounts') return null;
       const subMap = treeHierarchy.get(selectedGroup);
       if (!subMap) return null;
       const accs: Account[] = [];
       subMap.forEach((accsInGroup) => accs.push(...accsInGroup));
       return accs;
     }, [selectedGroup, treeHierarchy]);
+
+    const isAllAccountsSelected = selectedGroup === 'All Accounts';
+
+    // Net worth trend stats across all visible accounts
+    const allTrendStats = useMemo(() => {
+      if (allVisibleAccounts.length === 0) {
+        return {
+          current: 0,
+          starting: 0,
+          change: 0,
+          percentChange: 0,
+          historyPoints: [],
+          isPositive: true,
+        };
+      }
+
+      if (historyData.length === 0) {
+        const current = allVisibleAccounts.reduce((sum, a) => {
+          const raw = a.balance;
+          const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+          if (!Number.isFinite(num)) return sum;
+          return isAssetAccount(a.type) ? sum + num : sum - Math.abs(num);
+        }, 0);
+        return {
+          current,
+          starting: current,
+          change: 0,
+          percentChange: 0,
+          historyPoints: [],
+          isPositive: true,
+        };
+      }
+
+      const range = getPreciseDateRange(hierarchyTimeframe);
+      let startIdx = 0;
+      let endIdx = historyData.length - 1;
+
+      if (hierarchyTimeframe !== 'all') {
+        const startStr = range.start;
+        const endStr = range.end;
+
+        const foundStart = historyData.findIndex((d) => d.date >= startStr);
+        if (foundStart !== -1) startIdx = foundStart;
+
+        let foundEnd = historyData.length - 1;
+        for (let i = historyData.length - 1; i >= 0; i--) {
+          if (historyData[i].date <= endStr) {
+            foundEnd = i;
+            break;
+          }
+        }
+        endIdx = foundEnd;
+      }
+
+      const slicedHistory = historyData.slice(startIdx, endIdx + 1);
+      const points = slicedHistory.map((d) => {
+        let net = 0;
+        for (const acc of allVisibleAccounts) {
+          const v = d[acc.id];
+          if (v == null) continue;
+          const num = Number(v) || 0;
+          if (isAssetAccount(acc.type)) {
+            net += num;
+          } else if (isLiabilityAccount(acc.type)) {
+            net -= Math.abs(num);
+          } else {
+            net += num;
+          }
+        }
+        return net;
+      });
+
+      const starting = points.length > 0 ? points[0] : 0;
+      const current = points.length > 0 ? points[points.length - 1] : 0;
+      const change = current - starting;
+      const percentChange = starting !== 0 ? (change / Math.abs(starting)) * 100 : 0;
+      const isPositive = change >= 0;
+
+      return {
+        current,
+        starting,
+        change,
+        percentChange,
+        historyPoints: points,
+        isPositive,
+      };
+    }, [allVisibleAccounts, historyData, hierarchyTimeframe]);
+
+
 
   // Group heading click: select the group (drives the detail panel at all viewports)
   const handleGroupSelect = useCallback((group: string) => {
@@ -366,6 +467,18 @@ export default function AccountHierarchyTree({
       <GroupDetailPanel
         group={selectedGroup}
         accounts={selectedGroupAccounts}
+        historyData={historyData}
+        hierarchyTimeframe={hierarchyTimeframe}
+        onHierarchyTimeframeChange={setHierarchyTimeframe}
+        onClose={() => setSelectedGroup(null)}
+      />
+    ) : null;
+
+  // All-accounts overview detail panel
+  const allAccountsDetailPanel =
+    isAllAccountsSelected && allVisibleAccounts.length > 0 ? (
+      <AllAccountsDetailPanel
+        accounts={allVisibleAccounts}
         historyData={historyData}
         hierarchyTimeframe={hierarchyTimeframe}
         onHierarchyTimeframeChange={setHierarchyTimeframe}
@@ -446,6 +559,72 @@ export default function AccountHierarchyTree({
 
               <div className="border-t border-border/10" />
               <div className="divide-y divide-border/10">
+                {/* All Accounts Rollup Row */}
+                <div
+                  className={`min-w-0 ${
+                    isAllAccountsSelected
+                      ? 'bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit'
+                      : ''
+                  }`}
+                >
+                  <div
+                    onClick={() => handleGroupSelect('All Accounts')}
+                    className={`w-full flex items-center justify-between px-0 ${
+                      isAllAccountsSelected ? 'py-2.5 sm:py-3.5' : 'py-3.5'
+                    } ${
+                      isAllAccountsSelected
+                        ? 'bg-primary/10 hover:bg-primary/15'
+                        : 'bg-muted/40 hover:bg-muted/60'
+                    } transition-colors cursor-pointer select-none`}
+                  >
+                    <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-6">
+                      <div className="flex items-center gap-2.5 min-w-0 truncate py-1">
+                        <Layers
+                          className={`w-4 h-4 flex-shrink-0 ${
+                            isAllAccountsSelected ? 'text-primary' : 'text-muted-foreground'
+                          }`}
+                        />
+                        <span
+                          className={`text-sm sm:text-base font-bold truncate ${
+                            isAllAccountsSelected ? 'text-primary' : 'text-foreground'
+                          }`}
+                        >
+                          All Accounts
+                        </span>
+                        <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 flex-shrink-0 font-normal">
+                          {allVisibleAccounts.length}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* All Accounts Sparkline */}
+                    <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                      <Sparkline
+                        data={allTrendStats.historyPoints}
+                        isPositive={allTrendStats.isPositive}
+                        width={90}
+                        height={20}
+                      />
+                    </div>
+
+                    <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
+                      <p className="font-mono text-sm sm:text-base font-bold text-foreground blur-number">
+                        {formatCurrency(allTrendStats.current)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Narrow viewports: inline all accounts detail */}
+                  {isAllAccountsSelected && (
+                    <div
+                      id="hierarchy-all-accounts-detail-inline"
+                      className="lg:hidden px-2 py-2.5 sm:px-3 sm:py-3"
+                    >
+                      {allAccountsDetailPanel}
+                    </div>
+                  )}
+                </div>
+
                 {sortedGroups.map((group) => {
                   const subMap = treeHierarchy.get(group);
                   if (!subMap) return null;
@@ -991,7 +1170,7 @@ export default function AccountHierarchyTree({
 
       {/* Desktop side panel: selected group or account detail (2/3 width) */}
       <div className="hidden lg:block lg:col-span-7 sticky top-[84px] max-h-[calc(100vh-100px)] overflow-y-auto">
-        {groupDetailPanel ?? (
+        {allAccountsDetailPanel ?? groupDetailPanel ?? (
           <AccountDetailPanel
             account={selectedAccount}
             historyData={historyData}

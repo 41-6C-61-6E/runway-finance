@@ -1,20 +1,15 @@
 'use client';
 
-import { Suspense, useState, useEffect, useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useQuery } from '@tanstack/react-query';
 import { Landmark } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
-import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
-import { AppTabs } from '@/components/ui/app-tabs';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import type { Account, TagItem } from '@/components/features/accounts/account-types';
-import AccountHistoryChart from '@/components/features/accounts/AccountHistoryChart';
 import AccountHierarchyTree from '@/components/features/accounts/AccountHierarchyTree';
-
-type Tab = 'history' | 'list';
 
 function AccountsContent() {
   const { data: session } = useSession();
@@ -22,31 +17,8 @@ function AccountsContent() {
   const isNetWorthEnabled = isEnabled('netWorth');
   const isRealEstateEnabled = isEnabled('realEstate');
 
-  const [isMobile, setIsMobile] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('list');
-  const availableTabs = [
-    { id: 'list', label: 'List' },
-    { id: 'history', label: 'History' },
-  ] as { id: Tab; label: string }[];
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   const searchParams = useSearchParams();
   const targetAccountId = searchParams.get('accountId') || searchParams.get('account');
-  const tabParam = searchParams.get('tab');
-
-  useEffect(() => {
-    if (tabParam === 'list' || tabParam === 'history') {
-      setActiveTab(tabParam as Tab);
-    } else if (targetAccountId) {
-      setActiveTab('list');
-    }
-  }, [tabParam, targetAccountId]);
 
   // 1. Fetch Accounts list
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
@@ -71,7 +43,7 @@ function AccountsContent() {
   });
 
   // 3. Fetch Accounts History Data
-  const { data: historyRes, isLoading: historyLoading } = useQuery<{ data: any[]; accounts: any[] }>({
+  const { data: historyRes } = useQuery<{ data: any[]; accounts: any[] }>({
     queryKey: ['accounts-history'],
     queryFn: async () => {
       const res = await fetch(`/api/accounts/history?timeframe=all`, { credentials: 'include' });
@@ -82,7 +54,6 @@ function AccountsContent() {
   });
 
   const historyData = historyRes?.data || [];
-  const reportableAccounts = historyRes?.accounts || [];
 
   // Filter accounts according to net worth & real estate synthetic toggles
   const filteredAllAccounts = useMemo(() => {
@@ -108,42 +79,13 @@ function AccountsContent() {
       <PageHeader title="Accounts" icon={Landmark} />
 
       <PageContent maxWidth="max-w-7xl" className="space-y-5 sm:space-y-6">
-        <MobileTabSwipeContainer
-          tabs={availableTabs}
-          activeTabId={activeTab}
-          onTabChange={(tabId) => setActiveTab(tabId as Tab)}
-          header={
-            <div className="mb-3 sm:mb-3.5">
-              <AppTabs
-                tabs={availableTabs}
-                activeTab={activeTab}
-                onChange={(tabId) => setActiveTab(tabId as Tab)}
-                variant="underline"
-              />
-            </div>
-          }
-        >
-          {activeTab === 'list' && (
-            <AccountHierarchyTree
-              filteredAllAccounts={filteredAllAccounts}
-              allTags={allTags}
-              historyData={historyData}
-              accountsLoading={accountsLoading}
-              targetAccountId={targetAccountId}
-            />
-          )}
-
-          {activeTab === 'history' && (
-            <AccountHistoryChart
-              filteredAllAccounts={filteredAllAccounts}
-              allTags={allTags}
-              historyData={historyData}
-              reportableAccounts={reportableAccounts}
-              historyLoading={historyLoading}
-              isMobile={isMobile}
-            />
-          )}
-        </MobileTabSwipeContainer>
+        <AccountHierarchyTree
+          filteredAllAccounts={filteredAllAccounts}
+          allTags={allTags}
+          historyData={historyData}
+          accountsLoading={accountsLoading}
+          targetAccountId={targetAccountId}
+        />
       </PageContent>
     </div>
   );

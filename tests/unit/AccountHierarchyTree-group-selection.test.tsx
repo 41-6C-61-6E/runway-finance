@@ -58,6 +58,9 @@ vi.mock('@/components/features/accounts/AccountDetailPanel', () => ({
 vi.mock('@/components/features/accounts/GroupDetailPanel', () => ({
   default: () => <div data-testid="group-detail-panel-stub" />,
 }));
+vi.mock('@/components/features/accounts/AllAccountsDetailPanel', () => ({
+  default: () => <div data-testid="all-accounts-detail-panel-stub" />,
+}));
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   AreaChart: () => null,
@@ -192,5 +195,20 @@ describe('AccountHierarchyTree — group selection (mobile: no desktop side pane
     await user.click(screen.getByLabelText('Expand Banking'));
     expect(screen.getByText('Main Checking')).toBeInTheDocument();
     assertGroupDetailHidden();
+  });
+
+  it('mounts the AllAccountsDetailPanel by default on initial navigation and has no chevron', () => {
+    render(<AccountHierarchyTree {...props} />);
+
+    // All Accounts detail is mounted by default
+    const slot = document.getElementById('hierarchy-all-accounts-detail-inline');
+    expect(slot).not.toBeNull();
+    expect(slot?.querySelector('[data-testid="all-accounts-detail-panel-stub"]')).toBeInTheDocument();
+
+    // All Accounts row exists without a collapse/expand chevron button
+    const allAccountsRow = screen.getByText('All Accounts').closest('.cursor-pointer');
+    expect(allAccountsRow).not.toBeNull();
+    expect(screen.queryByLabelText('Collapse all groups')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Expand all groups')).not.toBeInTheDocument();
   });
 });
