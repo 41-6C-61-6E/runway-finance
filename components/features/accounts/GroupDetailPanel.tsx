@@ -21,7 +21,11 @@ import type { Account } from './account-types';
 import type { TimeRange } from '../../charts/chart-filters';
 import { getPreciseDateRange } from '../../../lib/utils/date-window';
 import { formatCurrency, formatPlainPercent } from '../../../lib/utils/format';
-import { isAssetAccount, isLiabilityAccount } from '../../../lib/utils/account-scope';
+import {
+  isAssetAccount,
+  isLiabilityAccount,
+  isAccountActiveOnDate,
+} from '../../../lib/utils/account-scope';
 import { ChartTooltip, TooltipHeader, TooltipRow } from '../../charts/chart-tooltip';
 import {
   formatChartXAxisDate,
@@ -198,26 +202,42 @@ export default function GroupDetailPanel({
   // Per-account composition at the most recent known balance point
   const composition = useMemo(() => {
     const entries: CompositionEntry[] = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
     for (const acc of accounts) {
-      // Use the account's current balance — it is the authoritative "now" figure
-      // (matches the account list). The history series must NOT be used here:
-      // paid-off/refinanced mortgages are omitted from all points from their end
-      // date onward, so a walk-back scan would resurrect the last (stale) balance.
-      const liveBalance = acc.balance;
-      let value =
-        typeof liveBalance === 'number' && Number.isFinite(liveBalance)
-          ? liveBalance
-          : Number(liveBalance) || 0;
-      // Fallback ONLY when no usable balance number is provided at all.
-      // A real 0 balance is a payoff — never resurrect it from history.
-      if (typeof liveBalance !== 'number' || !Number.isFinite(liveBalance)) {
-        for (let j = historyData.length - 1; j >= 0; j--) {
-          const v = historyData[j][acc.id];
-          if (v == null) continue;
-          value = v;
-          break;
+      // 1. Exclude accounts that have ended (refinanced or paid off)
+      let isClosedMortgage = false;
+      if (acc.metadata) {
+        try {
+          const meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata;
+          if (meta && ['paid_off', 'refinanced'].includes(meta.mortgageStatus)) {
+            const endEventDate = meta.mortgageStatus === 'paid_off' ? meta.payoffDate : meta.refinanceDate;
+            if (!endEventDate || todayStr >= endEventDate) {
+              isClosedMortgage = true;
+            }
+          }
+        } catch {
+          // Ignore parse errors
         }
       }
+      if (isClosedMortgage || !isAccountActiveOnDate(acc, todayStr)) {
+        continue;
+      }
+
+      // 2. Parse live balance (handles number, string representation, and negative liability sign)
+      const raw = acc.balance;
+      const parsed = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+      let value = Number.isFinite(parsed) ? (isLiab ? Math.abs(parsed) : parsed) : 0;
+
+      // 3. Fallback ONLY when balance is completely unparseable (undefined/NaN/null)
+      // and only inspect the latest historical point — never scan backward to resurrect old balances.
+      if (!Number.isFinite(parsed) && historyData.length > 0) {
+        const latestVal = historyData[historyData.length - 1]?.[acc.id];
+        if (latestVal != null) {
+          value = isLiab ? Math.abs(Number(latestVal) || 0) : Number(latestVal) || 0;
+        }
+      }
+
       if (value > 0) {
         entries.push({
           name: acc.name,
@@ -227,7 +247,7 @@ export default function GroupDetailPanel({
       }
     }
     return entries.sort((a, b) => b.value - a.value);
-  }, [accounts, historyData, colorByAccount]);
+  }, [accounts, historyData, colorByAccount, isLiab]);
 
   const compositionTotal = useMemo(
     () => composition.reduce((sum, entry) => sum + entry.value, 0),

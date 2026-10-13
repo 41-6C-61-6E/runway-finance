@@ -214,4 +214,39 @@ describe('GroupDetailPanel — composition donut uses current balances', () => {
     // Center total = both live balances
     expect(screen.getAllByText(/1,285,628/).length).toBeGreaterThanOrEqual(1);
   });
+
+  it('excludes a paid-off mortgage when balance is returned as a string "0" or "0.00"', () => {
+    const history = buildHistory({
+      acc_nationstar: { untilDate: '2025-12-01', value: 659099 },
+      acc_becu: { untilDate: null, value: 626529 },
+      acc_student: { untilDate: null, value: 80000 },
+    });
+
+    const paidOffString = acct({
+      id: 'acc_nationstar',
+      name: 'Nationstar Mortgage',
+      balance: '0.00' as any,
+      metadata: JSON.stringify({ mortgageStatus: 'refinanced', refinanceDate: '2025-12-01' }),
+    });
+    const becNegativeString = acct({
+      id: 'acc_becu',
+      name: 'BECU Mortgage',
+      balance: '-626529' as any,
+    });
+
+    render(
+      <GroupDetailPanel
+        group="Loans"
+        accounts={[paidOffString, becNegativeString, student]}
+        historyData={history}
+        hierarchyTimeframe="365d"
+        onClose={() => {}}
+      />
+    );
+
+    const rows = donutRows();
+    expect(rows.map((r) => r.name)).toEqual(['BECU Mortgage', 'Student Loans']);
+    expect(rows.map((r) => r.value)).toEqual([626529, 80000]);
+    expect(screen.queryByText('Nationstar Mortgage')).not.toBeInTheDocument();
+  });
 });
