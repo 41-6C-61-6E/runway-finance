@@ -69,6 +69,11 @@ export default function AccountHierarchyTree({
     'finance:accounts:expandedSubgroups',
     {}
   );
+  const [selectedAccountId, setSelectedAccountId] = usePersistentState<string>(
+    'finance:accounts:selectedAccountId',
+    targetAccountId ?? '',
+    { skipRestore: Boolean(targetAccountId) }
+  );
   const [expandedAccounts, setExpandedAccounts] = usePersistentState<Record<string, boolean>>(
     'finance:accounts:expandedAccounts',
     {},
@@ -125,29 +130,52 @@ export default function AccountHierarchyTree({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (!targetAccountId) return;
-    setExpandedAccounts({ [targetAccountId]: true });
-    setSelectedGroup(null);
+  // Derive the active selected account ID (URL targetAccountId takes highest priority,
+  // followed by persisted selectedAccountId, then any legacy expandedAccounts key).
+  const effectiveAccountId = useMemo(() => {
+    if (targetAccountId) return targetAccountId;
+    if (selectedAccountId) return selectedAccountId;
+    const fromExpanded = Object.keys(expandedAccounts).find((id) => expandedAccounts[id]);
+    return fromExpanded || '';
+  }, [targetAccountId, selectedAccountId, expandedAccounts]);
 
-    if (filteredAllAccounts && filteredAllAccounts.length > 0) {
-      const acc = filteredAllAccounts.find((a) => a.id === targetAccountId);
-      if (acc) {
-        const { group, subGroup } = getHierarchy(acc.type);
-        setExpandedGroups((prev) => ({ ...prev, [group]: true }));
-        setExpandedSubgroups((prev) => ({ ...prev, [`${group}::${subGroup}`]: true }));
-      }
+  const hasAutoScrolledRef = useRef(false);
+
+  // When an account is active (via URL param or restored from persistent state),
+  // auto-expand its parent group and subgroup so it's visible in the tree, and scroll into view.
+  useEffect(() => {
+    if (!effectiveAccountId) {
+      hasAutoScrolledRef.current = false;
+      return;
     }
 
-    const timer = setTimeout(() => {
-      const el = document.getElementById(`account-row-${targetAccountId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 150);
+    setExpandedAccounts((prev) => (prev[effectiveAccountId] ? prev : { [effectiveAccountId]: true }));
 
-    return () => clearTimeout(timer);
-  }, [targetAccountId, filteredAllAccounts]);
+    if (filteredAllAccounts && filteredAllAccounts.length > 0) {
+      const acc = filteredAllAccounts.find((a) => a.id === effectiveAccountId);
+      if (acc) {
+        const { group, subGroup } = getHierarchy(acc.type);
+        setExpandedGroups((prev) => (prev[group] ? prev : { ...prev, [group]: true }));
+        setExpandedSubgroups((prev) => (prev[`${group}::${subGroup}`] ? prev : { ...prev, [`${group}::${subGroup}`]: true }));
+
+        if (!hasAutoScrolledRef.current) {
+          hasAutoScrolledRef.current = true;
+          const timer = setTimeout(() => {
+            const el = document.getElementById(`account-row-${effectiveAccountId}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 150);
+          return () => clearTimeout(timer);
+        }
+      } else if (!accountsLoading) {
+        // Stored account no longer exists in filtered accounts — reset selection
+        setSelectedAccountId('');
+        setExpandedAccounts({});
+        setSelectedGroup('All Accounts');
+      }
+    }
+  }, [effectiveAccountId, filteredAllAccounts, accountsLoading, setExpandedAccounts, setExpandedGroups, setExpandedSubgroups, setSelectedAccountId, setSelectedGroup]);
 
   const hierarchyAvailableGroups = useMemo(() => {
     const groups = new Set<string>();
@@ -325,35 +353,34 @@ export default function AccountHierarchyTree({
     setSearchQuery('');
   }, [setHierarchySelectedGroups, setHierarchySelectedTypes, setHierarchySelectedAccounts, setHierarchySelectedTags]);
 
-  // Selected account (single-select via expandedAccounts) — drives the desktop side panel
+  // Selected account — drives the desktop side panel (takes precedence over group selection)
   const selectedAccount = useMemo(() => {
-    const selectedId = Object.keys(expandedAccounts).find((id) => expandedAccounts[id]);
-    if (!selectedId) return null;
-    return filteredAllAccounts.find((a) => a.id === selectedId) || null;
-  }, [expandedAccounts, filteredAllAccounts]);
+    if (!effectiveAccountId) return null;
+    return filteredAllAccounts.find((a) => a.id === effectiveAccountId) || null;
+  }, [effectiveAccountId, filteredAllAccounts]);
 
-    // Flat list of all accounts currently visible in the tree hierarchy
-    const allVisibleAccounts = useMemo(() => {
-      const list: Account[] = [];
-      for (const subMap of treeHierarchy.values()) {
-        for (const accs of subMap.values()) {
-          list.push(...accs);
-        }
+  // Flat list of all accounts currently visible in the tree hierarchy
+  const allVisibleAccounts = useMemo(() => {
+    const list: Account[] = [];
+    for (const subMap of treeHierarchy.values()) {
+      for (const accs of subMap.values()) {
+        list.push(...accs);
       }
-      return list;
-    }, [treeHierarchy]);
+    }
+    return list;
+  }, [treeHierarchy]);
 
-    // Selected group — drives the desktop side panel (mutually exclusive with account selection)
-    const selectedGroupAccounts = useMemo(() => {
-      if (!selectedGroup || selectedGroup === 'All Accounts') return null;
-      const subMap = treeHierarchy.get(selectedGroup);
-      if (!subMap) return null;
-      const accs: Account[] = [];
-      subMap.forEach((accsInGroup) => accs.push(...accsInGroup));
-      return accs;
-    }, [selectedGroup, treeHierarchy]);
+  // Selected group — drives the desktop side panel (mutually exclusive with account selection)
+  const selectedGroupAccounts = useMemo(() => {
+    if (effectiveAccountId || !selectedGroup || selectedGroup === 'All Accounts') return null;
+    const subMap = treeHierarchy.get(selectedGroup);
+    if (!subMap) return null;
+    const accs: Account[] = [];
+    subMap.forEach((accsInGroup) => accs.push(...accsInGroup));
+    return accs;
+  }, [effectiveAccountId, selectedGroup, treeHierarchy]);
 
-    const isAllAccountsSelected = selectedGroup === 'All Accounts';
+  const isAllAccountsSelected = !effectiveAccountId && selectedGroup === 'All Accounts';
 
     // Net worth trend stats across all visible accounts
     const allTrendStats = useMemo(() => {
@@ -444,24 +471,40 @@ export default function AccountHierarchyTree({
 
   // Group heading click: select the group (drives the detail panel at all viewports)
   const handleGroupSelect = useCallback((group: string) => {
-    setSelectedGroup(group);
+    setSelectedAccountId('');
     setExpandedAccounts({});
-  }, []);
+    setSelectedGroup(group);
+  }, [setSelectedAccountId, setExpandedAccounts, setSelectedGroup]);
 
   const handleAccountSelect = useCallback((accountId: string, isExpanded: boolean) => {
     if (!isExpanded && window.innerWidth < 1024) {
       pendingMobileAccountScrollRef.current = accountId;
     }
-    setSelectedGroup(null);
-    setExpandedAccounts(isExpanded ? {} : { [accountId]: true });
-  }, []);
+    if (isExpanded) {
+      setSelectedAccountId('');
+      setExpandedAccounts({});
+      setSelectedGroup(null);
+    } else {
+      setSelectedAccountId(accountId);
+      setExpandedAccounts({ [accountId]: true });
+      setSelectedGroup(null);
+
+      // Auto-expand parent group and subgroup immediately on click
+      const acc = filteredAllAccounts.find((a) => a.id === accountId);
+      if (acc) {
+        const { group, subGroup } = getHierarchy(acc.type);
+        setExpandedGroups((prev) => (prev[group] ? prev : { ...prev, [group]: true }));
+        setExpandedSubgroups((prev) => (prev[`${group}::${subGroup}`] ? prev : { ...prev, [`${group}::${subGroup}`]: true }));
+      }
+    }
+  }, [filteredAllAccounts, setSelectedAccountId, setExpandedAccounts, setSelectedGroup, setExpandedGroups, setExpandedSubgroups]);
 
   // Selecting an account can remove a tall combined panel above it. Once the
   // new account detail has been laid out, keep its row at the top of the view
   // so the detail the user opened stays visible on mobile.
   useEffect(() => {
     const accountId = pendingMobileAccountScrollRef.current;
-    if (!accountId || !expandedAccounts[accountId] || selectedGroup) return;
+    if (!accountId || effectiveAccountId !== accountId || selectedGroup) return;
 
     pendingMobileAccountScrollRef.current = null;
     const frame = requestAnimationFrame(() => {
@@ -472,31 +515,39 @@ export default function AccountHierarchyTree({
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [expandedAccounts, selectedGroup]);
+  }, [effectiveAccountId, selectedGroup]);
 
   // Selected-group detail (combined chart) — below lg it renders inline under the group heading,
   // identical to how an account's transaction card opens under its row; at lg+ it fills the side column
   const groupDetailPanel =
-    selectedGroup && selectedGroupAccounts ? (
+    !effectiveAccountId && selectedGroup && selectedGroupAccounts ? (
       <GroupDetailPanel
         group={selectedGroup}
         accounts={selectedGroupAccounts}
         historyData={historyData}
         hierarchyTimeframe={hierarchyTimeframe}
         onHierarchyTimeframeChange={setHierarchyTimeframe}
-        onClose={() => setSelectedGroup(null)}
+        onClose={() => {
+          setSelectedGroup(null);
+          setSelectedAccountId('');
+          setExpandedAccounts({});
+        }}
       />
     ) : null;
 
   // All-accounts overview detail panel
   const allAccountsDetailPanel =
-    isAllAccountsSelected && allVisibleAccounts.length > 0 ? (
+    !effectiveAccountId && isAllAccountsSelected && allVisibleAccounts.length > 0 ? (
       <AllAccountsDetailPanel
         accounts={allVisibleAccounts}
         historyData={historyData}
         hierarchyTimeframe={hierarchyTimeframe}
         onHierarchyTimeframeChange={setHierarchyTimeframe}
-        onClose={() => setSelectedGroup(null)}
+        onClose={() => {
+          setSelectedGroup(null);
+          setSelectedAccountId('');
+          setExpandedAccounts({});
+        }}
       />
     ) : null;
 
@@ -647,7 +698,7 @@ export default function AccountHierarchyTree({
                   subMap.forEach((accs) => groupAccounts.push(...accs));
                   const groupStats = getTrendStats(groupAccounts);
                   const isGroupExpanded = expandedGroups[group] ?? true;
-                  const isGroupSelected = selectedGroup === group;
+                  const isGroupSelected = !effectiveAccountId && selectedGroup === group;
 
                   return (
                     <div key={group} className="divide-y divide-border/10">
@@ -732,7 +783,7 @@ export default function AccountHierarchyTree({
                               });
                               return flatAccs.map(({ acc, subgroup }) => {
                                 const accStats = getTrendStats([acc]);
-                                const isAccExpanded = expandedAccounts[acc.id] ?? false;
+                                const isAccExpanded = effectiveAccountId === acc.id;
                                 const row = (
                                     <div 
                                       id={`account-row-${acc.id}`}
@@ -912,7 +963,7 @@ export default function AccountHierarchyTree({
 
                                     {isSubExpanded && accs.map((acc) => {
                                       const accStats = getTrendStats([acc]);
-                                      const isAccExpanded = expandedAccounts[acc.id] ?? false;
+                                      const isAccExpanded = effectiveAccountId === acc.id;
 
                                       const row = (
                                           <div 
@@ -1053,7 +1104,7 @@ export default function AccountHierarchyTree({
                               const singleAcc = accs[0];
                               if (!singleAcc) return null;
                               const accStats = getTrendStats([singleAcc]);
-                              const isAccExpanded = expandedAccounts[singleAcc.id] ?? false;
+                              const isAccExpanded = effectiveAccountId === singleAcc.id;
 
                               const row = (
                                   <div 
@@ -1184,13 +1235,35 @@ export default function AccountHierarchyTree({
 
       {/* Desktop side panel: selected group or account detail (2/3 width) */}
       <div className="hidden lg:block lg:col-span-7 sticky top-[84px] max-h-[calc(100vh-100px)] overflow-y-auto">
-        {allAccountsDetailPanel ?? groupDetailPanel ?? (
+        {accountsLoading ? (
+          <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm p-6 space-y-4">
+            <Skeleton className="h-8 w-1/3" />
+            <Skeleton className="h-10 w-1/2" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : selectedAccount ? (
           <AccountDetailPanel
             account={selectedAccount}
             historyData={historyData}
             hierarchyTimeframe={hierarchyTimeframe}
             onHierarchyTimeframeChange={setHierarchyTimeframe}
-            onClose={() => setExpandedAccounts({})}
+            onClose={() => {
+              setSelectedAccountId('');
+              setExpandedAccounts({});
+              setSelectedGroup(null);
+            }}
+          />
+        ) : allAccountsDetailPanel ?? groupDetailPanel ?? (
+          <AccountDetailPanel
+            account={null}
+            historyData={historyData}
+            hierarchyTimeframe={hierarchyTimeframe}
+            onHierarchyTimeframeChange={setHierarchyTimeframe}
+            onClose={() => {
+              setSelectedAccountId('');
+              setExpandedAccounts({});
+              setSelectedGroup(null);
+            }}
           />
         )}
       </div>

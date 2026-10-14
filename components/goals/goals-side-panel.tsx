@@ -4,11 +4,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/goals';
 import { formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { SidebarCollapseButton } from '@/components/ui/sidebar-collapse-button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useGoalInflow } from './goal-inflow-context';
 import {
-  Target,
   Coins,
   TrendingUp,
   PieChart,
@@ -139,26 +138,10 @@ export function GoalsSidePanel() {
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
   return (
-    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
-      <CollapsibleCardHeader
-        isCollapsed={collapsed}
-        onToggle={setCollapsed}
-        collapseDirection="horizontal"
-        showMobileToggle={false}
-        title={
-          <div className="flex items-center gap-2">
-            <Target className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-bold text-foreground">Overview</span>
-          </div>
-        }
-        actions={
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-chart-2 font-semibold">{data.activeGoals} active</span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-chart-1 font-semibold">{data.completedGoals} done</span>
-          </div>
-        }
-        className="border-b border-sidebar-border/60 bg-sidebar"
+    <div className="relative bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+      <SidebarCollapseButton
+        onClick={() => setCollapsed(true)}
+        label="Collapse overview"
       />
 
       {!collapsed && (
@@ -200,10 +183,15 @@ export function GoalsSidePanel() {
             </div>
 
             {/* Goal Count Chips */}
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold border border-primary/20 font-mono text-[11px]">
                 {data.totalGoals} Total Goals
               </span>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-chart-2 font-semibold">{data.activeGoals} active</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-chart-1 font-semibold">{data.completedGoals} done</span>
+              </div>
             </div>
           </div>
 

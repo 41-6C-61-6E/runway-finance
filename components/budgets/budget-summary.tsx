@@ -6,9 +6,9 @@ import { useBudgetPeriod } from './budget-period-selector';
 import { getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { SidebarCollapseButton } from '@/components/ui/sidebar-collapse-button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChartBar, TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle, PiggyBank, Info } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, ChevronRight, ChevronDown, Layers, BarChart3, HelpCircle, PiggyBank, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
@@ -492,25 +492,16 @@ export function BudgetSummary() {
   );
 
   return (
-    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
-      <CollapsibleCardHeader
-        isCollapsed={collapsed}
-        onToggle={setCollapsed}
-        collapseDirection="horizontal"
-        showMobileToggle={false}
-        title={
-          <div className="flex items-center gap-2">
-            <ChartBar className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-bold text-foreground">Overview</span>
-          </div>
-        }
-        className="border-b border-sidebar-border/60 bg-sidebar"
+    <div className="relative bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+      <SidebarCollapseButton
+        onClick={() => setCollapsed(true)}
+        label="Collapse overview"
       />
       {!collapsed && (
         <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
-          {/* Section 1: Header Status & Net Position */}
+        {/* Section 1: Header Status & Net Position */}
           <div className="py-4 first:pt-0 last:pb-0 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between sm:pr-8">
               <div className="space-y-0.5">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</span>
                 <div className="flex items-center gap-1.5 pt-0.5">

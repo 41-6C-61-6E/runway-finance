@@ -115,6 +115,7 @@ const CollapsibleCardHeader = React.forwardRef<HTMLDivElement, CollapsibleCardHe
             onClick={() => onToggle?.(!isCollapsed)}
             className="p-1 rounded hover:bg-accent transition-colors cursor-pointer shrink-0 text-muted-foreground hover:text-foreground hidden sm:block"
             aria-label={isCollapsed ? 'Expand card' : 'Collapse card'}
+            title={isCollapsed ? 'Expand card' : 'Collapse card'}
             aria-expanded={!isCollapsed}
             type="button"
           >

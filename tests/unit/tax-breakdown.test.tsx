@@ -106,7 +106,7 @@ describe('TaxBreakdown Component', () => {
     expect(screen.getByText('$7,000')).toBeDefined();
   });
 
-  it('renders scorecard style conventions including hero metrics, pill badges, and distribution', () => {
+  it('renders scorecard style conventions including portfolio balance hero metric and distribution', () => {
     const mockAccounts = [
       {
         id: 'acc_1',
@@ -139,19 +139,25 @@ describe('TaxBreakdown Component', () => {
     expect(rootEl.className).toContain('border-sidebar-border');
     expect(rootEl.className).toContain('rounded-2xl');
 
-    // Verify Scorecard header
-    expect(screen.getByText('Scorecard')).toBeDefined();
+    // Verify Scorecard header label is removed, leaving content
+    expect(screen.queryByText('Scorecard')).toBeNull();
 
-    // Total = $200,000; Tax-Advantaged (401k + Roth) = $100,000 (50%); Brokerage = $100,000
-    expect(screen.getByText('Tax-Advantaged Assets')).toBeDefined();
-    expect(screen.getAllByText('$100,000').length).toBe(2);
-    expect(screen.getAllByText(/50%/).length).toBeGreaterThan(0);
-    expect(screen.getByText('Sheltered')).toBeDefined();
+    // Verify Portfolio Balance is the main hero metric at the top
+    expect(screen.getByText('Portfolio Balance')).toBeDefined();
+    expect(screen.getByText('$200,000')).toBeDefined();
 
-    // Verify Wrapper Distribution section and Wrapper Breakdown section
+    // Verify Tax-Advantaged Assets section and wrappers count are removed
+    expect(screen.queryByText('Tax-Advantaged Assets')).toBeNull();
+    expect(screen.queryByText(/wrappers/i)).toBeNull();
+
+    // Verify Wrapper Distribution section exists with centered percentages, and Wrapper Breakdown header is removed
     expect(screen.getByText('Wrapper Distribution')).toBeDefined();
-    expect(screen.getByText('Wrapper Breakdown')).toBeDefined();
-    expect(screen.getByText('Majority of your portfolio is sheltered in tax-free & tax-deferred accounts.')).toBeDefined();
+    expect(screen.queryByText('Wrapper Breakdown')).toBeNull();
+
+    // Verify individual wrapper amounts are present
+    expect(screen.getByText('$60,000')).toBeDefined(); // Tax-Deferred
+    expect(screen.getByText('$40,000')).toBeDefined(); // Tax-Free
+    expect(screen.getByText('$100,000')).toBeDefined(); // Taxable
   });
 
   it('supports custom title prop', () => {

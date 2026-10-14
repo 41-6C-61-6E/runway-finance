@@ -7,6 +7,7 @@ import '@testing-library/jest-dom';
 
 // jsdom has no matchMedia
 beforeEach(() => {
+  localStorage.clear();
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,

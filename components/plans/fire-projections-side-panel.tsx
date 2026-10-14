@@ -3,10 +3,9 @@
 import { useMemo, useState } from 'react';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { Card, CardContent } from '@/components/ui/card';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { SidebarCollapseButton } from '@/components/ui/sidebar-collapse-button';
 import {
-  Flame,
   Target,
   Clock,
   Palmtree,
@@ -112,25 +111,16 @@ export function FireProjectionsSidePanel({
   const strokeDashoffset = circumference - (clampedProgress / 100) * circumference;
 
   return (
-    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
-        collapseDirection="horizontal"
-        showMobileToggle={false}
-        title={
-          <div className="flex items-center gap-2">
-            <Flame className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-bold text-foreground">Scorecard</span>
-          </div>
-        }
-        className="border-b border-sidebar-border/60 bg-sidebar"
+    <div className="relative bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+      <SidebarCollapseButton
+        onClick={() => setIsCollapsed(true)}
+        label="Collapse scorecard"
       />
 
       {!isCollapsed && (
         <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
           {/* Section 1: Plan Sustainability Grade */}
-          <div className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+          <div className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-3 sm:pr-8">
             <div className="space-y-1 min-w-0">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                 Plan Sustainability

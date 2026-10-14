@@ -6,19 +6,18 @@ import { formatCurrency } from '@/lib/utils/format';
 import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { isAssetAccount, isReportableAccount } from '@/lib/utils/account-scope';
 import { convertCurrency } from '@/lib/constants/currency-rates';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { computeNetWorthTotals } from '@/lib/utils/account-scope';
 import { formatInTimezone } from '@/lib/utils/timeframe';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { EstimatePill } from '@/components/ui/estimate-pill';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import type { AccountData, ChartPoint } from '@/lib/types/financial';
 import { computeMovingAverage, computeMedianFilter } from '@/lib/utils/chart-aggregation';
+import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { SidebarCollapseButton } from '@/components/ui/sidebar-collapse-button';
 import { TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
 
 import {
-  DollarSign,
   ShieldCheck,
   Percent,
   ArrowUpRight,
@@ -288,21 +287,12 @@ export function NetWorthSidePanel() {
   }
 
   return (
-    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
-        collapseDirection="horizontal"
-        showMobileToggle={false}
-        title={
-          <div className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-bold text-foreground">Overview</span>
-          </div>
-        }
-        actions={hasEstimated ? <EstimatePill /> : null}
-        className="border-b border-sidebar-border/60 bg-sidebar"
+    <div className="relative bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+      <SidebarCollapseButton
+        onClick={() => setIsCollapsed(true)}
+        label="Collapse overview"
       />
+
       {!isCollapsed && (
         <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
           {/* Section 1: Hero Net Worth */}
@@ -324,15 +314,18 @@ export function NetWorthSidePanel() {
               }
             >
               <div className="space-y-2 cursor-help">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                  Total Net Worth
-                  <Info className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
-                </span>
-                <div className="flex flex-col">
-                  <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
-                    {formatCurrency(totals.netWorth)}
+                <div className="flex items-center justify-between sm:pr-8">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    Total Net Worth
+                    <Info className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                   </span>
-                  <div className="flex items-center gap-1.5 mt-1">
+                  {hasEstimated ? <EstimatePill /> : null}
+                </div>
+              <div className="flex flex-col">
+                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
+                  {formatCurrency(totals.netWorth)}
+                </span>
+                <div className="flex items-center gap-1.5 mt-1">
                     <div
                       className={cn(
                         'inline-flex items-center gap-0.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border font-mono',

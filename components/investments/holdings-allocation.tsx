@@ -7,10 +7,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
-import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { PieChart as PieIcon } from 'lucide-react';
 import { getDisplayTicker } from '@/lib/types/investments';
 
 interface Holding {
@@ -142,7 +139,6 @@ const getTaxWrapper = (type: string, name: string = '', metadata?: any): TaxWrap
 };
 
 export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationProps) {
-  const [isCollapsed, setIsCollapsed] = useCardCollapsed('holdingsAllocationChart');
   const [groupBy, setGroupBy] = usePersistentState<GroupByOption>(
     'finance:investments:allocation:groupBy',
     'security'
@@ -267,21 +263,9 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
   if (holdings.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl shadow-sm">
-        <CollapsibleCardHeader
-          isCollapsed={isCollapsed}
-          onToggle={setIsCollapsed}
-          title={
-            <div className="flex items-center gap-2">
-              <PieIcon className="w-4 h-4 text-primary shrink-0" />
-              <span>Asset Allocation</span>
-            </div>
-          }
-        />
-        {!isCollapsed && (
-          <div className="p-5">
-            <ChartEmptyState variant="nodata" description="No allocation data available" />
-          </div>
-        )}
+        <div className="p-5">
+          <ChartEmptyState variant="nodata" description="No allocation data available" />
+        </div>
       </div>
     );
   }
@@ -295,20 +279,8 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm flex flex-col h-full">
-      <CollapsibleCardHeader
-        isCollapsed={isCollapsed}
-        onToggle={setIsCollapsed}
-        title={
-          <div className="flex items-center gap-2">
-            <PieIcon className="w-4 h-4 text-primary shrink-0" />
-            <span>Asset Allocation</span>
-          </div>
-        }
-      />
-
-      {!isCollapsed && (
-        <div className="flex-1 flex flex-col p-4 sm:p-5">
-          {/* Secondary Controls: Grouping Filter */}
+      <div className="flex-1 flex flex-col p-4 sm:p-5">
+        {/* Secondary Controls: Grouping Filter */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none">
@@ -419,7 +391,6 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
             </div>
           </div>
         </div>
-      )}
     </div>
   );
 }

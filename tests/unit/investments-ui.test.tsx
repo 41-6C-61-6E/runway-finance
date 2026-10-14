@@ -94,7 +94,7 @@ describe('Investments UI Enhancements', () => {
 
     // Wait for performance chart to finish loading data
     await waitFor(() => {
-      expect(screen.getByText('Portfolio Balance')).toBeDefined();
+      expect(screen.getByText('1Y Change')).toBeDefined();
       expect(screen.getByText('Portfolio TWR:')).toBeDefined();
     });
 
@@ -120,7 +120,7 @@ describe('Investments UI Enhancements', () => {
     });
   });
 
-  it('renders total portfolio balance when passed via totalBalance prop', async () => {
+  it('renders performance metrics and omits redundant Portfolio Balance from chart area', async () => {
     const mockHistoryResponse = {
       data: [
         { date: '2026-01-01', value: 10000, twr: 0 },
@@ -143,12 +143,12 @@ describe('Investments UI Enhancements', () => {
     render(<PerformanceChart totalBalance={50000} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Portfolio Balance')).toBeDefined();
+      expect(screen.getByText('1Y Change')).toBeDefined();
     });
 
-    // Check that custom totalBalance is displayed in hero and header
-    const balances = screen.getAllByText('$50,000');
-    expect(balances.length).toBeGreaterThan(0);
-    expect(screen.getByText('1Y Change')).toBeDefined();
+    // Check that Portfolio Balance is omitted from chart area (shown in sidebar scorecard instead)
+    expect(screen.queryByText('Portfolio Balance')).toBeNull();
+    expect(screen.getByText('$10,000')).toBeDefined();
+    expect(screen.getByText('$11,000')).toBeDefined();
   });
 });

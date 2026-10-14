@@ -20,6 +20,8 @@ import {
   calculateAmortizationSchedule,
   calculateAmortizationWithExtraPayments,
 } from '@/lib/utils/amortization';
+import { cn } from '@/lib/utils';
+import { Sparkles, RotateCcw, Calculator, Calendar } from 'lucide-react';
 
 interface MortgageDetail {
   id: string;
@@ -92,7 +94,6 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
       if (!showProjection) {
         const standard = calculateAmortizationSchedule(amortParams);
         const zeroRow = standard.find((r) => r.remainingBalance <= 0);
-        const defaultDate = new Date().toISOString().split('T')[0];
         const isNegative = !zeroRow && standard[standard.length - 1]?.remainingBalance > mortgage.originalLoanAmount;
         return {
           standard,
@@ -171,228 +172,274 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
     return getChartXTicksUnified(chartDataPoints, 'all', isMobile, 'date');
   }, [chartDataPoints, isMobile]);
 
+  const setPresetExtra = (amount: number) => {
+    setShowProjection(true);
+    setExtraMonthly(String(amount));
+  };
+
   return (
-    <div className={inline ? "" : "bg-card border border-border rounded-xl p-5"}>
-      {!inline && (
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">{mortgage.name}</h3>
-            {propertyName && (
-              <p className="text-[10px] text-muted-foreground">{propertyName}</p>
+    <div className={cn('space-y-4', !inline && 'bg-card border border-border rounded-xl p-5')}>
+      {/* ── 1. Unified Loan Status Banner ── */}
+      <div className="p-4 bg-muted/20 border border-border/50 rounded-xl space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-foreground">{mortgage.name}</h4>
+            {mortgage.interestRate > 0 && (
+              <span className="px-1.5 py-0.5 text-micro font-mono font-medium rounded-md bg-muted text-muted-foreground border border-border">
+                {mortgage.interestRate.toFixed(2)}% APR
+              </span>
             )}
           </div>
           <div className="text-right">
-            <div className="font-mono text-lg font-bold text-foreground blur-number">
+            <span className="font-mono text-base sm:text-lg font-bold text-foreground blur-number">
               {formatCurrency(currentBalance)}
-            </div>
-            <div className="text-[10px] text-muted-foreground">Current Balance</div>
+            </span>
+            <span className="text-[10px] text-muted-foreground block">Current Balance</span>
           </div>
         </div>
-      )}
 
-      {/* Mortgage Payoff Progress */}
-      <div className="mb-4 space-y-1.5">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-foreground">Mortgage Payoff</span>
-          <div className="flex items-center gap-1.5 font-mono text-[11px]">
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold blur-number">
-              {formatPlainPercent(payoffProgress)} Paid
-            </span>
-            <span className="text-muted-foreground">/</span>
-            <span className="text-slate-500 dark:text-slate-400 blur-number">
-              {formatPlainPercent(100 - Math.min(payoffProgress, 100))} Owed
+        {/* 4-Stat Metric Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
+          <div className="p-2 rounded-lg bg-card/60 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block">Monthly P&amp;I</span>
+            <span className="font-mono font-semibold text-foreground blur-number">
+              {formatCurrency(monthlyPayment)}/mo
             </span>
           </div>
-        </div>
-        <div className="w-full h-3 bg-muted/60 dark:bg-muted/40 rounded-full p-0.5 overflow-hidden flex items-stretch gap-0.5 border border-border/40 shadow-inner">
-          <div
-            className="h-full bg-emerald-500 dark:bg-emerald-500/90 rounded-l-full transition-all duration-300 shadow-xs"
-            style={{ width: `${Math.min(payoffProgress, 100)}%` }}
-            title={`Paid Off: ${formatCurrency(Math.max(0, mortgage.originalLoanAmount - currentBalance))} (${formatPlainPercent(payoffProgress)})`}
-          />
-          <div
-            className="h-full bg-slate-400/40 dark:bg-slate-700/70 rounded-r-full flex-1 transition-all duration-300 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:4px_4px]"
-            title={`Remaining Balance: ${formatCurrency(currentBalance)} (${formatPlainPercent(100 - Math.min(payoffProgress, 100))})`}
-          />
-        </div>
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
-          <span>
-            Paid:{' '}
-            <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-medium blur-number">
-              {formatCurrency(Math.max(0, mortgage.originalLoanAmount - currentBalance))}
-            </strong>
-          </span>
-          <span>
-            Original:{' '}
-            <strong className="text-foreground font-mono font-medium blur-number">
+          <div className="p-2 rounded-lg bg-card/60 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block">Original Loan</span>
+            <span className="font-mono font-semibold text-foreground blur-number">
               {formatCurrency(mortgage.originalLoanAmount)}
-            </strong>
-          </span>
-          <span>
-            Owed:{' '}
-            <strong className="text-slate-600 dark:text-slate-400 font-mono font-medium blur-number">
-              {formatCurrency(currentBalance)}
-            </strong>
-          </span>
+            </span>
+          </div>
+          <div className="p-2 rounded-lg bg-card/60 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block">Paid Off</span>
+            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 blur-number">
+              {formatPlainPercent(payoffProgress)}
+            </span>
+          </div>
+          <div className="p-2 rounded-lg bg-card/60 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block">Loan Term</span>
+            <span className="font-medium text-foreground">
+              {termMonths} mo ({Math.round(termMonths / 12)} yr)
+            </span>
+          </div>
         </div>
+
+        {/* Payoff Progress Bar */}
+        <div className="space-y-1.5 pt-1">
+          <div className="w-full h-2.5 bg-muted/60 dark:bg-muted/40 rounded-full overflow-hidden flex shadow-inner">
+            <div
+              className="h-full bg-emerald-500 rounded-l-full transition-all duration-300"
+              style={{ width: `${Math.min(payoffProgress, 100)}%` }}
+            />
+            <div
+              className="h-full bg-slate-400/40 dark:bg-slate-700/60 rounded-r-full flex-1"
+            />
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>
+              Paid: <strong className="text-emerald-600 dark:text-emerald-400 font-mono blur-number">{formatCurrency(Math.max(0, mortgage.originalLoanAmount - currentBalance))}</strong>
+            </span>
+            <span>
+              Remaining: <strong className="text-slate-600 dark:text-slate-400 font-mono blur-number">{formatCurrency(currentBalance)}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* Escrow & PMI Badges */}
+        {((mortgage.escrow !== undefined && mortgage.escrow > 0) ||
+          (mortgage.pmi !== undefined && mortgage.pmi > 0) ||
+          (mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0)) && (
+          <div className="pt-2 border-t border-border/40 flex flex-wrap gap-2 text-[10px]">
+            {mortgage.escrow !== undefined && mortgage.escrow > 0 && (
+              <span className="px-2 py-0.5 rounded bg-muted/50 border border-border/40 text-muted-foreground">
+                Escrow: <strong className="font-mono text-foreground blur-number">{formatCurrency(mortgage.escrow)}</strong>
+              </span>
+            )}
+            {mortgage.pmi !== undefined && mortgage.pmi > 0 && (
+              <span className="px-2 py-0.5 rounded bg-muted/50 border border-border/40 text-muted-foreground">
+                PMI: <strong className="font-mono text-foreground blur-number">{formatCurrency(mortgage.pmi)}</strong>
+              </span>
+            )}
+            {mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0 && (
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-medium">
+                Extra Principal: <strong className="font-mono blur-number">{formatCurrency(mortgage.extraPrincipal)}</strong>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Mortgage Details */}
-      <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
-        <div>
-          <span className="text-muted-foreground">Rate</span>
-          <div className="font-mono font-medium text-foreground blur-number">{mortgage.interestRate.toFixed(2)}%</div>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Payment</span>
-          <div className="font-mono font-medium text-foreground blur-number">{formatCurrency(monthlyPayment)}/mo</div>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Term</span>
-          <div className="font-mono font-medium text-foreground blur-number">{termMonths}mo</div>
-        </div>
-      </div>
-
-      {/* Payment Breakdown */}
-      {((mortgage.escrow !== undefined && mortgage.escrow > 0) ||
-        (mortgage.pmi !== undefined && mortgage.pmi > 0) ||
-        (mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0)) && (
-        <div className="mb-4 p-3 bg-muted/20 border border-border/50 rounded-lg grid grid-cols-2 sm:grid-cols-5 gap-2 text-[10px] text-muted-foreground">
-          {mortgage.escrow !== undefined && mortgage.escrow > 0 && (
-            <div>
-              <span className="block text-muted-foreground">Escrow</span>
-              <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(mortgage.escrow)}</span>
-            </div>
-          )}
-          {mortgage.pmi !== undefined && mortgage.pmi > 0 && (
-            <div>
-              <span className="block text-muted-foreground">PMI</span>
-              <span className="font-mono font-medium text-foreground blur-number">{formatCurrency(mortgage.pmi)}</span>
-            </div>
-          )}
-          {mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0 && (
-            <div>
-              <span className="block text-chart-1 font-medium">Extra Principal</span>
-              <span className="font-mono font-medium text-chart-1 blur-number">{formatCurrency(mortgage.extraPrincipal)}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Extra Payment Controls */}
-      <div className="mb-4 p-3 bg-muted/30 border border-border rounded-lg">
+      {/* ── 2. Early Payoff Simulator ── */}
+      <div className="p-3.5 bg-muted/20 border border-border/50 rounded-xl space-y-3">
         {currentBalance === 0 ? (
-          <div className="text-center py-1">
-            <span className="text-xs font-semibold text-chart-2 uppercase tracking-wider flex items-center justify-center gap-1">
+          <div className="text-center py-2">
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center justify-center gap-1.5">
               ✓ Fully Paid Off
             </span>
-            <p className="text-[10px] text-muted-foreground mt-1">This loan is fully paid off. View historical amortization below.</p>
+            <p className="text-[11px] text-muted-foreground mt-1">This loan is completely paid off. View historical amortization below.</p>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-foreground">Extra Payment Calculator</span>
-              <label className="flex items-center gap-1.5 font-normal cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showProjection}
-                  onChange={(e) => setShowProjection(e.target.checked)}
-                  className="rounded border-border text-primary focus:ring-primary"
-                />
-                <span className="text-xs text-muted-foreground">Enable</span>
-              </label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Calculator className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs font-semibold text-foreground">Early Payoff Simulator</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProjection(!showProjection)}
+                className={cn(
+                  'px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-all cursor-pointer',
+                  showProjection
+                    ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                    : 'bg-background hover:bg-muted text-muted-foreground hover:text-foreground border-border'
+                )}
+              >
+                {showProjection ? 'Simulator Active' : 'Enable Simulator'}
+              </button>
             </div>
 
             {showProjection && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">Extra Monthly</label>
-                    <input
-                      type="number"
-                      value={extraMonthly}
-                      onChange={(e) => setExtraMonthly(e.target.value)}
-                      placeholder="e.g., 500"
-                      className="w-full px-2 py-1.5 text-xs bg-background border border-input rounded font-mono"
-                    />
+              <div className="space-y-3 pt-1 animate-in fade-in-50 duration-200">
+                {/* Inputs Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Extra Monthly Payment */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-medium text-foreground">
+                      Extra Monthly Principal
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">$</span>
+                      <input
+                        type="number"
+                        value={extraMonthly}
+                        onChange={(e) => setExtraMonthly(e.target.value)}
+                        placeholder="e.g. 250"
+                        className="w-full pl-6 pr-2.5 py-1.5 text-xs bg-background border border-input rounded-lg font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    {/* Quick Preset Buttons */}
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <span className="text-[10px] text-muted-foreground">Presets:</span>
+                      {[100, 250, 500].map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setPresetExtra(amt)}
+                          className={cn(
+                            'px-1.5 py-0.5 rounded text-[10px] font-mono border transition-colors cursor-pointer',
+                            extraMonthly === String(amt)
+                              ? 'bg-primary/10 border-primary/30 text-primary font-semibold'
+                              : 'bg-background border-border/60 text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          +${amt}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex items-end">
-                    <label className="flex items-center gap-1.5 pb-1 font-normal cursor-pointer">
+
+                  {/* Biweekly Option & Lump Sum */}
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 p-2 rounded-lg bg-card/60 border border-border/50 cursor-pointer hover:bg-card transition-colors">
                       <input
                         type="checkbox"
                         checked={biweekly}
                         onChange={(e) => setBiweekly(e.target.checked)}
                         className="rounded border-border text-primary focus:ring-primary"
                       />
-                      <span className="text-[10px] text-muted-foreground leading-tight">Bi-weekly (½ payment every 2 weeks)</span>
+                      <div className="min-w-0">
+                        <span className="text-xs font-medium text-foreground block">Bi-weekly Payments</span>
+                        <span className="text-[10px] text-muted-foreground block">
+                          26 half-payments/yr (1 extra full payment/year)
+                        </span>
+                      </div>
                     </label>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">Lump Sum</label>
-                    <input
-                      type="number"
-                      value={lumpSum}
-                      onChange={(e) => setLumpSum(e.target.value)}
-                      placeholder="e.g., 10000"
-                      className="w-full px-2 py-1.5 text-xs bg-background border border-input rounded font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">Lump Sum Date</label>
-                    <input
-                      type="date"
-                      value={lumpSumDate}
-                      onChange={(e) => setLumpSumDate(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs bg-background border border-input rounded font-mono"
-                    />
+
+                    {/* Lump Sum Input */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-muted-foreground mb-0.5">Lump Sum ($)</label>
+                        <input
+                          type="number"
+                          value={lumpSum}
+                          onChange={(e) => setLumpSum(e.target.value)}
+                          placeholder="e.g. 5000"
+                          className="w-full px-2 py-1 text-xs bg-background border border-input rounded-md font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-muted-foreground mb-0.5">Lump Sum Date</label>
+                        <input
+                          type="date"
+                          value={lumpSumDate}
+                          onChange={(e) => setLumpSumDate(e.target.value)}
+                          className="w-full px-2 py-1 text-xs bg-background border border-input rounded-md font-mono"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {standardSummary.isNegativeAmortization && (
-                  <div className="p-2 bg-destructive/10 border border-destructive/20 rounded text-[11px] text-destructive">
-                    <span className="font-semibold">Negative Amortization:</span> Monthly payment does not cover interest accrued. Balance will grow over time.
+                  <div className="p-2.5 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive">
+                    <span className="font-semibold">Negative Amortization Warning:</span> Monthly payment does not cover accrued interest. Balance will grow.
                   </div>
                 )}
 
+                {/* Simulation Impact Banner */}
                 {hasExtraPayments && (
-                  <div className="flex items-start justify-between pt-2 border-t border-border gap-2">
-                    <div className="text-xs space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Payoff:</span>
-                        <span className="font-medium text-chart-1">
-                          {acceleratedSummary.payoffDate ? formatSafeUTCDate(acceleratedSummary.payoffDate, { month: 'short', year: 'numeric' }) : 'Never'}
-                        </span>
-                        <span className="text-muted-foreground">
-                          (vs {standardSummary.payoffDate ? formatSafeUTCDate(standardSummary.payoffDate, { month: 'short', year: 'numeric' }) : 'Never'})
-                        </span>
+                  <div className="p-3 bg-card border border-emerald-500/30 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Accelerated Payoff Outcome</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Interest saved:</span>
-                        <span className="font-medium text-chart-2 blur-number">{formatCurrency(acceleratedSummary.interestSaved)}</span>
+                      <button
+                        type="button"
+                        onClick={handleReset}
+                        className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 underline cursor-pointer"
+                      >
+                        <RotateCcw className="w-2.5 h-2.5" />
+                        Reset
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block">New Payoff Date</span>
+                        <span className="font-semibold text-chart-1">
+                          {acceleratedSummary.payoffDate
+                            ? formatSafeUTCDate(acceleratedSummary.payoffDate, { month: 'short', year: 'numeric' })
+                            : 'Never'}
+                        </span>
                         {acceleratedSummary.monthsSaved > 0 && (
-                          <span className="text-muted-foreground">| {acceleratedSummary.monthsSaved}mo sooner</span>
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-medium">
+                            {Math.floor(acceleratedSummary.monthsSaved / 12) > 0
+                              ? `${Math.floor(acceleratedSummary.monthsSaved / 12)} yr ${acceleratedSummary.monthsSaved % 12} mo sooner`
+                              : `${acceleratedSummary.monthsSaved} mo sooner`}
+                          </span>
                         )}
                       </div>
+
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block">Interest Saved</span>
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 blur-number">
+                          {formatCurrency(acceleratedSummary.interestSaved)}
+                        </span>
+                      </div>
+
                       {acceleratedSummary.pmiSaved !== undefined && acceleratedSummary.pmiSaved > 0 && (
-                        <div className="flex items-center gap-2 text-chart-1">
-                          <span className="text-muted-foreground">PMI saved:</span>
-                          <span className="font-medium blur-number">{formatCurrency(acceleratedSummary.pmiSaved)}</span>
-                          {acceleratedSummary.pmiRemovalDate78 && (
-                            <span className="text-muted-foreground">
-                              (ends {formatSafeUTCDate(acceleratedSummary.pmiRemovalDate78, { month: 'short', year: 'numeric' })})
-                            </span>
-                          )}
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">PMI Saved</span>
+                          <span className="font-mono font-bold text-primary blur-number">
+                            {formatCurrency(acceleratedSummary.pmiSaved)}
+                          </span>
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={handleReset}
-                      className="text-[10px] text-muted-foreground hover:text-foreground underline cursor-pointer shrink-0"
-                    >
-                      Reset
-                    </button>
                   </div>
                 )}
               </div>
@@ -401,15 +448,13 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
         )}
       </div>
 
-      {/* Chart */}
+      {/* ── 3. Amortization Projection Chart ── */}
       {chartDataPoints.length > 0 ? (
-        <div className="h-[250px]">
-          <div className="h-full w-full overflow-x-auto overflow-y-hidden">
-            <div className="min-w-max h-full">
-              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
-                <LineChart
+        <div className="h-[230px] pt-1">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+            <LineChart
               data={chartDataPoints}
-              margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+              margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} horizontal={true} />
               <XAxis
@@ -459,6 +504,7 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
               <Line
                 type="monotone"
                 dataKey="Standard"
+                name="Standard Payoff"
                 stroke="var(--color-chart-4)"
                 strokeWidth={2}
                 dot={false}
@@ -468,6 +514,7 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
                 <Line
                   type="monotone"
                   dataKey="With Extra Payments"
+                  name="With Extra Payments"
                   stroke="var(--color-chart-2)"
                   strokeWidth={2}
                   strokeDasharray="6 4"
@@ -475,13 +522,11 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
                   connectNulls
                 />
               )}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       ) : (
-        <div className="h-[250px] flex items-center justify-center">
+        <div className="h-[200px] flex items-center justify-center">
           <ChartEmptyState variant="nodata" description="No amortization data available" />
         </div>
       )}

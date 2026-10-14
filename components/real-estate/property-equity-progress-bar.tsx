@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,7 @@ import {
   computeEquityBreakdown,
 } from '@/lib/services/real-estate-equity-breakdown';
 import { IconTip } from '@/components/ui/icon-tip';
-import { ShieldCheck, TrendingUp, Wallet, Landmark } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 interface PropertyEquityProgressBarProps {
   propertyValue: number;
@@ -27,8 +27,6 @@ export function PropertyEquityProgressBar({
   linkedMortgages,
   className,
 }: PropertyEquityProgressBarProps) {
-  const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
-
   const {
     totalValue,
     downPayment,
@@ -60,48 +58,43 @@ export function PropertyEquityProgressBar({
         label: 'Down Payment',
         amount: downPayment,
         pct: downPaymentPct,
-        colorClass: 'bg-sky-500 hover:bg-sky-400 dark:bg-sky-500/90 dark:hover:bg-sky-400',
+        colorClass: 'bg-sky-500 dark:bg-sky-500/90',
         dotColorClass: 'bg-sky-500',
         textColorClass: 'text-sky-600 dark:text-sky-400',
-        icon: Wallet,
-        subLabel: 'and Loan Costs',
-        description: 'Purchase price minus the original purchase-time mortgage. Loan costs are included here when they are rolled into the purchase or financed amount; they are not calculated separately.',
+        description: 'Purchase price minus original purchase mortgage, including rolled-in loan costs.',
       },
       {
         id: 'principalPaid',
         label: 'Principal Paid',
         amount: principalPaid,
         pct: principalPaidPct,
-        colorClass: 'bg-emerald-500 hover:bg-emerald-400 dark:bg-emerald-500/90 dark:hover:bg-emerald-400',
+        colorClass: 'bg-emerald-500 dark:bg-emerald-500/90',
         dotColorClass: 'bg-emerald-500',
         textColorClass: 'text-emerald-600 dark:text-emerald-400',
-        icon: ShieldCheck,
-        description: 'Estimated from original loan amounts and refinance payoff balances. This is not a transaction-level total of every principal payment.',
+        description: 'Estimated principal paid down from loan balances and refinance payoffs across active and closed mortgages.',
       },
       {
         id: 'appreciation',
         label: 'Appreciation',
         amount: appreciation,
         pct: appreciationPct,
-        colorClass: 'bg-violet-500 hover:bg-violet-400 dark:bg-violet-500/90 dark:hover:bg-violet-400',
+        colorClass: 'bg-violet-500 dark:bg-violet-500/90',
         dotColorClass: 'bg-violet-500',
         textColorClass: 'text-violet-600 dark:text-violet-400',
-        icon: TrendingUp,
-        description: 'Current property value minus the recorded purchase price. It may reflect an estimated valuation and excludes selling costs.',
+        description: 'Current property value minus recorded purchase price.',
       },
       {
         id: 'mortgageOwed',
-        label: 'Mortgage Owed',
+        label: 'Mortgage Debt',
         amount: mortgageOwed,
         pct: mortgageOwedPct,
         colorClass: cn(
-          'bg-slate-400/50 hover:bg-slate-400/70 dark:bg-slate-700/70 dark:hover:bg-slate-600/80',
+          'bg-slate-400/50 dark:bg-slate-700/70',
           'bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:6px_6px] dark:bg-[radial-gradient(#475569_1px,transparent_1px)]'
         ),
-        dotColorClass: 'bg-slate-400 dark:bg-slate-600 border border-slate-500/30',
+        dotColorClass: 'bg-slate-400 dark:bg-slate-500 border border-slate-500/30',
         textColorClass: 'text-slate-600 dark:text-slate-400',
-        icon: Landmark,
-        description: 'Balances on active linked mortgages only. Closed or refinanced loans are reflected in Principal Paid instead.',
+        description: 'Remaining balance on active linked mortgages.',
         isDebt: true,
       },
     ].filter((s) => s.pct > 0.05);
@@ -127,8 +120,8 @@ export function PropertyEquityProgressBar({
           <span className="text-[10px] text-muted-foreground">(estimated attribution)</span>
           <IconTip
             size={13}
-            content="These buckets estimate how the current property value is attributed. Percentages use current property value; refinance fees, cash-out amounts, or incomplete loan history can create small differences."
-            aria-label="About asset breakdown calculations"
+            content="Estimates how the property value is attributed across cash down, principal paid down, market appreciation, and outstanding debt."
+            aria-label="About asset breakdown attribution"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -138,12 +131,14 @@ export function PropertyEquityProgressBar({
               100% Owned
             </span>
           ) : (
-            <div className="flex items-center gap-1.5 text-[11px] font-mono font-medium">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold blur-number">
+            <div className="flex items-center gap-2 text-[11px] font-mono">
+              <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold blur-number">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                 {formatPlainPercent(totalEquityPct)} Equity
               </span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-slate-500 dark:text-slate-400 blur-number">
+              <span className="text-muted-foreground/30">•</span>
+              <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium blur-number">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0" />
                 {formatPlainPercent(mortgageOwedPct)} Debt
               </span>
             </div>
@@ -153,107 +148,59 @@ export function PropertyEquityProgressBar({
 
       {isUnderwater && (
         <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px] text-amber-700 dark:text-amber-300">
-          Property value is below the recorded purchase price. Equity buckets are proportionally scaled to the current equity.
+          Property value is below recorded purchase price. Equity buckets are scaled to current equity.
         </div>
       )}
 
-      {/* Multi-segment Progress Bar with Interactive Hover Tooltips */}
-      <div className="relative group">
-        <div
-          role="progressbar"
-          aria-label="Real Estate Equity and Debt Breakdown"
-          aria-valuenow={Math.round(totalEquityPct)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          className="w-full h-4 bg-muted/60 dark:bg-muted/40 rounded-lg p-0.5 overflow-hidden flex items-stretch gap-0.5 shadow-inner border border-border/40"
-        >
-          {segments.map((seg, idx) => {
-            const isFirst = idx === 0;
-            const isLast = idx === segments.length - 1;
-            const isHovered = hoveredSegment === seg.id;
+      {/* Multi-segment Progress Bar without Mouseover Animations */}
+      <div
+        role="progressbar"
+        aria-label="Real Estate Equity and Debt Breakdown"
+        aria-valuenow={Math.round(totalEquityPct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="w-full h-3 sm:h-3.5 bg-muted/60 dark:bg-muted/40 rounded-full p-0.5 overflow-hidden flex items-stretch gap-0.5 shadow-inner border border-border/40"
+      >
+        {segments.map((seg, idx) => {
+          const isFirst = idx === 0;
+          const isLast = idx === segments.length - 1;
 
-            return (
-              <div
-                key={seg.id}
-                onMouseEnter={() => setHoveredSegment(seg.id)}
-                onMouseLeave={() => setHoveredSegment(null)}
-                style={{ width: `${seg.pct}%` }}
-                className={cn(
-                  'h-full transition-all duration-300 relative cursor-pointer',
-                  seg.colorClass,
-                  isFirst && 'rounded-l-md',
-                  isLast && 'rounded-r-md',
-                  isHovered && 'brightness-110 scale-y-110 z-10 shadow-sm'
-                )}
-                title={`${seg.label}: ${formatCurrency(seg.amount)} (${formatPlainPercent(seg.pct)})`}
-              />
-            );
-          })}
-        </div>
-
-        {/* Hover detail pill (dynamic on hover) */}
-        {hoveredSegment && (
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-all duration-200">
-            {(() => {
-              const seg = segments.find((s) => s.id === hoveredSegment);
-              if (!seg) return null;
-              return (
-                <div className="px-2.5 py-1 rounded-md bg-popover text-popover-foreground border border-border shadow-lg text-[11px] whitespace-nowrap flex items-center gap-1.5 animate-in fade-in-0 zoom-in-95">
-                  <div className={cn('w-2 h-2 rounded-full', seg.dotColorClass)} />
-                  <span className="font-medium text-foreground">{seg.label}:</span>
-                  <span className="font-mono font-semibold blur-number">{formatCurrency(seg.amount)}</span>
-                  <span className="text-muted-foreground font-mono">({formatPlainPercent(seg.pct)})</span>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-      </div>
-
-      {/* Legend Breakdown Grid */}
-      <div className="grid grid-cols-2 @sm:grid-cols-4 gap-2 pt-1">
-        {segments.map((seg) => {
-          const isHovered = hoveredSegment === seg.id;
           return (
             <div
               key={seg.id}
-              onMouseEnter={() => setHoveredSegment(seg.id)}
-              onMouseLeave={() => setHoveredSegment(null)}
+              style={{ width: `${seg.pct}%` }}
               className={cn(
-                'p-2 rounded-lg border transition-all cursor-pointer flex flex-col justify-between',
-                isHovered
-                  ? 'bg-muted/60 border-primary/40 shadow-xs scale-[1.02]'
-                  : 'bg-muted/20 hover:bg-muted/40 border-border/40'
+                'h-full',
+                seg.colorClass,
+                isFirst && 'rounded-l-full',
+                isLast && 'rounded-r-full'
               )}
-            >
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className={cn('w-2 h-2 rounded-full shrink-0', seg.dotColorClass)} />
-                <span className="text-[11px] font-medium text-muted-foreground truncate">
-                  <span className="block truncate">{seg.label}</span>
-                  {'subLabel' in seg && seg.subLabel && (
-                    <span className="block text-[11px] font-normal text-muted-foreground/75 truncate">
-                      {seg.subLabel}
-                    </span>
-                  )}
-                </span>
-                <IconTip
-                  size={12}
-                  content={seg.description}
-                  aria-label={`${seg.label} calculation details`}
-                  className="shrink-0"
-                />
-              </div>
-              <div className="flex items-baseline justify-between gap-1">
-                <span className="font-mono text-xs font-semibold text-foreground blur-number">
-                  {formatCurrency(seg.amount)}
-                </span>
-                <span className="font-mono text-[10px] text-muted-foreground/80 blur-number">
-                  {formatPlainPercent(seg.pct)}
-                </span>
-              </div>
-            </div>
+              title={`${seg.label}: ${formatCurrency(seg.amount)} (${formatPlainPercent(seg.pct)})`}
+            />
           );
         })}
+      </div>
+
+      {/* Clean Legend / Ledger Style */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 pt-1 border-t border-border/25">
+        {segments.map((seg) => (
+          <div key={seg.id} className="min-w-0">
+            <div className="flex items-center gap-1.5 text-xs mb-0.5">
+              <span className={cn('w-2 h-2 rounded-full shrink-0', seg.dotColorClass)} />
+              <span className="font-medium text-muted-foreground truncate" title={seg.label}>
+                {seg.label}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5 font-mono pl-3.5">
+              <span className="text-xs sm:text-sm font-bold text-foreground blur-number">
+                {formatCurrency(seg.amount)}
+              </span>
+              <span className="text-[11px] text-muted-foreground/80 blur-number">
+                ({formatPlainPercent(seg.pct)})
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/chart-tooltip';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
+import { SidebarCollapseButton } from '@/components/ui/sidebar-collapse-button';
 import { ChartHoverTooltip } from '@/components/charts/chart-hover-tooltip';
 import { cn } from '@/lib/utils';
 import { Building2, Home, Landmark, PieChart as PieIcon, ShieldCheck } from 'lucide-react';
@@ -27,7 +27,7 @@ function OverviewContent({ data }: { data: RealEstateData }) {
     return [...(equity > 0 ? [{ id: `${property.id}-equity`, label: property.name, value: equity, color, isMortgage: false as const }] : []), ...(property.mortgageBalance > 0 ? [{ id: `${property.id}-mortgage`, label: `${property.name} (Mortgage)`, value: property.mortgageBalance, color: 'var(--color-muted-foreground)', isMortgage: true as const }] : [])];
   }), [properties]);
   return <div className="p-4 sm:p-5 divide-y divide-sidebar-border/50">
-    <div className="py-4 first:pt-0 last:pb-0"><ChartHoverTooltip content={<><TooltipHeader>Portfolio Equity</TooltipHeader><TooltipRow label="Property value" value={formatCurrency(summary.totalValue)} color="var(--color-chart-1)" /><TooltipRow label="Mortgage debt" value={formatCurrency(summary.totalMortgage)} color="var(--color-muted-foreground)" /></>}><div className="space-y-1 cursor-help"><span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Equity</span><div className="text-2xl sm:text-3xl font-extrabold font-mono text-foreground blur-number">{formatCurrency(summary.totalEquity)}</div><div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /><span>{equityPct.toFixed(0)}% of property value is owned</span></div></div></ChartHoverTooltip></div>
+    <div className="py-4 first:pt-0 last:pb-0 sm:pr-8"><ChartHoverTooltip content={<><TooltipHeader>Portfolio Equity</TooltipHeader><TooltipRow label="Property value" value={formatCurrency(summary.totalValue)} color="var(--color-chart-1)" /><TooltipRow label="Mortgage debt" value={formatCurrency(summary.totalMortgage)} color="var(--color-muted-foreground)" /></>}><div className="space-y-1 cursor-help"><span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Equity</span><div className="text-2xl sm:text-3xl font-extrabold font-mono text-foreground blur-number">{formatCurrency(summary.totalEquity)}</div><div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /><span>{equityPct.toFixed(0)}% of property value is owned</span></div></div></ChartHoverTooltip></div>
     <div className="py-4 space-y-3"><div className="flex items-center justify-between"><span className="text-xs font-bold text-foreground flex items-center gap-1.5"><PieIcon className="w-3.5 h-3.5 text-primary" />Portfolio mix</span><span className="text-[11px] text-muted-foreground">Value + debt</span></div><div className="h-40 relative"><ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 100, height: 100 }}><PieChart><defs><pattern id="real-estate-debt-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--color-muted-foreground)" fillOpacity=".5" /><line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,255,255,.4)" strokeWidth="1.2" /></pattern></defs><Pie data={chartData} dataKey="value" nameKey="id" cx="50%" cy="50%" innerRadius="62%" outerRadius="86%" paddingAngle={1} cornerRadius={4} stroke="none">{chartData.map((entry) => <Cell key={entry.id} fill={entry.isMortgage ? 'url(#real-estate-debt-hatch)' : entry.color} />)}</Pie><Tooltip content={({ active, payload }) => { if (!active || !payload?.length) return null; const item = payload[0].payload as ChartDatum; return <ChartTooltip><div className="font-semibold text-xs">{item.label}</div><div className="text-xs mt-1">{formatCurrency(item.value)}</div></ChartTooltip>; }} /></PieChart></ResponsiveContainer><div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"><span className="text-xl font-extrabold font-mono text-foreground blur-number">{formatCurrency(summary.totalValue)}</span><span className="text-[10px] uppercase tracking-wider text-muted-foreground">gross value</span></div></div><div className="space-y-1.5">{properties.slice(0, 4).map((property, index) => <div key={property.id} className="flex items-center justify-between text-xs"><span className="flex items-center gap-2 min-w-0"><span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: `var(--color-chart-${(index % 5) + 1})` }} /><span className="truncate text-muted-foreground">{property.name}</span></span><span className="font-mono text-foreground blur-number">{formatCurrency(property.value)}</span></div>)}{properties.length > 4 && <div className="text-[10px] text-muted-foreground text-center pt-1">+{properties.length - 4} more properties</div>}</div></div>
     <div className="py-4 space-y-4"><ChartHoverTooltip content={<><TooltipHeader>Debt-to-Value</TooltipHeader><TooltipRow label="Mortgage debt" value={`${formatCurrency(summary.totalMortgage)} (${formatPlainPercent(debtPct)})`} color="var(--color-muted-foreground)" /><TooltipRow label="Owned equity" value={`${formatCurrency(summary.totalEquity)} (${formatPlainPercent(equityPct)})`} color="var(--color-chart-1)" /></>}><div className="space-y-2 cursor-help"><div className="flex items-center justify-between text-xs font-bold"><span className="flex items-center gap-1.5"><Landmark className="w-3.5 h-3.5 text-primary" />Debt-to-value</span><span className="font-mono text-muted-foreground">{formatPlainPercent(summary.overallLtv)}</span></div><div className="h-2.5 w-full rounded-full bg-muted/50 overflow-hidden"><div className={cn('h-full rounded-full transition-all', summary.overallLtv > 80 ? 'bg-destructive' : summary.overallLtv > 60 ? 'bg-amber-500' : 'bg-chart-1')} style={{ width: `${Math.min(summary.overallLtv, 100)}%` }} /></div><div className="flex justify-between text-[10px] text-muted-foreground"><span>{summary.overallLtv <= 60 ? 'Healthy leverage' : summary.overallLtv <= 80 ? 'Moderate leverage' : 'High leverage'}</span><span>{formatCurrency(summary.totalMortgage)} owed</span></div></div></ChartHoverTooltip><div className="grid grid-cols-2 gap-2.5"><div className="rounded-xl border border-sidebar-border/70 bg-sidebar/50 p-3"><div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><Building2 className="w-3 h-3" />Properties</div><div className="mt-1 text-lg font-bold font-mono text-foreground">{summary.propertyCount}</div></div><div className="rounded-xl border border-sidebar-border/70 bg-sidebar/50 p-3"><div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><Home className="w-3 h-3" />Largest asset</div><div className="mt-1 truncate text-sm font-bold text-foreground" title={largestProperty?.name}>{largestProperty?.name || '—'}</div></div></div></div>
   </div>;
@@ -38,6 +38,37 @@ export function PortfolioAllocationChart() {
   const [data, setData] = useState<RealEstateData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { fetch('/api/real-estate', { credentials: 'include' }).then((res) => { if (!res.ok) throw new Error('Failed to fetch'); return res.json(); }).then(setData).catch((err) => setError(err.message)).finally(() => setLoading(false)); }, []);
-  return <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground"><CollapsibleCardHeader isCollapsed={isCollapsed} onToggle={setIsCollapsed} showMobileToggle={false} collapseDirection="horizontal" title={<div className="flex items-center gap-2"><PieIcon className="w-4 h-4 text-primary shrink-0" /><span className="font-bold text-foreground">Overview</span></div>} className="border-b border-sidebar-border/60 bg-sidebar" />{!isCollapsed && (loading ? <LoadingSpinner category="chart" className="h-[360px]" /> : error ? <div className="p-5"><ChartEmptyState variant="error" error={error} /></div> : !data?.properties.length ? <div className="p-5"><ChartEmptyState variant="nodata" /></div> : <OverviewContent data={data} />)}</div>;
+  useEffect(() => {
+    fetch('/api/real-estate', { credentials: 'include' })
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch');
+        return res.json();
+      })
+      .then(setData)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+  return (
+    <div className="relative bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
+      <SidebarCollapseButton
+        onClick={() => setIsCollapsed(true)}
+        label="Collapse overview"
+      />
+      {!isCollapsed && (
+        loading ? (
+          <LoadingSpinner category="chart" className="h-[360px]" />
+        ) : error ? (
+          <div className="p-5">
+            <ChartEmptyState variant="error" error={error} />
+          </div>
+        ) : !data?.properties.length ? (
+          <div className="p-5">
+            <ChartEmptyState variant="nodata" />
+          </div>
+        ) : (
+          <OverviewContent data={data} />
+        )
+      )}
+    </div>
+  );
 }
