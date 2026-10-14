@@ -8,6 +8,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, encryptRow, decryptField } from '@/lib/crypto';
 import { computeGoalAllocations, findSharedAccounts, getGoalAllocation } from '@/lib/services/goal-allocation';
 import { formatToCents } from '@/lib/services/account-history';
+import { getCached, setCached, invalidateUserServerCache } from '@/lib/server-cache';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -19,6 +20,12 @@ export async function GET(req: NextRequest) {
   const type = searchParams.get('type');
   const userId = session.user.id;
   const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+
+  const cacheKey = `user:${userId}:financial-goals:${dataUserId}:${status || ''}:${type || ''}`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   const conditions = [eq(financialGoals.userId, dataUserId)];
   if (status) conditions.push(eq(financialGoals.status, status));
@@ -114,6 +121,7 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  setCached(cacheKey, enriched, 2 * 60 * 1000);
   logger.info('GET /api/financial-goals', { count: enriched.length, status, type });
   return NextResponse.json(enriched);
 }
@@ -160,6 +168,7 @@ export async function POST(req: NextRequest) {
 
     const decrypted = await decryptRow('financial_goals', goal[0], dek);
 
+    invalidateUserServerCache(dataUserId);
     logger.info('POST /api/financial-goals', { goalId: goal[0].id });
     return NextResponse.json(decrypted, { status: 201 });
   } catch (err) {
@@ -245,6 +254,7 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    invalidateUserServerCache(dataUserId);
     logger.info('PATCH /api/financial-goals', { goalId: id });
     const decrypted = updated[0] ? await decryptRow('financial_goals', updated[0], dek) : updated[0];
     return NextResponse.json(decrypted);
@@ -285,6 +295,7 @@ export async function DELETE(req: NextRequest) {
       .delete(financialGoals)
       .where(eq(financialGoals.id, id));
 
+    invalidateUserServerCache(dataUserId);
     logger.info('DELETE /api/financial-goals', { goalId: id });
     return NextResponse.json({ success: true });
   } catch (err) {

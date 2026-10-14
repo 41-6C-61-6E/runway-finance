@@ -72,6 +72,8 @@ export function GoalsList({ targetGoalId }: { targetGoalId?: string | null } = {
   dragIndexRef.current = dragIndex;
 
 
+  const inflowsKey = useMemo(() => JSON.stringify(savedInflows ?? null), [savedInflows]);
+
   const fetchGoals = useCallback(async () => {
     try {
       setLoading(true);
@@ -104,7 +106,7 @@ export function GoalsList({ targetGoalId }: { targetGoalId?: string | null } = {
     } finally {
       setLoading(false);
     }
-  }, [savedInflows]);
+  }, [inflowsKey, savedInflows]);
 
   useEffect(() => {
     fetchGoals();

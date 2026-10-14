@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { computeGoalProjections } from '@/lib/services/goal-projections';
+import { getCached, setCached } from '@/lib/server-cache';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -15,6 +16,12 @@ export async function GET(req: NextRequest) {
   const accountInflowsParam = searchParams.get('accountInflows');
   const lookbackMonthsParam = searchParams.get('lookbackMonths');
   const projectionMonthsParam = searchParams.get('projectionMonths');
+
+  const cacheKey = `user:${userId}:goals-projections:${dataUserId}:${monthlyInflowParam || ''}:${accountInflowsParam || ''}:${lookbackMonthsParam || ''}:${projectionMonthsParam || ''}`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   try {
     const overrides: {
@@ -57,7 +64,7 @@ export async function GET(req: NextRequest) {
     }
 
     const projections = await computeGoalProjections(dataUserId, overrides);
-
+    setCached(cacheKey, projections, 2 * 60 * 1000);
     return NextResponse.json(projections);
   } catch (err) {
     logger.error('GET /api/goals/projections', { error: err });

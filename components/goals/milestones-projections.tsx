@@ -215,7 +215,7 @@ export function MilestonesProjections() {
         hasLoadedOnce.current = true;
         const inputs: Record<string, string> = {};
         for (const acct of result.accounts) {
-          const saved = savedInflows?.[acct.accountId];
+          const saved = inflows?.[acct.accountId];
           inputs[acct.accountId] = String(saved !== undefined ? saved : acct.monthlyInflow);
         }
         setPendingInputs(inputs);
@@ -225,12 +225,14 @@ export function MilestonesProjections() {
     } finally {
       setLoading(false);
     }
-  }, [savedInflows]);
+  }, []);
+
+  const inflowsKey = useMemo(() => JSON.stringify(savedInflows ?? null), [savedInflows]);
 
   useEffect(() => {
     if (savedInflows === undefined) return;
     fetchProjections(savedInflows);
-  }, [savedInflows, fetchProjections]);
+  }, [inflowsKey, fetchProjections]);
 
   const adjustInflowForAccount = (accountId: string, delta: number) => {
     const current = parseFloat(pendingInputs[accountId] ?? '0') || 0;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '@/lib/utils/goals';
 import { formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -293,6 +293,7 @@ function ProjectionPacingCard() {
     accounts: Array<{ allFundedBy: string | null; goals: Array<{ willFund: boolean }> }>;
   } | null>(null);
   const { savedInflows } = useGoalInflow();
+  const inflowsKey = useMemo(() => JSON.stringify(savedInflows ?? null), [savedInflows]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -315,7 +316,7 @@ function ProjectionPacingCard() {
         setProjections({ allFundedBy, accounts: data.accounts });
       })
       .catch(() => {});
-  }, [savedInflows]);
+  }, [inflowsKey, savedInflows]);
 
   if (!projections) return null;
 

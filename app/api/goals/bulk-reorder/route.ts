@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { financialGoals } from '@/lib/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
+import { invalidateUserServerCache } from '@/lib/server-cache';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
         .where(eq(financialGoals.id, update.id as any));
     }
 
+    invalidateUserServerCache(dataUserId);
     return NextResponse.json({ success: true, updated: validUpdates.length });
   } catch (err) {
     logger.error('POST /api/goals/bulk-reorder', { error: err });
