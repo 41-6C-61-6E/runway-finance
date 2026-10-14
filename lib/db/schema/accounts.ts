@@ -96,6 +96,8 @@ export const holdings = pgTable(
   },
   (t) => [
     unique().on(t.accountId, t.securityId),
+    index('holdings_user_id_idx').on(t.userId),
+    index('holdings_account_id_idx').on(t.accountId),
   ]
 );
 
@@ -120,6 +122,7 @@ export const holdingSnapshots = pgTable(
   },
   (t) => [
     unique().on(t.userId, t.accountId, t.securityId, t.snapshotDate),
+    index('holding_snapshots_account_date_idx').on(t.accountId, t.snapshotDate),
   ]
 );
 
@@ -140,5 +143,10 @@ export const accountSnapshots = pgTable(
     importId: uuid('import_id').references(() => importLog.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.userId, t.accountId, t.snapshotDate)]
+  (t) => [
+    unique().on(t.userId, t.accountId, t.snapshotDate),
+    index('account_snapshots_account_date_idx').on(t.accountId, t.snapshotDate),
+    index('account_snapshots_user_date_idx').on(t.userId, t.snapshotDate),
+  ]
 );
+

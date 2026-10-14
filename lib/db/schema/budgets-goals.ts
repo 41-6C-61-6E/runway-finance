@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -14,66 +15,78 @@ import { categories, tags } from './transactions';
 
 // ── Budgets ──────────────────────────────────────────────────────────────────
 // User-defined budgets for categories and time periods
-export const budgets = pgTable('budgets', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull(),
-  categoryId: uuid('category_id')
-    .notNull()
-    .references(() => categories.id, { onDelete: 'cascade' }),
-  yearMonth: text('year_month'),
-  periodType: text('period_type').notNull().default('monthly'),
-  periodKey: text('period_key'),
-  amount: text('amount').notNull(),
-  isRecurring: boolean('is_recurring').notNull().default(true),
-  effectiveFrom: text('effective_from'),
-  effectiveTo: text('effective_to'),
-  fundingAccountId: uuid('funding_account_id').references(() => accounts.id, { onDelete: 'set null' }),
-  rollover: boolean('rollover').notNull().default(false),
-  notes: text('notes'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const budgets = pgTable(
+  'budgets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    categoryId: uuid('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+    yearMonth: text('year_month'),
+    periodType: text('period_type').notNull().default('monthly'),
+    periodKey: text('period_key'),
+    amount: text('amount').notNull(),
+    isRecurring: boolean('is_recurring').notNull().default(true),
+    effectiveFrom: text('effective_from'),
+    effectiveTo: text('effective_to'),
+    fundingAccountId: uuid('funding_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    rollover: boolean('rollover').notNull().default(false),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('budgets_user_id_idx').on(t.userId)]
+);
 
 // ── Financial Goals ──────────────────────────────────────────────────────────
 // Savings goals with target amounts and progress tracking
-export const financialGoals = pgTable('financial_goals', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull(),
-  name: text('name').notNull(),
-  description: text('description'),
-  type: text('type').notNull(),
-  targetAmount: text('target_amount').notNull(),
-  currentAmount: text('current_amount').notNull(),
-  targetDate: date('target_date'),
-  category: text('category'),
-  categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
-  status: text('status').notNull().default('active'),
-  linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
-  percentage: text('percentage').notNull(),
-  reserve: text('reserve').notNull(),
-  sortOrder: integer('sort_order').notNull().default(0),
-  allocatedAmount: text('allocated_amount').notNull().default('0'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const financialGoals = pgTable(
+  'financial_goals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    type: text('type').notNull(),
+    targetAmount: text('target_amount').notNull(),
+    currentAmount: text('current_amount').notNull(),
+    targetDate: date('target_date'),
+    category: text('category'),
+    categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
+    status: text('status').notNull().default('active'),
+    linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    percentage: text('percentage').notNull(),
+    reserve: text('reserve').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    allocatedAmount: text('allocated_amount').notNull().default('0'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('financial_goals_user_id_idx').on(t.userId)]
+);
 
 // ── Goal Allocation History ────────────────────────────────────────────────────
 // Tracks allocation snapshots over time for historical analysis
-export const goalAllocationHistory = pgTable('goal_allocation_history', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull(),
-  goalId: uuid('goal_id').notNull().references(() => financialGoals.id, { onDelete: 'cascade' }),
-  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
-  snapshotDate: date('snapshot_date').notNull().defaultNow(),
-  accountBalance: text('account_balance').notNull(),
-  allocatedAmount: text('allocated_amount').notNull().default('0'),
-  desiredAmount: text('desired_amount').notNull().default('0'),
-  percentage: text('percentage').notNull().default('100'),
-  sortOrder: integer('sort_order').notNull().default(0),
-  isUnderfunded: boolean('is_underfunded').notNull().default(false),
-  remainingOnAccount: text('remaining_on_account').notNull().default('0'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const goalAllocationHistory = pgTable(
+  'goal_allocation_history',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    goalId: uuid('goal_id').notNull().references(() => financialGoals.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    snapshotDate: date('snapshot_date').notNull().defaultNow(),
+    accountBalance: text('account_balance').notNull(),
+    allocatedAmount: text('allocated_amount').notNull().default('0'),
+    desiredAmount: text('desired_amount').notNull().default('0'),
+    percentage: text('percentage').notNull().default('100'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    isUnderfunded: boolean('is_underfunded').notNull().default(false),
+    remainingOnAccount: text('remaining_on_account').notNull().default('0'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('goal_allocation_history_user_idx').on(t.userId, t.snapshotDate)]
+);
 
 // ── Net Worth Snapshots ──────────────────────────────────────────────────────
 export const netWorthSnapshots = pgTable(
@@ -97,7 +110,10 @@ export const budgetTags = pgTable(
     budgetId: uuid('budget_id').notNull().references(() => budgets.id, { onDelete: 'cascade' }),
     tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
   },
-  (t) => [unique().on(t.budgetId, t.tagId)]
+  (t) => [
+    unique().on(t.budgetId, t.tagId),
+    index('budget_tags_tag_id_idx').on(t.tagId),
+  ]
 );
 
 export const goalTags = pgTable(
@@ -106,5 +122,9 @@ export const goalTags = pgTable(
     goalId: uuid('goal_id').notNull().references(() => financialGoals.id, { onDelete: 'cascade' }),
     tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
   },
-  (t) => [unique().on(t.goalId, t.tagId)]
+  (t) => [
+    unique().on(t.goalId, t.tagId),
+    index('goal_tags_tag_id_idx').on(t.tagId),
+  ]
 );
+

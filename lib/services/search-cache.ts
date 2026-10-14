@@ -3,6 +3,7 @@ import { transactions, accounts, categories } from '@/lib/db/schema';
 import { eq, and, or } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
+import { invalidateUserServerCache } from '@/lib/server-cache';
 
 const CACHE_TTL_MS = process.env.SEARCH_CACHE_TTL_MS ? parseInt(process.env.SEARCH_CACHE_TTL_MS, 10) : 30 * 60 * 1000; // 30 minutes
 const MAX_CACHED_USERS = process.env.SEARCH_CACHE_MAX_USERS ? parseInt(process.env.SEARCH_CACHE_MAX_USERS, 10) : 5;
@@ -226,6 +227,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
  */
 export function invalidateUserSearchCache(userId: string): void {
   userCache.delete(userId);
+  invalidateUserServerCache(userId);
   logger.info('Invalidated search cache for user', { userId });
 }
 

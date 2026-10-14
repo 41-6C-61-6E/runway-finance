@@ -167,14 +167,15 @@ export async function GET(request: Request) {
       });
     }
 
-    // 2. Fetch snapshots before the range to establish the baseline balances
+    // 2. Fetch baseline snapshots before the range using DISTINCT ON to only load the latest snapshot per account
     const snapshotsConditionsBefore = [
       eq(accountSnapshots.userId, dataUserId),
+      inArray(accountSnapshots.accountId, accountIds),
       lt(accountSnapshots.snapshotDate, startStr),
     ];
 
     const snapshotsBefore = await getDb()
-      .select({
+      .selectDistinctOn([accountSnapshots.accountId], {
         snapshotDate: accountSnapshots.snapshotDate,
         accountId: accountSnapshots.accountId,
         balance: accountSnapshots.balance,
@@ -183,11 +184,12 @@ export async function GET(request: Request) {
       })
       .from(accountSnapshots)
       .where(and(...snapshotsConditionsBefore))
-      .orderBy(desc(accountSnapshots.snapshotDate));
+      .orderBy(accountSnapshots.accountId, desc(accountSnapshots.snapshotDate));
 
-    // 3. Fetch snapshots in range
+    // 3. Fetch snapshots in range scoped strictly to reportable accounts
     const snapshotsConditionsInRange = [
       eq(accountSnapshots.userId, dataUserId),
+      inArray(accountSnapshots.accountId, accountIds),
       gte(accountSnapshots.snapshotDate, startStr),
       lte(accountSnapshots.snapshotDate, endStr),
     ];

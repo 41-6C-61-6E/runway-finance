@@ -10,6 +10,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { filterReportableAccounts, computeNetWorthTotals, computeCategoryBreakdown } from '@/lib/utils/account-scope';
 import { getDateRange, type TimeFrame, formatInTimezone } from '@/lib/utils/timeframe';
+import { getCached, setCached } from '@/lib/server-cache';
 
 
 export async function GET(request: Request) {
@@ -36,6 +37,12 @@ export async function GET(request: Request) {
     .limit(1);
   const userTz = userSettingsList[0]?.timezone || 'America/New_York';
   const baseCurrency = userSettingsList[0]?.currency || 'USD';
+
+  const cacheKey = `user:${userId}:net-worth-chart:${timeframe}:${explicitStart || ''}:${explicitEnd || ''}:${dataUserId}:${userTz}:${baseCurrency}`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   // Sensitive accounts are excluded from live balance math for plain members.
   const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
@@ -87,7 +94,7 @@ export async function GET(request: Request) {
       const todayStr = formatInTimezone(new Date(), userTz);
 
       if (!(todayStr >= startStr && todayStr <= endStr)) {
-        return NextResponse.json({
+        const payload = {
           data: [],
           categories: [],
           summary: {
@@ -98,7 +105,9 @@ export async function GET(request: Request) {
             includedAccounts: 0,
             totalAccounts: 0,
           },
-        });
+        };
+        setCached(cacheKey, payload, 2 * 60 * 1000);
+        return NextResponse.json(payload);
       }
 
       // Fallback: use current account balances
@@ -127,7 +136,7 @@ export async function GET(request: Request) {
         currentSnapshot[cat] = breakdown[cat]?.value ?? 0;
       }
 
-      return NextResponse.json({
+      const payload = {
         data: [currentSnapshot],
         categories: Array.from(allBreakdownCategories),
         summary: {
@@ -138,7 +147,9 @@ export async function GET(request: Request) {
           includedAccounts: reportableAccounts.length,
           totalAccounts: userAccounts.length,
         },
-      });
+      };
+      setCached(cacheKey, payload, 2 * 60 * 1000);
+      return NextResponse.json(payload);
     }
 
     // Decrypt encrypted fields (totalAssets, totalLiabilities, netWorth)
@@ -198,7 +209,7 @@ export async function GET(request: Request) {
     const numericFields = ['netWorth', 'totalAssets', 'totalLiabilities'];
     const aggregated = aggregateChartData(formattedData, numericFields as any);
 
-    return NextResponse.json({
+    const payload = {
       data: aggregated,
       categories: [],
       summary: {
@@ -209,7 +220,9 @@ export async function GET(request: Request) {
         includedAccounts: 0,
         totalAccounts: 0,
       },
-    });
+    };
+    setCached(cacheKey, payload, 2 * 60 * 1000);
+    return NextResponse.json(payload);
   } catch (error) {
     logger.error('Error fetching net worth chart data', { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json(

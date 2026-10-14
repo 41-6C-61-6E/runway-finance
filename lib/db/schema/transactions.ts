@@ -91,7 +91,11 @@ export const transactionTags = pgTable(
     transactionId: uuid('transaction_id').notNull().references(() => transactions.id, { onDelete: 'cascade' }),
     tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
   },
-  (t) => [unique().on(t.transactionId, t.tagId)]
+  (t) => [
+    unique().on(t.transactionId, t.tagId),
+    index('transaction_tags_tag_id_idx').on(t.tagId),
+    index('transaction_tags_tx_id_idx').on(t.transactionId),
+  ]
 );
 
 export const accountTags = pgTable(
@@ -100,7 +104,11 @@ export const accountTags = pgTable(
     accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
     tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
   },
-  (t) => [unique().on(t.accountId, t.tagId)]
+  (t) => [
+    unique().on(t.accountId, t.tagId),
+    index('account_tags_tag_id_idx').on(t.tagId),
+    index('account_tags_account_id_idx').on(t.accountId),
+  ]
 );
 
 // ── Category Rules ───────────────────────────────────────────────────────────
@@ -140,7 +148,10 @@ export const monthlyCashFlow = pgTable(
     transactionCount: text('transaction_count').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.userId, t.yearMonth)]
+  (t) => [
+    unique().on(t.userId, t.yearMonth),
+    index('monthly_cash_flow_user_ym_idx').on(t.userId, t.yearMonth),
+  ]
 );
 
 // ── Category Spending Summary ────────────────────────────────────────────────
@@ -161,7 +172,10 @@ export const categorySpendingSummary = pgTable(
     transactionCount: text('transaction_count').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.userId, t.categoryId, t.accountId, t.yearMonth)]
+  (t) => [
+    unique().on(t.userId, t.categoryId, t.accountId, t.yearMonth),
+    index('category_spending_summary_user_ym_idx').on(t.userId, t.yearMonth),
+  ]
 );
 
 // ── Category Income Summary ──────────────────────────────────────────────────
@@ -182,5 +196,9 @@ export const categoryIncomeSummary = pgTable(
     transactionCount: text('transaction_count').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.userId, t.categoryId, t.accountId, t.yearMonth)]
+  (t) => [
+    unique().on(t.userId, t.categoryId, t.accountId, t.yearMonth),
+    index('category_income_summary_user_ym_idx').on(t.userId, t.yearMonth),
+  ]
 );
+

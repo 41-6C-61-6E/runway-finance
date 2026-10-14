@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, accountSnapshots, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, lte, lt, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, desc, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRows } from '@/lib/crypto';
@@ -123,21 +123,23 @@ export async function GET(request: Request) {
 
     const snapshotsConditionsBefore = [
       eq(accountSnapshots.userId, dataUserId),
+      inArray(accountSnapshots.accountId, accountIds),
       lt(accountSnapshots.snapshotDate, startStr),
     ];
 
     const snapshotsBefore = await getDb()
-      .select({
+      .selectDistinctOn([accountSnapshots.accountId], {
         snapshotDate: accountSnapshots.snapshotDate,
         accountId: accountSnapshots.accountId,
         balance: accountSnapshots.balance,
       })
       .from(accountSnapshots)
       .where(and(...snapshotsConditionsBefore))
-      .orderBy(desc(accountSnapshots.snapshotDate));
+      .orderBy(accountSnapshots.accountId, desc(accountSnapshots.snapshotDate));
 
     const snapshotsInRangeConditions = [
       eq(accountSnapshots.userId, dataUserId),
+      inArray(accountSnapshots.accountId, accountIds),
       gte(accountSnapshots.snapshotDate, startStr),
       lte(accountSnapshots.snapshotDate, endStr),
     ];

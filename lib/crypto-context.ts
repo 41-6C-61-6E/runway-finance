@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { enterDekFallbackContext, getServerKey, unwrapKey, type DekFallbackContext } from '@/lib/crypto';
+import { enterDekFallbackContext, getServerKey, unwrapKey, clearDecryptedFieldCache, type DekFallbackContext } from '@/lib/crypto';
 import { getDb } from '@/lib/db';
 import { dekVersions, userEncryptionKeys } from '@/lib/db/schema';
 import { desc, eq } from 'drizzle-orm';
@@ -42,6 +42,7 @@ export function invalidateUserDEKCache(userId?: string): void {
   } else {
     userDEKCache.clear();
   }
+  clearDecryptedFieldCache();
 }
 
 // Get the DEK for the current authenticated user

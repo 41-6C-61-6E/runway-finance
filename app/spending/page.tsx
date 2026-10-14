@@ -1,9 +1,17 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { SpendingBreakdown } from '@/components/cash-flow/spending-breakdown';
-import { CashVsCreditCard } from '@/components/cash-flow/cash-vs-credit-card';
+
+const SpendingBreakdown = dynamic(
+  () => import('@/components/cash-flow/spending-breakdown').then((m) => m.SpendingBreakdown),
+  { ssr: false, loading: () => <LoadingSpinner category="chart" /> }
+);
+const CashVsCreditCard = dynamic(
+  () => import('@/components/cash-flow/cash-vs-credit-card').then((m) => m.CashVsCreditCard),
+  { ssr: false, loading: () => <LoadingSpinner category="chart" /> }
+);
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { CreditCard } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';

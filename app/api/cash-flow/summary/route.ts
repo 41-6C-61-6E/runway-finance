@@ -3,10 +3,11 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { monthlyCashFlow, accounts, categories, transactions, userSettings } from '@/lib/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, gte } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField } from '@/lib/crypto';
 import { toCashFlowAmount } from '@/lib/utils/account-scope';
+import { getCached, setCached } from '@/lib/server-cache';
 
 export async function GET() {
   const session = await auth();
@@ -20,6 +21,12 @@ export async function GET() {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+  const cacheKey = `user:${userId}:cash-flow-summary:${dataUserId}:${currentMonth}`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   try {
     // Fetch user settings to respect imported data toggles
@@ -118,11 +125,27 @@ export async function GET() {
               eq(transactions.deleted, false),
               eq(transactions.pending, false),
               eq(transactions.ignored, false),
-              eq(transactions.isImported, false)
+              eq(transactions.isImported, false),
+              gte(transactions.date, `${previousMonth}-01`)
             )
           );
 
-        for (const tx of allTransactions) {
+        // Pre-decrypt amounts in parallel chunks
+        const CHUNK_SIZE = 100;
+        const decryptedAmounts: number[] = new Array(allTransactions.length);
+        for (let i = 0; i < allTransactions.length; i += CHUNK_SIZE) {
+          const chunk = allTransactions.slice(i, i + CHUNK_SIZE);
+          const chunkDecrypted = await Promise.all(
+            chunk.map(async (tx) => parseFloat(await decryptField(tx.amount, dek)) || 0)
+          );
+          for (let j = 0; j < chunkDecrypted.length; j++) {
+            decryptedAmounts[i + j] = chunkDecrypted[j];
+          }
+        }
+
+        for (let i = 0; i < allTransactions.length; i++) {
+          const tx = allTransactions[i];
+          const rawAmount = decryptedAmounts[i];
           const category = tx.categoryId ? catById.get(tx.categoryId.toString()) : undefined;
           let excluded = category?.excludeFromReports ?? false;
           if (!excluded && category?.parentId) {
@@ -134,7 +157,7 @@ export async function GET() {
           const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
           const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
           const ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
-          const amount = toCashFlowAmount(parseFloat(await decryptField(tx.amount, dek)) || 0, accountTypeById.get(tx.accountId.toString()));
+          const amount = toCashFlowAmount(rawAmount, accountTypeById.get(tx.accountId.toString()));
 
           if (category?.categoryType === 'transfer') continue;
           const isCompound = category?.categoryType === 'compound';
@@ -174,8 +197,7 @@ export async function GET() {
     const savingsRate = income > 0 ? (netIncome / income) * 100 : 0;
     const prevNet = prevIncome - prevExpenses;
 
-    logger.info('GET /api/cash-flow/summary', { currentMonth, netIncome });
-    return NextResponse.json({
+    const payload = {
       totalIncome: income,
       totalExpenses: expenses,
       netIncome,
@@ -187,7 +209,10 @@ export async function GET() {
         expenses: prevExpenses > 0 ? ((expenses - prevExpenses) / prevExpenses) * 100 : 0,
         netIncome: prevNet !== 0 ? ((netIncome - prevNet) / prevNet) * 100 : 0,
       },
-    });
+    };
+    setCached(cacheKey, payload, 2 * 60 * 1000);
+    logger.info('GET /api/cash-flow/summary', { currentMonth, netIncome });
+    return NextResponse.json(payload);
   } catch (error) {
     logger.error('Error fetching cash flow summary', { error });
     return NextResponse.json(

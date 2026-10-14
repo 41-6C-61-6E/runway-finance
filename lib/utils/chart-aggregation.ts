@@ -6,10 +6,10 @@ export interface AggregatablePoint {
 }
 
 export function getAggregationLevel(pointCount: number): AggregationLevel {
-  if (pointCount <= 2000) return 'daily';
-  if (pointCount <= 10000) return 'weekly';
-  if (pointCount <= 40000) return 'monthly';
-  if (pointCount <= 160000) return 'quarterly';
+  if (pointCount <= 366) return 'daily';
+  if (pointCount <= 1500) return 'weekly';
+  if (pointCount <= 5000) return 'monthly';
+  if (pointCount <= 20000) return 'quarterly';
   return 'yearly';
 }
 

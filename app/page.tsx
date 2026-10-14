@@ -1,8 +1,7 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { NetWorthChart } from '@/components/net-worth/net-worth-chart';
-import { DebtBreakdown } from '@/components/debt-breakdown';
+import { Suspense, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { NetWorthSidePanel } from '@/components/net-worth/net-worth-side-panel';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { ChartSpline } from 'lucide-react';
@@ -13,6 +12,15 @@ import PageContent from '@/components/page-content';
 import { AppTabs, type TabItem } from '@/components/ui/app-tabs';
 import { MobileViewSwitcher, MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+
+const NetWorthChart = dynamic(
+  () => import('@/components/net-worth/net-worth-chart').then((m) => m.NetWorthChart),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+const DebtBreakdown = dynamic(
+  () => import('@/components/debt-breakdown').then((m) => m.DebtBreakdown),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 type ChartTab = 'history' | 'breakdown';
 
 const CHART_TABS: TabItem[] = [

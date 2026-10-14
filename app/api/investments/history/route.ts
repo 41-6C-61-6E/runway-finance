@@ -88,9 +88,9 @@ export async function GET(request: Request) {
       : formatInTimezone(startDate, userTz);
     const endStr = formatInTimezone(endDate, userTz);
 
-    // 3. Fetch snapshots prior to date range to get baseline balances
+    // 3. Fetch snapshots prior to date range to get baseline balances using DISTINCT ON
     const snapshotsBefore = await getDb()
-      .select({
+      .selectDistinctOn([accountSnapshots.accountId], {
         snapshotDate: accountSnapshots.snapshotDate,
         accountId: accountSnapshots.accountId,
         balance: accountSnapshots.balance,
@@ -103,7 +103,7 @@ export async function GET(request: Request) {
           lt(accountSnapshots.snapshotDate, startStr)
         )
       )
-      .orderBy(desc(accountSnapshots.snapshotDate));
+      .orderBy(accountSnapshots.accountId, desc(accountSnapshots.snapshotDate));
 
     // 4. Fetch snapshots inside the date range
     const snapshotsInRange = await getDb()

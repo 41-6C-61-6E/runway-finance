@@ -31,12 +31,32 @@ const MARKET_TYPES = new Set([
   'metals'
 ]);
 
+interface CachedSyncHealth {
+  data: Record<string, SyncStatus>;
+  expiresAt: number;
+}
+const syncHealthCache = new Map<string, CachedSyncHealth>();
+
+export function invalidateSyncHealthCache(userId?: string): void {
+  if (userId) syncHealthCache.delete(userId);
+  else syncHealthCache.clear();
+}
+
 export async function getAccountsSyncStatus(
   userId: string,
   dataUserId: string,
   dek: Uint8Array,
   decryptedAccounts: any[]
 ): Promise<Record<string, SyncStatus>> {
+  const isTest = process.env.NODE_ENV === 'test' || !!process.env.VITEST;
+  const cacheKey = `${userId}:${dataUserId}:${decryptedAccounts.length}`;
+  if (!isTest) {
+    const cached = syncHealthCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.data;
+    }
+  }
+
   try {
     const db = getDb();
     
@@ -276,6 +296,9 @@ export async function getAccountsSyncStatus(
       statuses[accountId] = { status: 'ok' };
     }
 
+    if (!isTest) {
+      syncHealthCache.set(cacheKey, { data: statuses, expiresAt: Date.now() + 120_000 });
+    }
     return statuses;
   } catch (error: any) {
     logger.error(`${LOG_TAG} Error calculating sync health`, { error: error.message });

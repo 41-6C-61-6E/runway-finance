@@ -46,6 +46,7 @@ export interface DekFallbackContext {
 const dekFallbackStore = new AsyncLocalStorage<DekFallbackContext>();
 
 export function setDekFallbacks(fallbackDeks: Uint8Array[]): void {
+  clearDecryptedFieldCache();
   dekFallbackStore.enterWith({ fallbackDeks });
 }
 
@@ -54,6 +55,7 @@ export function setDekFallbacks(fallbackDeks: Uint8Array[]): void {
 // await so it is visible to the caller's continuation; Node 20 does not
 // reliably propagate a store entered after an await in an async function.
 export function enterDekFallbackContext(ctx: DekFallbackContext): void {
+  clearDecryptedFieldCache();
   dekFallbackStore.enterWith(ctx);
 }
 
@@ -255,6 +257,13 @@ export async function unwrapKey(payload: EncryptedPayload, kek: Uint8Array): Pro
 
 // ── Field-level helpers (store as JSON string in TEXT column) ──────────
 
+const MAX_FIELD_CACHE_SIZE = 40000;
+const decryptedFieldCache = new Map<string, string>();
+
+export function clearDecryptedFieldCache(): void {
+  decryptedFieldCache.clear();
+}
+
 export async function encryptField(plaintext: string, key: Uint8Array): Promise<string> {
   const p = await encrypt(plaintext, key);
   return JSON.stringify({ ct: p.ciphertext, iv: p.iv });
@@ -282,8 +291,26 @@ export async function decryptField(payload: string | number, key: Uint8Array): P
     return payloadStr;
   }
 
+  const keyHex = bytesToHex(key.subarray(0, 8));
+  const cacheKey = `${keyHex}:${parsed.ct}`;
+  const cached = decryptedFieldCache.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   try {
-    return await decrypt({ ciphertext: parsed.ct, iv: parsed.iv, tag: '' }, key);
+    const decrypted = await decrypt({ ciphertext: parsed.ct, iv: parsed.iv, tag: '' }, key);
+    if (decryptedFieldCache.size >= MAX_FIELD_CACHE_SIZE) {
+      // Evict oldest 10% of entries to keep memory bounded and avoid frequent resizing
+      const iter = decryptedFieldCache.keys();
+      for (let i = 0; i < MAX_FIELD_CACHE_SIZE / 10; i++) {
+        const nextKey = iter.next().value;
+        if (nextKey) decryptedFieldCache.delete(nextKey);
+        else break;
+      }
+    }
+    decryptedFieldCache.set(cacheKey, decrypted);
+    return decrypted;
   } catch (err) {
     // M-10 (2026-08-27 security review): an ENCRYPTED value that fails to
     // decrypt (wrong key, corruption, tamper) is a hard, visible failure —
@@ -295,6 +322,7 @@ export async function decryptField(payload: string | number, key: Uint8Array): P
     throw new Error('Encrypted field could not be decrypted (wrong key or corrupted data)');
   }
 }
+
 
 // ── Row-level helpers ──────────────────────────────────────────────────
 

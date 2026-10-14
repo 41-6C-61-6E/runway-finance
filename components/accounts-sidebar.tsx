@@ -36,12 +36,13 @@ export default function AccountsSidebar() {
   const startWidthRef = useRef(accountsWidth);
 
   const { data: accounts = [], refetch } = useQuery({
-    queryKey: ['accounts', false],
+    queryKey: ['accounts-all'],
     queryFn: async () => {
-      const res = await fetch(`/api/accounts`, { credentials: 'include' });
+      const res = await fetch('/api/accounts?includeHidden=true&includeVirtual=true', { credentials: 'include' });
       if (!res.ok) return [];
       return res.json();
     },
+    staleTime: 5 * 60 * 1000,
     refetchInterval: 1000 * 60 * 5, // Poll every 5 minutes
     refetchOnWindowFocus: true,
   });

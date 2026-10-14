@@ -192,17 +192,33 @@ export async function GET(request: Request) {
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .where(whereClause);
 
-    // Decrypt and aggregate in memory
+    // Filter relevant rows first before decrypting
+    const relevantRows = txRows.filter((row) => {
+      if (!row.categoryId) return false;
+      if (row.categoryType === 'transfer') return false;
+      if (row.categoryType !== 'compound' && row.isIncome !== isIncome) return false;
+      return true;
+    });
+
+    // Batch decrypt in parallel chunks
+    const CHUNK_SIZE = 100;
+    const decryptedAmounts: number[] = new Array(relevantRows.length);
+    for (let i = 0; i < relevantRows.length; i += CHUNK_SIZE) {
+      const chunk = relevantRows.slice(i, i + CHUNK_SIZE);
+      const chunkDecrypted = await Promise.all(
+        chunk.map(async (row) => parseFloat(await decryptField(row.amount, dek)) || 0)
+      );
+      for (let j = 0; j < chunkDecrypted.length; j++) {
+        decryptedAmounts[i + j] = chunkDecrypted[j];
+      }
+    }
+
+    // Aggregate in memory
     const catTotals = new Map<string, number>();
     let catCounts = new Map<string, number>();
-    for (const row of txRows) {
-      if (!row.categoryId) continue;
-      // Skip transfer categories entirely
-      if (row.categoryType === 'transfer') continue;
-      // Compound categories match BOTH income and expense requests
-      if (row.categoryType !== 'compound' && row.isIncome !== isIncome) continue;
-
-      const decrypted = parseFloat(await decryptField(row.amount, dek)) || 0;
+    for (let i = 0; i < relevantRows.length; i++) {
+      const row = relevantRows[i];
+      const decrypted = decryptedAmounts[i];
       const val = isIncome ? decrypted : -decrypted;
       if (val === 0) continue;
       catTotals.set(row.categoryId, (catTotals.get(row.categoryId) || 0) + val);
