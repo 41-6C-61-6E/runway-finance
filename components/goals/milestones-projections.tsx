@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { Card, CardContent } from '@/components/ui/card';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -168,7 +169,10 @@ export function MilestonesProjections() {
   const [data, setData] = useState<ProjectionsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [selectedAccountId, setSelectedAccountId] = usePersistentState<string>(
+    'finance:goals:projections:selectedAccountId',
+    'all'
+  );
   // Per-account pending inflow inputs: accountId -> string (raw input)
   const [pendingInputs, setPendingInputs] = useState<Record<string, string>>({});
   const [isMobile, setIsMobile] = useState(false);

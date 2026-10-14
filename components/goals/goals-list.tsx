@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterGoalChange } from '@/lib/query-invalidation';
 import { GoalCard } from './goal-card';
@@ -55,7 +56,10 @@ export function GoalsList({ targetGoalId }: { targetGoalId?: string | null } = {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterStatus>('all');
+  const [filter, setFilter] = usePersistentState<FilterStatus>(
+    'finance:goals:filterStatus',
+    'all'
+  );
   const [flashGoalId, setFlashGoalId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined);

@@ -106,13 +106,15 @@ interface CategoryEntry {
   share: number; // 0-1 within its group
 }
 
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+
 export function DebtBreakdown() {
   const router = useRouter();
   const { privacyMode } = usePrivacyMode();
   const { settings } = useUserSettings() ?? {};
   const baseCurrency = settings?.currency || 'USD';
-  const [view, setView] = useState<BreakdownView>('donut');
-  const [activeTab, setActiveTab] = useState<'assets' | 'debt'>('assets');
+  const [view, setView] = usePersistentState<BreakdownView>('finance:debt-breakdown:view', 'donut');
+  const [activeTab, setActiveTab] = usePersistentState<'assets' | 'debt'>('finance:debt-breakdown:activeTab', 'assets');
 
   const { data: accounts = [], isLoading: loading } = useQuery<AccountData[]>({
     queryKey: ['accounts-all'],

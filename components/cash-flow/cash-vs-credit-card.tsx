@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useQuery } from '@tanstack/react-query';
 
 import {
@@ -120,29 +121,15 @@ export function CashVsCreditCard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [includeSavings, setIncludeSavings] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('finance:cash-vs-credit:include-savings');
-      return saved !== 'false';
-    }
-    return true;
-  });
+  const [includeSavings, setIncludeSavings] = usePersistentState<boolean>(
+    'finance:cash-vs-credit:include-savings',
+    true
+  );
 
-  const [showNetPosition, setShowNetPosition] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('finance:cash-vs-credit:show-net-position');
-      return saved !== 'false';
-    }
-    return true;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('finance:cash-vs-credit:include-savings', String(includeSavings));
-  }, [includeSavings]);
-
-  useEffect(() => {
-    localStorage.setItem('finance:cash-vs-credit:show-net-position', String(showNetPosition));
-  }, [showNetPosition]);
+  const [showNetPosition, setShowNetPosition] = usePersistentState<boolean>(
+    'finance:cash-vs-credit:show-net-position',
+    true
+  );
 
   const queryParams = useMemo(() => {
     const base = timeframe === 'all' ? 'timeframe=all' : `startDate=${dateRange.start}&endDate=${dateRange.end}`;

@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { TrendingUp, TrendingDown, Info, ChevronDown } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { getOrFetch } from '@/lib/fetch-cache';
 import { SegPill } from '@/components/ui/seg-pill';
@@ -454,7 +455,7 @@ export function WealthFlowSankey() {
   const [error, setError] = useState<string | null>(null);
   const [allAccounts, setAllAccounts] = useState<AccountData[]>([]);
   const [isMobile, setIsMobile] = useState(false);
-  const [routeThroughAccounts, setRouteThroughAccounts] = useState(false);
+  const [routeThroughAccounts, setRouteThroughAccounts] = usePersistentState<boolean>('finance:wealth-flow:routeThroughAccounts', false);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
   const [chartWidth, setChartWidth] = useState(0);

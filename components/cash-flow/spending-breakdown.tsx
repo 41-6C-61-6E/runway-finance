@@ -73,8 +73,8 @@ export function SpendingBreakdown() {
       deserialize: (raw) => new Set(JSON.parse(raw)),
     }
   );
-  const [sortBy, setSortBy] = useState<'amount' | 'name'>('amount');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sortBy, setSortBy] = usePersistentState<'amount' | 'name'>('finance:spending-breakdown:sortBy', 'amount');
+  const [sortDirection, setSortDirection] = usePersistentState<'asc' | 'desc'>('finance:spending-breakdown:sortDirection', 'desc');
 
   const queryParams = useMemo(() => {
     return `startDate=${dateRange.start}&endDate=${dateRange.end}`;

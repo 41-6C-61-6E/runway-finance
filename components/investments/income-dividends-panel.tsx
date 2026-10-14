@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatChartYAxisCurrency } from '@/lib/utils/chart-format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
@@ -86,14 +87,20 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
   const [internalTimeframe, setInternalTimeframe] = useState<IncomeTimeframeValue>('1y');
   const timeframe = value ?? internalTimeframe;
   const setTimeframe = onValueChange ?? setInternalTimeframe;
-  const [visibleSeries, setVisibleSeries] = useState<Record<CashflowSeriesKey, boolean>>({
-    income: true,
-    contributions: true,
-    growth: true,
-    withdrawals: true,
-    losses: true,
-  });
-  const [showReinvested, setShowReinvested] = useState(false);
+  const [visibleSeries, setVisibleSeries] = usePersistentState<Record<CashflowSeriesKey, boolean>>(
+    'finance:investments:income:visibleSeries',
+    {
+      income: true,
+      contributions: true,
+      growth: true,
+      withdrawals: true,
+      losses: true,
+    }
+  );
+  const [showReinvested, setShowReinvested] = usePersistentState<boolean>(
+    'finance:investments:income:showReinvested',
+    false
+  );
   const [selectedMonth, setSelectedMonth] = useState<MonthlyFlowDatum | null>(null);
   // CF-5 (a11y/UX parity): close the detail modal on Escape.
   useEffect(() => {

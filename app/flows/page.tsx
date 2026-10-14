@@ -13,6 +13,8 @@ import { AppTabs } from '@/components/ui/app-tabs';
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+
 type Tab = 'wealth' | 'cash' | 'income';
 
 function FlowsContent() {
@@ -21,7 +23,7 @@ function FlowsContent() {
   const showCash = isVisible('cashFlowSankey');
   const showIncome = isVisible('incomeExpenseChart');
 
-  const [activeTab, setActiveTab] = useState<Tab>('wealth');
+  const [activeTab, setActiveTab] = usePersistentState<Tab>('finance:flows:activeTab', 'wealth');
 
   useEffect(() => {
     const visible: Tab[] = [];

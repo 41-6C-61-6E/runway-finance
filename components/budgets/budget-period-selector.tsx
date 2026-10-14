@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -71,16 +72,16 @@ function getKeyLabel(type: PeriodType, key: string): string {
 }
 
 export function BudgetPeriodProvider({ children }: { children: ReactNode }) {
-  const [periodType, setPeriodType] = useState<PeriodType>('monthly');
-  const [periodKey, setPeriodKey] = useState(() => getCurrentKey('monthly'));
+  const [periodType, setPeriodType] = usePersistentState<PeriodType>('finance:budgets:periodType', 'monthly');
+  const [periodKey, setPeriodKey] = usePersistentState<string>('finance:budgets:periodKey', getCurrentKey('monthly'));
 
   const handleSetPeriodType = useCallback((type: PeriodType) => {
     setPeriodType(type);
     setPeriodKey(getCurrentKey(type));
-  }, []);
+  }, [setPeriodType, setPeriodKey]);
 
-  const goNext = useCallback(() => setPeriodKey((k) => getNextKey(periodType, k)), [periodType]);
-  const goPrev = useCallback(() => setPeriodKey((k) => getPrevKey(periodType, k)), [periodType]);
+  const goNext = useCallback(() => setPeriodKey((k) => getNextKey(periodType, k)), [periodType, setPeriodKey]);
+  const goPrev = useCallback(() => setPeriodKey((k) => getPrevKey(periodType, k)), [periodType, setPeriodKey]);
 
   return (
     <PeriodContext.Provider value={{ periodType, periodKey, setPeriodType: handleSetPeriodType, setPeriodKey, goNext, goPrev }}>

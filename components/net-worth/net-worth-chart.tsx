@@ -62,6 +62,8 @@ interface ChartResponse {
   };
 }
 
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+
 export function NetWorthChart() {
   const router = useRouter();
   const { privacyMode } = usePrivacyMode();
@@ -75,19 +77,7 @@ export function NetWorthChart() {
     dateRange,
   } = useDateWindow('finance:net-worth-chart:timeframe', 'finance:net-worth-chart:windowEnd', '1y');
   const [isMobile, setIsMobile] = useState(false);
-  const [showPercent, setShowPercent] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('finance:net-worth-chart:show-percent');
-    if (saved !== null) {
-      setShowPercent(saved === 'true');
-    }
-  }, []);
-
-  const handlePercentChange = (checked: boolean) => {
-    setShowPercent(checked);
-    localStorage.setItem('finance:net-worth-chart:show-percent', String(checked));
-  };
+  const [showPercent, setShowPercent] = usePersistentState<boolean>('finance:net-worth-chart:show-percent', false);
 
   const handleNavigateToFlows = useCallback(() => {
     router.push(`/flows?timeframe=${timeframe}`);
@@ -524,7 +514,7 @@ export function NetWorthChart() {
                   <Switch
                     id="show-percent-change"
                     checked={showPercent}
-                    onCheckedChange={handlePercentChange}
+                    onCheckedChange={setShowPercent}
                   />
                 </div>
               </div>

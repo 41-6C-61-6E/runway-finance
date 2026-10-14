@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import {
   Area,
   CartesianGrid,
@@ -71,7 +72,10 @@ export function EquityOverTimeChart() {
     showWindowNav,
     dateRange,
   } = useDateWindow('finance:real-estate:timeframe', 'finance:real-estate:windowEnd', 'all');
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
+  const [selectedPropertyId, setSelectedPropertyId] = usePersistentState<string>(
+    'finance:real-estate:selectedPropertyId',
+    'all'
+  );
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useSearchParams, useRouter } from 'next/navigation';
 import TableSelector from './TableSelector';
 import DataToolbar from './DataToolbar';
@@ -46,8 +47,16 @@ export default function DataExplorerPage() {
   const [tables, setTables] = useState<TableMeta[]>([]);
   const [tablesLoading, setTablesLoading] = useState(true);
 
-  const [table, setTable] = useState(searchParams.get('table') ?? 'account_snapshots');
-  const [activeTab, setActiveTab] = useState<'explore' | 'cleanup'>('explore');
+  const hasUrlTable = Boolean(searchParams.get('table'));
+  const [table, setTable] = usePersistentState<string>(
+    'finance:data-explorer:table',
+    searchParams.get('table') ?? 'account_snapshots',
+    { skipRestore: hasUrlTable }
+  );
+  const [activeTab, setActiveTab] = usePersistentState<'explore' | 'cleanup'>(
+    'finance:data-explorer:activeTab',
+    'explore'
+  );
   const [search, setSearch] = useState(searchParams.get('search') ?? '');
   const [sort, setSort] = useState(searchParams.get('sort') ?? '');
   const [order, setOrder] = useState(searchParams.get('order') ?? 'desc');

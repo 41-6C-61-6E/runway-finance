@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useCallback, type ReactNode } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 interface InflowContextValue {
   savedInflows: Record<string, number> | undefined;
@@ -12,49 +13,44 @@ const InflowContext = createContext<InflowContextValue>({
   setSavedInflow: () => {},
 });
 
-const STORAGE_KEY = 'rf-goal-saved-inflows-by-account';
-
 export function GoalInflowProvider({ children }: { children: ReactNode }) {
-  const [savedInflows, setSavedInflowsState] = useState<Record<string, number> | undefined>(undefined);
+  const [savedInflows, setSavedInflowsState, isLoaded] = usePersistentState<Record<string, number>>(
+    'finance:goals:savedInflows',
+    {}
+  );
 
+  // Backward compatibility migration from old raw key
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) {
+    if (typeof window !== 'undefined' && isLoaded && Object.keys(savedInflows).length === 0) {
       try {
-        const parsed = JSON.parse(stored);
-        if (typeof parsed === 'object' && parsed !== null) {
-          // Validate values are numbers
-          const cleaned: Record<string, number> = {};
-          for (const [k, v] of Object.entries(parsed)) {
-            if (typeof v === 'number' && !isNaN(v) && v >= 0) {
-              cleaned[k] = v;
-            }
+        const legacy = localStorage.getItem('rf-goal-saved-inflows-by-account');
+        if (legacy) {
+          const parsed = JSON.parse(legacy);
+          if (parsed && typeof parsed === 'object') {
+            setSavedInflowsState(parsed);
           }
-          setSavedInflowsState(cleaned);
-          return;
         }
-      } catch {
-        // ignore parse errors
-      }
+      } catch {}
     }
-    setSavedInflowsState({});
-  }, []);
+  }, [isLoaded, savedInflows, setSavedInflowsState]);
 
-  const setSavedInflow = useCallback((accountId: string, value: number | null) => {
-    setSavedInflowsState((prev) => {
-      const next = { ...(prev || {}) };
-      if (value !== null) {
-        next[accountId] = value;
-      } else {
-        delete next[accountId];
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const setSavedInflow = useCallback(
+    (accountId: string, value: number | null) => {
+      setSavedInflowsState((prev) => {
+        const next = { ...(prev || {}) };
+        if (value !== null) {
+          next[accountId] = value;
+        } else {
+          delete next[accountId];
+        }
+        return next;
+      });
+    },
+    [setSavedInflowsState]
+  );
 
   return (
-    <InflowContext.Provider value={{ savedInflows, setSavedInflow }}>
+    <InflowContext.Provider value={{ savedInflows: isLoaded ? savedInflows : undefined, setSavedInflow }}>
       {children}
     </InflowContext.Provider>
   );

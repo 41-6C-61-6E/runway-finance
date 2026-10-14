@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useSearchParams } from 'next/navigation';
 import {
   Repeat,
@@ -67,11 +68,19 @@ export default function RecurringView({ onSelectTransaction }: RecurringViewProp
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
 
-  // Filters & Search
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'needs_review' | 'paused' | 'dismissed'>('all');
-  const [expenseSubView, setExpenseSubView] = useState<'all' | 'subscriptions' | 'fixed'>('all');
+  const [activeFilter, setActiveFilter] = usePersistentState<'all' | 'active' | 'needs_review' | 'paused' | 'dismissed'>(
+    'finance:recurring:activeFilter',
+    'all'
+  );
+  const [expenseSubView, setExpenseSubView] = usePersistentState<'all' | 'subscriptions' | 'fixed'>(
+    'finance:recurring:expenseSubView',
+    'all'
+  );
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
-  const [sortBy, setSortBy] = useState<'amount' | 'name' | 'nextDate'>('amount');
+  const [sortBy, setSortBy] = usePersistentState<'amount' | 'name' | 'nextDate'>(
+    'finance:recurring:sortBy',
+    'amount'
+  );
   const [showOptions, setShowOptions] = useState(false);
 
   // Multi-selection state

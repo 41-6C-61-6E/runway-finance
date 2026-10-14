@@ -12,6 +12,7 @@ import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { getOrFetch } from '@/lib/fetch-cache';
 import { SegPill } from '@/components/ui/seg-pill';
@@ -719,7 +720,7 @@ export function CashFlowSankey() {
   const [error, setError] = useState<string | null>(null);
   const [allCategoryInfo, setAllCategoryInfo] = useState<CategoryInfo[]>([]);
   const [isMobile, setIsMobile] = useState(false);
-  const [hideParents, setHideParents] = useState<boolean | null>(null);
+  const [hideParents, setHideParents] = usePersistentState<boolean | null>('finance:sankey:hideParents', null);
   const actualHideParents = hideParents ?? isMobile;
   const showParents = !actualHideParents;
   const showPercentages = false;

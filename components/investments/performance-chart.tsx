@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
@@ -83,9 +84,18 @@ export interface PerformanceChartProps {
 export function PerformanceChart({ totalBalance: propTotalBalance }: PerformanceChartProps = {}) {
   const { privacyMode } = usePrivacyMode();
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('performanceChart');
-  const [timeframe, setTimeframe] = useState<TimeRange>('1y');
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('dollar');
-  const [showBenchmark, setShowBenchmark] = useState(false);
+  const [timeframe, setTimeframe] = usePersistentState<TimeRange>(
+    'finance:investments:performance:timeframe',
+    '1y'
+  );
+  const [displayMode, setDisplayMode] = usePersistentState<DisplayMode>(
+    'finance:investments:performance:displayMode',
+    'dollar'
+  );
+  const [showBenchmark, setShowBenchmark] = usePersistentState<boolean>(
+    'finance:investments:performance:showBenchmark',
+    false
+  );
   const [chartData, setChartData] = useState<{ date: string; value: number; twr?: number }[]>([]);
   const [benchmarkData, setBenchmarkData] = useState<BenchmarkPoint[]>([]);
   const [summary, setSummary] = useState<HistoryResponse['summary'] | null>(null);

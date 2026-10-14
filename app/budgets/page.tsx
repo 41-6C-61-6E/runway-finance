@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { BudgetPeriodProvider, BudgetPeriodSelector, useBudgetPeriod, type PeriodType } from '@/components/budgets/budget-period-selector';
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 import { BudgetTable } from '@/components/budgets/budget-table';
@@ -12,31 +13,20 @@ import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
-const ENVELOPE_BANNER_KEY = 'finance:budgets:envelope-info-dismissed';
-
 /**
  * Dismissible one-time explainer for "envelope" (longer-timeframe) budgets:
  * a yearly/quarterly budget is judged over its FULL native period — a
  * lumpy month (a $6,000 vacation under a $12,000/yr budget) is not an
- * overrun. Shown until the user dismisses it (persisted in localStorage).
+ * overrun. Shown until the user dismisses it (persisted in DB/localStorage).
  */
 function EnvelopeInfoBanner() {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    try {
-      if (!window.localStorage.getItem(ENVELOPE_BANNER_KEY)) setVisible(true);
-    } catch {
-      setVisible(true);
-    }
-  }, []);
-  if (!visible) return null;
+  const [dismissed, setDismissed, isLoaded] = usePersistentState<boolean>(
+    'finance:budgets:envelope-info-dismissed',
+    false
+  );
+  if (!isLoaded || dismissed) return null;
   const dismiss = () => {
-    setVisible(false);
-    try {
-      window.localStorage.setItem(ENVELOPE_BANNER_KEY, 'true');
-    } catch {
-      // ignore storage errors
-    }
+    setDismissed(true);
   };
   return (
     <div className="flex items-start gap-2.5 p-3 bg-primary/5 border border-primary/20 rounded-xl text-xs">

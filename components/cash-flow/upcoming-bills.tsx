@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import {
   CalendarClock,
   AlertCircle,
@@ -36,9 +37,18 @@ export function UpcomingBills() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const [viewMode, setViewMode] = useState<'calendar' | 'timeline'>('calendar');
-  const [flowFilter, setFlowFilter] = useState<'all' | 'expense' | 'income'>('all');
-  const [daysHorizon, setDaysHorizon] = useState<number>(60);
+  const [viewMode, setViewMode] = usePersistentState<'calendar' | 'timeline'>(
+    'finance:upcoming-bills:viewMode',
+    'calendar'
+  );
+  const [flowFilter, setFlowFilter] = usePersistentState<'all' | 'expense' | 'income'>(
+    'finance:upcoming-bills:flowFilter',
+    'all'
+  );
+  const [daysHorizon, setDaysHorizon] = usePersistentState<number>(
+    'finance:upcoming-bills:daysHorizon',
+    60
+  );
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [searchQuery, setSearchQuery] = useState('');
 

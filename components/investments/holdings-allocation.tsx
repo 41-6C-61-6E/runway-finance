@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
@@ -142,8 +143,14 @@ const getTaxWrapper = (type: string, name: string = '', metadata?: any): TaxWrap
 
 export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('holdingsAllocationChart');
-  const [groupBy, setGroupBy] = useState<GroupByOption>('security');
-  const [showAll, setShowAll] = useState(false);
+  const [groupBy, setGroupBy] = usePersistentState<GroupByOption>(
+    'finance:investments:allocation:groupBy',
+    'security'
+  );
+  const [showAll, setShowAll] = usePersistentState<boolean>(
+    'finance:investments:allocation:showAll',
+    false
+  );
 
   const accountMap = useMemo(() => {
     const m = new Map<string, Account>();

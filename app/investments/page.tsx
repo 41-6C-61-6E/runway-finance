@@ -47,7 +47,7 @@ interface InvestmentsData {
 
 export default function InvestmentsPage() {
   const { isVisible } = useChartVisibility();
-  const [activeTab, setActiveTab] = useState<InvestmentTabId>('overview');
+  const [activeTab, setActiveTab] = usePersistentState<InvestmentTabId>('finance:investments:activeTab', 'overview');
   const [selectedHolding, setSelectedHolding] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   // CF-17: persist the Activity timeframe like every other chart selection —
@@ -58,7 +58,7 @@ export default function InvestmentsPage() {
   ).includes(persistedTimeframe)
     ? persistedTimeframe
     : '1y';
-  const [activityFilter, setActivityFilter] = useState<string>('all');
+  const [activityFilter, setActivityFilter] = usePersistentState<string>('finance:investments:activityFilter', 'all');
 
   const queryClient = useQueryClient();
 

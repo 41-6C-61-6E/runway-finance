@@ -27,12 +27,19 @@ function HiddenChartNote() {
   );
 }
 
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+
 function SpendingContent() {
   const { isVisible } = useChartVisibility();
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<SpendingTab>(() => parseTab(searchParams.get('tab')));
+  const hasUrlTab = searchParams.has('tab');
+  const [activeTab, setActiveTab] = usePersistentState<SpendingTab>(
+    'finance:spending:activeTab',
+    parseTab(searchParams.get('tab')),
+    { skipRestore: hasUrlTab }
+  );
 
   const handleTabChange = (tabId: string) => {
     const nextTab = parseTab(tabId);

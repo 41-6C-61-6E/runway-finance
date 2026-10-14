@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useMemo, useState } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { X, ArrowUpRight, ArrowDownRight, Layers } from 'lucide-react';
 import {
   Area,
@@ -203,7 +204,10 @@ export default function AllAccountsDetailPanel({
   onHierarchyTimeframeChange,
   onClose,
 }: AllAccountsDetailPanelProps) {
-  const [chartMode, setChartMode] = useState<'net-worth' | 'by-group'>('by-group');
+  const [chartMode, setChartMode] = usePersistentState<'net-worth' | 'by-group'>(
+    'finance:all-accounts:chartMode',
+    'by-group'
+  );
   const panelId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const netWorthGradientId = `gradient-all-accounts-networth-${panelId}`;
   const getGradientId = (group: string) =>
@@ -420,7 +424,10 @@ export default function AllAccountsDetailPanel({
   }, [chartData, presentAssetGroups, presentLiabilityGroups]);
 
   // Segregated allocation datasets: Assets vs Debts
-  const [allocationMode, setAllocationMode] = useState<'assets' | 'debts'>('assets');
+  const [allocationMode, setAllocationMode] = usePersistentState<'assets' | 'debts'>(
+    'finance:all-accounts:allocationMode',
+    'assets'
+  );
 
   const assetAllocation = useMemo(() => {
     const groupMap = new Map<string, { name: string; value: number; count: number; isAsset: boolean }>();

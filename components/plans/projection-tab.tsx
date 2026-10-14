@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useDeferredValue } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
@@ -98,7 +99,10 @@ export function ProjectionTab({
   desktopHeader,
   subHeader,
 }: ProjectionTabProps) {
-  const [showYearlyTable, setShowYearlyTable] = useState(false);
+  const [showYearlyTable, setShowYearlyTable] = usePersistentState<boolean>(
+    'finance:plans:projection:showYearlyTable',
+    false
+  );
   const [showDrawdownDetails, setShowDrawdownDetails] = useState(true);
   const [localRetirementAge, setLocalRetirementAge] = useState(Number(plan?.retirementAge) || 60);
   const [localSpouseRetirementAge, setLocalSpouseRetirementAge] = useState(Number(plan?.spouseRetirementAge) || 60);
@@ -121,19 +125,28 @@ export function ProjectionTab({
     if (onToggleViewMode) onToggleViewMode(mode);
     else setInternalViewMode(mode);
   };
-  const [chartType, setChartType] = useState<'total' | 'stacked_category' | 'stacked_account'>('stacked_category');
-  const [showMilestones, setShowMilestones] = useState(true);
+  const [chartType, setChartType] = usePersistentState<'total' | 'stacked_category' | 'stacked_account'>(
+    'finance:plans:projection:chartType',
+    'stacked_category'
+  );
+  const [showMilestones, setShowMilestones] = usePersistentState<boolean>(
+    'finance:plans:projection:showMilestones',
+    true
+  );
   const [showChartOptionsDropdown, setShowChartOptionsDropdown] = useState(false);
   const [showStrategyDropdown, setShowStrategyDropdown] = useState(false);
   const [isOptionsPopoverOpen, setIsOptionsPopoverOpen] = useState(false);
   const [selectedYearDetail, setSelectedYearDetail] = useState<any>(null);
-  const [activeAssetCategories, setActiveAssetCategories] = useState<Record<string, boolean>>({
-    taxable: true,
-    taxDeferred: true,
-    taxFree: true,
-    hsa: true,
-    cash: true,
-  });
+  const [activeAssetCategories, setActiveAssetCategories] = usePersistentState<Record<string, boolean>>(
+    'finance:plans:projection:assetCategories',
+    {
+      taxable: true,
+      taxDeferred: true,
+      taxFree: true,
+      hsa: true,
+      cash: true,
+    }
+  );
   // Collapsible section states using useCardCollapsed hook
   const [isControlsCollapsed, setIsControlsCollapsed] = useCardCollapsed('fire_projection_controls', true); // Collapsed by default
   const [isMainChartCollapsed, setIsMainChartCollapsed] = useCardCollapsed('fire_main_chart');

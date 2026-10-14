@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { usePersistentState } from "@/lib/hooks/use-persistent-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { invalidateAfterTransactionChange } from "@/lib/query-invalidation";
 import {
@@ -335,15 +336,18 @@ export default function TransactionTable({
     setPrevSorting(sorting);
     setPage(0);
   }
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
-    select: true,
-    account: true,
-    accountType: true,
-    category: true,
-    postedDate: false,
-    ai: false,
-    tags: showRegisterTags,
-  });
+  const [columnVisibility, setColumnVisibility] = usePersistentState<VisibilityState>(
+    'finance:transactions:columnVisibility',
+    {
+      select: true,
+      account: true,
+      accountType: true,
+      category: true,
+      postedDate: false,
+      ai: false,
+      tags: showRegisterTags,
+    }
+  );
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const columnMenuRef = useRef<HTMLDivElement>(null);
 
@@ -372,8 +376,14 @@ export default function TransactionTable({
     categoryId: string;
     categoryName: string;
   } | null>(null);
-  const [columnOrder, setColumnOrder] = useState<string[]>(ALL_COLUMNS);
-  const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
+  const [columnOrder, setColumnOrder] = usePersistentState<string[]>(
+    'finance:transactions:columnOrder',
+    ALL_COLUMNS
+  );
+  const [columnSizing, setColumnSizing] = usePersistentState<Record<string, number>>(
+    'finance:transactions:columnSizing',
+    {}
+  );
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);

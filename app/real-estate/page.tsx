@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { PropertyCards } from '@/components/real-estate/property-cards';
 import { EquityOverTimeChart } from '@/components/real-estate/equity-over-time-chart';
 import { PortfolioAllocationChart } from '@/components/real-estate/portfolio-allocation-chart';
@@ -23,7 +24,10 @@ function RealEstateContent() {
     ...(showEquity ? [{ id: 'equity', label: 'Equity' }] : []),
     ...(showProperties ? [{ id: 'properties', label: 'Properties' }] : []),
   ];
-  const [activeTab, setActiveTab] = useState<RealEstateTab>(showEquity ? 'equity' : 'properties');
+  const [activeTab, setActiveTab] = usePersistentState<RealEstateTab>(
+    'finance:real-estate:activeTab',
+    showEquity ? 'equity' : 'properties'
+  );
 
   useEffect(() => {
     if (!availableTabs.some((tab) => tab.id === activeTab)) {

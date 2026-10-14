@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, Fragment, useRef } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBudgetPeriod } from './budget-period-selector';
@@ -105,7 +106,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1000);
-  const [showDirectOnly, setShowDirectOnly] = useState(false);
+  const [showDirectOnly, setShowDirectOnly] = usePersistentState<boolean>('finance:budgets:showDirectOnly', false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -194,8 +195,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Default sort set to Budgeted Amount Descending
-  const [sortField, setSortField] = useState<SortField>('budgeted');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortField, setSortField] = usePersistentState<SortField>('finance:budgets:sortField', 'budgeted');
+  const [sortDirection, setSortDirection] = usePersistentState<SortDirection>('finance:budgets:sortDirection', 'desc');
 
   // Gear actions & popup menu state
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
@@ -203,7 +204,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const [actionLoading, setActionLoading] = useState(false);
 
   // Breakout dropdown state for "Everything Else" catch-all item
-  const [expandedCatchAll, setExpandedCatchAll] = useState(false);
+  const [expandedCatchAll, setExpandedCatchAll] = usePersistentState<boolean>('finance:budgets:expandedCatchAll', false);
   const [convertingCatId, setConvertingCatId] = useState<string | null>(null);
 
   const fetchBudgets = useCallback(() => {

@@ -151,7 +151,7 @@ export function IncomeExpenseChart() {
     periodOptions,
     showWindowNav,
   } = useDateWindow('finance:income-expense:timeframe', 'finance:income-expense:windowEnd', '1y');
-  const [chartType, setChartType] = useState<ChartType>('bar');
+  const [chartType, setChartType] = usePersistentState<ChartType>('finance:income-expense:chartType', 'bar');
 
   const [isMobile, setIsMobile] = useState(false);
 

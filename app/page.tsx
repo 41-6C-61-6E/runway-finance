@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { AppTabs, type TabItem } from '@/components/ui/app-tabs';
 import { MobileViewSwitcher, MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 type ChartTab = 'history' | 'breakdown';
 
 const CHART_TABS: TabItem[] = [
@@ -38,7 +39,7 @@ function NetWorthContent() {
 
   // History & Breakdown are tabs now (like Spending / Investments /
   // Accounts); the Overview side panel stays on the right.
-  const [activeChartTab, setActiveChartTab] = useState<ChartTab>('history');
+  const [activeChartTab, setActiveChartTab] = usePersistentState<ChartTab>('finance:net-worth:activeTab', 'history');
 
   // If the active tab's chart gets hidden in settings, fall back to the
   // other one (mirrors the Flows page behavior).

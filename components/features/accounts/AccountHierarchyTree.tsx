@@ -61,10 +61,24 @@ export default function AccountHierarchyTree({
   const [showHierarchyFilters, setShowHierarchyFilters] = useState(false);
   const [hierarchyTimeframe, setHierarchyTimeframe] = usePersistentState<TimeRange>('finance:accounts:hierarchyTimeframe', '1m');
 
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [expandedSubgroups, setExpandedSubgroups] = useState<Record<string, boolean>>({});
-  const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
-  const [selectedGroup, setSelectedGroup] = useState<string | null>('All Accounts');
+  const [expandedGroups, setExpandedGroups] = usePersistentState<Record<string, boolean>>(
+    'finance:accounts:expandedGroups',
+    {}
+  );
+  const [expandedSubgroups, setExpandedSubgroups] = usePersistentState<Record<string, boolean>>(
+    'finance:accounts:expandedSubgroups',
+    {}
+  );
+  const [expandedAccounts, setExpandedAccounts] = usePersistentState<Record<string, boolean>>(
+    'finance:accounts:expandedAccounts',
+    {},
+    { skipRestore: Boolean(targetAccountId) }
+  );
+  const [selectedGroup, setSelectedGroup] = usePersistentState<string | null>(
+    'finance:accounts:selectedGroup',
+    'All Accounts',
+    { skipRestore: Boolean(targetAccountId) }
+  );
 
   const [hierarchySelectedGroups, setHierarchySelectedGroups] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedGroups', new Set(), setOptions);
   const [hierarchySelectedTypes, setHierarchySelectedTypes] = usePersistentState<Set<string>>('finance:accounts:hierarchySelectedTypes', new Set(), setOptions);

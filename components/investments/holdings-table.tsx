@@ -1,6 +1,19 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+
+const setOptions = {
+  serialize: (val: Set<string>) => JSON.stringify(Array.from(val)),
+  deserialize: (raw: string) => {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? new Set<string>(parsed) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  },
+};
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import {
   Search,
@@ -96,14 +109,27 @@ function formatRelativeTime(dateStr?: string) {
 
 export function HoldingsTable({ holdings, accounts, quotes = [], onSelectHolding }: HoldingsTableProps) {
   const [search, setSearch] = useState('');
-  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set()); // empty Set means all
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistentState<Set<string>>(
+    'finance:investments:holdings:selectedAccounts',
+    new Set(),
+    setOptions
+  );
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
   const accountDropdownRef = useRef<HTMLDivElement>(null);
 
-  const [selectedAssetType, setSelectedAssetType] = useState<AssetTypeFilter>('all');
-  const [sortField, setSortField] = useState<SortField>('value');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [selectedAssetType, setSelectedAssetType] = usePersistentState<AssetTypeFilter>(
+    'finance:investments:holdings:assetType',
+    'all'
+  );
+  const [sortField, setSortField] = usePersistentState<SortField>(
+    'finance:investments:holdings:sortField',
+    'value'
+  );
+  const [sortDirection, setSortDirection] = usePersistentState<SortDirection>(
+    'finance:investments:holdings:sortDirection',
+    'desc'
+  );
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const toggleRow = (id: string) => {

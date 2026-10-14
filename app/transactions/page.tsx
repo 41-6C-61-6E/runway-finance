@@ -106,10 +106,14 @@ function TransactionsContent() {
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
   const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
 
-  const [activeView, setActiveView] = useState<'all' | 'recurring' | 'calendar'>(() => {
-    const v = searchParams.get('view');
-    return v === 'recurring' ? 'recurring' : v === 'calendar' ? 'calendar' : 'all';
-  });
+  const hasUrlView = Boolean(searchParams.get('view'));
+  const urlView = searchParams.get('view');
+  const initialView = urlView === 'recurring' ? 'recurring' : urlView === 'calendar' ? 'calendar' : 'all';
+  const [activeView, setActiveView] = usePersistentState<'all' | 'recurring' | 'calendar'>(
+    'finance:transactions:activeView',
+    initialView,
+    { skipRestore: hasUrlView }
+  );
   const [recurringCount, setRecurringCount] = useState<number | undefined>(undefined);
   const [upcomingWeekCount, setUpcomingWeekCount] = useState<number | undefined>(undefined);
 

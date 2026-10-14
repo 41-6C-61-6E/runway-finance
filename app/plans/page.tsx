@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { Flame, TrendingUp, BarChart3, Settings, Plus, Sparkles } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
@@ -17,15 +18,27 @@ import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
 export default function PlansPage() {
-  const [activeTab, setActiveTab] = useState<'projection' | 'scenarios' | 'settings'>('projection');
+  const [activeTab, setActiveTab] = usePersistentState<'projection' | 'scenarios' | 'settings'>(
+    'finance:plans:activeTab',
+    'projection'
+  );
   const [plansList, setPlansList] = useState<any[]>([]);
   const [accountsList, setAccountsList] = useState<any[]>([]);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = usePersistentState<string | null>(
+    'finance:plans:selectedPlanId',
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
-  const [dollarMode, setDollarMode] = useState<'real' | 'nominal'>('real');
-  const [viewMode, setViewMode] = useState<'deterministic' | 'monte_carlo'>('deterministic');
+  const [dollarMode, setDollarMode] = usePersistentState<'real' | 'nominal'>(
+    'finance:plans:dollarMode',
+    'real'
+  );
+  const [viewMode, setViewMode] = usePersistentState<'deterministic' | 'monte_carlo'>(
+    'finance:plans:viewMode',
+    'deterministic'
+  );
 
   // Plan Wizard Modal State
   const [wizardOpen, setWizardOpen] = useState(false);
