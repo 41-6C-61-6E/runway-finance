@@ -247,7 +247,7 @@ export default function InvestmentsPage() {
                   {isVisible('performanceChart') && isVisible('taxBreakdown') ? (
                     <MobileViewSwitcher
                       main={<PerformanceChart totalBalance={data.summary.totalBalance} />}
-                      summary={<TaxBreakdown accounts={data.accounts} />}
+                      summary={<TaxBreakdown accounts={data.accounts} holdings={data.holdings} quotes={quotes} />}
                       mainLabel="Performance"
                       summaryLabel="Scorecard"
                       summaryCardId="taxBreakdown"
@@ -255,7 +255,7 @@ export default function InvestmentsPage() {
                   ) : isVisible('performanceChart') ? (
                     <PerformanceChart totalBalance={data.summary.totalBalance} />
                   ) : isVisible('taxBreakdown') ? (
-                    <TaxBreakdown accounts={data.accounts} />
+                    <TaxBreakdown accounts={data.accounts} holdings={data.holdings} quotes={quotes} />
                   ) : null}
                 </div>
               )}

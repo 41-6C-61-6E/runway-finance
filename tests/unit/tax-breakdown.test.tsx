@@ -168,5 +168,57 @@ describe('TaxBreakdown Component', () => {
     render(<TaxBreakdown accounts={mockAccounts} title={<span>Custom Tax Overview</span>} />);
     expect(screen.getByText('Custom Tax Overview')).toBeDefined();
   });
+
+  it('renders top performer and worst performer tiles when holdings are provided', () => {
+    const mockAccounts = [
+      { id: 'acc_1', name: 'Brokerage', type: 'brokerage', balance: 60000, institution: null },
+    ];
+
+    const mockHoldings = [
+      {
+        accountId: 'acc_1',
+        securityId: 'sec_1',
+        ticker: 'NVDA',
+        name: 'NVIDIA Corporation',
+        value: 30000,
+        costBasis: 15000,
+        unrealizedGainLoss: 15000,
+        unrealizedReturnPct: 100,
+        portfolioWeight: 50,
+      },
+      {
+        accountId: 'acc_1',
+        securityId: 'sec_2',
+        ticker: 'AAPL',
+        name: 'Apple Inc.',
+        value: 20000,
+        costBasis: 18000,
+        unrealizedGainLoss: 2000,
+        unrealizedReturnPct: 11.11,
+        portfolioWeight: 33.33,
+      },
+      {
+        accountId: 'acc_1',
+        securityId: 'sec_3',
+        ticker: 'INTC',
+        name: 'Intel Corporation',
+        value: 10000,
+        costBasis: 15000,
+        unrealizedGainLoss: -5000,
+        unrealizedReturnPct: -33.33,
+        portfolioWeight: 16.67,
+      },
+    ];
+
+    render(<TaxBreakdown accounts={mockAccounts} holdings={mockHoldings} />);
+
+    expect(screen.getByText('Top Performer')).toBeDefined();
+    expect(screen.getByText('NVDA')).toBeDefined();
+    expect(screen.getByText('+100%')).toBeDefined();
+
+    expect(screen.getByText('Worst Performer')).toBeDefined();
+    expect(screen.getByText('INTC')).toBeDefined();
+    expect(screen.getByText('-33.3%')).toBeDefined();
+  });
 });
 

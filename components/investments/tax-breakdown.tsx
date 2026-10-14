@@ -4,7 +4,10 @@ import { useMemo } from 'react';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { SidebarCollapseButton } from '@/components/ui/sidebar-collapse-button';
-import { PieChart } from 'lucide-react';
+import { PieChart, TrendingUp, TrendingDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { getDisplayTicker, type InvestmentHolding } from '@/lib/types/investments';
+import type { QuoteData } from '@/app/api/investments/quotes/route';
 
 interface Account {
   id: string;
@@ -17,6 +20,8 @@ interface Account {
 
 interface TaxBreakdownProps {
   accounts: Account[];
+  holdings?: InvestmentHolding[];
+  quotes?: QuoteData[];
   title?: React.ReactNode;
 }
 
@@ -56,7 +61,7 @@ const WRAPPER_DESCRIPTIONS: Record<TaxWrapper, string> = {
 
 const WRAPPER_ORDER: TaxWrapper[] = ['Tax-Free', 'Tax-Deferred', 'Taxable', 'Other'];
 
-export function TaxBreakdown({ accounts, title }: TaxBreakdownProps) {
+export function TaxBreakdown({ accounts, holdings, quotes, title }: TaxBreakdownProps) {
   const [isCollapsed, setIsCollapsed] = useCardCollapsed('taxBreakdown');
   const wrapperTotals = useMemo(() => {
     const totals: Partial<Record<TaxWrapper, number>> = {};
@@ -96,6 +101,109 @@ export function TaxBreakdown({ accounts, title }: TaxBreakdownProps) {
   );
 
   const activeWrappers = WRAPPER_ORDER.filter((w) => (wrapperTotals[w] ?? 0) > 0);
+
+  // Build live quote map for ticker lookups
+  const quoteMap = useMemo(() => {
+    const m = new Map<string, QuoteData>();
+    for (const q of quotes ?? []) {
+      if (q.ticker) m.set(q.ticker.toUpperCase(), q);
+    }
+    return m;
+  }, [quotes]);
+
+  // Aggregate holdings across accounts to compute Top and Worst Performers
+  const performers = useMemo(() => {
+    if (!holdings || holdings.length === 0) return { top: null, worst: null };
+
+    const map = new Map<string, {
+      key: string;
+      ticker: string | null;
+      name: string;
+      value: number;
+      costBasis: number;
+      hasCostBasis: boolean;
+      gainLoss: number;
+      hasGainLoss: boolean;
+      directReturnPct: number | null;
+    }>();
+
+    for (const h of holdings) {
+      const ticker = getDisplayTicker(h) || h.ticker || null;
+      const key = h.securityId || ticker || h.name;
+      const existing = map.get(key);
+
+      const val = h.value || 0;
+      const cost = h.costBasis;
+      const gl = h.unrealizedGainLoss;
+
+      if (!existing) {
+        map.set(key, {
+          key,
+          ticker,
+          name: h.name || ticker || 'Unknown Security',
+          value: val,
+          costBasis: cost != null ? cost : 0,
+          hasCostBasis: cost != null && cost > 0,
+          gainLoss: gl != null ? gl : 0,
+          hasGainLoss: gl != null,
+          directReturnPct: h.unrealizedReturnPct ?? null,
+        });
+      } else {
+        existing.value += val;
+        if (cost != null && cost > 0) {
+          existing.costBasis += cost;
+          existing.hasCostBasis = true;
+        }
+        if (gl != null) {
+          existing.gainLoss += gl;
+          existing.hasGainLoss = true;
+        }
+      }
+    }
+
+    const items: Array<{
+      key: string;
+      ticker: string | null;
+      name: string;
+      value: number;
+      returnPct: number;
+      dayChangePct: number | null;
+    }> = [];
+
+    for (const item of map.values()) {
+      const q = item.ticker ? quoteMap.get(item.ticker.toUpperCase()) : undefined;
+      let returnPct: number | null = null;
+
+      if (item.hasCostBasis && item.costBasis > 0 && item.hasGainLoss) {
+        returnPct = (item.gainLoss / item.costBasis) * 100;
+      } else if (item.directReturnPct != null) {
+        returnPct = item.directReturnPct;
+      } else if (q?.changePercent != null) {
+        returnPct = q.changePercent;
+      }
+
+      if (returnPct !== null && !isNaN(returnPct)) {
+        items.push({
+          key: item.key,
+          ticker: item.ticker,
+          name: item.name,
+          value: item.value,
+          returnPct,
+          dayChangePct: q?.changePercent ?? null,
+        });
+      }
+    }
+
+    if (items.length === 0) return { top: null, worst: null };
+
+    // Sort descending by return percentage
+    items.sort((a, b) => b.returnPct - a.returnPct);
+
+    const top = items[0];
+    const worst = items.length > 1 && items[items.length - 1].key !== top.key ? items[items.length - 1] : null;
+
+    return { top, worst };
+  }, [holdings, quoteMap]);
 
   if (accounts.length === 0) return null;
 
@@ -197,6 +305,69 @@ export function TaxBreakdown({ accounts, title }: TaxBreakdownProps) {
               );
             })}
           </div>
+
+          {/* Section 4: Top & Worst Performers */}
+          {performers.top && (
+            <div className="py-4 first:pt-0 last:pb-0 space-y-3">
+              {/* Top Performer */}
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-6 h-6 rounded-lg bg-chart-1/10 border border-chart-1/20 flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-3.5 h-3.5 text-chart-1" />
+                  </div>
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-chart-1">Top Performer</span>
+                      <span className="font-mono text-xs font-bold text-foreground">
+                        {performers.top.ticker || performers.top.name}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground truncate max-w-[150px] sm:max-w-[180px]" title={performers.top.name}>
+                      {performers.top.name}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0 font-mono">
+                  <span className="text-xs font-bold text-chart-1 blur-number">
+                    {performers.top.returnPct >= 0 ? '+' : ''}{formatPlainPercent(performers.top.returnPct, 1)}
+                  </span>
+                  <div className="text-micro text-muted-foreground blur-number">
+                    {formatCurrency(performers.top.value)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Worst Performer */}
+              {performers.worst && (
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center justify-center shrink-0">
+                      <TrendingDown className="w-3.5 h-3.5 text-destructive" />
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-destructive">Worst Performer</span>
+                        <span className="font-mono text-xs font-bold text-foreground">
+                          {performers.worst.ticker || performers.worst.name}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground truncate max-w-[150px] sm:max-w-[180px]" title={performers.worst.name}>
+                        {performers.worst.name}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 font-mono">
+                    <span className="text-xs font-bold text-destructive blur-number">
+                      {performers.worst.returnPct >= 0 ? '+' : ''}{formatPlainPercent(performers.worst.returnPct, 1)}
+                    </span>
+                    <div className="text-micro text-muted-foreground blur-number">
+                      {formatCurrency(performers.worst.value)}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
