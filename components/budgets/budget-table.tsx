@@ -899,31 +899,36 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                       return (
                         <tr key={b.id} data-budget-category-id={b.categoryId} className="border-b border-border hover:bg-accent/20 transition-colors group/row">
                           <td className={`px-3 sm:px-4 py-2 sm:py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
-                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-wrap">
+                            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                               <div className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor }} />
-                              <Link
-                                href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
-                                title={b.categoryName}
-                                className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate"
-                              >
-                                {b.categoryName}
-                              </Link>
-                              <BudgetItemTransactionsIcon
-                                categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? undefined : b.categoryId}
-                                categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId]}
-                                categoryName={b.categoryName}
-                                periodType={periodType}
-                                periodKey={periodKey}
-                              />
-                              {b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                              <div className="relative min-w-0 flex-1 flex items-center">
+                                <Link
+                                  href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
+                                  title={b.categoryName}
+                                  className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate block flex-1 sm:group-hover/row:pr-7 transition-[padding]"
+                                >
+                                  {b.categoryName}
+                                </Link>
+                                <BudgetItemTransactionsIcon
+                                  categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? undefined : b.categoryId}
+                                  categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId]}
+                                  categoryName={b.categoryName}
+                                  periodType={periodType}
+                                  periodKey={periodKey}
+                                  className="sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
+                                />
+                              </div>
+                            </div>
+                            {b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                              <div className="mt-0.5 ml-4 sm:ml-4.5 flex items-center gap-1.5 min-w-0">
                                 <span
                                   title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
                                   className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
                                 >
                                   {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
                                 </span>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </td>
                           <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
                           <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm">
@@ -997,59 +1002,66 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                         <Fragment key={b.id}>
                           <tr data-budget-category-id={b.categoryId} className={`border-b border-border hover:bg-accent/20 transition-colors group/row ${isEE ? 'bg-muted/10 font-semibold' : ''}`}>
                             <td className={`px-3 sm:px-4 py-2 sm:py-2.5 min-w-0 ${flashCategoryId === b.categoryId ? 'bg-primary/10' : ''}`}>
-                              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-wrap">
-                                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
-                                <Link
-                                  href={getTxUrl(
-                                    isEE && b.groupedBreakout && b.groupedBreakout.length > 0
-                                      ? b.groupedBreakout.map((i) => i.categoryId)
-                                      : b.coveredCategoryIds,
-                                    b.categoryId
-                                  )}
-                                  title={b.categoryName}
-                                  className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate"
-                                >
-                                  {b.categoryName}
-                                </Link>
-                                <BudgetItemTransactionsIcon
-                                  categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 0) ? undefined : b.categoryId}
-                                  categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId])}
-                                  categoryName={b.categoryName}
-                                  periodType={periodType}
-                                  periodKey={periodKey}
-                                />
-                                {isEnvelope(b) && renderEnvelopeBadge(b)}
-                                {!isEE && !isEnvelope(b) && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
-                                  <span
-                                    title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
-                                    className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
+                              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <div className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
+                                <div className="relative min-w-0 flex-1 flex items-center">
+                                  <Link
+                                    href={getTxUrl(
+                                      isEE && b.groupedBreakout && b.groupedBreakout.length > 0
+                                        ? b.groupedBreakout.map((i) => i.categoryId)
+                                        : b.coveredCategoryIds,
+                                      b.categoryId
+                                    )}
+                                    title={b.categoryName}
+                                    className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate block flex-1 sm:group-hover/row:pr-7 transition-[padding]"
                                   >
-                                    {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
-                                  </span>
-                                )}
-                                {!isEE && b.rollover && b.rolloverCarryover !== undefined && b.rolloverCarryover > 0 && (
-                                  <span
-                                    title={`Base: ${formatCurrency(b.budgeted)} + Rollover: ${formatCurrency(b.rolloverCarryover)} = Total Available: ${formatCurrency(b.availableBudget || b.budgeted)}`}
-                                    className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-constructive/10 text-constructive border border-constructive/20 rounded shrink-0"
-                                  >
-                                    +{formatCurrency(b.rolloverCarryover)} rollover
-                                  </span>
-                                )}
-
-                                {/* Redesigned compact Everything Else breakout dropdown pill */}
-                                {isEE && (
-                                  <button
-                                    onClick={() => setExpandedCatchAll(!expandedCatchAll)}
-                                    title="Expand to see unbudgeted category spending in this bucket"
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-accent hover:bg-accent/80 border border-border/80 rounded text-primary transition-all cursor-pointer shrink-0"
-                                  >
-                                    <Layers className="w-3 h-3 text-primary shrink-0" />
-                                    <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} items</span>
-                                    {expandedCatchAll ? <ChevronUp className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0" />}
-                                  </button>
-                                )}
+                                    {b.categoryName}
+                                  </Link>
+                                  <BudgetItemTransactionsIcon
+                                    categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 0) ? undefined : b.categoryId}
+                                    categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId])}
+                                    categoryName={b.categoryName}
+                                    periodType={periodType}
+                                    periodKey={periodKey}
+                                    className="sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
+                                  />
+                                </div>
                               </div>
-                              {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 truncate">{b.notes}</div>}
+                              {(isEnvelope(b) || (!isEE && !isEnvelope(b) && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined) || (!isEE && b.rollover && b.rolloverCarryover !== undefined && b.rolloverCarryover > 0) || isEE) && (
+                                <div className="flex items-center gap-1.5 mt-0.5 ml-4 sm:ml-4.5 flex-wrap min-w-0">
+                                  {isEnvelope(b) && renderEnvelopeBadge(b)}
+                                  {!isEE && !isEnvelope(b) && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
+                                    <span
+                                      title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
+                                      className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
+                                    >
+                                      {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
+                                    </span>
+                                  )}
+                                  {!isEE && b.rollover && b.rolloverCarryover !== undefined && b.rolloverCarryover > 0 && (
+                                    <span
+                                      title={`Base: ${formatCurrency(b.budgeted)} + Rollover: ${formatCurrency(b.rolloverCarryover)} = Total Available: ${formatCurrency(b.availableBudget || b.budgeted)}`}
+                                      className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-constructive/10 text-constructive border border-constructive/20 rounded shrink-0"
+                                    >
+                                      +{formatCurrency(b.rolloverCarryover)} rollover
+                                    </span>
+                                  )}
+
+                                  {/* Redesigned compact Everything Else breakout dropdown pill */}
+                                  {isEE && (
+                                    <button
+                                      onClick={() => setExpandedCatchAll(!expandedCatchAll)}
+                                      title="Expand to see unbudgeted category spending in this bucket"
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-accent hover:bg-accent/80 border border-border/80 rounded text-primary transition-all cursor-pointer shrink-0"
+                                    >
+                                      <Layers className="w-3 h-3 text-primary shrink-0" />
+                                      <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} items</span>
+                                      {expandedCatchAll ? <ChevronUp className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0" />}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {b.notes && <div className="text-[10px] text-muted-foreground mt-0.5 ml-4 sm:ml-4.5 truncate">{b.notes}</div>}
                             </td>
                             <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono text-foreground blur-number whitespace-nowrap text-xs sm:text-sm">{renderBudgetCell(b)}</td>
                             <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right font-mono blur-number whitespace-nowrap text-xs sm:text-sm">
@@ -1147,19 +1159,22 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                               className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
                                               style={{ backgroundColor: item.categoryColor || '#6366f1' }}
                                             />
-                                            <Link
-                                              href={getTxUrl(undefined, item.categoryId)}
-className="font-medium text-foreground text-sm hover:text-primary hover:underline transition-colors min-w-0 block"
-                                              title={item.categoryName}
-                                            >
-                                              {item.categoryName}
-                                            </Link>
-                                            <BudgetItemTransactionsIcon
-                                              categoryId={item.categoryId}
-                                              categoryName={item.categoryName}
-                                              periodType={periodType}
-                                              periodKey={periodKey}
-                                            />
+                                            <div className="relative min-w-0 flex-1 flex items-center">
+                                              <Link
+                                                href={getTxUrl(undefined, item.categoryId)}
+                                                className="font-medium text-foreground text-sm hover:text-primary hover:underline transition-colors min-w-0 block truncate flex-1 sm:group-hover/cat:pr-7 transition-[padding]"
+                                                title={item.categoryName}
+                                              >
+                                                {item.categoryName}
+                                              </Link>
+                                              <BudgetItemTransactionsIcon
+                                                categoryId={item.categoryId}
+                                                categoryName={item.categoryName}
+                                                periodType={periodType}
+                                                periodKey={periodKey}
+                                                className="sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
+                                              />
+                                            </div>
                                           </div>
                                           <div className="flex items-center gap-2.5 shrink-0">
                                             <span className="font-mono text-sm font-semibold text-foreground blur-number">

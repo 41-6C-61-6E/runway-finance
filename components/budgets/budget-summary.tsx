@@ -364,7 +364,7 @@ export function BudgetSummary() {
   const chartData = (spentAmount === 0 && remainingAmount === 0)
     ? [{ name: 'Empty', value: 1, color: 'var(--muted)' }]
     : [
-        { name: 'Spent', value: spentAmount, color: expensePercent > 100 ? 'var(--destructive)' : 'var(--primary)' },
+        { name: 'Spent', value: spentAmount, color: expensePercent > 100 ? 'var(--destructive)' : 'var(--chart-1)' },
         { name: 'Remaining', value: remainingAmount, color: 'var(--muted)' },
       ];
 
@@ -611,18 +611,18 @@ export function BudgetSummary() {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="flex items-center gap-1 text-foreground font-semibold">
-                      <TrendingDown className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <TrendingDown className="w-3.5 h-3.5 text-chart-1 shrink-0" />
                       Expenses
                     </span>
                     <span className="font-mono text-xs text-foreground">
                       <span className="blur-number font-bold">{formatCurrency(totalExpenseActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalExpenseBudgeted)}</span>
                     </span>
                   </div>
-                  <div className="w-full h-2 budget-progress-track rounded-full overflow-hidden">
+                  <div className="w-full h-2.5 bg-muted/50 rounded-full overflow-hidden flex">
                     <div
                       className={cn(
                         'h-full transition-all duration-500 rounded-full',
-                        expensePercent > 100 ? 'bg-destructive' : expensePercent > 85 ? 'bg-amber-500' : 'budget-progress-fill'
+                        expensePercent > 100 ? 'bg-destructive' : expensePercent > 85 ? 'bg-amber-500' : 'bg-chart-1'
                       )}
                       style={{ width: `${Math.min(expensePercent, 100)}%` }}
                     />
@@ -639,18 +639,18 @@ export function BudgetSummary() {
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="flex items-center gap-1 text-foreground font-semibold">
-                      <TrendingUp className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <TrendingUp className="w-3.5 h-3.5 text-chart-1 shrink-0" />
                     Income Budget
                     </span>
                     <span className="font-mono text-xs text-foreground">
                       <span className="blur-number font-bold">{formatCurrency(totalIncomeActual)}</span> / <span className="text-muted-foreground blur-number">{formatCurrency(totalIncomeBudgeted)}</span>
                     </span>
                   </div>
-                  <div className="w-full h-2 budget-progress-track rounded-full overflow-hidden">
+                  <div className="w-full h-2.5 bg-muted/50 rounded-full overflow-hidden flex">
                     <div
                       className={cn(
                         'h-full transition-all duration-500 rounded-full',
-                        incomePercent >= 100 ? 'budget-progress-fill' : 'bg-amber-500'
+                        incomePercent >= 100 ? 'bg-chart-1' : 'bg-amber-500'
                       )}
                       style={{ width: `${Math.min(incomePercent, 100)}%` }}
                     />
@@ -718,7 +718,7 @@ export function BudgetSummary() {
                 <div className="space-y-2 cursor-help">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <span className="text-foreground flex items-center gap-1">
-                      <BarChart3 className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <BarChart3 className="w-3.5 h-3.5 text-chart-1 shrink-0" />
                       Budget Compliance
                       <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
                     </span>
@@ -729,7 +729,7 @@ export function BudgetSummary() {
                   <div className="h-2.5 w-full bg-muted/50 rounded-full overflow-hidden flex">
                     {underPct > 0 && (
                       <div
-                        className="h-full bg-emerald-500 transition-all duration-500"
+                        className="h-full bg-chart-1 transition-all duration-500"
                         style={{ width: `${underPct}%` }}
                       />
                     )}
@@ -747,7 +747,7 @@ export function BudgetSummary() {
                     )}
                   </div>
                   <div className="flex justify-between text-[11px] font-mono font-medium text-muted-foreground">
-                    <span className="text-emerald-500 font-semibold">{underBudgetCount} On Track</span>
+                    <span className="text-chart-1 font-semibold">{underBudgetCount} On Track</span>
                     {nearBudgetCount > 0 && <span className="text-amber-500 font-semibold">{nearBudgetCount} Near</span>}
                     {overBudgetCount > 0 && <span className="text-destructive font-semibold">{overBudgetCount} Over</span>}
                   </div>
@@ -790,7 +790,7 @@ export function BudgetSummary() {
                     <div
                       className={cn(
                         'h-full transition-all duration-500 rounded-full',
-                        actualSavingsRate >= budgetedSavingsRate ? 'bg-emerald-500' : 'bg-amber-500'
+                        actualSavingsRate >= budgetedSavingsRate ? 'bg-chart-1' : 'bg-amber-500'
                       )}
                       style={{ width: `${Math.min(Math.max(actualSavingsRate, 0), 100)}%` }}
                     />
