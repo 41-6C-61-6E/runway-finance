@@ -244,7 +244,10 @@ export default function CategoriesTab() {
     setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder);
     setFormHideFromTransactions(cat.hideFromTransactions ?? false);
-    setFormIsDiscretionary(cat.isDiscretionary ?? true);
+    const resolvedDiscretionary = (cat.categoryType === 'compound' && cat.expenseParentId)
+      ? (categoryById.get(cat.expenseParentId)?.isDiscretionary ?? cat.isDiscretionary ?? true)
+      : (cat.isDiscretionary ?? true);
+    setFormIsDiscretionary(resolvedDiscretionary);
   };
 
   const openClone = (cat: Category) => {
@@ -258,7 +261,10 @@ export default function CategoriesTab() {
     setFormExpenseParentId(cat.expenseParentId);
     setFormOrder(cat.displayOrder + 1);
     setFormHideFromTransactions(cat.hideFromTransactions ?? false);
-    setFormIsDiscretionary(cat.isDiscretionary ?? true);
+    const resolvedDiscretionary = (cat.categoryType === 'compound' && cat.expenseParentId)
+      ? (categoryById.get(cat.expenseParentId)?.isDiscretionary ?? cat.isDiscretionary ?? true)
+      : (cat.isDiscretionary ?? true);
+    setFormIsDiscretionary(resolvedDiscretionary);
   };
 
   const handleClose = () => {
@@ -276,6 +282,13 @@ export default function CategoriesTab() {
       const resolvedExpenseParentId = isCompound
         ? formExpenseParentId || inferCompoundExpenseParentId(formName)
         : null;
+      let effectiveDiscretionary = formIsDiscretionary;
+      if (isCompound && resolvedExpenseParentId) {
+        const matched = categoryById.get(resolvedExpenseParentId);
+        if (matched && matched.isDiscretionary !== undefined) {
+          effectiveDiscretionary = matched.isDiscretionary;
+        }
+      }
       const body = {
         name: formName.trim(),
         parentId: formParentId || null,
@@ -285,7 +298,7 @@ export default function CategoriesTab() {
         expenseParentId: resolvedExpenseParentId,
         displayOrder: formOrder,
         hideFromTransactions: formHideFromTransactions,
-        isDiscretionary: formIsDiscretionary,
+        isDiscretionary: effectiveDiscretionary,
       };
 
       if (editing) {
@@ -528,7 +541,7 @@ export default function CategoriesTab() {
                   }`}>
                     {parent.categoryType === 'compound' ? 'Compound' : parent.categoryType === 'transfer' ? 'Transfer' : parent.isIncome ? 'Income' : 'Expense'}
                   </span>
-                  {!parent.isIncome && parent.categoryType === 'standard' && (
+                  {((!parent.isIncome && parent.categoryType === 'standard') || parent.categoryType === 'compound') && (
                     <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full border ${
                       parent.isDiscretionary === false
                         ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
@@ -601,7 +614,7 @@ export default function CategoriesTab() {
                               }`}>
                                 {child.categoryType === 'compound' ? 'Compound' : child.categoryType === 'transfer' ? 'Transfer' : child.isIncome ? 'Income' : 'Expense'}
                               </span>
-                              {!child.isIncome && child.categoryType === 'standard' && (
+                              {((!child.isIncome && child.categoryType === 'standard') || child.categoryType === 'compound') && (
                                 <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full border ${
                                   child.isDiscretionary === false
                                     ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
@@ -727,7 +740,16 @@ export default function CategoriesTab() {
                 <label className="block text-sm font-medium text-foreground mb-1">Uses Expense Category</label>
                 <Select
                   value={formExpenseParentId || ''}
-                  onChange={(e) => setFormExpenseParentId(e.target.value || null)}
+                  onChange={(e) => {
+                    const nextId = e.target.value || null;
+                    setFormExpenseParentId(nextId);
+                    if (nextId) {
+                      const matched = categoryById.get(nextId);
+                      if (matched && matched.isDiscretionary !== undefined) {
+                        setFormIsDiscretionary(matched.isDiscretionary);
+                      }
+                    }
+                  }}
                 >
                   <option value="">Select expense category...</option>
                   {compoundExpenseOptions
@@ -738,6 +760,22 @@ export default function CategoriesTab() {
                 <p className="text-[10px] text-muted-foreground mt-1">
                   This category is used as the expense-side category in charts and reporting. It can be top-level or nested.
                 </p>
+                {formExpenseParentId && (() => {
+                  const matched = categoryById.get(formExpenseParentId);
+                  const isFixed = matched?.isDiscretionary === false;
+                  return (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span>Inherited classification:</span>
+                      <span className={`px-1.5 py-0.5 rounded font-semibold text-[10px] border ${
+                        isFixed
+                          ? 'bg-chart-1/10 text-chart-1 border-chart-1/20'
+                          : 'bg-chart-4/10 text-chart-4 border-chart-4/20'
+                      }`}>
+                        {isFixed ? 'Fixed (Essential)' : 'Discretionary'}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

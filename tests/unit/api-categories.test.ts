@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET, POST } from '@/app/api/categories/route';
+import { PATCH } from '@/app/api/categories/[id]/route';
 import { standardSession, unauthed } from './mocks/session';
 
 const mockCategories: any[] = [];
+const lastUpdatedSets: any[] = [];
 let authFn = standardSession();
 
 vi.mock('@/lib/auth', () => ({
@@ -15,6 +17,7 @@ vi.mock('@/lib/crypto-context', () => ({
 
 vi.mock('@/lib/crypto', () => ({
   decryptRows: vi.fn((_table, rows) => Promise.resolve(rows.map((r: any) => ({ ...r })))),
+  decryptRow: vi.fn((_table, row) => Promise.resolve({ ...row })),
   encryptRow: vi.fn((_table, data) => Promise.resolve(data)),
   decryptField: vi.fn((val) => Promise.resolve(String(val ?? ''))),
 }));
@@ -23,6 +26,10 @@ vi.mock('@/lib/db/seed-categories', () => ({
   ensureCompoundCategories: vi.fn().mockResolvedValue([]),
   ensureEmployerContributions: vi.fn().mockResolvedValue([]),
   mergeDuplicateCategories: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('@/lib/services/search-cache', () => ({
+  invalidateUserSearchCache: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -37,6 +44,19 @@ vi.mock('@/lib/db', () => ({
       where: vi.fn(() => chain),
       orderBy: vi.fn(() => chain),
       groupBy: vi.fn(() => chain),
+      limit: vi.fn(() => chain),
+      transaction: vi.fn((cb: any) => cb(chain)),
+      delete: vi.fn(() => chain),
+      update: vi.fn(() => chain),
+      set: vi.fn((val: any) => {
+        lastUpdatedSets.push(val);
+        return {
+          where: vi.fn(() => ({
+            returning: () => Promise.resolve([{ id: 'cat_updated_1', ...val }]),
+            then: (resolve: (v: any) => any) => Promise.resolve([{ id: 'cat_updated_1', ...val }]).then(resolve),
+          })),
+        };
+      }),
       insert: vi.fn(() => ({
         values: vi.fn((val: any) => ({
           returning: () => Promise.resolve([{ id: 'cat_created_1', ...val }]),
@@ -55,6 +75,7 @@ describe('API Route: /api/categories', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCategories.length = 0;
+    lastUpdatedSets.length = 0;
     authFn = standardSession();
   });
 
@@ -100,6 +121,87 @@ describe('API Route: /api/categories', () => {
       const json = await res.json();
       expect(json.id).toBe('cat_created_1');
       expect(json.name).toBe('Dining Out');
+    });
+
+    it('inherits isDiscretionary from expenseParentId for compound categories when not specified', async () => {
+      const expenseParent = {
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        userId: 'test-user-id',
+        name: 'Taxes',
+        isDiscretionary: false,
+      };
+      mockCategories.push(expenseParent);
+
+      const payload = {
+        name: 'Federal Withholding Tax',
+        color: '#ef4444',
+        categoryType: 'compound',
+        expenseParentId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+      };
+
+      const req = new Request('http://localhost:3000/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(201);
+      const json = await res.json();
+      expect(json.isDiscretionary).toBe(false);
+    });
+
+    it('honors explicit isDiscretionary override on compound categories', async () => {
+      const expenseParent = {
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        userId: 'test-user-id',
+        name: 'Taxes',
+        isDiscretionary: false,
+      };
+      mockCategories.push(expenseParent);
+
+      const payload = {
+        name: 'Voluntary Tax Prepayment',
+        color: '#ef4444',
+        categoryType: 'compound',
+        expenseParentId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        isDiscretionary: true,
+      };
+
+      const req = new Request('http://localhost:3000/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(201);
+      const json = await res.json();
+      expect(json.isDiscretionary).toBe(true);
+    });
+  });
+
+  describe('PATCH /api/categories/[id]', () => {
+    it('cascades isDiscretionary change on expense category to compound children', async () => {
+      const expenseCatId = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22';
+      mockCategories.push({
+        id: expenseCatId,
+        userId: 'test-user-id',
+        name: 'Taxes',
+        isDiscretionary: true,
+      });
+
+      const req = new Request(`http://localhost:3000/api/categories/${expenseCatId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDiscretionary: false }),
+      });
+
+      const res = await PATCH(req, { params: Promise.resolve({ id: expenseCatId }) });
+      expect(res.status).toBe(200);
+
+      // Verify that an update was triggered setting isDiscretionary: false
+      expect(lastUpdatedSets.some((s) => s.isDiscretionary === false)).toBe(true);
     });
   });
 });

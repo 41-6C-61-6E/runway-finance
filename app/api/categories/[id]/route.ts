@@ -151,13 +151,39 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json(decrypted);
   }
 
-  const encrypted = await encryptRow('categories', { ...parsed.data }, dek);
+  const updateData: any = { ...parsed.data };
+  const targetCategoryType = parsed.data.categoryType ?? decryptedExisting.categoryType;
+  if (targetCategoryType === 'compound' && parsed.data.isDiscretionary === undefined) {
+    const nextExpenseParentId = parsed.data.expenseParentId !== undefined ? parsed.data.expenseParentId : decryptedExisting.expenseParentId;
+    if (nextExpenseParentId) {
+      const expCat = decryptedCategories.find((c) => c.id === nextExpenseParentId);
+      if (expCat && expCat.isDiscretionary !== undefined) {
+        updateData.isDiscretionary = expCat.isDiscretionary;
+      }
+    }
+  }
+
+  const encrypted = await encryptRow('categories', updateData, dek);
 
   const [updated] = await getDb()
     .update(categories)
     .set(encrypted)
     .where(eq(categories.id, id))
     .returning();
+
+  // If updating isDiscretionary on an expense category, cascade to compound categories using it
+  if (parsed.data.isDiscretionary !== undefined) {
+    await getDb()
+      .update(categories)
+      .set({ isDiscretionary: parsed.data.isDiscretionary })
+      .where(
+        and(
+          eq(categories.userId, dataUserId),
+          eq(categories.categoryType, 'compound'),
+          eq(categories.expenseParentId, id)
+        )
+      );
+  }
 
   const decrypted = updated ? await decryptRow('categories', updated, dek) : updated;
   logger.info('PATCH /api/categories/[id]', { userId, id, updatedFields: Object.keys(parsed.data) });

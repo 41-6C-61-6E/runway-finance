@@ -86,7 +86,12 @@ function buildCategoryConditions(
             db
               .select({ id: categories.id })
               .from(categories)
-              .where(inArray(categories.parentId, validCategoryIds))
+              .where(
+                or(
+                  inArray(categories.parentId, validCategoryIds),
+                  inArray(categories.expenseParentId, validCategoryIds),
+                )
+              )
           ),
           inArray(
             transactions.id,
@@ -102,7 +107,12 @@ function buildCategoryConditions(
                       db
                         .select({ id: categories.id })
                         .from(categories)
-                        .where(inArray(categories.parentId, validCategoryIds))
+                        .where(
+                          or(
+                            inArray(categories.parentId, validCategoryIds),
+                            inArray(categories.expenseParentId, validCategoryIds),
+                          )
+                        )
                     )
                   ),
                   isNotNull(transactions.parentId)
@@ -127,7 +137,12 @@ function buildCategoryConditions(
             db
               .select({ id: categories.id })
               .from(categories)
-              .where(inArray(categories.parentId, validCategoryIds))
+              .where(
+                or(
+                  inArray(categories.parentId, validCategoryIds),
+                  inArray(categories.expenseParentId, validCategoryIds),
+                )
+              )
           ),
           inArray(
             transactions.id,
@@ -143,7 +158,12 @@ function buildCategoryConditions(
                       db
                         .select({ id: categories.id })
                         .from(categories)
-                        .where(inArray(categories.parentId, validCategoryIds))
+                        .where(
+                          or(
+                            inArray(categories.parentId, validCategoryIds),
+                            inArray(categories.expenseParentId, validCategoryIds),
+                          )
+                        )
                     )
                   ),
                   isNotNull(transactions.parentId)
@@ -172,7 +192,12 @@ function buildCategoryConditions(
             db
               .select({ id: categories.id })
               .from(categories)
-              .where(eq(categories.parentId, categoryId))
+              .where(
+                or(
+                  eq(categories.parentId, categoryId),
+                  eq(categories.expenseParentId, categoryId),
+                )
+              )
           ),
           inArray(
             transactions.id,
@@ -188,7 +213,12 @@ function buildCategoryConditions(
                       db
                         .select({ id: categories.id })
                         .from(categories)
-                        .where(eq(categories.parentId, categoryId))
+                        .where(
+                          or(
+                            eq(categories.parentId, categoryId),
+                            eq(categories.expenseParentId, categoryId),
+                          )
+                        )
                     )
                   ),
                   isNotNull(transactions.parentId)

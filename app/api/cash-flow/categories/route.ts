@@ -75,7 +75,7 @@ export async function GET(request: Request) {
   let prevExpenseMap = new Map<string, number>();
   let prevIncomeMap = new Map<string, number>();
 
-  function expandCategoryRecord(row: any, previousAmount = 0) {
+  function expandCategoryRecord(row: any, previousAmount = 0, expenseLookup?: Map<string, { isDiscretionary: boolean }>) {
     const baseRecord = {
       sourceCategoryId: row.sourceCategoryId || row.categoryId,
       categoryName: row.categoryName,
@@ -113,6 +113,10 @@ export async function GET(request: Request) {
     const incomePreviousAmount = Math.abs(row.compoundIncomePreviousAmount ?? previousAmount ?? 0);
     const expensePreviousAmount = Math.abs(row.compoundExpensePreviousAmount ?? previousAmount ?? 0);
 
+    const expenseSideDiscretionary = row.expenseParentId && expenseLookup?.has(row.expenseParentId)
+      ? expenseLookup.get(row.expenseParentId)!.isDiscretionary
+      : (row.isDiscretionary ?? true);
+
     return [
       {
         ...baseRecord,
@@ -128,9 +132,59 @@ export async function GET(request: Request) {
         isIncome: false,
         parentId: row.expenseParentId || null,
         side: 'expense',
+        isDiscretionary: expenseSideDiscretionary,
         ...buildMetrics(expenseAmount, expenseCount, expensePreviousAmount),
       },
     ];
+  }
+
+  async function fetchExpenseParentLookup(catRows: any[]): Promise<Map<string, { isDiscretionary: boolean }>> {
+    const expenseParentIds = Array.from(
+      new Set(
+        catRows
+          .filter((r) => r.categoryType === 'compound' && r.expenseParentId)
+          .map((r) => r.expenseParentId as string)
+      )
+    );
+
+    if (expenseParentIds.length === 0) return new Map();
+
+    const targetCats = await db
+      .select({
+        id: categories.id,
+        parentId: categories.parentId,
+        isDiscretionary: categories.isDiscretionary,
+      })
+      .from(categories)
+      .where(and(eq(categories.userId, dataUserId), inArray(categories.id, expenseParentIds)));
+
+    const parentIds = targetCats.map((c) => c.parentId).filter(Boolean) as string[];
+    const parentCats = parentIds.length > 0
+      ? await db
+          .select({
+            id: categories.id,
+            parentId: categories.parentId,
+            isDiscretionary: categories.isDiscretionary,
+          })
+          .from(categories)
+          .where(and(eq(categories.userId, dataUserId), inArray(categories.id, parentIds)))
+      : [];
+
+    const lookup = new Map<string, { isDiscretionary: boolean }>();
+    for (const pc of parentCats) {
+      lookup.set(pc.id, { isDiscretionary: pc.isDiscretionary ?? true });
+    }
+    for (const tc of targetCats) {
+      let isDiscretionary = tc.isDiscretionary;
+      if (isDiscretionary === null || isDiscretionary === undefined) {
+        if (tc.parentId && lookup.has(tc.parentId)) {
+          isDiscretionary = lookup.get(tc.parentId)!.isDiscretionary;
+        }
+      }
+      lookup.set(tc.id, { isDiscretionary: isDiscretionary ?? true });
+    }
+
+    return lookup;
   }
 
     async function fetchTransactionsAggregated(start: string, end: string, accountIds: string[], isIncome?: boolean): Promise<any[]> {
@@ -517,7 +571,8 @@ export async function GET(request: Request) {
         });
       }
 
-      const expandedData = data.flatMap((row) => expandCategoryRecord(row));
+      const expenseLookup = await fetchExpenseParentLookup(data);
+      const expandedData = data.flatMap((row) => expandCategoryRecord(row, 0, expenseLookup));
 
       logger.info('GET /api/cash-flow/categories (range)', { startMonth, endMonth, accountIds: accountIdList, count: expandedData.length });
       return NextResponse.json(expandedData);
@@ -727,12 +782,14 @@ export async function GET(request: Request) {
       }
     }
 
-    const data = Array.from(currentCategoryMap.values()).flatMap((aggregated) => {
+    const currentList = Array.from(currentCategoryMap.values());
+    const expenseLookup = await fetchExpenseParentLookup(currentList);
+    const data = currentList.flatMap((aggregated) => {
       const prevAmount = prevMap.get(aggregated.categoryId) || 0;
       return expandCategoryRecord({
         ...aggregated,
         sourceCategoryId: aggregated.categoryId,
-      }, prevAmount);
+      }, prevAmount, expenseLookup);
     });
 
     logger.info('GET /api/cash-flow/categories', { month: resolvedMonth, accountIds: accountIdList, count: data.length });

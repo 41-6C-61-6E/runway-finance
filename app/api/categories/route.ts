@@ -132,6 +132,14 @@ export async function POST(request: Request) {
     }
   }
 
+  let effectiveIsDiscretionary = isDiscretionary ?? true;
+  if (effectiveCategoryType === 'compound' && expenseParentId) {
+    const expenseParent = existingCategories.find((cat) => cat.id === expenseParentId);
+    if (expenseParent && expenseParent.isDiscretionary !== undefined && (body as any)?.isDiscretionary === undefined) {
+      effectiveIsDiscretionary = expenseParent.isDiscretionary;
+    }
+  }
+
   const encryptedValues = await encryptRow('categories', {
     userId: dataUserId,
     name,
@@ -144,7 +152,7 @@ export async function POST(request: Request) {
     displayOrder,
     categoryType: effectiveCategoryType,
     expenseParentId: expenseParentId ?? null,
-    isDiscretionary: isDiscretionary ?? true,
+    isDiscretionary: effectiveIsDiscretionary,
   }, dek);
 
   const [cat] = await getDb()

@@ -456,16 +456,18 @@ async function seedCompoundChildren(userId: string, parentId: string, startOrder
   const db = getDb();
   let order = startOrder;
 
-  // Build lookup of expense parent names to IDs
+  // Build lookup of expense parent names to IDs and discretionary flags
   const allExpenseParents = await db
-    .select({ id: categories.id, name: categories.name })
+    .select({ id: categories.id, name: categories.name, isDiscretionary: categories.isDiscretionary })
     .from(categories)
     .where(and(eq(categories.userId, userId), isNull(categories.parentId)));
 
-  const expenseParentByName = new Map(allExpenseParents.map((c) => [c.name, c.id]));
+  const expenseParentByName = new Map(allExpenseParents.map((c) => [c.name, c]));
 
   for (const sub of subcategories) {
-    const expenseParentId = expenseParentByName.get(sub.expenseParentName);
+    const expParent = expenseParentByName.get(sub.expenseParentName);
+    const expenseParentId = expParent?.id ?? null;
+    const isDiscretionary = expParent ? (expParent.isDiscretionary ?? true) : true;
     await db.insert(categories).values({
       userId,
       parentId,
@@ -475,6 +477,7 @@ async function seedCompoundChildren(userId: string, parentId: string, startOrder
       isSystem: true,
       categoryType: 'compound',
       expenseParentId: expenseParentId ?? null,
+      isDiscretionary,
       displayOrder: order++,
     });
   }
@@ -615,6 +618,7 @@ async function ensureCompoundGroup(
       parentId: categories.parentId,
       expenseParentId: categories.expenseParentId,
       name: categories.name,
+      isDiscretionary: categories.isDiscretionary,
       displayOrder: categories.displayOrder,
       isSystem: categories.isSystem,
       createdAt: categories.createdAt,
@@ -659,7 +663,7 @@ async function ensureCompoundGroup(
 
   const allExpenseParents = allCategories.filter((c) => !c.parentId);
 
-  const expenseParentByName = new Map(allExpenseParents.map((c) => [c.name, c.id]));
+  const expenseParentByName = new Map(allExpenseParents.map((c) => [c.name, c]));
   const neededExpenseParentNames = [...new Set(subcategories.map((sub) => sub.expenseParentName))];
 
   for (const expenseParentName of neededExpenseParentNames) {
@@ -682,17 +686,24 @@ async function ensureCompoundGroup(
       })
       .returning();
 
-    expenseParentByName.set(createdParent.name, createdParent.id);
+    expenseParentByName.set(createdParent.name, createdParent);
   }
 
   for (const sub of subcategories) {
-    const expenseParentId = expenseParentByName.get(sub.expenseParentName);
+    const expParent = expenseParentByName.get(sub.expenseParentName);
+    const expenseParentId = expParent?.id ?? null;
+    const isDiscretionary = expParent ? (expParent.isDiscretionary ?? true) : true;
     const existingChild = existingChildrenByName.get(sub.name);
     if (existingChild) {
-      if (expenseParentId && existingChild.expenseParentId !== expenseParentId) {
+      const needsExpenseParentUpdate = expenseParentId && existingChild.expenseParentId !== expenseParentId;
+      const needsDiscretionaryUpdate = existingChild.isDiscretionary !== isDiscretionary;
+      if (needsExpenseParentUpdate || needsDiscretionaryUpdate) {
         await db
           .update(categories)
-          .set({ expenseParentId })
+          .set({
+            ...(needsExpenseParentUpdate ? { expenseParentId } : {}),
+            ...(needsDiscretionaryUpdate ? { isDiscretionary } : {}),
+          })
           .where(and(eq(categories.userId, userId), eq(categories.id, existingChild.id)));
       }
       continue;
@@ -707,6 +718,7 @@ async function ensureCompoundGroup(
       isSystem: true,
       categoryType: 'compound',
       expenseParentId: expenseParentId ?? null,
+      isDiscretionary,
       displayOrder: order++,
     });
   }
@@ -733,6 +745,16 @@ export async function ensureCategoryDiscretionaryColumn() {
           AND name LIKE ${`%${kw}%`};
       `);
     }
+
+    // Synchronize compound categories to inherit is_discretionary from their associated expense category
+    await db.execute(sql`
+      UPDATE categories c 
+      SET is_discretionary = ec.is_discretionary 
+      FROM categories ec 
+      WHERE c.expense_parent_id = ec.id 
+        AND c.category_type = 'compound';
+    `);
+
     hasMigratedDiscretionaryColumn = true;
   } catch {
     hasMigratedDiscretionaryColumn = true;
