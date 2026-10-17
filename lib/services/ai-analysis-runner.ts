@@ -19,7 +19,7 @@ const LOG_TAG = '[ai-analysis-runner]';
  */
 export function startAiAnalysis(
   userId: string,
-  opts?: { dek?: Uint8Array },
+  opts?: { dek?: Uint8Array; transactionIds?: string[] },
 ): 'started' | 'already-running' {
   if (activeAnalysisSessions.has(userId)) {
     return 'already-running';
@@ -57,6 +57,7 @@ export function startAiAnalysis(
     },
     abortController,
     opts?.dek,
+    opts?.transactionIds,
   )
     .then((result) => {
       const existing = activeAnalysisSessions.get(userId);

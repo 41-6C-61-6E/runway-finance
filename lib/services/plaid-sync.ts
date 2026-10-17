@@ -767,8 +767,14 @@ export async function syncPlaidConnection(
       });
 
       const uncategorized = syncedWithPlaintext.filter((t) => !t.categoryId);
+      let ruleCategorizedTxIds = new Set<string>();
       if (syncedWithPlaintext.length > 0) {
         const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, dataUserId, dek);
+        ruleCategorizedTxIds = new Set(
+          Array.from(ruleResults.entries())
+            .filter(([, action]) => action.shouldUpdateCategory && action.categoryId)
+            .map(([txId]) => txId)
+        );
 
         for (const [txId, action] of ruleResults) {
           if (action.shouldUpdateCategory) {
@@ -803,8 +809,9 @@ export async function syncPlaidConnection(
         }
       }
 
-      // Auto AI Analysis
-      if (uncategorized.length > 0) {
+      // Auto AI Analysis scoped to transactions that remain uncategorized
+      const remainingUncategorized = uncategorized.filter((t) => !ruleCategorizedTxIds.has(t.id));
+      if (remainingUncategorized.length > 0) {
         try {
           const [settingsRow] = await getDb()
             .select()
@@ -815,8 +822,11 @@ export async function syncPlaidConnection(
           if (settingsRow?.aiAutoAnalyze) {
             try {
               const { startAiAnalysis } = await import('@/lib/services/ai-analysis-runner');
-              const started = startAiAnalysis(userId, { dek });
-              logger.info(`${LOG_TAG} AI auto-analysis ${started} after sync`, { userId });
+              const started = startAiAnalysis(userId, {
+                dek,
+                transactionIds: remainingUncategorized.map((t) => t.id),
+              });
+              logger.info(`${LOG_TAG} AI auto-analysis ${started} after sync`, { userId, count: remainingUncategorized.length });
             } catch (err) {
               logger.error(`${LOG_TAG} AI auto-analysis failed to start (non-fatal)`, { userId, error: String(err) });
             }

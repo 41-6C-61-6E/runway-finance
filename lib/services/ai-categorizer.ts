@@ -68,13 +68,124 @@ type AiResponse = {
   servedModel?: string;
 };
 
+/**
+ * Prune duplicate or stale AI proposals for a user:
+ * 1. For `categorize` proposals with `status = 'pending'`, keeps only the newest
+ *    proposal per transaction and deletes older duplicates.
+ * 2. Marks pending proposals as `applied` if the underlying transaction is already
+ *    categorized (`categoryId IS NOT NULL`) or deleted.
+ * 3. Removes duplicate pending `create_category` proposals (keeping the newest per name).
+ * 4. Removes duplicate pending `create_rule` proposals (keeping the newest per rule condition).
+ */
+export async function pruneDuplicateProposals(userId: string): Promise<number> {
+  const db = getDb();
+  const dataUserId = await resolveDataUserId(userId);
+
+  try {
+    // 1. Delete duplicate pending categorize proposals (keeping newest per transaction)
+    const dedupCategorize = await db.execute(sql`
+      DELETE FROM ${aiProposals}
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY user_id, (payload->>'transactionId')
+                   ORDER BY created_at DESC, id DESC
+                 ) as rn
+          FROM ${aiProposals}
+          WHERE user_id = ${dataUserId}
+            AND status = 'pending'
+            AND type = 'categorize'
+            AND (payload->>'transactionId') IS NOT NULL
+        ) dupes
+        WHERE dupes.rn > 1
+      )
+    `);
+
+    // 2. Mark pending categorize proposals as applied if the transaction is already categorized or deleted
+    const markCategorized = await db.execute(sql`
+      UPDATE ${aiProposals}
+      SET status = 'applied', updated_at = NOW()
+      WHERE user_id = ${dataUserId}
+        AND status = 'pending'
+        AND type = 'categorize'
+        AND (payload->>'transactionId') IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM ${transactions}
+          WHERE (${transactions.id})::text = (${aiProposals.payload}->>'transactionId')
+            AND (${transactions.categoryId} IS NOT NULL OR ${transactions.deleted} = true)
+        )
+    `);
+
+    // 3. Delete duplicate pending create_category proposals
+    const dedupCategory = await db.execute(sql`
+      DELETE FROM ${aiProposals}
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY user_id, LOWER(payload->>'name')
+                   ORDER BY created_at DESC, id DESC
+                 ) as rn
+          FROM ${aiProposals}
+          WHERE user_id = ${dataUserId}
+            AND status = 'pending'
+            AND type = 'create_category'
+            AND (payload->>'name') IS NOT NULL
+        ) dupes
+        WHERE dupes.rn > 1
+      )
+    `);
+
+    // 4. Delete duplicate pending create_rule proposals
+    const dedupRules = await db.execute(sql`
+      DELETE FROM ${aiProposals}
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY user_id, (payload->>'conditionField'), (payload->>'conditionOperator'), LOWER(payload->>'conditionValue')
+                   ORDER BY created_at DESC, id DESC
+                 ) as rn
+          FROM ${aiProposals}
+          WHERE user_id = ${dataUserId}
+            AND status = 'pending'
+            AND type = 'create_rule'
+            AND (payload->>'conditionField') IS NOT NULL
+        ) dupes
+        WHERE dupes.rn > 1
+      )
+    `);
+
+    const totalPruned =
+      (Number(dedupCategorize.rowCount) || 0) +
+      (Number(markCategorized.rowCount) || 0) +
+      (Number(dedupCategory.rowCount) || 0) +
+      (Number(dedupRules.rowCount) || 0);
+
+    if (totalPruned > 0) {
+      logger.info(`${LOG_TAG} Pruned duplicate/stale proposals`, { userId: dataUserId, totalPruned });
+    }
+    return totalPruned;
+  } catch (err) {
+    logger.error(`${LOG_TAG} Failed to prune duplicate proposals`, { userId, error: String(err) });
+    return 0;
+  }
+}
+
 export async function analyzeUncategorized(
   userId: string,
   onProgress?: (processedCount: number, totalCount: number | null) => void,
   onLog?: (message: string) => void,
   abortController?: AbortController,
   dekOverride?: Uint8Array,
+  transactionIds?: string[],
 ): Promise<{ proposalsCreated: number; autoApproved: number; errors: string[] }> {
+  if (transactionIds && transactionIds.length === 0) {
+    onLog?.('No uncategorized transactions to analyze.');
+    return { proposalsCreated: 0, autoApproved: 0, errors: [] };
+  }
+
   if (activeAiAnalysisUsers.has(userId)) {
     logger.info(`${LOG_TAG} Analysis already in progress for user, skipping duplicate run`, { userId });
     onLog?.('Analysis already in progress for this user.');
@@ -104,6 +215,9 @@ export async function analyzeUncategorized(
     // Accept an explicit DEK so background runs kicked off from sync jobs
     // don't depend on request-scoped auth after the response completes.
     const dek = dekOverride ?? await getSessionDEK();
+
+    // Prune existing duplicate and obsolete proposals before running analysis
+    await pruneDuplicateProposals(userId);
 
     // Enforce the deployment-wide provider (env vars win over saved settings).
     try {
@@ -203,24 +317,35 @@ export async function analyzeUncategorized(
     }));
 
     onLog?.('Counting uncategorized transactions...');
+    const baseWhereConditions = [
+      eq(transactions.userId, dataUserId),
+      isNull(transactions.categoryId),
+      eq(transactions.deleted, false),
+      or(
+        and(
+          eq(accounts.isHidden, false),
+          eq(accounts.isExcludedFromNetWorth, false)
+        ),
+        eq(accounts.type, 'paystub')
+      ),
+      sql`NOT EXISTS (
+        SELECT 1 FROM ${aiProposals}
+        WHERE ${aiProposals.userId} = ${dataUserId}
+          AND ${aiProposals.status} IN ('pending', 'rejected', 'approved')
+          AND ${aiProposals.type} = 'categorize'
+          AND (${aiProposals.payload}->>'transactionId') = (${transactions.id})::text
+      )`,
+    ];
+
+    if (transactionIds && transactionIds.length > 0) {
+      baseWhereConditions.push(inArray(transactions.id, transactionIds));
+    }
+
     const countResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(transactions)
       .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-      .where(
-        and(
-          eq(transactions.userId, dataUserId),
-          isNull(transactions.categoryId),
-          eq(transactions.deleted, false),
-          or(
-            and(
-              eq(accounts.isHidden, false),
-              eq(accounts.isExcludedFromNetWorth, false)
-            ),
-            eq(accounts.type, 'paystub')
-          )
-        )
-      );
+      .where(and(...baseWhereConditions));
     const totalUncategorized = Number(countResult[0]?.count ?? 0);
     onProgress?.(0, totalUncategorized);
     onLog?.(`Found ${totalUncategorized} uncategorized transaction(s)`);
@@ -280,16 +405,7 @@ export async function analyzeUncategorized(
         .leftJoin(accounts, eq(transactions.accountId, accounts.id))
         .where(
           and(
-            eq(transactions.userId, dataUserId),
-            isNull(transactions.categoryId),
-            eq(transactions.deleted, false),
-            or(
-              and(
-                eq(accounts.isHidden, false),
-                eq(accounts.isExcludedFromNetWorth, false)
-              ),
-              eq(accounts.type, 'paystub')
-            ),
+            ...baseWhereConditions,
             ...cursorConditions
           )
         )
@@ -372,14 +488,123 @@ export async function analyzeUncategorized(
           const status = shouldAutoApprove ? 'approved' : 'pending';
           const confidenceStr = String(Math.round(suggestion.confidence * 100));
 
-          await db.insert(aiProposals).values({
-            userId: dataUserId,
-            type: suggestion.type,
-            status,
-            confidence: confidenceStr,
-            payload: payload as any,
-            explanation: suggestion.explanation,
-          });
+          if (suggestion.type === 'categorize') {
+            const txId = (payload as any).transactionId;
+            if (!txId) continue;
+
+            // Ensure transaction is still uncategorized and not deleted in DB
+            const [txCheck] = await db
+              .select({ categoryId: transactions.categoryId, deleted: transactions.deleted })
+              .from(transactions)
+              .where(and(eq(transactions.id, txId), eq(transactions.userId, dataUserId)))
+              .limit(1);
+
+            if (!txCheck || txCheck.categoryId || txCheck.deleted) {
+              continue;
+            }
+
+            // Check if a pending proposal already exists for this transaction
+            const existing = await db
+              .select({ id: aiProposals.id })
+              .from(aiProposals)
+              .where(
+                and(
+                  eq(aiProposals.userId, dataUserId),
+                  eq(aiProposals.status, 'pending'),
+                  eq(aiProposals.type, 'categorize'),
+                  sql`(${aiProposals.payload}->>'transactionId') = ${txId}::text`
+                )
+              )
+              .limit(1);
+
+            if (existing.length > 0) {
+              await db
+                .update(aiProposals)
+                .set({
+                  status,
+                  confidence: confidenceStr,
+                  payload: payload as any,
+                  explanation: suggestion.explanation,
+                  updatedAt: new Date(),
+                })
+                .where(eq(aiProposals.id, existing[0].id));
+            } else {
+              await db.insert(aiProposals).values({
+                userId: dataUserId,
+                type: suggestion.type,
+                status,
+                confidence: confidenceStr,
+                payload: payload as any,
+                explanation: suggestion.explanation,
+              });
+            }
+          } else if (suggestion.type === 'create_category') {
+            const catName = String((payload as any).name || '').trim().toLowerCase();
+            if (!catName) continue;
+
+            if (categories.some((c) => c.name.trim().toLowerCase() === catName)) {
+              continue;
+            }
+
+            const existing = await db
+              .select({ id: aiProposals.id })
+              .from(aiProposals)
+              .where(
+                and(
+                  eq(aiProposals.userId, dataUserId),
+                  eq(aiProposals.status, 'pending'),
+                  eq(aiProposals.type, 'create_category'),
+                  sql`LOWER(${aiProposals.payload}->>'name') = ${catName}`
+                )
+              )
+              .limit(1);
+
+            if (existing.length > 0) {
+              continue;
+            }
+
+            await db.insert(aiProposals).values({
+              userId: dataUserId,
+              type: suggestion.type,
+              status,
+              confidence: confidenceStr,
+              payload: payload as any,
+              explanation: suggestion.explanation,
+            });
+          } else if (suggestion.type === 'create_rule') {
+            const rulePayload = payload as any;
+            const condField = String(rulePayload.conditionField || '');
+            const condOp = String(rulePayload.conditionOperator || '');
+            const condVal = String(rulePayload.conditionValue || '').trim().toLowerCase();
+
+            const existing = await db
+              .select({ id: aiProposals.id })
+              .from(aiProposals)
+              .where(
+                and(
+                  eq(aiProposals.userId, dataUserId),
+                  eq(aiProposals.status, 'pending'),
+                  eq(aiProposals.type, 'create_rule'),
+                  sql`${aiProposals.payload}->>'conditionField' = ${condField}`,
+                  sql`${aiProposals.payload}->>'conditionOperator' = ${condOp}`,
+                  sql`LOWER(${aiProposals.payload}->>'conditionValue') = ${condVal}`
+                )
+              )
+              .limit(1);
+
+            if (existing.length > 0) {
+              continue;
+            }
+
+            await db.insert(aiProposals).values({
+              userId: dataUserId,
+              type: suggestion.type,
+              status,
+              confidence: confidenceStr,
+              payload: payload as any,
+              explanation: suggestion.explanation,
+            });
+          }
 
           batchProposals++;
           if (shouldAutoApprove) batchAutoApproved++;
@@ -607,6 +832,18 @@ export async function analyzeSingleTransaction(
   if (!payload) {
     throw new Error('AI suggestion could not be matched to this transaction');
   }
+
+  // Remove any previous pending or rejected proposals for this transaction to avoid duplicates
+  await db
+    .delete(aiProposals)
+    .where(
+      and(
+        eq(aiProposals.userId, dataUserId),
+        eq(aiProposals.type, 'categorize'),
+        inArray(aiProposals.status, ['pending', 'rejected']),
+        sql`(${aiProposals.payload}->>'transactionId') = ${transactionId}::text`
+      )
+    );
 
   const [created] = await db
     .insert(aiProposals)
@@ -1316,6 +1553,26 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
     .update(aiProposals)
     .set({ status: 'applied', updatedAt: new Date() })
     .where(inArray(aiProposals.id, appliedIds));
+
+  // Also resolve any duplicate pending proposals for the newly categorized transactions
+  const categorizedTxIds = pending
+    .filter((p) => p.type === 'categorize')
+    .map((p) => (p.payload as any)?.transactionId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+  if (categorizedTxIds.length > 0) {
+    await db
+      .update(aiProposals)
+      .set({ status: 'applied', updatedAt: new Date() })
+      .where(
+        and(
+          eq(aiProposals.userId, dataUserId),
+          eq(aiProposals.status, 'pending'),
+          eq(aiProposals.type, 'categorize'),
+          sql`(${aiProposals.payload}->>'transactionId')::text = ANY(${categorizedTxIds}::text[])`
+        )
+      );
+  }
 
   logger.info(`${LOG_TAG} All approved proposals applied and marked as applied`, { userId, count: pending.length });
   invalidateUserSearchCache(dataUserId);

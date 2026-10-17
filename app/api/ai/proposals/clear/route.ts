@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { aiProposals } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
+import { pruneDuplicateProposals } from '@/lib/services/ai-categorizer';
 
 export async function POST() {
   const session = await auth();
@@ -32,8 +33,9 @@ export async function POST() {
       )
     );
 
-  const deletedCount = (result.rowCount ?? 0) + (rejectedResult.rowCount ?? 0);
+  const prunedCount = await pruneDuplicateProposals(dataUserId);
+  const deletedCount = (result.rowCount ?? 0) + (rejectedResult.rowCount ?? 0) + prunedCount;
 
-  logger.info('POST /api/ai/proposals/clear', { userId, deletedCount });
+  logger.info('POST /api/ai/proposals/clear', { userId, deletedCount, prunedCount });
   return NextResponse.json({ success: true, deletedCount });
 }

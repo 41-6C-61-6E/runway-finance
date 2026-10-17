@@ -6,6 +6,7 @@ import { eq, and, or, isNull, desc, sql, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { decryptRow, decryptField } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
+import { pruneDuplicateProposals } from '@/lib/services/ai-categorizer';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -18,6 +19,15 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status'); // optional filter
   const type = searchParams.get('type'); // optional filter
+
+  // Self-heal: prune duplicate or stale proposals before fetching
+  if (!status || status === 'pending') {
+    try {
+      await pruneDuplicateProposals(dataUserId);
+    } catch (err) {
+      logger.error('Failed to prune duplicate proposals in GET /api/ai/proposals', { error: err });
+    }
+  }
 
   const whereConditions = [
     eq(aiProposals.userId, dataUserId),
@@ -37,6 +47,21 @@ export async function GET(request: Request) {
     whereConditions.push(eq(aiProposals.type, type));
   }
 
+  // When requesting pending proposals, exclude categorize proposals where the transaction
+  // was already categorized outside AI (or deleted)
+  if (status === 'pending') {
+    whereConditions.push(
+      or(
+        sql`${aiProposals.type} != 'categorize'`,
+        and(
+          sql`${transactions.id} IS NOT NULL`,
+          eq(transactions.deleted, false),
+          isNull(transactions.categoryId)
+        )
+      )
+    );
+  }
+
   const db = getDb();
   const rawProposals = await db
     .select({
@@ -49,10 +74,7 @@ export async function GET(request: Request) {
       transactions,
       and(
         eq(transactions.userId, dataUserId),
-        eq(
-          transactions.id,
-          sql<string>`(${aiProposals.payload}->>'transactionId')::uuid`
-        )
+        sql`(${transactions.id})::text = (${aiProposals.payload}->>'transactionId')`
       )
     )
     .leftJoin(

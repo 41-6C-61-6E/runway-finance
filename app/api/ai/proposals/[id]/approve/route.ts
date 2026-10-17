@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { aiProposals, transactions, categories as categoriesTable, categoryRules } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { encryptField } from '@/lib/crypto';
@@ -65,6 +65,22 @@ export async function POST(
               eq(transactions.userId, dataUserId)
             )
           );
+
+        // Mark any duplicate pending proposals for this transaction as applied
+        if (payload.transactionId) {
+          await db
+            .update(aiProposals)
+            .set({ status: 'applied', updatedAt: new Date() })
+            .where(
+              and(
+                eq(aiProposals.userId, dataUserId),
+                eq(aiProposals.status, 'pending'),
+                eq(aiProposals.type, 'categorize'),
+                sql`(${aiProposals.payload}->>'transactionId') = ${payload.transactionId}::text`
+              )
+            );
+        }
+
         logger.info('Approved categorize proposal', { userId, proposalId: id, transactionId: payload.transactionId });
         break;
       }

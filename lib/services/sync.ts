@@ -1212,8 +1212,14 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       });
 
       const uncategorized = syncedWithPlaintext.filter((t) => !t.categoryId);
+      let ruleCategorizedTxIds = new Set<string>();
       if (syncedWithPlaintext.length > 0) {
         const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, dataUserId, dek);
+        ruleCategorizedTxIds = new Set(
+          Array.from(ruleResults.entries())
+            .filter(([, action]) => action.shouldUpdateCategory && action.categoryId)
+            .map(([txId]) => txId)
+        );
         logger.info(`${LOG_TAG} Categorization rules applied`, {
           connectionId,
           transactionsEvaluated: syncedWithPlaintext.length,
@@ -1254,8 +1260,9 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         logger.debug(`${LOG_TAG} No uncategorized transactions to apply rules to`, { connectionId });
       }
 
-      // Auto-trigger AI analysis if user has it enabled
-      if (uncategorized.length > 0) {
+      // Auto-trigger AI analysis if user has it enabled, scoped to transactions that remain uncategorized
+      const remainingUncategorized = uncategorized.filter((t) => !ruleCategorizedTxIds.has(t.id));
+      if (remainingUncategorized.length > 0) {
         try {
           const userSettingsRow = await getDb()
             .select()
@@ -1264,10 +1271,13 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             .limit(1);
 
           if (userSettingsRow.length > 0 && userSettingsRow[0].aiAutoAnalyze) {
-            logger.info(`${LOG_TAG} Auto-triggering AI analysis after sync`, { connectionId, userId });
+            logger.info(`${LOG_TAG} Auto-triggering AI analysis after sync`, { connectionId, userId, count: remainingUncategorized.length });
             try {
               const { startAiAnalysis } = await import('@/lib/services/ai-analysis-runner');
-              const started = startAiAnalysis(userId, { dek });
+              const started = startAiAnalysis(userId, {
+                dek,
+                transactionIds: remainingUncategorized.map((t) => t.id),
+              });
               logger.info(`${LOG_TAG} AI auto-analysis ${started}`, { connectionId, userId });
             } catch (err) {
               logger.error(`${LOG_TAG} AI analysis failed to start (non-fatal)`, { connectionId, userId, error: String(err) });
