@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CategoryCombobox } from '@/components/budgets/category-combobox';
-import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FolderPlus, ArrowRight, Trash2, Clock, BarChart3, Layers, Pencil, AlertTriangle, RefreshCw, Zap } from 'lucide-react';
+import { Sparkles, Check, X, Loader2, Brain, Tag, FolderPlus, ArrowRight, Clock, BarChart3, Layers, AlertTriangle, RefreshCw, ChevronDown, Search } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 
 type AiProposal = {
@@ -23,6 +22,14 @@ type AiProposal = {
     accountName: string | null;
     accountTags?: { id: string; name: string; color: string }[];
   };
+};
+
+type Category = {
+  id: string;
+  name: string;
+  isIncome: boolean;
+  parentId: string | null;
+  color: string;
 };
 
 function confidenceColor(confidence: number): string {
@@ -44,214 +51,359 @@ function ProposalIcon({ type }: { type: string }) {
   }
 }
 
+/**
+ * Dropdown selector matching the exact design and functionality of the TransactionTable category picker.
+ */
+function CategoryPillSelector({
+  currentCategoryName,
+  categories,
+  onSelectCategory,
+  onCategoryCreated,
+}: {
+  currentCategoryName: string | null;
+  categories: Category[];
+  onSelectCategory: (categoryId: string, categoryName: string, categoryColor: string) => void;
+  onCategoryCreated?: (newCategory: Category) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
+  const [newCategoryColor, setNewCategoryColor] = useState('#6366f1');
+  const [newCategoryIsIncome, setNewCategoryIsIncome] = useState(false);
+  const [creatingCategoryLoading, setCreatingCategoryLoading] = useState(false);
+
+  const currentCat = categories.find(
+    (c) => c.name.toLowerCase() === (currentCategoryName || '').toLowerCase()
+  );
+  const color = currentCat?.color || '#6366f1';
+  const displayName = currentCategoryName || 'Uncategorized';
+
+  const parents = categories.filter((c) => !c.parentId);
+  const getChildren = (parentId: string) => categories.filter((c) => c.parentId === parentId);
+
+  const filter = categoryFilter.toLowerCase();
+  const filteredParents = filter
+    ? parents.filter(
+        (p) =>
+          p.name.toLowerCase().includes(filter) ||
+          getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
+      )
+    : parents;
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    setCreatingCategoryLoading(true);
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          parentId: newCategoryParentId || null,
+          color: newCategoryColor,
+          isIncome: newCategoryIsIncome,
+        }),
+      });
+
+      if (res.ok) {
+        const createdData = await res.json();
+        const createdCategory: Category = {
+          id: createdData.id,
+          name: newCategoryName.trim(),
+          parentId: newCategoryParentId || null,
+          color: newCategoryColor,
+          isIncome: newCategoryIsIncome,
+        };
+        onCategoryCreated?.(createdCategory);
+        onSelectCategory(createdCategory.id, createdCategory.name, createdCategory.color);
+        setIsOpen(false);
+        setDropdownPos(null);
+        setIsCreatingCategory(false);
+      }
+    } catch (err) {
+      console.error('Failed to create category', err);
+    } finally {
+      setCreatingCategoryLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isOpen) {
+            setIsOpen(false);
+            setDropdownPos(null);
+          } else {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const left = Math.min(rect.left, window.innerWidth - 260);
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const top = spaceBelow < 290 ? Math.max(8, rect.top - 290) : rect.bottom + 4;
+            setDropdownPos({ top, left });
+            setIsOpen(true);
+            setCategoryFilter('');
+            setIsCreatingCategory(false);
+          }
+        }}
+        className="group/cat inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer hover:brightness-95 hover:shadow-xs active:scale-95"
+        style={{
+          backgroundColor: `${color}18`,
+          color: color,
+          borderColor: `${color}35`,
+        }}
+        title="Click to change category"
+      >
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ backgroundColor: color }}
+        />
+        <span className="font-semibold">{displayName}</span>
+        <ChevronDown className="h-3 w-3 opacity-60 group-hover/cat:opacity-100 transition-opacity shrink-0" />
+      </button>
+
+      {isOpen && dropdownPos && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+              setDropdownPos(null);
+              setCategoryFilter('');
+              setIsCreatingCategory(false);
+            }}
+          />
+          <div
+            className="fixed z-50 w-64 bg-card border border-border rounded-xl shadow-2xl max-h-80 flex flex-col text-xs overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+            style={{ top: dropdownPos.top, left: dropdownPos.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isCreatingCategory ? (
+              <div className="p-3 space-y-2.5 flex flex-col text-xs">
+                <div className="font-semibold text-foreground uppercase tracking-wider text-[10px]">
+                  New Category
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">
+                    Name
+                  </label>
+                  <input
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Category name"
+                    className="w-full px-2 py-1 bg-background border border-input rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">
+                    Parent Category
+                  </label>
+                  <Select
+                    className="h-8 text-xs rounded px-2"
+                    value={newCategoryParentId || ''}
+                    onChange={(e) => setNewCategoryParentId(e.target.value || null)}
+                  >
+                    <option value="">None (top-level)</option>
+                    {parents.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={newCategoryColor}
+                      onChange={(e) => setNewCategoryColor(e.target.value)}
+                      className="w-5 h-5 rounded cursor-pointer border border-input"
+                    />
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      {newCategoryColor}
+                    </span>
+                  </div>
+
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newCategoryIsIncome}
+                      onChange={(e) => setNewCategoryIsIncome(e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-ring"
+                    />
+                    Income
+                  </label>
+                </div>
+
+                <div className="flex gap-2 pt-2 border-t border-border/50">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingCategory(false)}
+                    className="flex-1 py-1 text-xs text-foreground bg-muted hover:bg-accent rounded-md transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    disabled={creatingCategoryLoading || !newCategoryName.trim()}
+                    className="flex-1 py-1 text-xs font-semibold text-primary-foreground bg-primary rounded-md hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1"
+                  >
+                    {creatingCategoryLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="relative p-2 border-b border-border bg-muted/20">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    placeholder="Search categories..."
+                    className="w-full pl-7 pr-2 py-1 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex-1 overflow-y-auto max-h-56 divide-y divide-border/20">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingCategory(true);
+                      setNewCategoryName('');
+                      setNewCategoryParentId(null);
+                      setNewCategoryColor('#6366f1');
+                      setNewCategoryIsIncome(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-muted font-medium transition-colors text-left"
+                  >
+                    + Create new category
+                  </button>
+
+                  {filteredParents.map((parent) => {
+                    const childList = filter
+                      ? getChildren(parent.id).filter((c) =>
+                          c.name.toLowerCase().includes(filter)
+                        )
+                      : getChildren(parent.id);
+                    if (
+                      filter &&
+                      childList.length === 0 &&
+                      !parent.name.toLowerCase().includes(filter)
+                    ) {
+                      return null;
+                    }
+
+                    const isParentSelected =
+                      (currentCategoryName || '').toLowerCase() === parent.name.toLowerCase();
+
+                    return (
+                      <div key={parent.id} className="py-0.5">
+                        <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/30">
+                          <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: parent.color }}
+                          />
+                          {parent.name}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectCategory(parent.id, parent.name, parent.color);
+                            setIsOpen(false);
+                            setDropdownPos(null);
+                          }}
+                          className={`w-full flex items-center justify-between px-4 py-1.5 text-xs transition-colors text-left ${
+                            isParentSelected
+                              ? 'text-primary bg-primary/10 font-medium'
+                              : 'text-foreground/90 hover:bg-muted'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: parent.color }}
+                            />
+                            {parent.name}
+                          </span>
+                          {isParentSelected && <Check className="h-3 w-3 text-primary shrink-0 ml-1" />}
+                        </button>
+
+                        {childList.map((child) => {
+                          const isChildSelected =
+                            (currentCategoryName || '').toLowerCase() === child.name.toLowerCase();
+
+                          return (
+                            <button
+                              key={child.id}
+                              type="button"
+                              onClick={() => {
+                                onSelectCategory(child.id, child.name, child.color);
+                                setIsOpen(false);
+                                setDropdownPos(null);
+                              }}
+                              className={`w-full flex items-center justify-between pl-6 pr-4 py-1.5 text-xs transition-colors text-left ${
+                                isChildSelected
+                                  ? 'text-primary bg-primary/10 font-medium'
+                                  : 'text-foreground/80 hover:bg-muted'
+                              }`}
+                            >
+                              <span className="flex items-center gap-2 truncate">
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: child.color }}
+                                />
+                                {child.name}
+                              </span>
+                              {isChildSelected && <Check className="h-3 w-3 text-primary shrink-0 ml-1" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 function ProposalCard({
   proposal,
+  categories,
   onApprove,
   onReject,
+  onCategoryChange,
+  onCategoryCreated,
   processing,
-  editingId,
-  editPayload,
-  onEdit,
-  onCancelEdit,
-  onEditField,
-  categories,
 }: {
   proposal: AiProposal;
+  categories: Category[];
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onCategoryChange: (proposalId: string, categoryId: string, categoryName: string) => void;
+  onCategoryCreated?: (newCategory: Category) => void;
   processing: string | null;
-  editingId: string | null;
-  editPayload: any;
-  onEdit: (id: string) => void;
-  onCancelEdit: () => void;
-  onEditField: (field: string, value: any) => void;
-  categories: { id: string; name: string; isIncome: boolean; parentId: string | null; color: string }[];
 }) {
   const confidence = parseInt(proposal.confidence ?? '0');
   const payload = proposal.payload;
-  const isEditing = editingId === proposal.id;
 
   const settingsContext = useUserSettings();
   const showSuggestionsTags = settingsContext?.settings?.accountTagVisibility?.suggestions !== false;
-
-  if (isEditing) {
-    const renderField = (label: string, field: string, type: 'text' | 'select' | 'checkbox', options?: string[]) => (
-      <div key={field} className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground shrink-0">{label}:</span>
-        {type === 'text' ? (
-          <input
-            value={editPayload[field] ?? ''}
-            onChange={(e) => onEditField(field, e.target.value)}
-            className="flex-1 px-2 py-1 bg-background border border-input rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        ) : type === 'checkbox' ? (
-          <input
-            type="checkbox"
-            checked={!!editPayload[field]}
-            onChange={(e) => onEditField(field, e.target.checked)}
-            className="accent-primary"
-          />
-        ) : (
-          <Select
-            className="text-xs font-mono rounded"
-            wrapperClassName="flex-1"
-            value={editPayload[field] ?? ''}
-            onChange={(e) => onEditField(field, e.target.value)}
-          >
-            {options?.map((o) => <option key={o} value={o}>{o}</option>)}
-          </Select>
-        )}
-      </div>
-    );
-
-    const categoryComboboxField = (label: string, nameField: string) => {
-      const catId = categories.find((c) => c.name === editPayload[nameField])?.id ?? '';
-      return (
-        <div key={nameField} className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground shrink-0">{label}:</span>
-          <div className="flex-1">
-            <CategoryCombobox
-              categories={categories}
-              value={catId}
-              onSelect={(id) => {
-                const cat = categories.find((c) => c.id === id);
-                onEditField(nameField, cat?.name ?? '');
-              }}
-            />
-          </div>
-        </div>
-      );
-    };
-
-    let fields: { label: string; field: string; type: 'text' | 'select' | 'checkbox'; options?: string[] }[] = [];
-    switch (proposal.type) {
-      case 'categorize':
-        return (
-          <div className="p-5 bg-muted border border-primary/40 rounded-xl">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
-                  <ProposalIcon type={proposal.type} />
-                </div>
-                <span className="text-xs font-medium text-muted-foreground uppercase">Categorize</span>
-                <span className="text-[10px] font-medium text-amber-500 bg-amber-500/20 px-1.5 py-0.5 rounded-full">Editing</span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={() => onApprove(proposal.id)} disabled={processing === proposal.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-chart-2 bg-chart-2/10 hover:bg-chart-2/20 rounded-lg transition-all disabled:opacity-50"
-                  title="Approve with edits">
-                  {processing === proposal.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                  Save & Approve
-                </button>
-                <button onClick={onCancelEdit} disabled={processing === proposal.id}
-                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors" title="Cancel editing">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            {categoryComboboxField('Category', 'proposedCategoryName')}
-            {proposal.explanation && <p className="text-xs text-muted-foreground italic mt-2">{proposal.explanation}</p>}
-          </div>
-        );
-      case 'create_category':
-        fields = [
-          { label: 'Name', field: 'name', type: 'text' },
-          { label: 'Parent', field: 'parentName', type: 'text' },
-          { label: 'Color', field: 'color', type: 'text' },
-          { label: 'Income', field: 'isIncome', type: 'checkbox' },
-        ];
-        break;
-      case 'create_rule':
-        return (
-          <div className="p-5 bg-muted border border-primary/40 rounded-xl">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
-                  <ProposalIcon type={proposal.type} />
-                </div>
-                <span className="text-xs font-medium text-muted-foreground uppercase">New Rule</span>
-                <span className="text-[10px] font-medium text-amber-500 bg-amber-500/20 px-1.5 py-0.5 rounded-full">Editing</span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={() => onApprove(proposal.id)} disabled={processing === proposal.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-chart-2 bg-chart-2/10 hover:bg-chart-2/20 rounded-lg transition-all disabled:opacity-50"
-                  title="Approve with edits">
-                  {processing === proposal.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                  Save & Approve
-                </button>
-                <button onClick={onCancelEdit} disabled={processing === proposal.id}
-                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors" title="Cancel editing">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2 mb-2">
-              {renderField('Name', 'ruleName', 'text')}
-              {renderField('Field', 'conditionField', 'select', ['description', 'payee', 'amount', 'memo'])}
-              {renderField('Operator', 'conditionOperator', 'select', ['contains', 'equals', 'starts_with', 'ends_with', 'regex'])}
-              {renderField('Value', 'conditionValue', 'text')}
-              {categoryComboboxField('Category', 'setCategoryName')}
-              {renderField('Case sensitive', 'conditionCaseSensitive', 'checkbox')}
-            </div>
-            {proposal.explanation && <p className="text-xs text-muted-foreground italic mt-2">{proposal.explanation}</p>}
-          </div>
-        );
-    }
-
-    return (
-      <div className="p-5 bg-muted border border-primary/40 rounded-xl">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
-              <ProposalIcon type={proposal.type} />
-            </div>
-            <span className="text-xs font-medium text-muted-foreground uppercase">New Category</span>
-            <span className="text-[10px] font-medium text-amber-500 bg-amber-500/20 px-1.5 py-0.5 rounded-full">Editing</span>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button onClick={() => onApprove(proposal.id)} disabled={processing === proposal.id}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-chart-2 bg-chart-2/10 hover:bg-chart-2/20 rounded-lg transition-all disabled:opacity-50"
-              title="Approve with edits">
-              {processing === proposal.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Save & Approve
-            </button>
-            <button onClick={onCancelEdit} disabled={processing === proposal.id}
-              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors" title="Cancel editing">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-2 mb-2">
-          {fields.map((f) => renderField(f.label, f.field, f.type, f.options))}
-        </div>
-
-        {proposal.explanation && <p className="text-xs text-muted-foreground italic mt-2">{proposal.explanation}</p>}
-      </div>
-    );
-  }
-
-  // Build category path lookup (e.g. "Electricity" → "Utilities > Electricity")
-  const catById = new Map(categories.map(c => [c.id, c]));
-  const catPath = (name: string | null): string => {
-    if (!name) return 'Uncategorized';
-    const cat = categories.find(c => c.name.toLowerCase() === name.toLowerCase());
-    if (cat?.parentId) {
-      const parent = catById.get(cat.parentId);
-      if (parent) return `${parent.name} > ${cat.name}`;
-    }
-    return name;
-  };
-
-  // Target category lookup for color badge
-  const targetCategoryName = proposal.type === 'create_rule'
-    ? payload.setCategoryName
-    : proposal.type === 'categorize'
-      ? payload.proposedCategoryName
-      : null;
-  const targetCategory = targetCategoryName
-    ? categories.find(c => c.name.toLowerCase() === targetCategoryName.toLowerCase())
-    : null;
 
   return (
     <div className="relative bg-card/60 hover:bg-card/90 rounded-xl border border-border/70 hover:border-border transition-all duration-200 p-4 sm:p-5 shadow-xs">
@@ -267,46 +419,34 @@ function ProposalCard({
             {confidence}%
           </div>
         </div>
-        {proposal.status === 'pending' && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              onClick={() => onEdit(proposal.id)}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-              title="Edit before approving"
-              aria-label="Edit proposal"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => onApprove(proposal.id)}
-              disabled={processing === proposal.id}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 rounded-lg transition-all disabled:opacity-50"
-              title="Approve"
-              aria-label="Approve proposal"
-            >
-              {processing === proposal.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">Approve</span>
-            </button>
-            <button
-              onClick={() => onReject(proposal.id)}
-              disabled={processing === proposal.id}
-              className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
-              title="Reject"
-              aria-label="Reject proposal"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-        {proposal.status === 'approved' && (
-          <span className="text-[10px] font-semibold text-chart-2 bg-chart-2/20 px-2 py-0.5 rounded-full">Approved</span>
-        )}
-        {proposal.status === 'applied' && (
-          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-500 bg-emerald-500/15 px-2 py-0.5 rounded-full">Applied</span>
-        )}
-        {proposal.status === 'rejected' && (
-          <span className="text-[10px] font-semibold text-destructive bg-destructive/20 px-2 py-0.5 rounded-full">Rejected</span>
-        )}
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => onApprove(proposal.id)}
+            disabled={processing === proposal.id}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 rounded-lg transition-all disabled:opacity-50 shadow-xs cursor-pointer"
+            title="Approve suggestion"
+            aria-label="Approve suggestion"
+          >
+            {processing === proposal.id ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
+            )}
+            <span>Approve</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onReject(proposal.id)}
+            disabled={processing === proposal.id}
+            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+            title="Dismiss suggestion"
+            aria-label="Dismiss suggestion"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {proposal.type === 'create_rule' && (
@@ -326,13 +466,14 @@ function ProposalCard({
               "{payload.conditionValue}"
             </span>
             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mx-0.5" />
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: targetCategory?.color || 'var(--color-primary)' }}
-              />
-              {catPath(payload.setCategoryName)}
-            </span>
+            <CategoryPillSelector
+              currentCategoryName={payload.setCategoryName}
+              categories={categories}
+              onSelectCategory={(catId, catName) => {
+                onCategoryChange(proposal.id, catId, catName);
+              }}
+              onCategoryCreated={onCategoryCreated}
+            />
           </div>
         </div>
       )}
@@ -385,16 +526,17 @@ function ProposalCard({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 text-xs py-2 px-3 rounded-lg bg-background/50 border border-border/50">
+          <div className="flex flex-wrap items-center gap-2 text-xs py-2 px-3 rounded-lg bg-background/50 border border-border/50">
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Suggests</span>
             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: targetCategory?.color || 'var(--color-primary)' }}
-              />
-              {catPath(payload.proposedCategoryName)}
-            </span>
+            <CategoryPillSelector
+              currentCategoryName={payload.proposedCategoryName}
+              categories={categories}
+              onSelectCategory={(catId, catName) => {
+                onCategoryChange(proposal.id, catId, catName);
+              }}
+              onCategoryCreated={onCategoryCreated}
+            />
           </div>
         </div>
       )}
@@ -404,9 +546,16 @@ function ProposalCard({
           <div className="flex flex-wrap items-center gap-2 text-xs py-2 px-3 rounded-lg bg-background/50 border border-border/50">
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">New Category</span>
             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
+              style={{
+                backgroundColor: `${payload.color || '#6366f1'}18`,
+                color: payload.color || '#6366f1',
+                borderColor: `${payload.color || '#6366f1'}35`,
+              }}
+            >
               <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
+                className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: payload.color || '#6366f1' }}
               />
               {payload.parentName ? `${payload.parentName} > ${payload.name}` : payload.name}
@@ -439,11 +588,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
-  const [clearing, setClearing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
-  const [historySubFilter, setHistorySubFilter] = useState<'all' | 'approved' | 'applied' | 'rejected'>('all');
   const [filterType, setFilterType] = useState<string>('all');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -455,13 +600,10 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   const [newRulesCount, setNewRulesCount] = useState(0);
   const [lastBatchAt, setLastBatchAt] = useState<number | null>(null);
   const [lastBatchDuration, setLastBatchDuration] = useState<number | null>(null);
-  const [pendingProposalsCount, setPendingProposalsCount] = useState(0);
   const [batchSize, setBatchSize] = useState(25);
   const [confirmModalConfig, setConfirmModalConfig] = useState<{ title: string; description: string; actionLabel: string; onConfirm: () => void; isDestructive?: boolean } | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editPayload, setEditPayload] = useState<any>(null);
-  const [categories, setCategories] = useState<{ id: string; name: string; isIncome: boolean; parentId: string | null; color: string }[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const analyzingRef = useRef(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -483,30 +625,16 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
 
   useEffect(() => {
     fetch('/api/user-settings', { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => setBatchSize(data.aiBatchSize ?? 25))
+      .then((r) => r.json())
+      .then((data) => setBatchSize(data.aiBatchSize ?? 25))
       .catch(() => setBatchSize(25));
-  }, []);
-
-  const fetchPendingCount = useCallback(async () => {
-    try {
-      const res = await fetch('/api/ai/proposals?status=pending&_t=' + Date.now(), { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setPendingProposalsCount(data.length);
-        }
-      }
-    } catch { /* ignore */ }
   }, []);
 
   const fetchProposals = useCallback(async () => {
     setLoadError(null);
     try {
       const params = new URLSearchParams();
-      const statusParam = activeTab === 'pending' ? 'pending' : (historySubFilter === 'all' ? 'history' : historySubFilter);
-      params.set('status', statusParam);
-      if (filterType !== 'all') params.set('type', filterType);
+      params.set('status', 'pending');
       params.set('_t', Date.now().toString());
       const res = await fetch(`/api/ai/proposals?${params.toString()}`, { credentials: 'include', cache: 'no-store' });
       if (!res.ok) {
@@ -515,26 +643,23 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
         return;
       }
       const data = await res.json();
-      const list = Array.isArray(data) ? data : [];
-      setProposals(list);
-      if (activeTab === 'pending') {
-        setPendingProposalsCount(list.filter((p: AiProposal) => p.status === 'pending').length);
-      }
+      setProposals(Array.isArray(data) ? data : []);
     } catch {
       setProposals([]);
       setLoadError('network error');
     } finally {
       setLoading(false);
     }
-  }, [activeTab, historySubFilter, filterType]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     fetchProposals();
-    fetchPendingCount();
     fetch('/api/categories', { credentials: 'include' })
       .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setCategories(data); })
+      .then((data) => {
+        if (Array.isArray(data)) setCategories(data);
+      })
       .catch(() => {});
 
     try {
@@ -544,13 +669,13 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
         if (parsed.status === 'running' && parsed.startedAt) {
           const elapsed = Date.now() - parsed.startedAt;
           if (elapsed > ANALYSIS_TIMEOUT_MS) {
-            const timeoutMsg = `Analysis timed out after 10 minutes. The server-side process may have stalled or taken too long. Please try running the analysis again.`;
+            const timeoutMsg = `Analysis timed out after 10 minutes. Please try running the analysis again.`;
             setSavedStatus({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt });
             localStorage.setItem(STATUS_KEY, JSON.stringify({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt }));
             return;
           }
         }
-        
+
         setSavedStatus(parsed);
         if (parsed.status === 'running') {
           setStartTime(parsed.startedAt || null);
@@ -572,24 +697,24 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             if (data.log) setAnalysisLogs(data.log);
             setAnalyzing(true);
             analyzingRef.current = true;
-            
+
             const statusWithTimestamp = {
               status: 'running' as const,
               message: 'Analysis running...',
               startedAt,
-              totalToAnalyze: data.totalCount
+              totalToAnalyze: data.totalCount,
             };
             setSavedStatus(statusWithTimestamp);
             localStorage.setItem(STATUS_KEY, JSON.stringify(statusWithTimestamp));
           } else if (data.status === 'completed' || data.status === 'error') {
             const msg = data.status === 'completed'
-              ? `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).`
+              ? `Analysis complete: ${data.proposalsCreated} proposals created.`
               : (data.error || 'Failed to run analysis.');
             const finalStatus: AnalysisStatus = { status: data.status, message: msg };
-            
+
             setSavedStatus(finalStatus);
             localStorage.setItem(STATUS_KEY, JSON.stringify(finalStatus));
-            
+
             setAnalyzing(false);
             analyzingRef.current = false;
             fetchProposals();
@@ -619,7 +744,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
     const checkTimeout = setInterval(() => {
       const elapsed = Date.now() - (savedStatus.startedAt || 0);
       if (elapsed > ANALYSIS_TIMEOUT_MS) {
-        const timeoutMsg = `Analysis timed out after 10 minutes. The server-side process may have stalled or taken too long. Please try running the analysis again.`;
+        const timeoutMsg = `Analysis timed out after 10 minutes. Please try running the analysis again.`;
         persistStatus({ status: 'error', message: timeoutMsg, startedAt: savedStatus.startedAt });
         setAnalyzing(false);
         showFeedback('error', timeoutMsg);
@@ -643,33 +768,15 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   useEffect(() => {
     if (!analyzing || !open) return;
     const interval = setInterval(() => {
-      const params = new URLSearchParams();
-      const statusParam = activeTab === 'pending' ? 'pending' : (historySubFilter === 'all' ? 'history' : historySubFilter);
-      params.set('status', statusParam);
-      if (filterType !== 'all') params.set('type', filterType);
-      params.set('_t', Date.now().toString());
-
-      fetch(`/api/ai/proposals?${params.toString()}`, { credentials: 'include', cache: 'no-store' })
+      fetch(`/api/ai/proposals?status=pending&_t=${Date.now()}`, { credentials: 'include', cache: 'no-store' })
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) {
-            fetchPendingCount();
-
-            let displayData = data;
-            if (activeTab === 'pending') {
-              displayData = displayData.filter((p: AiProposal) => p.status === 'pending');
-            } else if (historySubFilter !== 'all') {
-              displayData = displayData.filter((p: AiProposal) => p.status === historySubFilter);
-            } else {
-              displayData = displayData.filter((p: AiProposal) => p.status !== 'pending');
-            }
-            if (filterType !== 'all') displayData = displayData.filter((p: AiProposal) => p.type === filterType);
-
             if (startTime) {
-              const sessionProposals = data.filter((p: AiProposal) => 
+              const sessionProposals = data.filter((p: AiProposal) =>
                 new Date(p.createdAt).getTime() >= startTime
               );
-              
+
               if (sessionProposals.length > newProposalsCount) {
                 const now = Date.now();
                 const reference = lastBatchAt || startTime;
@@ -684,12 +791,12 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
 
             setProposals((prev) => {
               const prevIds = new Set(prev.map((p) => p.id));
-              const currentIds = new Set(displayData.map((p: any) => p.id));
-              const hasChanges = displayData.length !== prev.length || 
-                                displayData.some((p: any) => !prevIds.has(p.id)) ||
-                                prev.some(p => !currentIds.has(p.id));
+              const currentIds = new Set(data.map((p: any) => p.id));
+              const hasChanges = data.length !== prev.length ||
+                                data.some((p: any) => !prevIds.has(p.id)) ||
+                                prev.some((p) => !currentIds.has(p.id));
               if (hasChanges) {
-                return [...displayData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                return [...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
               }
               return prev;
             });
@@ -698,7 +805,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
         .catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
-  }, [analyzing, startTime, activeTab, historySubFilter, filterType, open, newProposalsCount, lastBatchAt, fetchPendingCount]);
+  }, [analyzing, startTime, open, newProposalsCount, lastBatchAt]);
 
   useEffect(() => {
     if (!analyzing || !open) {
@@ -728,11 +835,11 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             setProcessedCount(data.processedCount ?? 0);
             if (data.log) setAnalysisLogs(data.log);
             setCurrentStep('Analysis complete.');
-            
-            const msg = `Analysis complete: ${data.proposalsCreated} proposals created (${data.autoApproved} auto-approved).` + ((data.errors?.length ?? 0) > 0 ? ` (${data.errors.length} batch error(s) — see log)` : '');
+
+            const msg = `Analysis complete: ${data.proposalsCreated} proposals created.`;
             const finalStatus: AnalysisStatus = { status: 'completed', message: msg };
             persistStatus(finalStatus);
-            
+
             setAnalyzing(false);
             analyzingRef.current = false;
             showFeedback('success', msg);
@@ -742,11 +849,11 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             setProcessedCount(data.processedCount ?? 0);
             if (data.log) setAnalysisLogs(data.log);
             setCurrentStep(`Error: ${data.error}`);
-            
-            const msg = data.error || 'Failed to run analysis. Please check your AI provider configuration.';
+
+            const msg = data.error || 'Failed to run analysis.';
             const finalStatus: AnalysisStatus = { status: 'error', message: msg };
             persistStatus(finalStatus);
-            
+
             setAnalyzing(false);
             analyzingRef.current = false;
             showFeedback('error', msg);
@@ -783,7 +890,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
     const startedAt = Date.now();
     setAnalysisLogs([]);
     setCurrentStep('Initializing...');
-    
+
     const txnRes = await fetch('/api/transactions?countOnly=true&uncategorized=true', { credentials: 'include' }).catch(() => null);
     const txnCount = txnRes?.ok ? (await txnRes.json()).count : null;
 
@@ -796,27 +903,27 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
     setNewCategoriesCount(0);
     setNewRulesCount(0);
     setElapsedSeconds(0);
-    persistStatus({ 
-      status: 'running', 
-      message: 'Analysis started — you can navigate away, it will continue in the background.',
+    persistStatus({
+      status: 'running',
+      message: 'Analysis started — running in the background.',
       startedAt,
-      totalToAnalyze: txnCount
+      totalToAnalyze: txnCount,
     });
     setFeedback(null);
 
     try {
-      const res = await fetch('/api/ai/analyze', { 
-        method: 'POST', 
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST',
         credentials: 'include',
-        keepalive: true
+        keepalive: true,
       });
-      
+
       const data = await res.json().catch(() => ({ error: 'Invalid response from server' }));
-      
+
       if (!res.ok) {
-        const finalStatus: AnalysisStatus = { 
-          status: 'error', 
-          message: data.error || 'Failed to run analysis. Please check your AI provider configuration.' 
+        const finalStatus: AnalysisStatus = {
+          status: 'error',
+          message: data.error || 'Failed to run analysis.',
         };
         persistStatus(finalStatus);
         if (analyzingRef.current) {
@@ -825,10 +932,8 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
           analyzingRef.current = false;
         }
       }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-
-      const errorStatus: AnalysisStatus = { status: 'error', message: 'Failed to run analysis. Please try again or check your connection.' };
+    } catch {
+      const errorStatus: AnalysisStatus = { status: 'error', message: 'Failed to run analysis. Please try again.' };
       persistStatus(errorStatus);
       if (analyzingRef.current) {
         showFeedback('error', errorStatus.message);
@@ -873,74 +978,52 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
           dismissStatus();
           showFeedback('success', 'Analysis stopped.');
         }
-      }
-    });
-  };
-
-  const handleApproveHighConfidence = async () => {
-    const highConfidenceIds = proposals
-      .filter((p) => p.status === 'pending' && parseInt(p.confidence ?? '0') >= 90)
-      .map((p) => p.id);
-    if (highConfidenceIds.length === 0) return;
-
-    confirmAction({
-      title: 'Approve High-Confidence Suggestions',
-      description: `Approve all ${highConfidenceIds.length} suggestion(s) with 90%+ confidence?`,
-      actionLabel: `Approve ${highConfidenceIds.length}`,
-      onConfirm: async () => {
-        try {
-          const res = await fetch('/api/ai/proposals/batch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ ids: highConfidenceIds, action: 'approve' }),
-          });
-          if (!res.ok) {
-            const data = await res.json();
-            showFeedback('error', data.error || 'Failed to approve high-confidence suggestions');
-          } else {
-            showFeedback('success', `Approved ${highConfidenceIds.length} high-confidence suggestion(s).`);
-          }
-          await fetchProposals();
-          fetchPendingCount();
-          onProposalsUpdated?.();
-        } catch {
-          showFeedback('error', 'Batch approve failed.');
-        }
       },
     });
   };
 
-  const handleEdit = (id: string) => {
-    const proposal = proposals.find((p) => p.id === id);
-    if (!proposal) return;
-    setEditingId(id);
-    setEditPayload({ ...proposal.payload });
+  const handleCategoryChange = (proposalId: string, categoryId: string, categoryName: string) => {
+    setProposals((prev) =>
+      prev.map((p) => {
+        if (p.id !== proposalId) return p;
+        if (p.type === 'categorize') {
+          return {
+            ...p,
+            payload: {
+              ...p.payload,
+              proposedCategoryId: categoryId,
+              proposedCategoryName: categoryName,
+            },
+          };
+        } else if (p.type === 'create_rule') {
+          return {
+            ...p,
+            payload: {
+              ...p.payload,
+              setCategoryId: categoryId,
+              setCategoryName: categoryName,
+            },
+          };
+        }
+        return p;
+      })
+    );
   };
 
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditPayload(null);
-  };
-
-  const handleEditField = (field: string, value: any) => {
-    setEditPayload((prev: any) => ({ ...prev, [field]: value }));
+  const handleCategoryCreated = (newCategory: Category) => {
+    setCategories((prev) => {
+      if (prev.some((c) => c.id === newCategory.id)) return prev;
+      return [...prev, newCategory];
+    });
   };
 
   const handleApprove = async (id: string) => {
-    const isEditing = editingId === id;
-    const modifiedPayload = isEditing ? editPayload : undefined;
-
+    const proposal = proposals.find((p) => p.id === id);
     setProcessing(id);
-    // Single-approve applies the proposal immediately on the server, so the
-    // status transitions straight to 'applied' (no 'approved' intermediate state).
-    setProposals((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: 'applied' } : p))
-    );
-    setPendingProposalsCount((prev) => Math.max(0, prev - 1));
+    setProposals((prev) => prev.filter((p) => p.id !== id));
 
     try {
-      const body = modifiedPayload ? { payload: modifiedPayload } : {};
+      const body = proposal ? { payload: proposal.payload } : {};
       const res = await fetch(`/api/ai/proposals/${id}/approve`, {
         method: 'POST',
         credentials: 'include',
@@ -953,11 +1036,8 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
         await fetchProposals();
       } else {
         showFeedback('success', 'Approved.');
-        await fetchProposals();
         onProposalsUpdated?.();
       }
-      setEditingId(null);
-      setEditPayload(null);
     } catch {
       showFeedback('error', 'Failed to approve.');
       await fetchProposals();
@@ -968,149 +1048,39 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
 
   const handleReject = async (id: string) => {
     setProcessing(id);
-    setProposals((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: 'rejected' } : p))
-    );
-    setPendingProposalsCount((prev) => Math.max(0, prev - 1));
+    setProposals((prev) => prev.filter((p) => p.id !== id));
 
     try {
       const res = await fetch(`/api/ai/proposals/${id}/reject`, { method: 'POST', credentials: 'include' });
       if (!res.ok) {
         const data = await res.json();
-        showFeedback('error', data.error || 'Failed to reject suggestion');
+        showFeedback('error', data.error || 'Failed to dismiss suggestion');
         await fetchProposals();
       } else {
-        showFeedback('success', 'Rejected.');
-        await fetchProposals();
+        showFeedback('success', 'Dismissed.');
         onProposalsUpdated?.();
       }
     } catch {
-      showFeedback('error', 'Failed to reject suggestion.');
+      showFeedback('error', 'Failed to dismiss suggestion.');
       await fetchProposals();
     } finally {
       setProcessing(null);
     }
   };
 
-  useEffect(() => {
-    if (!open || activeTab !== 'pending') return;
+  const countCategorize = proposals.filter((p) => p.type === 'categorize').length;
+  const countRules = proposals.filter((p) => p.type === 'create_rule').length;
+  const countCategories = proposals.filter((p) => p.type === 'create_category').length;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (editingId) return;
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      const pendingProposals = proposals.filter((p) => p.status === 'pending');
-      if (pendingProposals.length === 0) return;
-
-      if (e.key === 'a' || e.key === 'A') {
-        e.preventDefault();
-        handleApprove(pendingProposals[0].id);
-      } else if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault();
-        handleReject(pendingProposals[0].id);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, activeTab, proposals, editingId, handleApprove, handleReject]);
-
-  const handleClearHistory = async () => {
-    confirmAction({
-      title: 'Clear Suggestion History',
-      description: 'Are you sure you want to clear all approved and rejected suggestions? This cannot be undone.',
-      actionLabel: 'Clear History',
-      isDestructive: true,
-      onConfirm: async () => {
-        setClearing(true);
-        try {
-          const res = await fetch('/api/ai/proposals/clear', {
-            method: 'POST',
-            credentials: 'include', 
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } 
-          });
-
-          if (!res.ok) {
-            let errorMessage = 'Failed to clear history';
-            if (res.status === 404) {
-              errorMessage = 'Clear history API endpoint not found (/api/ai/proposals/clear). Please ensure the server-side route exists.';
-            } else {
-              try {
-                const data = await res.json();
-                errorMessage = data.error || errorMessage;
-              } catch {
-                errorMessage = `Server error (${res.status})`;
-              }
-            }
-            showFeedback('error', errorMessage);
-          } else {
-            setProposals(prev => prev.filter(p => p.status === 'pending'));
-            setSelectedIds(new Set());
-            showFeedback('success', 'History cleared.');
-            onProposalsUpdated?.();
-          }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Failed to clear history.';
-          showFeedback('error', msg);
-        } finally {
-          setClearing(false);
-        }
-      }
-    });
-  };
-
-  const handleBatchAction = async (action: 'approve' | 'reject') => {
-    if (selectedIds.size === 0) return;
-    confirmAction({
-      title: action === 'approve' ? 'Batch Approve' : 'Batch Reject',
-      description: `Are you sure you want to ${action} all ${selectedIds.size} selected suggestion(s)?`,
-      actionLabel: action === 'approve' ? 'Approve All' : 'Reject All',
-      isDestructive: action === 'reject',
-      onConfirm: async () => {
-        try {
-          const res = await fetch('/api/ai/proposals/batch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ ids: Array.from(selectedIds), action }),
-          });
-          if (!res.ok) {
-            const data = await res.json();
-            showFeedback('error', data.error || 'Batch action failed');
-          } else {
-            showFeedback('success', `${action === 'approve' ? 'Approved' : 'Rejected'} ${selectedIds.size} proposal(s).`);
-            setSelectedIds(new Set());
-          }
-          await fetchProposals();
-          onProposalsUpdated?.();
-        } catch {
-          showFeedback('error', 'Batch action failed.');
-        }
-      }
-    });
-  };
-
-  const pendingCount = activeTab === 'pending'
-    ? proposals.filter((p) => p.status === 'pending').length
-    : pendingProposalsCount;
-  const hasHistory = activeTab === 'history' ? proposals.length > 0 : true;
-  const allPendingIds = proposals.filter((p) => p.status === 'pending').map((p) => p.id);
-  const highConfidencePending = proposals.filter(
-    (p) => p.status === 'pending' && parseInt(p.confidence ?? '0') >= 90
-  );
+  const filteredProposals = proposals.filter((p) => {
+    if (filterType === 'all') return true;
+    return p.type === filterType;
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-full max-h-[90dvh] sm:max-h-[85vh] p-4 sm:p-6 font-sans flex flex-col">
-        <DialogHeader className="border-b border-border pb-3 mb-1 shrink-0">
+      <DialogContent className="max-w-3xl w-full max-h-[85vh] p-4 sm:p-6 font-sans flex flex-col">
+        <DialogHeader className="border-b border-border pb-3 mb-2 shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-primary/10 text-primary">
@@ -1119,14 +1089,14 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
               <div>
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-lg font-bold">AI Suggestions</DialogTitle>
-                  {pendingCount > 0 && (
+                  {proposals.length > 0 && (
                     <span className="px-2 py-0.5 text-xs font-semibold bg-primary/15 text-primary rounded-full">
-                      {pendingCount} pending
+                      {proposals.length} pending
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Review, approve, or refine categorization and rule suggestions.
+                  Review and approve categorization and rule suggestions.
                 </p>
               </div>
             </div>
@@ -1147,7 +1117,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                 type="button"
                 onClick={handleAnalyze}
                 disabled={analyzing}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50 shadow-xs"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50 shadow-xs cursor-pointer"
               >
                 {analyzing ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1159,7 +1129,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             </div>
           </div>
           <DialogDescription className="sr-only">
-            Review and manage AI categorization suggestions and rules.
+            Review and approve AI categorization suggestions and rules.
           </DialogDescription>
         </DialogHeader>
 
@@ -1182,27 +1152,19 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                     <div className="space-y-2.5">
                       <p className="font-semibold text-sm">AI analysis in progress</p>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1" title="Transactions prompted to the AI model so far">
+                        <span className="flex items-center gap-1">
                           <BarChart3 className="h-3.5 w-3.5" />
                           Prompted: {processedCount}{totalToAnalyze !== null ? ` / ${totalToAnalyze}` : ''}
                         </span>
-                        <span className="flex items-center gap-1" title="Categorization suggestions created">
+                        <span className="flex items-center gap-1">
                           <Tag className="h-3.5 w-3.5" />
                           Categorized: {newTxnsCount}
                         </span>
-                        <span className="flex items-center gap-1" title="Category suggestions created">
-                          <FileText className="h-3.5 w-3.5" />
-                          Categories: {newCategoriesCount}
-                        </span>
-                        <span className="flex items-center gap-1" title="Rule suggestions created">
+                        <span className="flex items-center gap-1">
                           <Brain className="h-3.5 w-3.5" />
                           Rules: {newRulesCount}
                         </span>
-                        <span className="flex items-center gap-1" title="Suggestions waiting for your review">
-                          <Layers className="h-3.5 w-3.5" />
-                          Pending: {pendingProposalsCount}
-                        </span>
-                        <span className="flex items-center gap-1" title="Number of transactions processed per AI call">
+                        <span className="flex items-center gap-1">
                           <Layers className="h-3.5 w-3.5" />
                           Batch: {batchSize || 25}
                         </span>
@@ -1225,17 +1187,11 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                           Status: {currentStep}
                         </p>
                       )}
-                      <div className="text-[10px] text-muted-foreground space-y-0.5">
-                        <p>
-                          The AI is analyzing your uncategorized transactions in batches of {batchSize || 25},
-                          considering your existing categories and rules to suggest categorizations, new categories, and rules.
-                        </p>
-                      </div>
                       <div className="pt-1">
                         <button
                           type="button"
                           onClick={() => setShowLogs(!showLogs)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors bg-primary/10 px-2 py-1 rounded-md"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors bg-primary/10 px-2 py-1 rounded-md cursor-pointer"
                         >
                           {showLogs ? 'Hide live progress log' : 'Show live progress log'}
                           <span className="text-[10px] opacity-60">({analysisLogs.length} entries)</span>
@@ -1258,7 +1214,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                     <button
                       type="button"
                       onClick={handleCancel}
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all shrink-0"
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all shrink-0 cursor-pointer"
                     >
                       <X className="h-3 w-3" />
                       Cancel
@@ -1269,7 +1225,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                       type="button"
                       onClick={handleAnalyze}
                       disabled={analyzing}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50 cursor-pointer"
                     >
                       <Sparkles className="h-3 w-3" />
                       Retry
@@ -1279,7 +1235,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                     <button
                       type="button"
                       onClick={dismissStatus}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-muted-foreground hover:text-foreground cursor-pointer"
                       title="Dismiss"
                     >
                       <X className="h-4 w-4" />
@@ -1308,142 +1264,34 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             </div>
           )}
 
-          {/* Primary Navigation Tabs */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
-            <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl border border-border/50">
+          {/* Type Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {[
+              { value: 'all', label: `All (${proposals.length})` },
+              { value: 'categorize', label: `Categorize (${countCategorize})` },
+              { value: 'create_rule', label: `New Rules (${countRules})` },
+              { value: 'create_category', label: `New Categories (${countCategories})` },
+            ].map((t) => (
               <button
+                key={t.value}
                 type="button"
-                onClick={() => { setActiveTab('pending'); setSelectedIds(new Set()); }}
-                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  activeTab === 'pending'
-                    ? 'bg-card text-foreground shadow-xs border border-border/50'
-                    : 'text-muted-foreground hover:text-foreground'
+                onClick={() => setFilterType(t.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  filterType === t.value
+                    ? 'bg-primary/15 text-primary border border-primary/25 shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-transparent'
                 }`}
               >
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span>Pending</span>
-                {pendingCount > 0 && (
-                  <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-bold ${
-                    activeTab === 'pending' ? 'bg-primary/15 text-primary' : 'bg-muted-foreground/20 text-muted-foreground'
-                  }`}>
-                    {pendingCount}
-                  </span>
-                )}
+                {t.label}
               </button>
-              <button
-                type="button"
-                onClick={() => { setActiveTab('history'); setSelectedIds(new Set()); }}
-                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  activeTab === 'history'
-                    ? 'bg-card text-foreground shadow-xs border border-border/50'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Clock className="h-3.5 w-3.5" />
-                <span>History</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {activeTab === 'pending' && highConfidencePending.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleApproveHighConfidence}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 rounded-lg transition-all shadow-xs"
-                  title="Approve all suggestions with 90% or higher confidence"
-                >
-                  <Zap className="h-3.5 w-3.5" />
-                  Approve High-Confidence (≥90%) • {highConfidencePending.length}
-                </button>
-              )}
-
-              {activeTab === 'history' && hasHistory && (
-                <button
-                  type="button"
-                  onClick={handleClearHistory}
-                  disabled={clearing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all disabled:opacity-50"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {clearing ? 'Clearing...' : 'Clear History'}
-                </button>
-              )}
-            </div>
+            ))}
           </div>
 
-          {/* Sub-Filters & Type Selection */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-            <div className="flex items-center gap-2 flex-wrap">
-              {activeTab === 'history' && (
-                <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border border-border/40">
-                  {[
-                    { id: 'all', label: 'All Status' },
-                    { id: 'applied', label: 'Applied' },
-                    { id: 'approved', label: 'Approved' },
-                    { id: 'rejected', label: 'Rejected' },
-                  ].map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setHistorySubFilter(s.id as any)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                        historySubFilter === s.id ? 'bg-card text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border border-border/40">
-                {[
-                  { value: 'all', label: 'All Types' },
-                  { value: 'categorize', label: 'Categorize' },
-                  { value: 'create_rule', label: 'New Rules' },
-                  { value: 'create_category', label: 'New Categories' },
-                ].map((t) => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    onClick={() => setFilterType(t.value)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                      filterType === t.value ? 'bg-card text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {activeTab === 'pending' && pendingCount > 0 && (
-              <div className="flex items-center gap-3">
-                <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-muted-foreground/70">
-                  Tip: Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">A</kbd> to approve, <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">R</kbd> to reject
-                </span>
-                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground select-none">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size === pendingCount && pendingCount > 0}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedIds(new Set(allPendingIds));
-                      else setSelectedIds(new Set());
-                    }}
-                    className="rounded border-input text-primary accent-primary h-3.5 w-3.5"
-                  />
-                  <span>Select all</span>
-                </label>
-              </div>
-            )}
-          </div>
-
-          {/* Proposal List Content */}
+          {/* Proposal Cards List */}
           {loading ? (
             <div className="space-y-3" role="status" aria-live="polite">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="flex items-start gap-3 border border-border/60 rounded-xl p-4 bg-card/40">
-                  <Skeleton className="h-4 w-4 rounded mt-1" />
                   <div className="flex-1 space-y-2">
                     <Skeleton className="h-3.5 w-1/3" />
                     <Skeleton className="h-3 w-1/2" />
@@ -1463,26 +1311,26 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
               <button
                 type="button"
                 onClick={fetchProposals}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all cursor-pointer"
               >
                 <RefreshCw className="h-4 w-4" />
                 Retry
               </button>
             </div>
-          ) : proposals.length === 0 ? (
+          ) : filteredProposals.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Sparkles className="h-8 w-8 text-muted-foreground/60 mb-3" />
               <p className="text-muted-foreground text-sm mb-4">
-                {activeTab === 'pending'
+                {proposals.length === 0
                   ? 'No pending AI suggestions.'
-                  : 'No suggestion history found for the selected filters.'}
+                  : 'No suggestions match this type filter.'}
               </p>
-              {activeTab === 'pending' && (
+              {proposals.length === 0 && (
                 <button
                   type="button"
                   onClick={handleAnalyze}
                   disabled={analyzing}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50 shadow-xs"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50 shadow-xs cursor-pointer"
                 >
                   <Sparkles className="h-4 w-4" />
                   Run Analysis Now
@@ -1491,77 +1339,22 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             </div>
           ) : (
             <div className="space-y-3">
-              {proposals.map((proposal) => (
-                <div key={proposal.id} className="flex items-start gap-3">
-                  {proposal.status === 'pending' && (
-                    <div className="pt-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(proposal.id)}
-                        onChange={(e) => {
-                          const next = new Set(selectedIds);
-                          if (e.target.checked) next.add(proposal.id);
-                          else next.delete(proposal.id);
-                          setSelectedIds(next);
-                        }}
-                        className="rounded border-input text-primary accent-primary h-3.5 w-3.5"
-                      />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <ProposalCard
-                      proposal={proposal}
-                      onApprove={handleApprove}
-                      onReject={handleReject}
-                      processing={processing}
-                      editingId={editingId}
-                      editPayload={editPayload}
-                      onEdit={handleEdit}
-                      onCancelEdit={handleCancelEdit}
-                      onEditField={handleEditField}
-                      categories={categories}
-                    />
-                  </div>
-                </div>
+              {filteredProposals.map((proposal) => (
+                <ProposalCard
+                  key={proposal.id}
+                  proposal={proposal}
+                  categories={categories}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onCategoryChange={handleCategoryChange}
+                  onCategoryCreated={handleCategoryCreated}
+                  processing={processing}
+                />
               ))}
             </div>
           )}
 
-          {/* Sticky floating batch actions bar */}
-          {selectedIds.size > 0 && (
-            <div className="sticky bottom-2 z-20 flex items-center justify-between gap-3 p-3 bg-card/95 backdrop-blur-md border border-border shadow-xl rounded-xl">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/15 text-primary">
-                  {selectedIds.size} selected
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIds(new Set())}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
-                >
-                  Clear selection
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleBatchAction('reject')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" /> Reject Selected
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleBatchAction('approve')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 rounded-lg transition-colors"
-                >
-                  <Check className="h-3.5 w-3.5" /> Approve Selected
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Confirmation Modal */}
+          {/* Confirmation Modal (e.g. Stop Analysis) */}
           <Dialog open={showConfirmModal} onOpenChange={(o) => { if (!o) setShowConfirmModal(false); }}>
             <DialogContent className="max-w-sm p-6">
               <DialogHeader>
@@ -1572,7 +1365,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                 <button
                   type="button"
                   onClick={() => setShowConfirmModal(false)}
-                  className="flex-1 px-3 py-2 text-sm font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all"
+                  className="flex-1 px-3 py-2 text-sm font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1582,7 +1375,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                     setShowConfirmModal(false);
                     confirmModalConfig?.onConfirm();
                   }}
-                  className={`flex-1 px-3 py-2 text-sm font-medium text-white rounded-lg transition-all ${
+                  className={`flex-1 px-3 py-2 text-sm font-medium text-white rounded-lg transition-all cursor-pointer ${
                     confirmModalConfig?.isDestructive ? 'bg-destructive hover:opacity-90' : 'bg-primary hover:opacity-90'
                   }`}
                 >
