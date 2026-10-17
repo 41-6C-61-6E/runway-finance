@@ -4,10 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { Skeleton } from '@/components/ui/skeleton';
-import AiTestProgress from '@/components/features/ai/AiTestProgress';
 import { CategoryCombobox } from '@/components/budgets/category-combobox';
-import { DEFAULT_TEST_PROMPT, TEST_PROMPT_STORAGE_KEY } from '@/lib/ai/prompts';
-import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FlaskConical, Trash2, Clock, BarChart3, Layers, Pencil, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Sparkles, Check, X, Loader2, Brain, Tag, FileText, FolderPlus, ArrowRight, Trash2, Clock, BarChart3, Layers, Pencil, AlertTriangle, RefreshCw, Zap } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 
 type AiProposal = {
@@ -36,11 +34,11 @@ function confidenceColor(confidence: number): string {
 function ProposalIcon({ type }: { type: string }) {
   switch (type) {
     case 'categorize':
-      return <Tag className="h-4 w-4" />;
+      return <Tag className="h-4 w-4 text-primary" />;
     case 'create_category':
-      return <FileText className="h-4 w-4" />;
+      return <FolderPlus className="h-4 w-4 text-amber-500" />;
     case 'create_rule':
-      return <Brain className="h-4 w-4" />;
+      return <Brain className="h-4 w-4 text-purple-400" />;
     default:
       return <Sparkles className="h-4 w-4" />;
   }
@@ -245,123 +243,180 @@ function ProposalCard({
     return name;
   };
 
-  const detailLines: string[] = [];
-  switch (proposal.type) {
-    case 'categorize':
-      detailLines.push(`Transaction: ${payload.transactionDescription ?? 'Unknown'}`);
-      detailLines.push(`→ Category: ${catPath(payload.proposedCategoryName)}`);
-      break;
-    case 'create_category':
-      detailLines.push(payload.parentName
-        ? `New category: ${payload.parentName} > ${payload.name}`
-        : `New category: ${payload.name}`);
-      break;
-    case 'create_rule':
-      detailLines.push(`Rule: ${payload.ruleName ?? 'Unnamed'}`);
-      detailLines.push(`If ${payload.conditionField} ${payload.conditionOperator} "${payload.conditionValue}"`);
-      detailLines.push(`→ ${catPath(payload.setCategoryName)}`);
-      break;
-  }
+  // Target category lookup for color badge
+  const targetCategoryName = proposal.type === 'create_rule'
+    ? payload.setCategoryName
+    : proposal.type === 'categorize'
+      ? payload.proposedCategoryName
+      : null;
+  const targetCategory = targetCategoryName
+    ? categories.find(c => c.name.toLowerCase() === targetCategoryName.toLowerCase())
+    : null;
 
   return (
-    <div className="relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-5">
+    <div className="relative bg-card/60 hover:bg-card/90 rounded-xl border border-border/70 hover:border-border transition-all duration-200 p-4 sm:p-5 shadow-xs">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
             <ProposalIcon type={proposal.type} />
           </div>
-          <span className="text-xs font-medium text-muted-foreground uppercase">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             {proposal.type === 'categorize' ? 'Categorize' : proposal.type === 'create_category' ? 'New Category' : 'New Rule'}
           </span>
-          <div className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${confidenceColor(confidence)}`}>
+          <div className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${confidenceColor(confidence)}`}>
             {confidence}%
           </div>
         </div>
         {proposal.status === 'pending' && (
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => onEdit(proposal.id)}
               className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
               title="Edit before approving"
+              aria-label="Edit proposal"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => onApprove(proposal.id)}
               disabled={processing === proposal.id}
-              className="p-1.5 text-chart-2 hover:bg-chart-2/10 rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 rounded-lg transition-all disabled:opacity-50"
               title="Approve"
+              aria-label="Approve proposal"
             >
-              {processing === proposal.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {processing === proposal.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">Approve</span>
             </button>
             <button
               onClick={() => onReject(proposal.id)}
               disabled={processing === proposal.id}
-              className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
+              className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
               title="Reject"
+              aria-label="Reject proposal"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           </div>
         )}
         {proposal.status === 'approved' && (
-          <span className="text-[10px] font-medium text-chart-2 bg-chart-2/20 px-1.5 py-0.5 rounded-full">Approved</span>
+          <span className="text-[10px] font-semibold text-chart-2 bg-chart-2/20 px-2 py-0.5 rounded-full">Approved</span>
         )}
         {proposal.status === 'applied' && (
-          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-500 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">Applied</span>
+          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-500 bg-emerald-500/15 px-2 py-0.5 rounded-full">Applied</span>
         )}
         {proposal.status === 'rejected' && (
-          <span className="text-[10px] font-medium text-destructive bg-destructive/20 px-1.5 py-0.5 rounded-full">Rejected</span>
+          <span className="text-[10px] font-semibold text-destructive bg-destructive/20 px-2 py-0.5 rounded-full">Rejected</span>
         )}
       </div>
 
-      <div className="space-y-1 mb-2">
-        {detailLines.map((line, i) => (
-          <p key={i} className="text-sm text-foreground font-mono">{line}</p>
-        ))}
-      </div>
-
-      {proposal.type === 'categorize' && proposal.transactionDetails && (
-        <div className="mt-2.5 mb-3 grid grid-cols-2 gap-x-4 gap-y-2 p-3 rounded-lg bg-background/50 text-[11px] font-mono text-muted-foreground border border-border/40">
-          <div>
-            <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Payee</span>
-            <span className="text-foreground text-xs">{proposal.transactionDetails.payee || '—'}</span>
+      {proposal.type === 'create_rule' && (
+        <div className="space-y-2 mb-2">
+          <div className="font-semibold text-sm text-foreground">
+            {payload.ruleName || 'Auto-rule'}
           </div>
-          <div>
-            <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Account</span>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-foreground text-xs">{proposal.transactionDetails.accountName || '—'}</span>
-              {showSuggestionsTags && proposal.transactionDetails.accountTags && proposal.transactionDetails.accountTags.length > 0 && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {proposal.transactionDetails.accountTags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: tag.color }}
-                      title={tag.name}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <div>
-            <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Date</span>
-            <span className="text-foreground text-xs">
-              {new Date(proposal.transactionDetails.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs py-2 px-3 rounded-lg bg-background/50 border border-border/50">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">When</span>
+            <span className="px-2 py-0.5 rounded bg-muted font-medium text-foreground capitalize">
+              {payload.conditionField || 'description'}
+            </span>
+            <span className="text-muted-foreground font-medium">
+              {payload.conditionOperator || 'contains'}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-muted/80 font-mono font-semibold text-foreground">
+              "{payload.conditionValue}"
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mx-0.5" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: targetCategory?.color || 'var(--color-primary)' }}
+              />
+              {catPath(payload.setCategoryName)}
             </span>
           </div>
-          <div>
-            <span className="text-[10px] font-semibold uppercase text-muted-foreground/60 block mb-0.5">Amount</span>
-            <span className="text-foreground text-xs font-semibold">
-              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(proposal.transactionDetails.amount))}
+        </div>
+      )}
+
+      {proposal.type === 'categorize' && (
+        <div className="space-y-2.5 mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+            <div className="min-w-0">
+              <div className="font-semibold text-sm text-foreground truncate">
+                {proposal.transactionDetails?.payee || payload.transactionDescription || 'Transaction'}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                {proposal.transactionDetails?.date && (
+                  <span>
+                    {new Date(proposal.transactionDetails.date).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </span>
+                )}
+                {proposal.transactionDetails?.accountName && (
+                  <>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      {proposal.transactionDetails.accountName}
+                      {showSuggestionsTags && proposal.transactionDetails.accountTags && proposal.transactionDetails.accountTags.length > 0 && (
+                        <span className="flex items-center gap-1 ml-1">
+                          {proposal.transactionDetails.accountTags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: tag.color }}
+                              title={tag.name}
+                            />
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+            {proposal.transactionDetails?.amount && (
+              <div className={`text-sm font-semibold font-mono sm:text-right shrink-0 ${
+                Number(proposal.transactionDetails.amount) < 0 ? 'text-foreground' : 'text-status-positive'
+              }`}>
+                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(proposal.transactionDetails.amount))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 text-xs py-2 px-3 rounded-lg bg-background/50 border border-border/50">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Suggests</span>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: targetCategory?.color || 'var(--color-primary)' }}
+              />
+              {catPath(payload.proposedCategoryName)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {proposal.type === 'create_category' && (
+        <div className="space-y-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs py-2 px-3 rounded-lg bg-background/50 border border-border/50">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">New Category</span>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: payload.color || '#6366f1' }}
+              />
+              {payload.parentName ? `${payload.parentName} > ${payload.name}` : payload.name}
             </span>
           </div>
         </div>
       )}
 
       {proposal.explanation && (
-        <p className="text-xs text-muted-foreground italic">{proposal.explanation}</p>
+        <p className="text-xs text-muted-foreground italic mt-1">{proposal.explanation}</p>
       )}
     </div>
   );
@@ -385,8 +440,9 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   const [analyzing, setAnalyzing] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
+  const [historySubFilter, setHistorySubFilter] = useState<'all' | 'approved' | 'applied' | 'rejected'>('all');
   const [filterType, setFilterType] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -401,7 +457,6 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   const [lastBatchDuration, setLastBatchDuration] = useState<number | null>(null);
   const [pendingProposalsCount, setPendingProposalsCount] = useState(0);
   const [batchSize, setBatchSize] = useState(25);
-  const [showTestProgress, setShowTestProgress] = useState(false);
   const [confirmModalConfig, setConfirmModalConfig] = useState<{ title: string; description: string; actionLabel: string; onConfirm: () => void; isDestructive?: boolean } | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -433,11 +488,24 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
       .catch(() => setBatchSize(25));
   }, []);
 
+  const fetchPendingCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/proposals?status=pending&_t=' + Date.now(), { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setPendingProposalsCount(data.length);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const fetchProposals = useCallback(async () => {
     setLoadError(null);
     try {
       const params = new URLSearchParams();
-      if (filterStatus !== 'all') params.set('status', filterStatus);
+      const statusParam = activeTab === 'pending' ? 'pending' : (historySubFilter === 'all' ? 'history' : historySubFilter);
+      params.set('status', statusParam);
       if (filterType !== 'all') params.set('type', filterType);
       params.set('_t', Date.now().toString());
       const res = await fetch(`/api/ai/proposals?${params.toString()}`, { credentials: 'include', cache: 'no-store' });
@@ -447,18 +515,23 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
         return;
       }
       const data = await res.json();
-      setProposals(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setProposals(list);
+      if (activeTab === 'pending') {
+        setPendingProposalsCount(list.filter((p: AiProposal) => p.status === 'pending').length);
+      }
     } catch {
       setProposals([]);
       setLoadError('network error');
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, filterType]);
+  }, [activeTab, historySubFilter, filterType]);
 
   useEffect(() => {
     if (!open) return;
     fetchProposals();
+    fetchPendingCount();
     fetch('/api/categories', { credentials: 'include' })
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setCategories(data); })
@@ -571,7 +644,8 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
     if (!analyzing || !open) return;
     const interval = setInterval(() => {
       const params = new URLSearchParams();
-      if (filterStatus !== 'all') params.set('status', filterStatus);
+      const statusParam = activeTab === 'pending' ? 'pending' : (historySubFilter === 'all' ? 'history' : historySubFilter);
+      params.set('status', statusParam);
       if (filterType !== 'all') params.set('type', filterType);
       params.set('_t', Date.now().toString());
 
@@ -579,11 +653,17 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) {
-            setPendingProposalsCount(data.filter((p: AiProposal) => p.status === 'pending').length);
+            fetchPendingCount();
 
             let displayData = data;
-            if (filterStatus !== 'all') displayData = displayData.filter(p => p.status === filterStatus);
-            if (filterType !== 'all') displayData = displayData.filter(p => p.type === filterType);
+            if (activeTab === 'pending') {
+              displayData = displayData.filter((p: AiProposal) => p.status === 'pending');
+            } else if (historySubFilter !== 'all') {
+              displayData = displayData.filter((p: AiProposal) => p.status === historySubFilter);
+            } else {
+              displayData = displayData.filter((p: AiProposal) => p.status !== 'pending');
+            }
+            if (filterType !== 'all') displayData = displayData.filter((p: AiProposal) => p.type === filterType);
 
             if (startTime) {
               const sessionProposals = data.filter((p: AiProposal) => 
@@ -618,7 +698,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
         .catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
-  }, [analyzing, startTime, filterStatus, filterType, open, newProposalsCount, lastBatchAt]);
+  }, [analyzing, startTime, activeTab, historySubFilter, filterType, open, newProposalsCount, lastBatchAt, fetchPendingCount]);
 
   useEffect(() => {
     if (!analyzing || !open) {
@@ -797,8 +877,38 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
     });
   };
 
-  const handleTestProvider = () => {
-    setShowTestProgress(true);
+  const handleApproveHighConfidence = async () => {
+    const highConfidenceIds = proposals
+      .filter((p) => p.status === 'pending' && parseInt(p.confidence ?? '0') >= 90)
+      .map((p) => p.id);
+    if (highConfidenceIds.length === 0) return;
+
+    confirmAction({
+      title: 'Approve High-Confidence Suggestions',
+      description: `Approve all ${highConfidenceIds.length} suggestion(s) with 90%+ confidence?`,
+      actionLabel: `Approve ${highConfidenceIds.length}`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/ai/proposals/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ ids: highConfidenceIds, action: 'approve' }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            showFeedback('error', data.error || 'Failed to approve high-confidence suggestions');
+          } else {
+            showFeedback('success', `Approved ${highConfidenceIds.length} high-confidence suggestion(s).`);
+          }
+          await fetchProposals();
+          fetchPendingCount();
+          onProposalsUpdated?.();
+        } catch {
+          showFeedback('error', 'Batch approve failed.');
+        }
+      },
+    });
   };
 
   const handleEdit = (id: string) => {
@@ -882,6 +992,37 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
     }
   };
 
+  useEffect(() => {
+    if (!open || activeTab !== 'pending') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (editingId) return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      const pendingProposals = proposals.filter((p) => p.status === 'pending');
+      if (pendingProposals.length === 0) return;
+
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        handleApprove(pendingProposals[0].id);
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        handleReject(pendingProposals[0].id);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, activeTab, proposals, editingId, handleApprove, handleReject]);
+
   const handleClearHistory = async () => {
     confirmAction({
       title: 'Clear Suggestion History',
@@ -957,51 +1098,56 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
     });
   };
 
-  const pendingCount = proposals.filter((p) => p.status === 'pending').length;
-  const hasHistory = proposals.some((p) => p.status !== 'pending');
+  const pendingCount = activeTab === 'pending'
+    ? proposals.filter((p) => p.status === 'pending').length
+    : pendingProposalsCount;
+  const hasHistory = activeTab === 'history' ? proposals.length > 0 : true;
   const allPendingIds = proposals.filter((p) => p.status === 'pending').map((p) => p.id);
+  const highConfidencePending = proposals.filter(
+    (p) => p.status === 'pending' && parseInt(p.confidence ?? '0') >= 90
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-full max-h-[90dvh] sm:max-h-[85vh] p-4 sm:p-6 font-sans">
-        <DialogHeader className="border-b border-border pb-4 mb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <DialogTitle className="text-xl font-bold">AI Suggestions</DialogTitle>
-              {pendingCount > 0 && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-primary/20 text-primary rounded-full">
-                  {pendingCount} pending
-                </span>
-              )}
+      <DialogContent className="max-w-4xl w-full max-h-[90dvh] sm:max-h-[85vh] p-4 sm:p-6 font-sans flex flex-col">
+        <DialogHeader className="border-b border-border pb-3 mb-1 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <DialogTitle className="text-lg font-bold">AI Suggestions</DialogTitle>
+                  {pendingCount > 0 && (
+                    <span className="px-2 py-0.5 text-xs font-semibold bg-primary/15 text-primary rounded-full">
+                      {pendingCount} pending
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Review, approve, or refine categorization and rule suggestions.
+                </p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap sm:justify-end">
               {feedback && (
-                <span className={`text-xs px-2 py-1 rounded-lg ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
+                <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${feedback.type === 'success' ? 'bg-status-positive/20 text-status-positive' : 'bg-destructive/20 text-destructive'}`}>
                   {feedback.message}
                 </span>
               )}
               {analyzing && (
-                <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary animate-pulse whitespace-nowrap">
-                  <Loader2 className="h-3 w-3 inline mr-1 animate-spin" />
-                  Running...
+                <span className="text-xs px-2.5 py-1 rounded-lg bg-primary/10 text-primary animate-pulse whitespace-nowrap font-medium flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Analyzing...
                 </span>
               )}
               <button
                 type="button"
-                onClick={handleTestProvider}
-                disabled={showTestProgress}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-foreground bg-muted hover:bg-accent border border-border rounded-lg transition-all disabled:opacity-50"
-              >
-                <FlaskConical className="h-3.5 w-3.5" />
-                Test Provider
-              </button>
-              <button
-                type="button"
                 onClick={handleAnalyze}
                 disabled={analyzing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50 shadow-xs"
               >
                 {analyzing ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1017,10 +1163,10 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
           {/* Persistent analysis status banner */}
           {(analyzing || savedStatus) && (
-            <div className={`p-4 rounded-lg border flex flex-col gap-3 ${
+            <div className={`p-4 rounded-xl border flex flex-col gap-3 ${
               savedStatus?.status === 'completed' ? 'bg-chart-2/10 border-chart-2/30' :
               savedStatus?.status === 'error' ? 'bg-destructive/10 border-destructive/30' :
               'bg-primary/5 border-primary/20'
@@ -1034,7 +1180,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                 <div className="flex-1 text-sm text-foreground space-y-2">
                   {(analyzing || savedStatus?.status === 'running') ? (
                     <div className="space-y-2.5">
-                      <p className="font-medium">AI analysis in progress</p>
+                      <p className="font-semibold text-sm">AI analysis in progress</p>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1" title="Transactions prompted to the AI model so far">
                           <BarChart3 className="h-3.5 w-3.5" />
@@ -1071,7 +1217,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                         </span>
                       </div>
                       {currentStep && (
-                        <p className="text-[11px] font-mono text-primary bg-primary/10 px-2.5 py-1.5 rounded border border-primary/20 select-none animate-pulse flex items-center gap-1.5">
+                        <p className="text-[11px] font-mono text-primary bg-primary/10 px-2.5 py-1.5 rounded-lg border border-primary/20 select-none animate-pulse flex items-center gap-1.5">
                           <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
@@ -1089,7 +1235,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                         <button
                           type="button"
                           onClick={() => setShowLogs(!showLogs)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors bg-primary/10 px-2 py-1 rounded"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors bg-primary/10 px-2 py-1 rounded-md"
                         >
                           {showLogs ? 'Hide live progress log' : 'Show live progress log'}
                           <span className="text-[10px] opacity-60">({analysisLogs.length} entries)</span>
@@ -1098,13 +1244,13 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                     </div>
                   ) : savedStatus?.status === 'error' ? (
                     <>
-                      <p className="font-medium text-destructive">{savedStatus.message}</p>
+                      <p className="font-semibold text-destructive">{savedStatus.message}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Check your AI provider settings and try again. If the issue persists, verify your AI provider endpoint and API key.
+                        Check your AI provider settings in Settings &gt; AI and try again.
                       </p>
                     </>
                   ) : (
-                    <p className="text-sm">{savedStatus?.message}</p>
+                    <p className="text-sm font-medium">{savedStatus?.message}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1112,7 +1258,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                     <button
                       type="button"
                       onClick={handleCancel}
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all shrink-0"
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all shrink-0"
                     >
                       <X className="h-3 w-3" />
                       Cancel
@@ -1123,7 +1269,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                       type="button"
                       onClick={handleAnalyze}
                       disabled={analyzing}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
                     >
                       <Sparkles className="h-3 w-3" />
                       Retry
@@ -1162,37 +1308,107 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             </div>
           )}
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
-                {['all', 'pending', 'approved', 'applied', 'rejected'].map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setFilterStatus(s)}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                      filterStatus === s ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-                  </button>
-                ))}
-              </div>
-              <div className="hidden sm:block w-px h-5 bg-border" />
-              <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
+          {/* Primary Navigation Tabs */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
+            <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl border border-border/50">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('pending'); setSelectedIds(new Set()); }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  activeTab === 'pending'
+                    ? 'bg-card text-foreground shadow-xs border border-border/50'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span>Pending</span>
+                {pendingCount > 0 && (
+                  <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-bold ${
+                    activeTab === 'pending' ? 'bg-primary/15 text-primary' : 'bg-muted-foreground/20 text-muted-foreground'
+                  }`}>
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('history'); setSelectedIds(new Set()); }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  activeTab === 'history'
+                    ? 'bg-card text-foreground shadow-xs border border-border/50'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Clock className="h-3.5 w-3.5" />
+                <span>History</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {activeTab === 'pending' && highConfidencePending.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleApproveHighConfidence}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 rounded-lg transition-all shadow-xs"
+                  title="Approve all suggestions with 90% or higher confidence"
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  Approve High-Confidence (≥90%) • {highConfidencePending.length}
+                </button>
+              )}
+
+              {activeTab === 'history' && hasHistory && (
+                <button
+                  type="button"
+                  onClick={handleClearHistory}
+                  disabled={clearing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {clearing ? 'Clearing...' : 'Clear History'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sub-Filters & Type Selection */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              {activeTab === 'history' && (
+                <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border border-border/40">
+                  {[
+                    { id: 'all', label: 'All Status' },
+                    { id: 'applied', label: 'Applied' },
+                    { id: 'approved', label: 'Approved' },
+                    { id: 'rejected', label: 'Rejected' },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setHistorySubFilter(s.id as any)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                        historySubFilter === s.id ? 'bg-card text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border border-border/40">
                 {[
                   { value: 'all', label: 'All Types' },
                   { value: 'categorize', label: 'Categorize' },
-                  { value: 'create_category', label: 'New Categories' },
                   { value: 'create_rule', label: 'New Rules' },
+                  { value: 'create_category', label: 'New Categories' },
                 ].map((t) => (
                   <button
                     key={t.value}
                     type="button"
                     onClick={() => setFilterType(t.value)}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                      filterType === t.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      filterType === t.value ? 'bg-card text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {t.label}
@@ -1201,54 +1417,32 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
               </div>
             </div>
 
-            {hasHistory && (
-              <button
-                type="button"
-                onClick={handleClearHistory}
-                disabled={clearing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 border border-destructive/20 rounded-lg transition-all disabled:opacity-50 shrink-0"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {clearing ? 'Clearing...' : 'Clear History'}
-              </button>
+            {activeTab === 'pending' && pendingCount > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  Tip: Press <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">A</kbd> to approve, <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">R</kbd> to reject
+                </span>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === pendingCount && pendingCount > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(new Set(allPendingIds));
+                      else setSelectedIds(new Set());
+                    }}
+                    className="rounded border-input text-primary accent-primary h-3.5 w-3.5"
+                  />
+                  <span>Select all</span>
+                </label>
+              </div>
             )}
           </div>
 
-          {/* Batch actions */}
-          {selectedIds.size > 0 && (
-            <div className="flex items-center gap-2 p-3 bg-muted/30 border border-border rounded-lg">
-              <span className="text-xs text-muted-foreground">{selectedIds.size} selected</span>
-              <button
-                type="button"
-                onClick={() => handleBatchAction('approve')}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-chart-2 bg-chart-2/10 hover:bg-chart-2/20 rounded-lg transition-colors"
-              >
-                <Check className="h-3 w-3" /> Approve All
-              </button>
-              <button
-                type="button"
-                onClick={() => handleBatchAction('reject')}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors"
-              >
-                <X className="h-3 w-3" /> Reject All
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedIds(new Set())}
-                className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-          )}
-
           {/* Proposal List Content */}
           {loading ? (
-            // Skeleton rows shaped like proposal cards — the shape of the
-            // answer, not a spinner wall (R-12).
             <div className="space-y-3" role="status" aria-live="polite">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="flex items-start gap-3 border border-border rounded-lg p-4">
+                <div key={i} className="flex items-start gap-3 border border-border/60 rounded-xl p-4 bg-card/40">
                   <Skeleton className="h-4 w-4 rounded mt-1" />
                   <div className="flex-1 space-y-2">
                     <Skeleton className="h-3.5 w-1/3" />
@@ -1269,7 +1463,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
               <button
                 type="button"
                 onClick={fetchProposals}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all"
               >
                 <RefreshCw className="h-4 w-4" />
                 Retry
@@ -1277,16 +1471,18 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             </div>
           ) : proposals.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Sparkles className="h-8 w-8 text-muted-foreground mb-3" />
+              <Sparkles className="h-8 w-8 text-muted-foreground/60 mb-3" />
               <p className="text-muted-foreground text-sm mb-4">
-                {filterStatus !== 'pending' ? 'No proposals match the current filters.' : 'No pending AI suggestions.'}
+                {activeTab === 'pending'
+                  ? 'No pending AI suggestions.'
+                  : 'No suggestion history found for the selected filters.'}
               </p>
-              {filterStatus === 'pending' && (
+              {activeTab === 'pending' && (
                 <button
                   type="button"
                   onClick={handleAnalyze}
                   disabled={analyzing}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50 shadow-xs"
                 >
                   <Sparkles className="h-4 w-4" />
                   Run Analysis Now
@@ -1294,25 +1490,11 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
               )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {filterStatus === 'pending' && (
-                <div className="flex items-center gap-2 mb-1">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size === pendingCount && pendingCount > 0}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedIds(new Set(allPendingIds));
-                      else setSelectedIds(new Set());
-                    }}
-                    className="accent-primary"
-                  />
-                  <span className="text-xs text-muted-foreground">Select all pending</span>
-                </div>
-              )}
+            <div className="space-y-3">
               {proposals.map((proposal) => (
                 <div key={proposal.id} className="flex items-start gap-3">
                   {proposal.status === 'pending' && (
-                    <div className="pt-5">
+                    <div className="pt-4">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(proposal.id)}
@@ -1322,7 +1504,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                           else next.delete(proposal.id);
                           setSelectedIds(next);
                         }}
-                        className="accent-primary"
+                        className="rounded border-input text-primary accent-primary h-3.5 w-3.5"
                       />
                     </div>
                   )}
@@ -1345,31 +1527,38 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             </div>
           )}
 
-          {/* Test Provider Progress */}
-          {showTestProgress && (
-            <AiTestProgress
-              title="Test AI Provider"
-              testFn={async (signal) => {
-                let prompt: string | undefined;
-                try {
-                  prompt = localStorage.getItem(TEST_PROMPT_STORAGE_KEY) ?? undefined;
-                } catch { /* ignore */ }
-                const res = await fetch('/api/ai/provider/test', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: prompt ? JSON.stringify({ prompt }) : undefined,
-                  signal,
-                });
-                const data = await res.json();
-                return {
-                  ok: data.ok,
-                  message: data.message || (data.ok ? 'Connected' : 'Failed'),
-                  response: data.response,
-                };
-              }}
-              onClose={() => setShowTestProgress(false)}
-            />
+          {/* Sticky floating batch actions bar */}
+          {selectedIds.size > 0 && (
+            <div className="sticky bottom-2 z-20 flex items-center justify-between gap-3 p-3 bg-card/95 backdrop-blur-md border border-border shadow-xl rounded-xl">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/15 text-primary">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+                >
+                  Clear selection
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleBatchAction('reject')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" /> Reject Selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBatchAction('approve')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25 rounded-lg transition-colors"
+                >
+                  <Check className="h-3.5 w-3.5" /> Approve Selected
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Confirmation Modal */}

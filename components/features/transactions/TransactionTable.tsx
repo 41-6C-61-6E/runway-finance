@@ -647,6 +647,7 @@ export default function TransactionTable({
                   categoryId,
                   categoryName: categoryName ?? null,
                   categoryColor: categoryColor ?? null,
+                  categorizedByAi: false,
                 }
               : t,
           ),

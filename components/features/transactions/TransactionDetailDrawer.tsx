@@ -86,6 +86,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   const [notes, setNotes] = useState(transaction?.notes ?? '');
   const [reviewed, setReviewed] = useState(!!transaction?.reviewed);
   const [categoryId, setCategoryId] = useState(transaction?.categoryId ?? null);
+  const [categorizedByAi, setCategorizedByAi] = useState(transaction?.categorizedByAi ?? false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -213,6 +214,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     setNotes(transaction?.notes ?? '');
     setReviewed(!!transaction?.reviewed);
     setCategoryId(transaction?.categoryId ?? null);
+    setCategorizedByAi(transaction?.categorizedByAi ?? false);
     setTagIds(transaction?.tags?.map((t) => t.id) ?? []);
     setDescription(transaction?.description ?? '');
     setAmount(transaction?.amount != null ? String(transaction.amount) : '');
@@ -330,8 +332,10 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
         if (matchingCat) {
           setCategoryId(matchingCat.id);
+          setCategorizedByAi(false);
         } else {
           setCategoryId(createdData.id);
+          setCategorizedByAi(false);
         }
         setIsCreatingCategory(false);
       }
@@ -975,7 +979,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                     <>
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedCat.color }} />
                       <span>{selectedCat.name}</span>
-                      {mode === 'edit' && transaction?.categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60 ml-auto" />}
+                      {mode === 'edit' && categorizedByAi && <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60 ml-auto" />}
                     </>
                   ) : (
                     <span className="text-muted-foreground">Uncategorized</span>
@@ -1011,7 +1015,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                           return (
                             <>
                               <button
-                                onClick={() => { setCategoryId(null); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                onClick={() => { setCategoryId(null); setCategorizedByAi(false); setShowCategoryDropdown(false); setCategorySearch(''); }}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors text-left"
                               >
                                 None (uncategorized)
@@ -1042,7 +1046,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                                       {parent.name}
                                     </div>
                                     <button
-                                      onClick={() => { setCategoryId(parent.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                      onClick={() => { setCategoryId(parent.id); setCategorizedByAi(false); setShowCategoryDropdown(false); setCategorySearch(''); }}
                                       className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors text-left ${
                                         categoryId === parent.id
                                           ? 'text-primary bg-primary/10'
@@ -1055,7 +1059,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                                     {childList.map((child) => (
                                       <button
                                         key={child.id}
-                                        onClick={() => { setCategoryId(child.id); setShowCategoryDropdown(false); setCategorySearch(''); }}
+                                        onClick={() => { setCategoryId(child.id); setCategorizedByAi(false); setShowCategoryDropdown(false); setCategorySearch(''); }}
                                         className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors text-left ${
                                           categoryId === child.id
                                             ? 'text-primary bg-primary/10'

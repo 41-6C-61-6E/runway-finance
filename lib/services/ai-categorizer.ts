@@ -1,14 +1,14 @@
 import { getDb } from '@/lib/db';
 import { resolveDataUserId } from '@/lib/sharing';
 import { transactions, categories as categoriesTable, categoryRules, userSettings, aiProposals, accounts, aiProviders } from '@/lib/db/schema';
-import { eq, and, or, isNull, asc, gt, inArray, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, asc, desc, gt, inArray, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypto';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import { buildModelParams, isOpenRouterEndpoint, parseStoredFallbacks } from '@/lib/ai/endpoints';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
-import { findDuplicateRule } from '@/lib/services/rules-engine';
+import { findDuplicateRule, evaluateCondition } from '@/lib/services/rules-engine';
 import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
 
 const LOG_TAG = '[ai-categorizer]';
@@ -67,6 +67,56 @@ type AiResponse = {
   /** Model that actually served the request (OpenRouter failover/reporting). */
   servedModel?: string;
 };
+
+/**
+ * Gate check for proposing new categories:
+ * Drops proposals if category already exists or if fewer than minOccurrences transactions in the batch are assigned to it.
+ */
+export function shouldProposeCategory(
+  catName: string,
+  existingCategories: { name: string }[],
+  categorizeSuggestions: { type?: string; categoryName?: string; name?: string }[],
+  minOccurrences = 2
+): boolean {
+  const normalized = catName.trim().toLowerCase();
+  if (!normalized) return false;
+  if (existingCategories.some((c) => c.name.trim().toLowerCase() === normalized)) {
+    return false;
+  }
+  const matchingCount = categorizeSuggestions.filter((s) => {
+    if (s.type && s.type !== 'categorize') return false;
+    const sCat = String(s.categoryName || s.name || '').trim().toLowerCase();
+    return sCat === normalized;
+  }).length;
+  return matchingCount >= minOccurrences;
+}
+
+/**
+ * Gate check for proposing automation rules:
+ * Drops rules if fewer than minOccurrences transactions in the current batch match the rule's condition.
+ */
+export function shouldProposeRule(
+  rulePayload: { conditionField?: string; conditionOperator?: string; conditionValue?: string; conditionCaseSensitive?: boolean },
+  batchTxns: any[],
+  minOccurrences = 2
+): boolean {
+  const condField = String(rulePayload.conditionField || '');
+  const condOp = String(rulePayload.conditionOperator || '');
+  const condVal = String(rulePayload.conditionValue || '').trim().toLowerCase();
+  if (!condField || !condOp || !condVal) return false;
+
+  const testRule = {
+    conditions: [{
+      field: condField,
+      operator: condOp,
+      value: condVal,
+      caseSensitive: !!rulePayload.conditionCaseSensitive,
+    }],
+  } as any;
+
+  const matchingCount = batchTxns.filter((tx) => evaluateCondition(testRule, tx as any)).length;
+  return matchingCount >= minOccurrences;
+}
 
 /**
  * Prune duplicate or stale AI proposals for a user:
@@ -369,6 +419,35 @@ export async function analyzeUncategorized(
     let hasMore = true;
     let batchNum = 1;
 
+    // Query recently rejected proposals to feed negative feedback into the prompt
+    const rejectedRows = await db
+      .select({
+        type: aiProposals.type,
+        payload: aiProposals.payload,
+      })
+      .from(aiProposals)
+      .where(
+        and(
+          eq(aiProposals.userId, dataUserId),
+          eq(aiProposals.status, 'rejected'),
+        )
+      )
+      .orderBy(desc(aiProposals.updatedAt))
+      .limit(10);
+
+    const rejectionSummaries: string[] = [];
+    for (const r of rejectedRows) {
+      const p = r.payload as any;
+      if (!p) continue;
+      if (r.type === 'create_rule' && p.ruleName) {
+        rejectionSummaries.push(`Rejected rule "${p.ruleName}" (${p.conditionField || 'description'} ${p.conditionOperator || 'contains'} "${p.conditionValue || ''}")`);
+      } else if (r.type === 'create_category' && p.name) {
+        rejectionSummaries.push(`Rejected new category "${p.name}"`);
+      } else if (r.type === 'categorize' && p.transactionDescription && p.proposedCategoryName) {
+        rejectionSummaries.push(`Do NOT categorize "${p.transactionDescription}" as "${p.proposedCategoryName}"`);
+      }
+    }
+
     while (hasMore) {
       // Check if analysis has been aborted
       if (abortController?.signal.aborted) {
@@ -442,7 +521,7 @@ export async function analyzeUncategorized(
         })
       );
 
-      const prompt = buildPrompt(categories, rules, decryptedTxns);
+      const prompt = buildPrompt(categories, rules, decryptedTxns, rejectionSummaries);
       const systemPrompt = settings.aiSystemPrompt || SYSTEM_PROMPT;
       onLog?.(`Batch ${batchNum}: Prepared prompt with ${decryptedTxns.length} transaction(s).`);
 
@@ -484,7 +563,8 @@ export async function analyzeUncategorized(
             continue;
           }
 
-          const shouldAutoApprove = settings.aiAutoApprove && (suggestion.confidence * 100) >= autoApproveThreshold;
+          // Restrict auto-approval strictly to 'categorize' proposals. Rules and categories always require user review.
+          const shouldAutoApprove = suggestion.type === 'categorize' && settings.aiAutoApprove && (suggestion.confidence * 100) >= autoApproveThreshold;
           const status = shouldAutoApprove ? 'approved' : 'pending';
           const confidenceStr = String(Math.round(suggestion.confidence * 100));
 
@@ -546,6 +626,13 @@ export async function analyzeUncategorized(
               continue;
             }
 
+            // Frequency check: only propose new categories if at least 2 transactions in this batch are mapped to it
+            const shouldPropose = shouldProposeCategory(catName, categories, suggestions as any);
+            if (!shouldPropose) {
+              logger.info(`${LOG_TAG} Skipping create_category proposal - insufficient transactions assigned in batch or already exists`, { catName });
+              continue;
+            }
+
             const existing = await db
               .select({ id: aiProposals.id })
               .from(aiProposals)
@@ -576,6 +663,17 @@ export async function analyzeUncategorized(
             const condField = String(rulePayload.conditionField || '');
             const condOp = String(rulePayload.conditionOperator || '');
             const condVal = String(rulePayload.conditionValue || '').trim().toLowerCase();
+
+            // Frequency check: only propose rules if at least 2 transactions in this batch match the rule condition
+            const shouldPropose = shouldProposeRule(rulePayload, decryptedTxns);
+            if (!shouldPropose) {
+              logger.info(`${LOG_TAG} Skipping create_rule proposal - insufficient matching transactions in batch (< 2)`, {
+                ruleName: rulePayload.ruleName,
+                field: condField,
+                value: condVal,
+              });
+              continue;
+            }
 
             const existing = await db
               .select({ id: aiProposals.id })
@@ -869,6 +967,7 @@ function buildPrompt(
   categories: CategoryInfo[],
   rules: RuleInfo[],
   transactions: TransactionInfo[],
+  rejections?: string[],
 ): string {
   let prompt = '## Existing Categories\n\n';
   prompt += 'ID | Name | Parent | Type\n';
@@ -886,6 +985,13 @@ function buildPrompt(
     }
   }
 
+  if (rejections && rejections.length > 0) {
+    prompt += '\n## User Feedback / Rejected Suggestions (Do NOT suggest these again)\n\n';
+    for (const rej of rejections) {
+      prompt += `- ${rej}\n`;
+    }
+  }
+
   prompt += '\n## Uncategorized Transactions\n\n';
   prompt += 'Index | Date | Description | Payee | Amount | Account Type\n';
   prompt += '------|------|-------------|-------|--------|-------------\n';
@@ -894,7 +1000,9 @@ function buildPrompt(
   }
 
   prompt += '\n## Instructions\n';
-  prompt += 'Analyze the transactions above and suggest categorizations, new categories, and rules. ';
+  prompt += 'Analyze the transactions above and suggest categorizations using existing categories. ';
+  prompt += 'Suggest a rule ONLY if 2 or more transactions in the table above share the exact same payee or merchant pattern. NEVER suggest a rule for a one-off transaction. ';
+  prompt += 'Suggest a new category ONLY if 3 or more transactions cannot reasonably fit ANY existing category. ';
   prompt += 'For "categorize" suggestions, transactionIndex must be the 1-based Index matching the transaction from the table above. ';
   prompt += 'Use the category IDs from the table above when referencing existing categories. ';
   prompt += 'Output ONLY the JSON object — no reasoning, no preamble, no text outside the JSON.\n';

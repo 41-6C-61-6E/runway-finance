@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { aiProposals, transactions, accounts, accountTags, tags } from '@/lib/db/schema';
-import { eq, and, or, isNull, desc, sql, inArray } from 'drizzle-orm';
+import { eq, ne, and, or, isNull, desc, sql, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { decryptRow, decryptField } from '@/lib/crypto';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -40,7 +40,9 @@ export async function GET(request: Request) {
       eq(accounts.type, 'paystub')
     )
   ];
-  if (status) {
+  if (status === 'history') {
+    whereConditions.push(ne(aiProposals.status, 'pending'));
+  } else if (status) {
     whereConditions.push(eq(aiProposals.status, status));
   }
   if (type) {
