@@ -37,7 +37,7 @@ jobs:
         run: TZ=America/New_York pnpm test
 
       - name: Lint
-        run: pnpm -s lint
+        run: pnpm --silent lint
 
       - name: Typecheck
-        run: pnpm -s typecheck
+        run: pnpm --silent typecheck

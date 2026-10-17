@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { BudgetSummary } from '@/components/budgets/budget-summary';
 
 const mockToggleCollapsed = vi.fn();
@@ -88,10 +88,17 @@ vi.mock('recharts', () => ({
 describe('BudgetSummary Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-05T12:00:00Z'));
+    mockPeriodKey = '2026-08';
     mockCollapsedState = {
       budgetSummary: false,
       budgetPacingDetails: true,
     };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders the budget status pill with status label and expand/collapse caret', () => {
