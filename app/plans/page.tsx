@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
-import { Flame, TrendingUp, BarChart3, Settings, Plus, Sparkles } from 'lucide-react';
+import { Flame, TrendingUp, BarChart3, Settings, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { AppTabs } from '@/components/ui/app-tabs';
@@ -16,11 +16,8 @@ import { FirePlanExportModal } from '@/components/plans/fire-plan-export-modal';
 import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
-import { Button } from '@/components/ui/button';
-import { useAsk } from '@/components/features/ask/AskProvider';
 
 export default function PlansPage() {
-  const { openAsk } = useAsk();
   const [activeTab, setActiveTab] = usePersistentState<'projection' | 'scenarios' | 'settings'>(
     'finance:plans:activeTab',
     'projection'
@@ -338,16 +335,6 @@ export default function PlansPage() {
               />
 
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openAsk({ path: '/plans', planId: selectedPlan?.id })}
-                  className="h-8 text-xs font-medium flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  <span>Ask about this plan</span>
-                </Button>
-
                 {/* Plan Selector & Management Controls */}
                 <PlanManagementMenu
                   plans={plansList}

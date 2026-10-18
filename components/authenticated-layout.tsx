@@ -15,7 +15,7 @@ import { PullToRefresh } from '@/components/pull-to-refresh';
 import { ReactNode, useState, useEffect } from 'react';
 
 import { MobileSubNavProvider } from '@/components/mobile-subnav-context';
-import { AskProvider } from '@/components/features/ask/AskProvider';
+import { AskProvider, useAsk } from '@/components/features/ask/AskProvider';
 import { AskSheet } from '@/components/features/ask/AskSheet';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
@@ -85,6 +85,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
 
 function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { children: ReactNode; hideAccountsSidebar: boolean }) {
   const { sidebarWidth, accountsWidth, accountsCollapsed } = useSidebar();
+  const { isOpen } = useAsk();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -96,12 +97,15 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
     ? `${COLLAPSED_WIDTH}px` 
     : `${COLLAPSED_WIDTH + accountsWidth}px`;
 
+  const desktopMarginRight = (!mounted || !isOpen) ? '0px' : '400px';
+
   return (
     <div 
       style={{ 
-        '--sidebar-margin-left': desktopMarginLeft 
+        '--sidebar-margin-left': desktopMarginLeft,
+        '--ask-margin-right': desktopMarginRight,
       } as React.CSSProperties} 
-      className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] pb-20 md:pb-0"
+      className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] mr-0 md:mr-[var(--ask-margin-right)] pb-20 md:pb-0"
     >
       <PullToRefresh>
         {children}
