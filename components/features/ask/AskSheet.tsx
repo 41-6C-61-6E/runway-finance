@@ -43,11 +43,36 @@ export function AskSheet() {
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'
         )}
       >
+        <svg
+          width="0"
+          height="0"
+          className="absolute pointer-events-none opacity-0"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            <linearGradient
+              id="sparkles-purple-blue-grad"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
+              <stop offset="0%" stopColor="#a855f7" />
+              <stop offset="50%" stopColor="#6366f1" />
+              <stop offset="100%" stopColor="#3b82f6" />
+            </linearGradient>
+          </defs>
+        </svg>
         {/* Header */}
         <div className="px-4 py-3 border-b border-border flex flex-row items-center justify-between shrink-0 bg-card/95 backdrop-blur-sm">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Sparkles
+                className="w-4 h-4"
+                color="url(#sparkles-purple-blue-grad)"
+                stroke="url(#sparkles-purple-blue-grad)"
+              />
             </div>
             <h2 className="text-sm font-semibold tracking-tight text-foreground">
               Ask

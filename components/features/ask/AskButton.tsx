@@ -28,6 +28,30 @@ export function AskButton({
     }
   }
 
+  const gradientDef = (
+    <svg
+      width="0"
+      height="0"
+      className="absolute pointer-events-none opacity-0"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <linearGradient
+          id="sparkles-purple-blue-grad"
+          x1="0%"
+          y1="0%"
+          x2="100%"
+          y2="100%"
+        >
+          <stop offset="0%" stopColor="#a855f7" />
+          <stop offset="50%" stopColor="#6366f1" />
+          <stop offset="100%" stopColor="#3b82f6" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+
   const buttonContent = collapsed ? (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -43,19 +67,30 @@ export function AskButton({
             className
           )}
         >
-          {/* Ambient subtle glow background */}
-          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500/25 via-purple-500/20 to-indigo-500/25 blur-[2px] opacity-70 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
+          {/* Subtle accent flair glow on hover */}
+          <div className="absolute inset-0 rounded-xl bg-primary/10 blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
 
-          {/* Gradient Icon Badge */}
-          <div className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 text-white shadow-xs shadow-violet-500/30 group-hover:shadow-md group-hover:shadow-violet-500/50 transition-all duration-200 border border-white/20">
-            <Sparkles className="w-4 h-4 text-white group-hover:rotate-12 transition-transform duration-200" />
+          {/* Translucent Accent Icon Tile */}
+          <div
+            className={cn(
+              'relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 border',
+              isOpen
+                ? 'bg-primary/20 border-primary/40 text-primary shadow-xs shadow-primary/15'
+                : 'bg-gradient-to-br from-primary/15 to-primary/5 border-primary/20 text-primary group-hover:border-primary/35 group-hover:from-primary/20 group-hover:to-primary/10 shadow-xs shadow-primary/5'
+            )}
+          >
+            <Sparkles
+              className="w-4 h-4 group-hover:rotate-12 transition-transform duration-200"
+              color="url(#sparkles-purple-blue-grad)"
+              stroke="url(#sparkles-purple-blue-grad)"
+            />
           </div>
         </button>
       </TooltipTrigger>
       <TooltipContent side="right">
         <div className="flex items-center gap-1.5 font-medium">
           <span>Ask</span>
-          <span className="px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider rounded bg-violet-500/20 text-violet-600 dark:text-violet-300">
+          <span className="px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider rounded bg-primary/15 text-primary border border-primary/25">
             AI
           </span>
         </div>
@@ -70,33 +105,44 @@ export function AskButton({
       onClick={() => (isOpen ? closeAsk() : openAsk())}
       className={cn(
         'group relative flex w-full items-center gap-2.5 px-3 py-2 rounded-xl transition-all duration-200 text-left overflow-hidden',
-        'border border-violet-500/30 dark:border-violet-400/25',
-        'bg-gradient-to-r from-violet-500/10 via-purple-500/8 to-indigo-500/10',
-        'hover:from-violet-500/20 hover:via-purple-500/15 hover:to-indigo-500/20',
-        'hover:border-violet-500/50 hover:shadow-xs hover:shadow-violet-500/20',
+        'border backdrop-blur-xs',
+        isOpen
+          ? 'bg-primary/15 border-primary/35 text-primary shadow-xs shadow-primary/10'
+          : 'bg-primary/5 hover:bg-primary/10 border-primary/15 hover:border-primary/30 text-sidebar-foreground/80 hover:text-sidebar-foreground',
         'active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
         className
       )}
     >
-      {/* Ambient luminous glow corner */}
-      <div className="absolute -left-6 -top-6 w-16 h-16 rounded-full bg-violet-500/20 blur-md pointer-events-none group-hover:bg-violet-500/35 transition-colors" />
+      {/* Subtle accent flair glow on hover */}
+      <div className="absolute -left-4 -top-4 w-12 h-12 rounded-full bg-primary/10 blur-sm pointer-events-none group-hover:bg-primary/20 transition-colors" />
 
-      {/* Vibrant Gradient Icon Badge */}
-      <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 text-white shadow-xs shadow-violet-500/30 group-hover:scale-105 group-hover:shadow-violet-500/50 transition-all duration-200 shrink-0 border border-white/20">
-        <Sparkles className="w-4 h-4 text-white group-hover:rotate-12 transition-transform duration-200" />
+      {/* Translucent Accent Icon Tile */}
+      <div
+        className={cn(
+          'relative flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 shrink-0 border',
+          isOpen
+            ? 'bg-primary/20 border-primary/40 text-primary'
+            : 'bg-gradient-to-br from-primary/15 to-primary/5 border-primary/20 text-primary group-hover:border-primary/35 group-hover:from-primary/20 group-hover:to-primary/10 group-hover:scale-105'
+        )}
+      >
+        <Sparkles
+          className="w-4 h-4 group-hover:rotate-12 transition-transform duration-200"
+          color="url(#sparkles-purple-blue-grad)"
+          stroke="url(#sparkles-purple-blue-grad)"
+        />
       </div>
 
       {/* Label and AI Badge */}
       <div className="flex flex-col min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold tracking-tight text-foreground group-hover:text-primary transition-colors">
+          <span className="text-sm font-medium tracking-tight text-foreground group-hover:text-primary transition-colors">
             Ask
           </span>
-          <span className="px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-300 border border-violet-500/25">
+          <span className="px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider rounded-full bg-primary/10 text-primary border border-primary/20">
             AI
           </span>
         </div>
-        <span className="text-micro text-muted-foreground/80 truncate">
+        <span className="text-micro text-muted-foreground/75 truncate">
           Financial assistant
         </span>
       </div>
@@ -104,7 +150,12 @@ export function AskButton({
   );
 
   if (!wrapInContainer) {
-    return buttonContent;
+    return (
+      <>
+        {gradientDef}
+        {buttonContent}
+      </>
+    );
   }
 
   return (
@@ -115,6 +166,7 @@ export function AskButton({
         containerClassName
       )}
     >
+      {gradientDef}
       {buttonContent}
     </div>
   );
