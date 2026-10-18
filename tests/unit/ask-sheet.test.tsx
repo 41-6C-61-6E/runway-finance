@@ -43,7 +43,7 @@ describe('AskSheet Component', () => {
     vi.clearAllMocks();
   });
 
-  it('renders "Read-only" badge and read-only disclosures in empty state and footer', async () => {
+  it('renders Ask panel header and empty state disclosures without read-only notices', async () => {
     render(
       <AskProvider>
         <TestHarness />
@@ -53,17 +53,18 @@ describe('AskSheet Component', () => {
     // Click open
     fireEvent.click(screen.getByText('Open Sheet'));
 
-    // 1. Badge in header
-    expect(await screen.findByText('Read-only')).not.toBeNull();
+    // 1. Header title renders
+    expect(await screen.findByRole('heading', { name: 'Ask' })).not.toBeNull();
 
-    // 2. Empty state copy
+    // 2. Read-only badge and footer notice should not be present
+    expect(screen.queryByText('Read-only')).toBeNull();
+    expect(
+      screen.queryByText(/Read-only · Not saved · Summaries only, no individual transactions./i)
+    ).toBeNull();
+
+    // 3. Empty state copy
     expect(screen.getByText(/Ask is/i)).not.toBeNull();
     expect(screen.getByText(/Conversations are not saved/i)).not.toBeNull();
-
-    // 3. Footer text
-    expect(
-      screen.getByText(/Read-only · Not saved · Summaries only, no individual transactions./i)
-    ).not.toBeNull();
   });
 
   it('does not persist conversation state on unmount / remount (memory-only state)', async () => {

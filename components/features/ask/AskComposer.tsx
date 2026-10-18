@@ -95,14 +95,13 @@ export function AskComposer({ onSend, onStop, isStreaming, disabled }: AskCompos
         )}
       </div>
 
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground px-1">
-        <span>Read-only · Not saved · Summaries only, no individual transactions.</span>
-        {input.length > 1500 && (
+      {input.length > 1500 && (
+        <div className="flex justify-end text-[11px] text-muted-foreground px-1">
           <span className={isOverLimit ? 'text-destructive font-medium' : ''}>
             {remaining} left
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

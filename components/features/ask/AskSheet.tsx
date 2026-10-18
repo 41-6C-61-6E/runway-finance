@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { Bot, Trash2, ShieldAlert, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useAsk } from './AskProvider';
 import { AskMessageList } from './AskMessageList';
@@ -77,18 +76,6 @@ export function AskSheet() {
             <h2 className="text-sm font-semibold tracking-tight text-foreground">
               Ask
             </h2>
-
-            {/* Read-Only Badge */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-micro font-semibold bg-secondary text-secondary-foreground border border-border/60 cursor-help select-none">
-                  Read-only
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[220px] text-center text-xs">
-                Ask can view summaries of your finances but can&apos;t change anything.
-              </TooltipContent>
-            </Tooltip>
           </div>
 
           <div className="flex items-center gap-1.5">
