@@ -70,6 +70,8 @@ export const ANALYTICS_DEFAULTS = {
 // ── AI Settings ──────────────────────────────────────────────────────────────
 
 export const AI_DEFAULTS = {
+  aiEnabled: true,
+  aiSuggestionsEnabled: true,
   aiSystemPrompt: null,
   aiAutoAnalyze: false,
   aiAutoApprove: false,
@@ -77,6 +79,11 @@ export const AI_DEFAULTS = {
   aiBatchSize: 25,
   aiAnalysisTimeoutSeconds: 3600,
   aiActiveProviderId: null,
+  aiAskEnabled: true,
+  aiAskModel: null,
+  aiAskIncludeAccountNames: false,
+  aiAskConsentHost: null,
+  aiAskConsentAt: null,
 } as const;
 
 // ── Notification Defaults ────────────────────────────────────────────────────
@@ -235,6 +242,9 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'showImportedData', label: 'Imported Data', description: 'Toggle imported data visibility (JSON: {global, netWorth, investments, realEstate, cashFlowProjections})', type: 'json', group: 'Analytics', defaultValue: ANALYTICS_DEFAULTS.showImportedData },
 
   // ── AI ──
+  { key: 'aiEnabled', label: 'Enable AI Features', description: 'Master switch for all AI-powered features in the application', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiEnabled },
+  { key: 'aiSuggestionsEnabled', label: 'Enable AI Suggestions', description: 'Enable AI categorization proposals and rule suggestions', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiSuggestionsEnabled },
+  { key: 'aiAskEnabled', label: 'Enable Ask', description: 'Enable Ask financial Q&A assistant', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAskEnabled },
   { key: 'aiAutoAnalyze', label: 'Auto-analyze after sync', description: 'Run AI analysis automatically after each SimpleFIN sync', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoAnalyze },
   { key: 'aiAutoApprove', label: 'Auto-approve suggestions', description: 'Automatically approve AI suggestions above confidence threshold', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoApprove },
   { key: 'aiAutoApproveThreshold', label: 'Auto-approve threshold', description: 'Confidence threshold % for auto-approval (0-100)', type: 'number', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoApproveThreshold },

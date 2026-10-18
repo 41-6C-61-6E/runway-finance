@@ -15,6 +15,8 @@ import { PullToRefresh } from '@/components/pull-to-refresh';
 import { ReactNode, useState, useEffect } from 'react';
 
 import { MobileSubNavProvider } from '@/components/mobile-subnav-context';
+import { AskProvider } from '@/components/features/ask/AskProvider';
+import { AskSheet } from '@/components/features/ask/AskSheet';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -63,12 +65,15 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
           <ReduceTransparencyProvider>
           <AccountSubheadingsProvider>
             <MobileSubNavProvider>
-              <ResizableSidebar />
-              {!hideAccountsSidebar && <AccountsSidebar />}
-              <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
-                {children}
-              </AuthenticatedLayoutContent>
-              <MobileNav />
+              <AskProvider>
+                <ResizableSidebar />
+                {!hideAccountsSidebar && <AccountsSidebar />}
+                <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
+                  {children}
+                </AuthenticatedLayoutContent>
+                <MobileNav />
+                <AskSheet />
+              </AskProvider>
             </MobileSubNavProvider>
           </AccountSubheadingsProvider>
           </ReduceTransparencyProvider>

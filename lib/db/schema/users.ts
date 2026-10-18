@@ -229,6 +229,13 @@ export const userSettings = pgTable('user_settings', {
   notificationLimiterPeriodMinutes: integer('notification_limiter_period_minutes').notNull().default(60),
   deletePendingOlderThan30Days: boolean('delete_pending_older_than_30_days').notNull().default(true),
   deletePendingDays: integer('delete_pending_days').notNull().default(10),
+  aiEnabled: boolean('ai_enabled').notNull().default(true),
+  aiSuggestionsEnabled: boolean('ai_suggestions_enabled').notNull().default(true),
+  aiAskEnabled: boolean('ai_ask_enabled').notNull().default(true),
+  aiAskModel: text('ai_ask_model'),
+  aiAskIncludeAccountNames: boolean('ai_ask_include_account_names').notNull().default(false),
+  aiAskConsentHost: text('ai_ask_consent_host'),
+  aiAskConsentAt: timestamp('ai_ask_consent_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

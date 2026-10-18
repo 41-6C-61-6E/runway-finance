@@ -16,8 +16,11 @@ import { FirePlanExportModal } from '@/components/plans/fire-plan-export-modal';
 import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
+import { Button } from '@/components/ui/button';
+import { useAsk } from '@/components/features/ask/AskProvider';
 
 export default function PlansPage() {
+  const { openAsk } = useAsk();
   const [activeTab, setActiveTab] = usePersistentState<'projection' | 'scenarios' | 'settings'>(
     'finance:plans:activeTab',
     'projection'
@@ -334,22 +337,34 @@ export default function PlansPage() {
                 className="border-b-0 -mb-1"
               />
 
-              {/* Plan Selector & Management Controls */}
-              <PlanManagementMenu
-                plans={plansList}
-                selectedPlan={selectedPlan}
-                onSelectPlan={(id) => setSelectedPlanId(id)}
-                onOpenWizardNew={openNewPlanWizard}
-                onOpenWizardEdit={(plan) => openEditPlanWizard(plan)}
-                onSetDefaultPlan={handleSetDefaultPlan}
-                onResetDefaultPlan={handleResetDefaultPlan}
-                onOpenExport={() => setExportModalOpen(true)}
-                onOpenDeleteConfirm={(plan) => {
-                  setPlanToDelete(plan);
-                  setDeleteDialogOpen(true);
-                }}
-                updating={updating}
-              />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openAsk({ path: '/plans', planId: selectedPlan?.id })}
+                  className="h-8 text-xs font-medium flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  <span>Ask about this plan</span>
+                </Button>
+
+                {/* Plan Selector & Management Controls */}
+                <PlanManagementMenu
+                  plans={plansList}
+                  selectedPlan={selectedPlan}
+                  onSelectPlan={(id) => setSelectedPlanId(id)}
+                  onOpenWizardNew={openNewPlanWizard}
+                  onOpenWizardEdit={(plan) => openEditPlanWizard(plan)}
+                  onSetDefaultPlan={handleSetDefaultPlan}
+                  onResetDefaultPlan={handleResetDefaultPlan}
+                  onOpenExport={() => setExportModalOpen(true)}
+                  onOpenDeleteConfirm={(plan) => {
+                    setPlanToDelete(plan);
+                    setDeleteDialogOpen(true);
+                  }}
+                  updating={updating}
+                />
+              </div>
             </div>
           );
 

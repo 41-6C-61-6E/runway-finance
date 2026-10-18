@@ -1,7 +1,7 @@
 import { DEFAULT_TEST_PROMPT } from '@/lib/ai/prompts';
 import { logger } from '@/lib/logger';
 import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
-import { extractJsonObject, isJsonFormatRejection } from '@/lib/services/ai-categorizer';
+import { extractJsonObject, isJsonFormatRejection } from '@/lib/ai/json';
 import {
   normalizeEndpoint,
   buildChatUrl,

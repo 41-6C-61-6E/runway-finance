@@ -19,6 +19,7 @@ import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
 import PageContent from '@/components/page-content';
 import { PageHeader } from '@/components/page-header';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
+import { useUserSettingsQuery } from '@/lib/hooks/use-settings';
 import { logger } from '@/lib/logger';
 
 export type FilterState = {
@@ -103,6 +104,9 @@ function TransactionsContent() {
   // Ref mirror so the pending-fetch callback (stable deps) sees fresh values.
   const dismissedIdsRef = useRef<string[]>([]);
   dismissedIdsRef.current = dismissedSuggestionIds ?? [];
+  const { data: userSettings } = useUserSettingsQuery();
+  const aiSuggestionsActive = userSettings?.aiEnabled !== false && userSettings?.aiSuggestionsEnabled !== false;
+
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
   const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
 
@@ -177,6 +181,11 @@ function TransactionsContent() {
   }, [searchParams]);
 
   const fetchPendingAi = useCallback(() => {
+    if (!aiSuggestionsActive) {
+      setPendingAiCount(0);
+      setPendingAiIds([]);
+      return;
+    }
     fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
@@ -195,14 +204,19 @@ function TransactionsContent() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [aiSuggestionsActive]);
 
   // Auto-trigger AI suggestions when new uncategorized proposals appear after sync
   useEffect(() => {
+    if (!aiSuggestionsActive) {
+      setPendingAiCount(0);
+      setPendingAiIds([]);
+      return;
+    }
     if (pendingAiIds.length > 0 && pendingAiIds.some(id => !dismissedIdsRef.current.includes(id))) {
       setAiSuggestionsDismissed(false);
     }
-  }, [pendingAiIds, dismissedIdsRef, setAiSuggestionsDismissed]);
+  }, [aiSuggestionsActive, pendingAiIds, dismissedIdsRef, setAiSuggestionsDismissed]);
 
 
   const handleProposalsUpdated = useCallback(() => {
@@ -602,7 +616,7 @@ useEffect(() => {
                 onDeletePreset={handleDeletePreset}
                 compactView={compactView}
                 onCompactViewChange={setCompactView}
-                pendingAiCount={pendingAiCount}
+                pendingAiCount={aiSuggestionsActive ? pendingAiCount : 0}
                 aiSuggestionsDismissed={isSuggestionsDismissed}
                 onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
                 onOpenAiSuggestions={() => setAiModalOpen(true)}
@@ -628,13 +642,13 @@ useEffect(() => {
                   onAddTransaction={handleAddTransaction}
                   compactView={compactView}
                   onCompactViewChange={setCompactView}
-                  pendingAiCount={pendingAiCount}
+                  pendingAiCount={aiSuggestionsActive ? pendingAiCount : 0}
                   aiSuggestionsDismissed={isSuggestionsDismissed}
                   onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
                   onOpenAiSuggestions={() => setAiModalOpen(true)}
                   onAiProposalCreated={handleAiProposalCreated}
-                  aiConfigured={aiConfigured}
-                  analysisRunning={analysisRunning}
+                  aiConfigured={aiSuggestionsActive && aiConfigured}
+                  analysisRunning={aiSuggestionsActive && analysisRunning}
                   analysisProcessed={analysisProcessed}
                   analysisTotal={analysisTotal}
                 />

@@ -24,6 +24,10 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     invalidateQueries: vi.fn(),
   }),
+  useQuery: () => ({
+    data: { aiEnabled: true, aiSuggestionsEnabled: true },
+    isLoading: false,
+  }),
 }));
 
 vi.mock('@/lib/hooks/use-persistent-state', () => ({

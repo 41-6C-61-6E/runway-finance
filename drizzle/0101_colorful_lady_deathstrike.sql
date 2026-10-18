@@ -1,0 +1,2 @@
+ALTER TABLE "user_settings" ADD COLUMN "ai_enabled" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "user_settings" ADD COLUMN "ai_suggestions_enabled" boolean DEFAULT true NOT NULL;

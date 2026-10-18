@@ -1270,7 +1270,12 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             .where(eq(userSettings.userId, userId))
             .limit(1);
 
-          if (userSettingsRow.length > 0 && userSettingsRow[0].aiAutoAnalyze) {
+          if (
+            userSettingsRow.length > 0 &&
+            userSettingsRow[0].aiEnabled !== false &&
+            userSettingsRow[0].aiSuggestionsEnabled !== false &&
+            userSettingsRow[0].aiAutoAnalyze
+          ) {
             logger.info(`${LOG_TAG} Auto-triggering AI analysis after sync`, { connectionId, userId, count: remainingUncategorized.length });
             try {
               const { startAiAnalysis } = await import('@/lib/services/ai-analysis-runner');

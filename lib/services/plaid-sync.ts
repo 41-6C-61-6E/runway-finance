@@ -819,7 +819,7 @@ export async function syncPlaidConnection(
             .where(eq(userSettings.userId, userId))
             .limit(1);
 
-          if (settingsRow?.aiAutoAnalyze) {
+          if (settingsRow && settingsRow.aiEnabled !== false && settingsRow.aiSuggestionsEnabled !== false && settingsRow.aiAutoAnalyze) {
             try {
               const { startAiAnalysis } = await import('@/lib/services/ai-analysis-runner');
               const started = startAiAnalysis(userId, {

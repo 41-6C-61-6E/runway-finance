@@ -28,6 +28,28 @@ function deepMergeRules<T extends Record<string, any>>(defaults: T, overrides: P
   return result;
 }
 
+/**
+ * Read-only getter for system tax rules. Never writes/seeds rows to the database.
+ * Falls back to built-in defaults if not found.
+ */
+export async function getSystemTaxRulesReadOnly(taxYear: number = 2026): Promise<SystemTaxRulesType> {
+  const defaultBase = getYearDefaultRules(taxYear);
+  try {
+    const existing = await getDb()
+      .select()
+      .from(systemTaxRules)
+      .where(eq(systemTaxRules.taxYear, taxYear))
+      .limit(1);
+
+    if (existing[0]) {
+      return deepMergeRules(defaultBase, existing[0] as any) as SystemTaxRulesType;
+    }
+  } catch (error) {
+    logger.error('Failed to query system tax rules in read-only mode, using defaults', { error });
+  }
+  return defaultBase;
+}
+
 export async function getSystemTaxRules(taxYear: number = 2026): Promise<SystemTaxRulesType> {
   const defaultBase = getYearDefaultRules(taxYear);
   try {

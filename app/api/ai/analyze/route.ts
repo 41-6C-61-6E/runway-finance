@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { getDb } from '@/lib/db';
+import { userSettings } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import { startAiAnalysis } from '@/lib/services/ai-analysis-runner';
 
 export async function POST() {
@@ -9,6 +12,17 @@ export async function POST() {
   try {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const db = getDb();
+    const settings = await db
+      .select({ aiEnabled: userSettings.aiEnabled, aiSuggestionsEnabled: userSettings.aiSuggestionsEnabled })
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    if (settings[0] && (settings[0].aiEnabled === false || settings[0].aiSuggestionsEnabled === false)) {
+      return NextResponse.json({ error: 'AI Suggestions are disabled in settings' }, { status: 403 });
     }
 
     const result = startAiAnalysis(userId);

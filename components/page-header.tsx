@@ -10,6 +10,7 @@ import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import Link from 'next/link';
 import { EyeOff, Settings } from 'lucide-react';
 import { glassBar, glassIconButton, glassItemInactive } from '@/components/ui/seg-pill';
+import { AskButton } from '@/components/features/ask/AskButton';
 
 interface PageHeaderProps {
   title: string;
@@ -83,6 +84,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         )}
         <BugReportingDropdown onOpenChange={setIsBugOpen} />
         <NotificationsDropdown onOpenChange={setIsNotificationsOpen} />
+        <AskButton className={`${glassIconButton} ${glassItemInactive}`} />
         <Link
           href="/settings"
           className={`${glassIconButton} ${glassItemInactive}`}
@@ -137,6 +139,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
           )}
           <BugReportingDropdown />
           <NotificationsDropdown />
+          <AskButton />
           <SettingsDropdown />
           <UserDropdown />
         </div>

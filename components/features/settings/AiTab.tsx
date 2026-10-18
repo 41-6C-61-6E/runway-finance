@@ -7,6 +7,15 @@ import { DEFAULT_AI_SYSTEM_PROMPT as DEFAULT_SYSTEM_PROMPT } from '@/config/defa
 import { Slider } from '@/components/ui/slider';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Select } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Loader2, Eye, RotateCcw } from 'lucide-react';
 
 type AutomationSettings = {
   aiSystemPrompt: string | null;
@@ -60,7 +69,6 @@ export default function AiTab() {
   const [modelsFetchError, setModelsFetchError] = useState<string | null>(null);
   const [isCustomModel, setIsCustomModel] = useState(false);
 
-  // Manual analysis run state (mirrors GET /api/ai/status)
   const [analysisStatus, setAnalysisStatus] = useState<{
     status: string;
     processedCount?: number;
@@ -68,6 +76,18 @@ export default function AiTab() {
     error?: string | null;
   }>({ status: 'idle' });
   const [analysisBusy, setAnalysisBusy] = useState(false);
+
+  // AI Feature toggles state
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiSuggestionsEnabled, setAiSuggestionsEnabled] = useState(true);
+  const [askEnabled, setAskEnabled] = useState(true);
+  const [askModel, setAskModel] = useState('');
+  const [askIncludeAccountNames, setAskIncludeAccountNames] = useState(false);
+  const [consentHost, setConsentHost] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [consentResetMessage, setConsentResetMessage] = useState<string | null>(null);
 
   const refreshAnalysisStatus = useCallback(async () => {
     try {
@@ -157,7 +177,7 @@ export default function AiTab() {
           setManaged(true);
         }
       }
-      if (settingsRes.ok) {
+        if (settingsRes.ok) {
         const data = await settingsRes.json();
         setAutomation({
           aiSystemPrompt: data.aiSystemPrompt ?? null,
@@ -167,6 +187,12 @@ export default function AiTab() {
           aiBatchSize: data.aiBatchSize ?? 25,
           aiAnalysisTimeoutSeconds: data.aiAnalysisTimeoutSeconds ?? 3600,
         });
+        setAiEnabled(data.aiEnabled !== false);
+        setAiSuggestionsEnabled(data.aiSuggestionsEnabled !== false);
+        setAskEnabled(data.aiAskEnabled !== false);
+        setAskModel(data.aiAskModel || '');
+        setAskIncludeAccountNames(Boolean(data.aiAskIncludeAccountNames));
+        setConsentHost(data.aiAskConsentHost || null);
       }
     } catch {
       console.error('Failed to load AI settings');
@@ -527,13 +553,17 @@ export default function AiTab() {
               <button
                 type="button"
                 onClick={handleRunAnalysis}
-                disabled={analysisBusy || !endpoint.trim() || !model.trim()}
+                disabled={analysisBusy || !aiEnabled || !aiSuggestionsEnabled || !endpoint.trim() || !model.trim()}
                 className="px-4 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
               >
                 {analysisBusy ? 'Starting…' : 'Run Analysis Now'}
               </button>
               <span className="text-[11px] text-muted-foreground">
-                {automation.aiAutoAnalyze
+                {!aiEnabled
+                  ? 'AI features are turned off.'
+                  : !aiSuggestionsEnabled
+                  ? 'AI Suggestions are turned off.'
+                  : automation.aiAutoAnalyze
                   ? 'Auto-analyze after sync is on.'
                   : 'Tip: enable “Auto-analyze after sync” below to run this automatically.'}
               </span>
@@ -640,7 +670,13 @@ export default function AiTab() {
           Control how and when AI analysis runs.
         </p>
 
-        <div className="space-y-4">
+        {(!aiEnabled || !aiSuggestionsEnabled) && (
+          <div className="text-xs px-3 py-2.5 rounded-lg bg-muted text-muted-foreground mb-4 border border-border">
+            {!aiEnabled ? 'AI features are turned off.' : 'AI Suggestions are turned off.'} Automatic analysis and auto-approvals will not run.
+          </div>
+        )}
+
+        <div className={`space-y-4 ${!aiEnabled || !aiSuggestionsEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <span className="text-sm text-foreground">Auto-analyze after sync</span>
@@ -729,6 +765,249 @@ export default function AiTab() {
           </div>
         </div>
       </div>
+
+      {/* AI Features & Controls Section */}
+      <div className="bg-card border border-border rounded-xl p-5 shadow-2xs space-y-5">
+        <div>
+          <SectionHeading>
+            AI Features
+          </SectionHeading>
+          <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+            Control which AI-powered features are active. You can turn off all AI capabilities with the master switch or toggle individual features below.
+          </p>
+        </div>
+
+        {/* Master Toggle */}
+        <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                Enable AI Features
+                {!aiEnabled && (
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                    Off
+                  </span>
+                )}
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Master switch for all AI capabilities in Runway Finance. When turned off, both AI Suggestions and Ask are completely disabled.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={aiEnabled}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setAiEnabled(val);
+                  saveSetting({ aiEnabled: val });
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+            </label>
+          </div>
+
+          {!aiEnabled && (
+            <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
+              All AI features are globally disabled. No prompts, analysis runs, or background LLM requests will be made.
+            </div>
+          )}
+        </div>
+
+        {/* Individual Feature Toggles */}
+        <div className={`space-y-4 pt-1 transition-opacity ${!aiEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+          {/* Feature 1: AI Suggestions */}
+          <div className="flex items-center justify-between gap-4 py-2 border-b border-border">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">Enable AI Suggestions</span>
+                {!aiSuggestionsEnabled && aiEnabled && (
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                    Off
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Automatically analyze uncategorized transactions, propose category rules, and suggest new spending categories.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={aiSuggestionsEnabled}
+                disabled={!aiEnabled}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setAiSuggestionsEnabled(val);
+                  saveSetting({ aiSuggestionsEnabled: val });
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+            </label>
+          </div>
+
+          {/* Feature 2: Ask */}
+          <div className="space-y-4 pt-1">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">Enable Ask</span>
+                  {!askEnabled && aiEnabled && (
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                      Off
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Show the Ask button in the navigation header to answer questions about your finances using read-only summaries.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={askEnabled}
+                  disabled={!aiEnabled}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setAskEnabled(val);
+                    saveSetting({ aiAskEnabled: val });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+              </label>
+            </div>
+
+            {/* Ask Detail Settings */}
+            <div className={`space-y-4 pt-1 pl-3 border-l-2 border-border/60 transition-opacity ${!askEnabled || !aiEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Model override (optional)
+                </label>
+                <input
+                  type="text"
+                  value={askModel}
+                  disabled={!askEnabled || !aiEnabled}
+                  onChange={(e) => setAskModel(e.target.value)}
+                  onBlur={(e) => saveSetting({ aiAskModel: e.target.value.trim() || null })}
+                  placeholder={model ? `Default (${model})` : 'Leave blank to use primary AI provider model'}
+                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Uses the same endpoint and API key as your AI provider, but calls a different model for Ask questions.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-foreground">Include account names</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When disabled, Ask uses generic labels like &quot;Checking #1&quot; or &quot;401(k) (spouse)&quot; instead of real account names.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={askIncludeAccountNames}
+                    disabled={!askEnabled || !aiEnabled}
+                    onChange={(e) => {
+                      setAskIncludeAccountNames(e.target.checked);
+                      saveSetting({ aiAskIncludeAccountNames: e.target.checked });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                </label>
+              </div>
+
+              <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!askEnabled || !aiEnabled}
+                    onClick={async () => {
+                      setPreviewLoading(true);
+                      setPreviewOpen(true);
+                      try {
+                        const res = await fetch('/api/ai/ask/context-preview');
+                        if (res.ok) {
+                          const data = await res.json();
+                          setPreviewText(data.text);
+                        } else {
+                          setPreviewText('Failed to load context preview.');
+                        }
+                      } catch {
+                        setPreviewText('Failed to load context preview.');
+                      } finally {
+                        setPreviewLoading(false);
+                      }
+                    }}
+                    className="text-xs h-8 flex items-center gap-1.5"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Review what&apos;s shared</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={!askEnabled || !aiEnabled}
+                    onClick={async () => {
+                      await saveSetting({ aiAskConsentHost: null, aiAskConsentAt: null });
+                      setConsentHost(null);
+                      setConsentResetMessage('Consent reset. You will be prompted on next use.');
+                      setTimeout(() => setConsentResetMessage(null), 4000);
+                    }}
+                    className="text-xs h-8 text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset consent</span>
+                  </Button>
+                </div>
+
+                {consentHost && (
+                  <span className="text-[11px] text-muted-foreground">
+                    Consented host: <code className="font-mono text-foreground">{consentHost}</code>
+                  </span>
+                )}
+              </div>
+
+              {consentResetMessage && (
+                <p className="text-xs text-primary animate-in fade-in">{consentResetMessage}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Context Preview Modal */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold">
+              Financial Context Sent to AI
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              This preview shows the exact financial snapshot and category rollups generated for Ask prompts.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto rounded-lg bg-muted/40 border border-border p-3 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            {previewLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              </div>
+            ) : (
+              previewText || 'No preview text available.'
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <p className="text-[10px] text-muted-foreground text-right">Settings are saved automatically.</p>
     </div>

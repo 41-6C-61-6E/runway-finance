@@ -701,6 +701,20 @@
       "when": 1791940379462,
       "tag": "0099_last_barracuda",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1792280205963,
+      "tag": "0100_bumpy_orphan",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1792282158576,
+      "tag": "0101_colorful_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }

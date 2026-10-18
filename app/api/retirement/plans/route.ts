@@ -12,224 +12,43 @@ import { populatePlanWithUserFinances } from '@/lib/services/plan-auto-populator
 
 import { getSystemTaxRules } from '@/lib/services/system-tax-rules-service';
 
+import { loadEnginePlan } from '@/lib/services/retirement-plans';
+
 /** Shared helper: hydrate a plan row with all sub-entities + run simulation */
 async function hydratePlan(planRow: any, dek: Uint8Array, preloadedTaxRules?: any) {
-  const decPlan = await decryptRow('plans', planRow, dek);
-  const currentYear = new Date().getFullYear();
-
-  // Fetch accounts, events, flows, settings, liabilities, and global tax rules for this plan
-  const [rawAccounts, rawEvents, rawFlows, rawSettings, rawLiabilities, activeRules] = await Promise.all([
-    getDb().select().from(planAccounts).where(eq(planAccounts.planId, planRow.id)),
-    getDb().select().from(planEvents).where(eq(planEvents.planId, planRow.id)),
-    getDb().select().from(planFlows).where(eq(planFlows.planId, planRow.id)),
-    getDb().select().from(planSettings).where(eq(planSettings.planId, planRow.id)).limit(1),
-    getDb().select().from(planLiabilities).where(eq(planLiabilities.planId, planRow.id)),
-    // Simulations run from the current calendar year; year-specific rules
-    // (e.g. statutory brackets/FICA caps) must match — see finding T-2.
-    preloadedTaxRules ? Promise.resolve(preloadedTaxRules) : getSystemTaxRules(currentYear),
-  ]);
-
-  const decAccounts = await Promise.all(rawAccounts.map((a) => decryptRow('plan_accounts', a, dek)));
-  const decEvents = await Promise.all(rawEvents.map((e) => decryptRow('plan_events', e, dek)));
-  const decFlows = await Promise.all(rawFlows.map((f) => decryptRow('plan_flows', f, dek)));
-  const decLiabilities = await Promise.all(rawLiabilities.map((l) => decryptRow('plan_liabilities', l, dek)));
-  const decSettings = rawSettings[0] ? await decryptRow('plan_settings', rawSettings[0], dek) : null;
-
-  // Filter only included accounts for the retirement simulation engine
-  const activeAccounts = decAccounts.filter((a) => a.isIncluded !== false);
-  const sAny = decSettings as any;
-
-  // ── Migration: If plan-level salary is '0', seed from existing salary events ──
-  // This ensures existing plans (which only had salary events) continue to work
-  // now that salary income is driven by plan-level fields.
-  let migratedPrimarySalary = parseFloat(decPlan.primarySalary) || 0;
-  let migratedPrimarySalaryYear = Number(decPlan.primarySalaryYear) || currentYear;
-  let migratedSpouseSalary = parseFloat(decPlan.spouseSalary) || 0;
-  let migratedSpouseSalaryYear = Number(decPlan.spouseSalaryYear) || currentYear;
-  let needsSalaryMigration = false;
-
-  if (migratedPrimarySalary === 0) {
-    const primarySalaryEv = decEvents.find((e: any) => e.type === 'salary' && e.owner !== 'spouse');
-    if (primarySalaryEv) {
-      migratedPrimarySalary = parseFloat(primarySalaryEv.amount) || 0;
-      if (primarySalaryEv.startTriggerType === 'year' && primarySalaryEv.startTriggerValue) {
-        migratedPrimarySalaryYear = parseInt(primarySalaryEv.startTriggerValue, 10) || currentYear;
-      } else {
-        migratedPrimarySalaryYear = currentYear;
-      }
-      needsSalaryMigration = true;
-    }
-  }
-  if (migratedSpouseSalary === 0) {
-    const spouseSalaryEv = decEvents.find((e: any) => e.type === 'salary' && e.owner === 'spouse');
-    if (spouseSalaryEv) {
-      migratedSpouseSalary = parseFloat(spouseSalaryEv.amount) || 0;
-      if (spouseSalaryEv.startTriggerType === 'year' && spouseSalaryEv.startTriggerValue) {
-        migratedSpouseSalaryYear = parseInt(spouseSalaryEv.startTriggerValue, 10) || currentYear;
-      } else {
-        migratedSpouseSalaryYear = currentYear;
-      }
-      needsSalaryMigration = true;
-    }
-  }
-
-  // Persist the migrated salary fields back to the DB (one-time write)
-  if (needsSalaryMigration) {
-    try {
-      const salaryUpdate: Record<string, any> = { userId: planRow.userId };
-      if (migratedPrimarySalary > 0) {
-        salaryUpdate.primarySalary = String(Math.round(migratedPrimarySalary));
-        salaryUpdate.primarySalaryYear = migratedPrimarySalaryYear;
-      }
-      if (migratedSpouseSalary > 0) {
-        salaryUpdate.spouseSalary = String(Math.round(migratedSpouseSalary));
-        salaryUpdate.spouseSalaryYear = migratedSpouseSalaryYear;
-      }
-      const encSalary = await encryptRow('plans', salaryUpdate, dek);
-      delete encSalary.userId;
-      await getDb().update(plans).set(encSalary).where(eq(plans.id, planRow.id));
-    } catch {
-      // Non-critical: if migration write fails, the engine still works via in-memory fallback
-    }
-  }
-
-  const enginePlan: EnginePlan = {
-    id: decPlan.id,
-    name: decPlan.name,
-    hasSpouse: Boolean(decPlan.hasSpouse),
-    primaryBirthYear: Number(decPlan.primaryBirthYear) || 1985,
-    primaryBirthMonth: Number(decPlan.primaryBirthMonth) || 1,
-    spouseBirthYear: decPlan.spouseBirthYear ? Number(decPlan.spouseBirthYear) : undefined,
-    spouseBirthMonth: decPlan.spouseBirthMonth ? Number(decPlan.spouseBirthMonth) : undefined,
-    spouseName: decPlan.spouseName || 'Spouse / Partner',
-    spouseRetirementAge: decPlan.spouseRetirementAge ? Number(decPlan.spouseRetirementAge) : 60,
-    spouseLifeExpectancyAge: decPlan.spouseLifeExpectancyAge ? Number(decPlan.spouseLifeExpectancyAge) : 100,
-    primarySsMonthlyAmount: decPlan.primarySsMonthlyAmount ? parseFloat(decPlan.primarySsMonthlyAmount) : 2500,
-    primarySsStartAge: decPlan.primarySsStartAge ? Number(decPlan.primarySsStartAge) : 67,
-    spouseSsMonthlyAmount: decPlan.spouseSsMonthlyAmount ? parseFloat(decPlan.spouseSsMonthlyAmount) : 2000,
-    spouseSsStartAge: decPlan.spouseSsStartAge ? Number(decPlan.spouseSsStartAge) : 67,
-    enableSpousalSsBenefit: decPlan.enableSpousalSsBenefit !== false,
-    filingStatus: decPlan.filingStatus || 'single',
-    retirementAge: Number(decPlan.retirementAge) || 60,
-    lifeExpectancyAge: Number(decPlan.lifeExpectancyAge) || 100,
-    withdrawalMethod: decPlan.withdrawalMethod || 'textbook',
-    customWithdrawalOrder: Array.isArray(decPlan.customWithdrawalOrder) ? decPlan.customWithdrawalOrder : undefined,
-    primarySalary: migratedPrimarySalary || parseFloat(decPlan.primarySalary) || 0,
-    spouseSalary: migratedSpouseSalary || parseFloat(decPlan.spouseSalary) || 0,
-    primarySalaryYear: migratedPrimarySalaryYear || Number(decPlan.primarySalaryYear) || currentYear,
-    primarySalaryRaisePct: parseFloat(decPlan.primarySalaryRaisePct) || 0,
-    primarySalaryOverrides: decPlan.primarySalaryOverrides && typeof decPlan.primarySalaryOverrides === 'object' ? decPlan.primarySalaryOverrides : undefined,
-    spouseSalaryYear: Number(decPlan.spouseSalaryYear) || currentYear,
-    spouseSalaryRaisePct: parseFloat(decPlan.spouseSalaryRaisePct) || 0,
-    spouseSalaryOverrides: decPlan.spouseSalaryOverrides && typeof decPlan.spouseSalaryOverrides === 'object' ? decPlan.spouseSalaryOverrides : undefined,
-    accounts: activeAccounts.map((a) => ({
-      id: a.id,
-      name: a.name,
-      type: a.type,
-      owner: a.owner,
-      balance: parseFloat(a.balance) || 0,
-      costBasis: parseFloat(a.costBasis) || 0,
-      expectedGrowthRate: parseFloat(a.expectedGrowthRate) || 6.0,
-      dividendYield: parseFloat(a.dividendYield) || 2.5,
-      reinvestDividends: a.reinvestDividends,
-      qualifiedDividendRatio: parseFloat(a.qualifiedDividendRatio) || 1.0,
-      rothPercentage: a.rothPercentage,
-      contributionMode: (a.contributionMode as any) || 'none',
-      contributionValue: a.contributionValue ? parseFloat(a.contributionValue) : undefined,
-      contributionSalarySource: (a.contributionSalarySource as any) || undefined,
-      companyMatchRate: a.companyMatchRate ? parseFloat(a.companyMatchRate) : undefined,
-      companyMatchLimit: a.companyMatchLimit ? parseFloat(a.companyMatchLimit) : undefined,
-      isSurplusDestination: Boolean(a.isSurplusDestination),
-    })),
-    liabilities: decLiabilities.map((l) => ({
-      id: l.id,
-      name: l.name,
-      owner: l.owner || 'primary',
-      balance: parseFloat(l.balance) || 0,
-      interestRate: parseFloat(l.interestRate) || 0,
-      monthlyPayment: parseFloat(l.monthlyPayment) || 0,
-      yearsRemaining: parseFloat(l.yearsRemaining) || 30,
-    })),
-    events: decEvents.map((e) => ({
-      id: e.id,
-      name: e.name,
-      category: e.category as any,
-      type: e.type,
-      owner: e.owner,
-      amount: parseFloat(e.amount) || 0,
-      frequency: e.frequency as any,
-      growthRate: parseFloat(e.growthRate) || 0,
-      adjustForInflation: e.adjustForInflation,
-      startTriggerType: e.startTriggerType,
-      startTriggerValue: e.startTriggerValue,
-      endTriggerType: e.endTriggerType,
-      endTriggerValue: e.endTriggerValue,
-    })),
-    flows: decFlows.map((f) => ({
-      id: f.id,
-      name: f.name,
-      type: f.type as any,
-      rank: f.rank,
-      targetAccountId: f.targetAccountId,
-      ruleType: f.ruleType as any,
-      ruleValue: f.ruleValue ? parseFloat(f.ruleValue) : undefined,
-      matchRate: f.matchRate ? parseFloat(f.matchRate) : undefined,
-      matchLimit: f.matchLimit ? parseFloat(f.matchLimit) : undefined,
-      matchAccountId: f.matchAccountId || undefined,
-      salarySource: (f.salarySource as any) || undefined,
-    })),
-    settings: {
-      fixedInflationRate: parseFloat(decSettings?.fixedInflationRate || '3.0'),
-      withholdingDeferred: parseFloat(decSettings?.withholdingDeferred || '20.0'),
-      withholdingTaxable: parseFloat(decSettings?.withholdingTaxable || '10.0'),
-      incomeTaxModifier: parseFloat(decSettings?.incomeTaxModifier || '0.0'),
-      // ── L-1: graduated state table from the state_tax_table jsonb column
-      // (absent → the flat incomeTaxModifier keeps its legacy behavior).
-      stateTaxBrackets: Array.isArray((decSettings as any)?.stateTaxTable?.stateTaxBrackets)
-        ? (decSettings as any).stateTaxTable.stateTaxBrackets
-        : undefined,
-      stateTaxStandardDeduction:
-        (decSettings as any)?.stateTaxTable?.stateTaxStandardDeduction != null
-          ? Number((decSettings as any).stateTaxTable.stateTaxStandardDeduction)
-          : undefined,
-      stateGrossFloorRate:
-        (decSettings as any)?.stateTaxTable?.stateGrossFloorRate != null
-          ? Number((decSettings as any).stateTaxTable.stateGrossFloorRate)
-          : undefined,
-      stateCode: (decSettings as any)?.stateTaxTable?.stateCode || undefined,
-      // T-2: per-year statutory rule selection (default: inflationEscalated).
-      projectionMode: (decSettings as any)?.projectionMode === 'statutory' ? 'statutory' : 'inflationEscalated',
-      // T-5: opt-in AMT (default off → bit-identical legacy output).
-      enableAmt: Boolean((decSettings as any)?.enableAmt),
-      capGainsTaxModifier: parseFloat(decSettings?.capGainsTaxModifier || '0.0'),
-      heirFlatIncomeTaxRate: parseFloat(decSettings?.heirFlatIncomeTaxRate || '25.0'),
-      stepUpBasis: decSettings?.stepUpBasis ?? true,
-      realEstateLiquidationRate: parseFloat(decSettings?.realEstateLiquidationRate || '6.0'),
-      administrativeCostRate: parseFloat(decSettings?.administrativeCostRate || '1.0'),
-      charitableGiving: parseFloat(decSettings?.charitableGiving || '0.0'),
-      withdrawalMethod: sAny?.withdrawalMethod || decPlan.withdrawalMethod || 'textbook',
-      enableRothConversions: Boolean(sAny?.enableRothConversions),
-      rothConversionTargetCeiling: sAny?.rothConversionTargetCeiling || 'top_of_12',
-      avoidIrmaaCliffs: Boolean(sAny?.avoidIrmaaCliffs),
-      allowPenaltyWithdrawals: sAny?.allowPenaltyWithdrawals !== false,
+  const loaded = await loadEnginePlan(
+    {
+      userId: planRow.userId,
+      dataUserId: planRow.userId,
+      dek,
+      role: 'primary',
+      hiddenAccountIds: new Set(),
+      settings: {} as any,
+      now: new Date(),
+      getAccounts: async () => [],
     },
-    rules: activeRules as any,
-  };
+    planRow.id,
+    { persistMigration: true, preloadedTaxRules }
+  );
 
-  const simulation = runRetirementSimulation(enginePlan);
+  if (!loaded) {
+    throw new Error('Plan not found');
+  }
+
+  const simulation = runRetirementSimulation(loaded.enginePlan);
 
   return {
-    ...decPlan,
-    accounts: decAccounts.map((a) => ({
+    ...loaded.rawDecryptedPlan,
+    accounts: loaded.decAccounts.map((a) => ({
       ...a,
       isIncluded: a.isIncluded !== false,
     })),
-    liabilities: decLiabilities,
-    events: decEvents,
-    flows: decFlows,
+    liabilities: loaded.decLiabilities,
+    events: loaded.decEvents,
+    flows: loaded.decFlows,
     settings: {
-      ...decSettings,
-      ...enginePlan.settings,
+      ...loaded.decSettings,
+      ...loaded.enginePlan.settings,
     },
     simulation,
   };

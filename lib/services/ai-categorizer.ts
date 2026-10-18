@@ -7,9 +7,15 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow, decryptRows, decryptField, encryptField } from '@/lib/crypto';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import { buildModelParams, isOpenRouterEndpoint, parseStoredFallbacks } from '@/lib/ai/endpoints';
+import { extractJsonObject, isJsonFormatRejection } from '@/lib/ai/json';
+import { extractStreamChunk } from '@/lib/ai/stream';
+import { resolveAiProvider } from '@/lib/ai/client';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { findDuplicateRule, evaluateCondition } from '@/lib/services/rules-engine';
 import { fetchSecure, validateEndpointUrl } from '@/lib/utils/ssrf';
+
+export { extractJsonObject, isJsonFormatRejection } from '@/lib/ai/json';
+export { extractStreamChunk } from '@/lib/ai/stream';
 
 const LOG_TAG = '[ai-categorizer]';
 // Adaptive per-batch timeout so slower models (~20 tok/s) aren't killed:
@@ -261,6 +267,11 @@ export async function analyzeUncategorized(
     }
 
     const settings = userSettingsRow[0];
+    if (settings.aiEnabled === false || settings.aiSuggestionsEnabled === false) {
+      const msg = 'AI Suggestions are disabled in settings';
+      onLog?.(`Info: ${msg}`);
+      return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
+    }
     const dataUserId = await resolveDataUserId(userId);
     // Accept an explicit DEK so background runs kicked off from sync jobs
     // don't depend on request-scoped auth after the response completes.
@@ -278,42 +289,15 @@ export async function analyzeUncategorized(
     }
 
     onLog?.('Resolving AI provider configuration...');
-    // Single provider per user: prefer the session user's own config
-    // (their API key), falling back to the household's. Legacy rows may
-    // have isActive=false, so prefer active but accept any row.
-    const pickProvider = (rows: typeof aiProviders.$inferSelect[]) =>
-      rows.find((r) => r.isActive) ?? rows[0];
-    const ownProviderRows = await db
-      .select()
-      .from(aiProviders)
-      .where(eq(aiProviders.userId, userId))
-      .limit(10);
-
-    let activeProvider;
-    const ownPick = pickProvider(ownProviderRows);
-    if (ownPick) {
-      activeProvider = ownPick;
-      logger.info(`${LOG_TAG} AI provider resolved from own config`, { userId });
-    } else {
-      const householdProviderRows = await db
-        .select()
-        .from(aiProviders)
-        .where(eq(aiProviders.userId, dataUserId))
-        .limit(10);
-
-      const householdPick = pickProvider(householdProviderRows);
-      if (!householdPick) {
-        const msg = 'No AI provider configured. Add one in Settings → AI Suggestions.';
-        onLog?.(`Error: ${msg}`);
-        return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
-      }
-
-      activeProvider = householdPick;
-      logger.info(`${LOG_TAG} AI provider fell back to household primary config`, { userId, dataUserId });
+    const activeProvider = await resolveAiProvider(userId, dek);
+    if (!activeProvider) {
+      const msg = 'No AI provider configured. Add one in Settings → AI Suggestions.';
+      onLog?.(`Error: ${msg}`);
+      return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
     }
     const endpoint = activeProvider.endpoint;
     const model = activeProvider.model;
-    const fallbacks = parseStoredFallbacks(activeProvider.fallbackModels);
+    const fallbacks = activeProvider.fallbacks;
 
     // Validate endpoint URL against SSRF
     const validation = await validateEndpointUrl(endpoint);
@@ -324,10 +308,7 @@ export async function analyzeUncategorized(
       return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
     }
 
-    let apiKey = '';
-    if (activeProvider.apiKeyEncrypted) {
-      apiKey = await decryptField(activeProvider.apiKeyEncrypted, dek);
-    }
+    const apiKey = activeProvider.apiKey;
 
     onLog?.('Fetching categories and rules...');
     const categoryRows = await db
@@ -873,22 +854,7 @@ export async function analyzeSingleTransaction(
     .limit(1);
   const systemPrompt = settingsRows[0]?.aiSystemPrompt || SYSTEM_PROMPT;
 
-  const pickProvider = (rows: typeof aiProviders.$inferSelect[]) =>
-    rows.find((r) => r.isActive) ?? rows[0];
-  const ownRows = await db
-    .select()
-    .from(aiProviders)
-    .where(eq(aiProviders.userId, userId))
-    .limit(10);
-  let provider = pickProvider(ownRows);
-  if (!provider) {
-    const householdRows = await db
-      .select()
-      .from(aiProviders)
-      .where(eq(aiProviders.userId, dataUserId))
-      .limit(10);
-    provider = pickProvider(householdRows);
-  }
+  const provider = await resolveAiProvider(userId, dek);
   if (!provider) {
     throw new Error('No AI provider configured. Add one in Settings → AI Suggestions.');
   }
@@ -898,10 +864,7 @@ export async function analyzeSingleTransaction(
     throw new Error(`AI provider endpoint is invalid or blocked: ${validation.error}`);
   }
 
-  let apiKey = '';
-  if (provider.apiKeyEncrypted) {
-    apiKey = await decryptField(provider.apiKeyEncrypted, dek);
-  }
+  const apiKey = provider.apiKey;
 
   const prompt = buildPrompt(categories, rules, [txnInfo]);
   const controller = new AbortController();
@@ -915,7 +878,7 @@ export async function analyzeSingleTransaction(
       prompt,
       systemPrompt,
       controller.signal,
-      parseStoredFallbacks(provider.fallbackModels),
+      provider.fallbacks,
     );
   } finally {
     clearTimeout(timeoutId);
@@ -1038,43 +1001,7 @@ function cleanJsonString(content: string): string {
   return clean;
 }
 
-/**
- * Extract the first balanced {...} JSON object from text that may contain
- * prose before/after it. String- and escape-aware. Returns null if none.
- * Exported for reuse by the connection test, which validates JSON output
- * the same way production parsing does.
- */
-export function extractJsonObject(text: string): string | null {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (ch === '\\') {
-        escaped = true;
-      } else if (ch === '"') {
-        inString = false;
-      }
-    } else {
-      if (ch === '"') {
-        inString = true;
-      } else if (ch === '{') {
-        depth++;
-      } else if (ch === '}') {
-        depth--;
-        if (depth === 0) {
-          return text.slice(start, i + 1);
-        }
-      }
-    }
-  }
-  return null;
-}
+
 
 function parseAiContent(content: string): AiResponse {
   // Strip reasoning traces some models emit despite JSON-only instructions.
@@ -1129,55 +1056,7 @@ function parseAiContent(content: string): AiResponse {
   return parsed;
 }
 
-/**
- * Pull answer text out of one parsed SSE `data:` payload. Handles two
- * dialects:
- * - Chat Completions: `{choices:[{delta:{content}}]}`
- * - Responses API (what Open WebUI proxies emit): `event: response.created`
- *   snapshots shaped `{response:{...}}` plus `output_text.delta` events shaped
- *   `{delta:"..."}` or `{type:"response.output_text.delta",delta:"..."}`.
- * Returns incremental text plus any full-text snapshot (from a completed
- * event) for use as a fallback when no deltas arrived.
- */
-function extractStreamChunk(chunk: any): { text: string; reasoning: boolean; completedText: string } {
-  if (!chunk || typeof chunk !== 'object') {
-    return { text: '', reasoning: false, completedText: '' };
-  }
-  const delta = chunk.choices?.[0]?.delta;
-  if (typeof delta?.content === 'string' && delta.content) {
-    return { text: delta.content, reasoning: false, completedText: '' };
-  }
-  if (typeof chunk.delta === 'string' && chunk.delta) {
-    return { text: chunk.delta, reasoning: false, completedText: '' };
-  }
 
-  let completedText = '';
-  const outputs = chunk.response?.output ?? chunk.output;
-  if (Array.isArray(outputs)) {
-    for (const item of outputs) {
-      const parts = item?.content;
-      if (Array.isArray(parts)) {
-        for (const part of parts) {
-          if (typeof part?.text === 'string') {
-            completedText += part.text;
-          }
-        }
-      }
-    }
-  }
-
-  const reasoning = !!(delta?.reasoning_content || delta?.reasoning || chunk.reasoning);
-  return { text: '', reasoning, completedText };
-}
-
-/**
- * True when an error means the server rejected the constrained-JSON request
- * (`response_format`), as opposed to a transient or auth failure. Used to
- * fall back to plain mode automatically.
- */
-export function isJsonFormatRejection(message: string): boolean {
-  return /response_format|json_object|response format|json mode|grammar/i.test(message);
-}
 
 export async function callAiApi(
   endpoint: string,
