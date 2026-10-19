@@ -15,8 +15,8 @@ import { PullToRefresh } from '@/components/pull-to-refresh';
 import { ReactNode, useState, useEffect } from 'react';
 
 import { MobileSubNavProvider } from '@/components/mobile-subnav-context';
-import { AskProvider, useAsk } from '@/components/features/ask/AskProvider';
-import { AskSheet } from '@/components/features/ask/AskSheet';
+import { AdviceProvider, useAdvice } from '@/components/features/advice/AdviceProvider';
+import { AdviceSheet } from '@/components/features/advice/AdviceSheet';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -65,15 +65,15 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
           <ReduceTransparencyProvider>
           <AccountSubheadingsProvider>
             <MobileSubNavProvider>
-              <AskProvider>
+              <AdviceProvider>
                 <ResizableSidebar />
                 {!hideAccountsSidebar && <AccountsSidebar />}
                 <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
                   {children}
                 </AuthenticatedLayoutContent>
                 <MobileNav />
-                <AskSheet />
-              </AskProvider>
+                <AdviceSheet />
+              </AdviceProvider>
             </MobileSubNavProvider>
           </AccountSubheadingsProvider>
           </ReduceTransparencyProvider>
@@ -85,7 +85,7 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
 
 function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { children: ReactNode; hideAccountsSidebar: boolean }) {
   const { sidebarWidth, accountsWidth, accountsCollapsed } = useSidebar();
-  const { isOpen } = useAsk();
+  const { isOpen } = useAdvice();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -103,9 +103,9 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
     <div 
       style={{ 
         '--sidebar-margin-left': desktopMarginLeft,
-        '--ask-margin-right': desktopMarginRight,
+        '--advice-margin-right': desktopMarginRight,
       } as React.CSSProperties} 
-      className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] mr-0 md:mr-[var(--ask-margin-right)] pb-20 md:pb-0"
+      className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] mr-0 md:mr-[var(--advice-margin-right)] pb-20 md:pb-0"
     >
       <PullToRefresh>
         {children}

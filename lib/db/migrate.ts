@@ -105,7 +105,13 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       { name: 'upcoming_bills_lead_days', type: 'INTEGER NOT NULL DEFAULT 3' },
       { name: 'birth_year', type: 'INTEGER' },
       { name: 'text_size', type: "TEXT NOT NULL DEFAULT 'default'" },
-      { name: 'notify_app_updates', type: 'BOOLEAN NOT NULL DEFAULT TRUE' }
+      { name: 'notify_app_updates', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'ai_advice_enabled', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'ai_advice_model', type: 'TEXT' },
+      { name: 'ai_advice_include_account_names', type: 'BOOLEAN NOT NULL DEFAULT FALSE' },
+      { name: 'ai_advice_consent_host', type: 'TEXT' },
+      { name: 'ai_advice_consent_at', type: 'TIMESTAMP WITH TIME ZONE' },
+      { name: 'ai_advice_token_profile', type: "TEXT NOT NULL DEFAULT 'balanced'" }
     ];
 
     for (const col of columnsToCheck) {

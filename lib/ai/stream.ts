@@ -43,6 +43,11 @@ export function extractStreamChunk(chunk: any): { text: string; reasoning: boole
   return { text: '', reasoning, completedText };
 }
 
+export function stripSafetyTags(text: string): string {
+  if (!text) return '';
+  return text.replace(/^(User\s+Safety:\s*(safe|unsafe)|Safety:\s*(safe|unsafe)|Agent\s+Safety:\s*(safe|unsafe))[\r\n\s]*/i, '');
+}
+
 /**
  * Creates a stateful stream processor that strips `<think>...</think>` and
  * `<thinking>...</thinking>` blocks, correctly handling tags and content split
@@ -50,6 +55,7 @@ export function extractStreamChunk(chunk: any): { text: string; reasoning: boole
  */
 export function createThinkStripper() {
   let inThink = false;
+  let hasEncounteredThink = false;
   let buffer = '';
 
   const OPEN_TAGS = ['<think>', '<thinking>'];
@@ -88,10 +94,11 @@ export function createThinkStripper() {
           if (bufLower.startsWith(tag)) {
             // Found complete open tag
             inThink = true;
+            hasEncounteredThink = true;
             buffer = buffer.slice(tag.length);
             matchedOpen = true;
             break;
-          } else if (tag.startsWith(bufLower) || bufLower.length < tag.length && tag.startsWith(bufLower)) {
+          } else if (tag.startsWith(bufLower) || (bufLower.length < tag.length && tag.startsWith(bufLower))) {
             // Buffer is a prefix of an open tag (e.g. '<th')
             isPotentialPrefix = true;
           }
@@ -168,5 +175,13 @@ export function createThinkStripper() {
     return '';
   }
 
-  return { process: processChunk, flush };
+  function isInThink(): boolean {
+    return inThink;
+  }
+
+  function hadThink(): boolean {
+    return hasEncounteredThink;
+  }
+
+  return { process: processChunk, flush, isInThink, hadThink };
 }

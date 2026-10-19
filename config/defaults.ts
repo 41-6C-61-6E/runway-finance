@@ -79,11 +79,19 @@ export const AI_DEFAULTS = {
   aiBatchSize: 25,
   aiAnalysisTimeoutSeconds: 3600,
   aiActiveProviderId: null,
+  aiAdviceEnabled: true,
+  aiAdviceModel: null,
+  aiAdviceIncludeAccountNames: false,
+  aiAdviceConsentHost: null,
+  aiAdviceConsentAt: null,
+  aiAdviceTokenProfile: 'balanced',
+  // Backwards compatibility aliases
   aiAskEnabled: true,
   aiAskModel: null,
   aiAskIncludeAccountNames: false,
   aiAskConsentHost: null,
   aiAskConsentAt: null,
+  aiAskTokenProfile: 'balanced',
 } as const;
 
 // ── Notification Defaults ────────────────────────────────────────────────────
@@ -244,7 +252,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   // ── AI ──
   { key: 'aiEnabled', label: 'Enable AI Features', description: 'Master switch for all AI-powered features in the application', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiEnabled },
   { key: 'aiSuggestionsEnabled', label: 'Enable AI Suggestions', description: 'Enable AI categorization proposals and rule suggestions', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiSuggestionsEnabled },
-  { key: 'aiAskEnabled', label: 'Enable Ask', description: 'Enable Ask financial Q&A assistant', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAskEnabled },
+  { key: 'aiAdviceEnabled', label: 'Enable Advice', description: 'Enable Advice financial Q&A assistant', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAdviceEnabled },
   { key: 'aiAutoAnalyze', label: 'Auto-analyze after sync', description: 'Run AI analysis automatically after each SimpleFIN sync', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoAnalyze },
   { key: 'aiAutoApprove', label: 'Auto-approve suggestions', description: 'Automatically approve AI suggestions above confidence threshold', type: 'boolean', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoApprove },
   { key: 'aiAutoApproveThreshold', label: 'Auto-approve threshold', description: 'Confidence threshold % for auto-approval (0-100)', type: 'number', group: 'AI', defaultValue: AI_DEFAULTS.aiAutoApproveThreshold },

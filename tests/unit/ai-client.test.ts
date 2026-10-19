@@ -61,6 +61,18 @@ describe('createThinkStripper', () => {
   });
 });
 
+describe('stripSafetyTags', () => {
+  it('strips User Safety: safe prefaces', async () => {
+    const { stripSafetyTags } = await import('@/lib/ai/stream');
+    expect(stripSafetyTags('User Safety: safe\n\nHere is your financial advice.')).toBe(
+      'Here is your financial advice.'
+    );
+    expect(stripSafetyTags('Safety: safe\nOverview of budget')).toBe('Overview of budget');
+    expect(stripSafetyTags('User Safety: safe')).toBe('');
+    expect(stripSafetyTags('Normal response without tags')).toBe('Normal response without tags');
+  });
+});
+
 describe('streamChat', () => {
   const mockFetch = vi.mocked(fetchSecure);
 
@@ -209,6 +221,48 @@ describe('streamChat', () => {
       expect(err.code).toBe('provider_rate_limited');
       expect(err.status).toBe(429);
     }
+  });
+
+  it('automatically fails over to fallback model on 429 rate limit', async () => {
+    // 1st call for primary model (meta/llama-3:free) returns 429
+    mockFetch.mockResolvedValueOnce(
+      new Response('Rate limit reached', { status: 429 })
+    );
+
+    // 2nd call for fallback model (mistral/mistral-7b:free) succeeds
+    const sseResponse = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('data: {"choices":[{"delta":{"content":"Recovered from fallback model!"}}]}\n\n')
+        );
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(sseResponse, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    );
+
+    const tokens: string[] = [];
+    const metaList: any[] = [];
+    for await (const ev of streamChat({
+      provider: openRouterProvider,
+      messages: [{ role: 'user', content: 'test rate limit failover' }],
+    })) {
+      if (ev.type === 'text') tokens.push(ev.text);
+      if (ev.type === 'meta') metaList.push(ev);
+    }
+
+    expect(tokens.join('')).toBe('Recovered from fallback model!');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    const secondCallBody = JSON.parse(mockFetch.mock.calls[1][1]?.body as string);
+    expect(secondCallBody.model).toBe('mistral/mistral-7b:free');
+    expect(metaList.some((m) => m.servedModel === 'mistral/mistral-7b:free')).toBe(true);
   });
 
   it('throws typed provider_auth on 401 without retry', async () => {

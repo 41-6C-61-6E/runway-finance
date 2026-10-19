@@ -7,9 +7,9 @@ import { ChartSpline, Receipt, Home, CreditCard, ChartBar, Database, Target, Spa
 import { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages'
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AskButton } from '@/components/features/ask/AskButton'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { AdviceButton } from '@/components/features/advice/AdviceButton'
 
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 
@@ -179,7 +179,7 @@ export default function ResizableSidebar() {
           })}
         </nav>
 
-        <AskButton collapsed={isCollapsed} />
+        <AdviceButton collapsed={isCollapsed} />
       </aside>
 
 

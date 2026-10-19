@@ -80,9 +80,10 @@ export default function AiTab() {
   // AI Feature toggles state
   const [aiEnabled, setAiEnabled] = useState(true);
   const [aiSuggestionsEnabled, setAiSuggestionsEnabled] = useState(true);
-  const [askEnabled, setAskEnabled] = useState(true);
-  const [askModel, setAskModel] = useState('');
-  const [askIncludeAccountNames, setAskIncludeAccountNames] = useState(false);
+  const [adviceEnabled, setAdviceEnabled] = useState(true);
+  const [adviceModel, setAdviceModel] = useState('');
+  const [adviceIncludeAccountNames, setAdviceIncludeAccountNames] = useState(false);
+  const [adviceTokenProfile, setAdviceTokenProfile] = useState<'local' | 'modest' | 'balanced' | 'frontier'>('balanced');
   const [consentHost, setConsentHost] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewText, setPreviewText] = useState<string | null>(null);
@@ -189,10 +190,13 @@ export default function AiTab() {
         });
         setAiEnabled(data.aiEnabled !== false);
         setAiSuggestionsEnabled(data.aiSuggestionsEnabled !== false);
-        setAskEnabled(data.aiAskEnabled !== false);
-        setAskModel(data.aiAskModel || '');
-        setAskIncludeAccountNames(Boolean(data.aiAskIncludeAccountNames));
-        setConsentHost(data.aiAskConsentHost || null);
+        const adviceOn = data.aiAdviceEnabled !== undefined ? data.aiAdviceEnabled : data.aiAskEnabled;
+        setAdviceEnabled(adviceOn !== false);
+        setAdviceModel(data.aiAdviceModel || data.aiAskModel || '');
+        setAdviceIncludeAccountNames(Boolean(data.aiAdviceIncludeAccountNames ?? data.aiAskIncludeAccountNames));
+        const tokenProf = data.aiAdviceTokenProfile || data.aiAskTokenProfile;
+        if (tokenProf) setAdviceTokenProfile(tokenProf);
+        setConsentHost(data.aiAdviceConsentHost || data.aiAskConsentHost || null);
       }
     } catch {
       console.error('Failed to load AI settings');
@@ -790,7 +794,7 @@ export default function AiTab() {
                 )}
               </span>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Master switch for all AI capabilities in Runway Finance. When turned off, both AI Suggestions and Ask are completely disabled.
+                Master switch for all AI capabilities in Runway Finance. When turned off, both AI Suggestions and Advice are completely disabled.
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -848,31 +852,31 @@ export default function AiTab() {
             </label>
           </div>
 
-          {/* Feature 2: Ask */}
+          {/* Feature 2: Advice */}
           <div className="space-y-4 pt-1">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">Enable Ask</span>
-                  {!askEnabled && aiEnabled && (
+                  <span className="text-sm font-medium text-foreground">Enable Advice</span>
+                  {!adviceEnabled && aiEnabled && (
                     <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                       Off
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Show the Ask button in the navigation header to answer questions about your finances using read-only summaries.
+                  Show the Advice button in the navigation header to answer questions about your finances using read-only summaries.
                 </p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer shrink-0">
                 <input
                   type="checkbox"
-                  checked={askEnabled}
+                  checked={adviceEnabled}
                   disabled={!aiEnabled}
                   onChange={(e) => {
                     const val = e.target.checked;
-                    setAskEnabled(val);
-                    saveSetting({ aiAskEnabled: val });
+                    setAdviceEnabled(val);
+                    saveSetting({ aiAdviceEnabled: val, aiAskEnabled: val });
                   }}
                   className="sr-only peer"
                 />
@@ -880,23 +884,26 @@ export default function AiTab() {
               </label>
             </div>
 
-            {/* Ask Detail Settings */}
-            <div className={`space-y-4 pt-1 pl-3 border-l-2 border-border/60 transition-opacity ${!askEnabled || !aiEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+            {/* Advice Detail Settings */}
+            <div className={`space-y-4 pt-1 pl-3 border-l-2 border-border/60 transition-opacity ${!adviceEnabled || !aiEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1">
                   Model override (optional)
                 </label>
                 <input
                   type="text"
-                  value={askModel}
-                  disabled={!askEnabled || !aiEnabled}
-                  onChange={(e) => setAskModel(e.target.value)}
-                  onBlur={(e) => saveSetting({ aiAskModel: e.target.value.trim() || null })}
+                  value={adviceModel}
+                  disabled={!adviceEnabled || !aiEnabled}
+                  onChange={(e) => setAdviceModel(e.target.value)}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim() || null;
+                    saveSetting({ aiAdviceModel: val, aiAskModel: val });
+                  }}
                   placeholder={model ? `Default (${model})` : 'Leave blank to use primary AI provider model'}
                   className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Uses the same endpoint and API key as your AI provider, but calls a different model for Ask questions.
+                  Uses the same endpoint and API key as your AI provider, but calls a different model for Advice questions.
                 </p>
               </div>
 
@@ -904,22 +911,44 @@ export default function AiTab() {
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-foreground">Include account names</span>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    When disabled, Ask uses generic labels like &quot;Checking #1&quot; or &quot;401(k) (spouse)&quot; instead of real account names.
+                    When disabled, Advice uses generic labels like &quot;Checking #1&quot; or &quot;401(k) (spouse)&quot; instead of real account names.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input
                     type="checkbox"
-                    checked={askIncludeAccountNames}
-                    disabled={!askEnabled || !aiEnabled}
+                    checked={adviceIncludeAccountNames}
+                    disabled={!adviceEnabled || !aiEnabled}
                     onChange={(e) => {
-                      setAskIncludeAccountNames(e.target.checked);
-                      saveSetting({ aiAskIncludeAccountNames: e.target.checked });
+                      setAdviceIncludeAccountNames(e.target.checked);
+                      saveSetting({ aiAdviceIncludeAccountNames: e.target.checked, aiAskIncludeAccountNames: e.target.checked });
                     }}
                     className="sr-only peer"
                   />
                   <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-card after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
                 </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Context & Token Budget Profile
+                </label>
+                <Select
+                  value={adviceTokenProfile}
+                  disabled={!adviceEnabled || !aiEnabled}
+                  onChange={(e) => {
+                    const val = e.target.value as 'local' | 'modest' | 'balanced' | 'frontier';
+                    setAdviceTokenProfile(val);
+                    saveSetting({ aiAdviceTokenProfile: val, aiAskTokenProfile: val });
+                  }}
+                >
+                  <option value="balanced">Balanced / Modest (Default: 3,500 data / 1,500 output tokens)</option>
+                  <option value="local">Local / Fast (Compact: 1,800 data / 800 output tokens — fits small context)</option>
+                  <option value="frontier">Frontier / Deep (Expanded: 7,000 data / 3,000 output tokens — reasoning models)</option>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Controls how much financial context and token history are included. Use &quot;Frontier&quot; for advanced or reasoning models (DeepSeek-R1, Claude 3.5), and &quot;Local&quot; for smaller local models (Ollama 8B).
+                </p>
               </div>
 
               <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
@@ -928,12 +957,12 @@ export default function AiTab() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={!askEnabled || !aiEnabled}
+                    disabled={!adviceEnabled || !aiEnabled}
                     onClick={async () => {
                       setPreviewLoading(true);
                       setPreviewOpen(true);
                       try {
-                        const res = await fetch('/api/ai/ask/context-preview');
+                        const res = await fetch('/api/ai/advice/context-preview');
                         if (res.ok) {
                           const data = await res.json();
                           setPreviewText(data.text);
@@ -956,9 +985,14 @@ export default function AiTab() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    disabled={!askEnabled || !aiEnabled}
+                    disabled={!adviceEnabled || !aiEnabled}
                     onClick={async () => {
-                      await saveSetting({ aiAskConsentHost: null, aiAskConsentAt: null });
+                      await saveSetting({
+                        aiAdviceConsentHost: null,
+                        aiAdviceConsentAt: null,
+                        aiAskConsentHost: null,
+                        aiAskConsentAt: null,
+                      });
                       setConsentHost(null);
                       setConsentResetMessage('Consent reset. You will be prompted on next use.');
                       setTimeout(() => setConsentResetMessage(null), 4000);
@@ -993,7 +1027,7 @@ export default function AiTab() {
               Financial Context Sent to AI
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              This preview shows the exact financial snapshot and category rollups generated for Ask prompts.
+              This preview shows the exact financial snapshot and category rollups generated for Advice prompts.
             </DialogDescription>
           </DialogHeader>
 

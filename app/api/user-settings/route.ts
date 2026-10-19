@@ -129,11 +129,18 @@ export async function GET() {
       aiActiveProviderId: created?.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
       aiEnabled: created?.aiEnabled ?? DEFAULTS.aiEnabled,
       aiSuggestionsEnabled: created?.aiSuggestionsEnabled ?? DEFAULTS.aiSuggestionsEnabled,
-      aiAskEnabled: created?.aiAskEnabled ?? DEFAULTS.aiAskEnabled,
-      aiAskModel: created?.aiAskModel ?? null,
-      aiAskIncludeAccountNames: created?.aiAskIncludeAccountNames ?? DEFAULTS.aiAskIncludeAccountNames,
-      aiAskConsentHost: created?.aiAskConsentHost ?? null,
-      aiAskConsentAt: created?.aiAskConsentAt ?? null,
+      aiAdviceEnabled: created?.aiAdviceEnabled ?? DEFAULTS.aiAdviceEnabled,
+      aiAdviceModel: created?.aiAdviceModel ?? null,
+      aiAdviceIncludeAccountNames: created?.aiAdviceIncludeAccountNames ?? DEFAULTS.aiAdviceIncludeAccountNames,
+      aiAdviceConsentHost: created?.aiAdviceConsentHost ?? null,
+      aiAdviceConsentAt: created?.aiAdviceConsentAt ?? null,
+      aiAdviceTokenProfile: created?.aiAdviceTokenProfile ?? DEFAULTS.aiAdviceTokenProfile,
+      aiAskEnabled: created?.aiAdviceEnabled ?? DEFAULTS.aiAdviceEnabled,
+      aiAskModel: created?.aiAdviceModel ?? null,
+      aiAskIncludeAccountNames: created?.aiAdviceIncludeAccountNames ?? DEFAULTS.aiAdviceIncludeAccountNames,
+      aiAskConsentHost: created?.aiAdviceConsentHost ?? null,
+      aiAskConsentAt: created?.aiAdviceConsentAt ?? null,
+      aiAskTokenProfile: created?.aiAdviceTokenProfile ?? DEFAULTS.aiAdviceTokenProfile,
       apiKeys: created?.apiKeys ?? {},
       accountTagVisibility: created?.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
       budgetExclusions: created?.budgetExclusions ?? DEFAULTS.budgetExclusions,
@@ -210,11 +217,18 @@ export async function GET() {
     aiActiveProviderId: settings[0].aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
     aiEnabled: settings[0].aiEnabled ?? DEFAULTS.aiEnabled,
     aiSuggestionsEnabled: settings[0].aiSuggestionsEnabled ?? DEFAULTS.aiSuggestionsEnabled,
-    aiAskEnabled: settings[0].aiAskEnabled ?? DEFAULTS.aiAskEnabled,
-    aiAskModel: settings[0].aiAskModel ?? null,
-    aiAskIncludeAccountNames: settings[0].aiAskIncludeAccountNames ?? DEFAULTS.aiAskIncludeAccountNames,
-    aiAskConsentHost: settings[0].aiAskConsentHost ?? null,
-    aiAskConsentAt: settings[0].aiAskConsentAt ?? null,
+    aiAdviceEnabled: settings[0].aiAdviceEnabled ?? DEFAULTS.aiAdviceEnabled,
+    aiAdviceModel: settings[0].aiAdviceModel ?? null,
+    aiAdviceIncludeAccountNames: settings[0].aiAdviceIncludeAccountNames ?? DEFAULTS.aiAdviceIncludeAccountNames,
+    aiAdviceConsentHost: settings[0].aiAdviceConsentHost ?? null,
+    aiAdviceConsentAt: settings[0].aiAdviceConsentAt ?? null,
+    aiAdviceTokenProfile: settings[0].aiAdviceTokenProfile ?? DEFAULTS.aiAdviceTokenProfile,
+    aiAskEnabled: settings[0].aiAdviceEnabled ?? DEFAULTS.aiAdviceEnabled,
+    aiAskModel: settings[0].aiAdviceModel ?? null,
+    aiAskIncludeAccountNames: settings[0].aiAdviceIncludeAccountNames ?? DEFAULTS.aiAdviceIncludeAccountNames,
+    aiAskConsentHost: settings[0].aiAdviceConsentHost ?? null,
+    aiAskConsentAt: settings[0].aiAdviceConsentAt ?? null,
+    aiAskTokenProfile: settings[0].aiAdviceTokenProfile ?? DEFAULTS.aiAdviceTokenProfile,
     apiKeys: apiKeys,
     accountTagVisibility: settings[0].accountTagVisibility ?? DEFAULTS.accountTagVisibility,
     budgetExclusions: settings[0].budgetExclusions ?? DEFAULTS.budgetExclusions,
@@ -317,11 +331,12 @@ export async function PATCH(request: Request) {
 	const upcomingBillsLeadDays = body.upcomingBillsLeadDays;
 	const aiEnabled = body.aiEnabled;
 	const aiSuggestionsEnabled = body.aiSuggestionsEnabled;
-	const aiAskEnabled = body.aiAskEnabled;
-	const aiAskModel = body.aiAskModel;
-	const aiAskIncludeAccountNames = body.aiAskIncludeAccountNames;
-	const aiAskConsentHost = body.aiAskConsentHost;
-	const aiAskConsentAt = body.aiAskConsentAt;
+	const aiAdviceEnabled = body.aiAdviceEnabled !== undefined ? body.aiAdviceEnabled : body.aiAskEnabled;
+	const aiAdviceModel = body.aiAdviceModel !== undefined ? body.aiAdviceModel : body.aiAskModel;
+	const aiAdviceIncludeAccountNames = body.aiAdviceIncludeAccountNames !== undefined ? body.aiAdviceIncludeAccountNames : body.aiAskIncludeAccountNames;
+	const aiAdviceConsentHost = body.aiAdviceConsentHost !== undefined ? body.aiAdviceConsentHost : body.aiAskConsentHost;
+	const aiAdviceConsentAt = body.aiAdviceConsentAt !== undefined ? body.aiAdviceConsentAt : body.aiAskConsentAt;
+	const aiAdviceTokenProfile = body.aiAdviceTokenProfile !== undefined ? body.aiAdviceTokenProfile : body.aiAskTokenProfile;
 
   if (currency !== undefined && (typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency.toUpperCase()))) {
     return Response.json({ error: 'Invalid currency value: must be a 3-letter ISO currency code (e.g. USD, EUR)' }, { status: 400 });
@@ -513,20 +528,23 @@ export async function PATCH(request: Request) {
 	if (aiSuggestionsEnabled !== undefined && typeof aiSuggestionsEnabled !== 'boolean') {
 		return Response.json({ error: 'Invalid aiSuggestionsEnabled value' }, { status: 400 });
 	}
-	if (aiAskEnabled !== undefined && typeof aiAskEnabled !== 'boolean') {
-		return Response.json({ error: 'Invalid aiAskEnabled value' }, { status: 400 });
+	if (aiAdviceEnabled !== undefined && typeof aiAdviceEnabled !== 'boolean') {
+		return Response.json({ error: 'Invalid aiAdviceEnabled value' }, { status: 400 });
 	}
-	if (aiAskModel !== undefined && aiAskModel !== null && typeof aiAskModel !== 'string') {
-		return Response.json({ error: 'Invalid aiAskModel value' }, { status: 400 });
+	if (aiAdviceModel !== undefined && aiAdviceModel !== null && typeof aiAdviceModel !== 'string') {
+		return Response.json({ error: 'Invalid aiAdviceModel value' }, { status: 400 });
 	}
-	if (aiAskIncludeAccountNames !== undefined && typeof aiAskIncludeAccountNames !== 'boolean') {
-		return Response.json({ error: 'Invalid aiAskIncludeAccountNames value' }, { status: 400 });
+	if (aiAdviceIncludeAccountNames !== undefined && typeof aiAdviceIncludeAccountNames !== 'boolean') {
+		return Response.json({ error: 'Invalid aiAdviceIncludeAccountNames value' }, { status: 400 });
 	}
-	if (aiAskConsentHost !== undefined && aiAskConsentHost !== null && typeof aiAskConsentHost !== 'string') {
-		return Response.json({ error: 'Invalid aiAskConsentHost value' }, { status: 400 });
+	if (aiAdviceConsentHost !== undefined && aiAdviceConsentHost !== null && typeof aiAdviceConsentHost !== 'string') {
+		return Response.json({ error: 'Invalid aiAdviceConsentHost value' }, { status: 400 });
 	}
-	if (aiAskConsentAt !== undefined && aiAskConsentAt !== null && typeof aiAskConsentAt !== 'string' && !(aiAskConsentAt instanceof Date)) {
-		return Response.json({ error: 'Invalid aiAskConsentAt value' }, { status: 400 });
+	if (aiAdviceConsentAt !== undefined && aiAdviceConsentAt !== null && typeof aiAdviceConsentAt !== 'string' && !(aiAdviceConsentAt instanceof Date)) {
+		return Response.json({ error: 'Invalid aiAdviceConsentAt value' }, { status: 400 });
+	}
+	if (aiAdviceTokenProfile !== undefined && !['local', 'modest', 'balanced', 'frontier'].includes(aiAdviceTokenProfile)) {
+		return Response.json({ error: 'Invalid aiAdviceTokenProfile value: must be "local", "modest", "balanced", or "frontier"' }, { status: 400 });
 	}
 
 	if (useMarketDataForSnapshots !== undefined && typeof useMarketDataForSnapshots !== 'boolean') {
@@ -758,11 +776,12 @@ export async function PATCH(request: Request) {
 	if (aiActiveProviderId !== undefined) updates.aiActiveProviderId = aiActiveProviderId;
 	if (aiEnabled !== undefined) updates.aiEnabled = aiEnabled;
 	if (aiSuggestionsEnabled !== undefined) updates.aiSuggestionsEnabled = aiSuggestionsEnabled;
-	if (aiAskEnabled !== undefined) updates.aiAskEnabled = aiAskEnabled;
-	if (aiAskModel !== undefined) updates.aiAskModel = aiAskModel ? aiAskModel.trim() : null;
-	if (aiAskIncludeAccountNames !== undefined) updates.aiAskIncludeAccountNames = aiAskIncludeAccountNames;
-	if (aiAskConsentHost !== undefined) updates.aiAskConsentHost = aiAskConsentHost ? aiAskConsentHost.trim() : null;
-	if (aiAskConsentAt !== undefined) updates.aiAskConsentAt = aiAskConsentAt ? new Date(aiAskConsentAt) : null;
+	if (aiAdviceEnabled !== undefined) updates.aiAdviceEnabled = aiAdviceEnabled;
+	if (aiAdviceModel !== undefined) updates.aiAdviceModel = aiAdviceModel ? aiAdviceModel.trim() : null;
+	if (aiAdviceIncludeAccountNames !== undefined) updates.aiAdviceIncludeAccountNames = aiAdviceIncludeAccountNames;
+	if (aiAdviceConsentHost !== undefined) updates.aiAdviceConsentHost = aiAdviceConsentHost ? aiAdviceConsentHost.trim() : null;
+	if (aiAdviceConsentAt !== undefined) updates.aiAdviceConsentAt = aiAdviceConsentAt ? new Date(aiAdviceConsentAt) : null;
+	if (aiAdviceTokenProfile !== undefined) updates.aiAdviceTokenProfile = aiAdviceTokenProfile;
 	if (useMarketDataForSnapshots !== undefined) updates.useMarketDataForSnapshots = useMarketDataForSnapshots;
 	if (apiKeys !== undefined) {
 		updates.apiKeys = dek ? await encryptField(JSON.stringify(apiKeys), dek) : JSON.stringify(apiKeys);
@@ -1016,11 +1035,18 @@ export async function PATCH(request: Request) {
     aiActiveProviderId: resultSetting.aiActiveProviderId ?? DEFAULTS.aiActiveProviderId,
     aiEnabled: resultSetting.aiEnabled ?? DEFAULTS.aiEnabled,
     aiSuggestionsEnabled: resultSetting.aiSuggestionsEnabled ?? DEFAULTS.aiSuggestionsEnabled,
-    aiAskEnabled: resultSetting.aiAskEnabled ?? DEFAULTS.aiAskEnabled,
-    aiAskModel: resultSetting.aiAskModel ?? null,
-    aiAskIncludeAccountNames: resultSetting.aiAskIncludeAccountNames ?? DEFAULTS.aiAskIncludeAccountNames,
-    aiAskConsentHost: resultSetting.aiAskConsentHost ?? null,
-    aiAskConsentAt: resultSetting.aiAskConsentAt ?? null,
+    aiAdviceEnabled: resultSetting.aiAdviceEnabled ?? DEFAULTS.aiAdviceEnabled,
+    aiAdviceModel: resultSetting.aiAdviceModel ?? null,
+    aiAdviceIncludeAccountNames: resultSetting.aiAdviceIncludeAccountNames ?? DEFAULTS.aiAdviceIncludeAccountNames,
+    aiAdviceConsentHost: resultSetting.aiAdviceConsentHost ?? null,
+    aiAdviceConsentAt: resultSetting.aiAdviceConsentAt ?? null,
+    aiAdviceTokenProfile: resultSetting.aiAdviceTokenProfile ?? DEFAULTS.aiAdviceTokenProfile,
+    aiAskEnabled: resultSetting.aiAdviceEnabled ?? DEFAULTS.aiAdviceEnabled,
+    aiAskModel: resultSetting.aiAdviceModel ?? null,
+    aiAskIncludeAccountNames: resultSetting.aiAdviceIncludeAccountNames ?? DEFAULTS.aiAdviceIncludeAccountNames,
+    aiAskConsentHost: resultSetting.aiAdviceConsentHost ?? null,
+    aiAskConsentAt: resultSetting.aiAdviceConsentAt ?? null,
+    aiAskTokenProfile: resultSetting.aiAdviceTokenProfile ?? DEFAULTS.aiAdviceTokenProfile,
     apiKeys: updatedApiKeys,
     accountTagVisibility: resultSetting.accountTagVisibility ?? DEFAULTS.accountTagVisibility,
     budgetExclusions: resultSetting.budgetExclusions ?? DEFAULTS.budgetExclusions,

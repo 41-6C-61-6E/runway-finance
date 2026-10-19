@@ -77,6 +77,7 @@ onboarding copy. Labels must match one of these concepts:
   the real offline behavior is the automatic banner
   (`components/offline-banner.tsx`). Labeled with "(preview)" so connected
   users never mistake it for an actual network state.
+- **Advice** — privacy-preserving financial assistant offering contextual insights, summaries, and scenario exploration across your finances.
 
 ## CTA verb pairing
 

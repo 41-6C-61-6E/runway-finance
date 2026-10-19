@@ -12,7 +12,7 @@ import {
   parseStoredFallbacks,
   buildModelParams,
 } from '@/lib/ai/endpoints';
-import { extractStreamChunk, createThinkStripper } from '@/lib/ai/stream';
+import { extractStreamChunk, createThinkStripper, stripSafetyTags } from '@/lib/ai/stream';
 
 export type ResolvedProvider = {
   providerId: string;
@@ -136,17 +136,10 @@ export async function* streamChat(args: {
   const { provider, messages, temperature = 0.3, maxTokens = 1200, signal } = args;
   const url = buildChatUrl(provider.endpoint);
 
-  const modelParams = buildModelParams(provider.endpoint, provider.model, provider.fallbacks);
-  const body: Record<string, any> = {
-    ...modelParams,
-    messages,
-    temperature,
-    max_tokens: maxTokens,
-    stream: true,
-    ...(provider.isOpenRouter
-      ? { reasoning: { exclude: true } }
-      : { enable_thinking: false }),
-  };
+  const candidateModels: string[] = [
+    provider.model,
+    ...provider.fallbacks.filter((m) => m && m.trim() !== provider.model.trim()),
+  ];
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -157,87 +150,137 @@ export async function* streamChat(args: {
 
   const MAX_RETRIES = 2;
   let response: Response | null = null;
+  let activeModel = provider.model;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (signal?.aborted) {
-      throw new DOMException('Aborted', 'AbortError');
-    }
+  for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
+    activeModel = candidateModels[mIdx];
+    const remainingFallbacks = candidateModels.slice(mIdx + 1);
+    const modelParams = buildModelParams(provider.endpoint, activeModel, remainingFallbacks);
 
-    try {
-      response = await fetchSecure(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal,
-      });
+    const isReasoningModel = /r1|reasoning|deepseek/i.test(activeModel);
+    const effectiveMaxTokens = isReasoningModel ? Math.max(maxTokens, 2500) : maxTokens;
 
-      if (!response.ok) {
-        const text = await response.text();
-        const isRetryable = response.status === 429 || response.status >= 500;
+    const body: Record<string, any> = {
+      ...modelParams,
+      messages,
+      temperature,
+      max_tokens: effectiveMaxTokens,
+      stream: true,
+      ...(provider.isOpenRouter
+        ? { reasoning: { exclude: true } }
+        : { enable_thinking: false }),
+    };
 
-        if (isRetryable && attempt < MAX_RETRIES && !signal?.aborted) {
-          let delay = Math.pow(2, attempt) * 1000;
-          const retryAfter = response.headers.get('retry-after');
-          if (retryAfter) {
-            const sec = parseInt(retryAfter, 10);
-            if (!isNaN(sec) && sec > 0 && sec <= 10) {
-              delay = sec * 1000;
-            }
-          }
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          continue;
-        }
+    let rateLimited = false;
 
-        // Map status code to AiClientError
-        const safeSnippet = text.replace(/Bearer\s+[A-Za-z0-9_.-]+/gi, 'Bearer [REDACTED]').slice(0, 300);
-        if (response.status === 429) {
-          throw new AiClientError('provider_rate_limited', 'AI provider rate limit reached', {
-            status: 429,
-            detail: safeSnippet,
-          });
-        }
-        if (response.status === 401 || response.status === 403) {
-          throw new AiClientError('provider_auth', 'AI provider authentication failed', {
-            status: response.status,
-            detail: safeSnippet,
-          });
-        }
-        if (response.status === 404) {
-          throw new AiClientError('provider_not_found', 'AI provider model or endpoint not found', {
-            status: 404,
-            detail: safeSnippet,
-          });
-        }
-        throw new AiClientError('provider_error', `AI provider error (${response.status})`, {
-          status: response.status,
-          detail: safeSnippet,
-        });
-      }
-
-      // Success opening connection
-      break;
-    } catch (err) {
-      if (err instanceof AiClientError || (err instanceof DOMException && err.name === 'AbortError')) {
-        throw err;
-      }
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       if (signal?.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
 
-      // Network error before response received
-      if (attempt < MAX_RETRIES) {
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        continue;
-      }
+      try {
+        response = await fetchSecure(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          signal,
+        });
 
-      const isTimeout = err instanceof Error && /timeout|abort/i.test(err.name);
-      if (isTimeout) {
-        throw new AiClientError('timeout', 'AI request timed out', { cause: err });
+        if (!response.ok) {
+          const text = await response.text();
+          const isRetryable = response.status === 429 || response.status >= 500;
+
+          if (response.status === 429 && mIdx < candidateModels.length - 1) {
+            rateLimited = true;
+            logger.warn('[ai-client] Model rate-limited (429), failing over to fallback model', {
+              providerId: provider.providerId,
+              fromModel: activeModel,
+              toModel: candidateModels[mIdx + 1],
+            });
+            break;
+          }
+
+          if (isRetryable && attempt < MAX_RETRIES && !signal?.aborted) {
+            let delay = Math.pow(2, attempt) * 1000;
+            const retryAfter = response.headers.get('retry-after');
+            if (retryAfter) {
+              const sec = parseInt(retryAfter, 10);
+              if (!isNaN(sec) && sec > 0 && sec <= 10) {
+                delay = sec * 1000;
+              }
+            }
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            continue;
+          }
+
+          // Map status code to AiClientError
+          const safeSnippet = text.replace(/Bearer\s+[A-Za-z0-9_.-]+/gi, 'Bearer [REDACTED]').slice(0, 300);
+          if (response.status === 429) {
+            throw new AiClientError('provider_rate_limited', 'AI provider rate limit reached', {
+              status: 429,
+              detail: safeSnippet,
+            });
+          }
+          if (response.status === 401 || response.status === 403) {
+            throw new AiClientError('provider_auth', 'AI provider authentication failed', {
+              status: response.status,
+              detail: safeSnippet,
+            });
+          }
+          if (response.status === 404) {
+            throw new AiClientError('provider_not_found', 'AI provider model or endpoint not found', {
+              status: 404,
+              detail: safeSnippet,
+            });
+          }
+          throw new AiClientError('provider_error', `AI provider error (${response.status})`, {
+            status: response.status,
+            detail: safeSnippet,
+          });
+        }
+
+        // Success opening connection
+        break;
+      } catch (err) {
+        if (err instanceof AiClientError || (err instanceof DOMException && err.name === 'AbortError')) {
+          if (err instanceof AiClientError && err.code === 'provider_rate_limited' && mIdx < candidateModels.length - 1) {
+            rateLimited = true;
+            logger.warn('[ai-client] Model rate-limited (429), failing over to fallback model', {
+              providerId: provider.providerId,
+              fromModel: activeModel,
+              toModel: candidateModels[mIdx + 1],
+            });
+            break;
+          }
+          throw err;
+        }
+        if (signal?.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+
+        // Network error before response received
+        if (attempt < MAX_RETRIES) {
+          const delay = Math.pow(2, attempt) * 1000;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        const isTimeout = err instanceof Error && /timeout|abort/i.test(err.name);
+        if (isTimeout) {
+          throw new AiClientError('timeout', 'AI request timed out', { cause: err });
+        }
+        throw new AiClientError('provider_error', `AI network error: ${err instanceof Error ? err.message : String(err)}`, {
+          cause: err,
+        });
       }
-      throw new AiClientError('provider_error', `AI network error: ${err instanceof Error ? err.message : String(err)}`, {
-        cause: err,
-      });
+    }
+
+    if (response && response.ok) {
+      break;
+    }
+
+    if (rateLimited && mIdx < candidateModels.length - 1) {
+      continue;
     }
   }
 
@@ -268,9 +311,10 @@ export async function* streamChat(args: {
       '';
 
     const stripper = createThinkStripper();
-    const stripped = stripper.process(direct) + stripper.flush();
+    let stripped = stripper.process(direct) + stripper.flush();
+    stripped = stripSafetyTags(stripped).trim();
 
-    if (!stripped.trim()) {
+    if (!stripped) {
       throw new AiClientError('empty_response', 'AI provider returned an empty response');
     }
 
@@ -282,6 +326,10 @@ export async function* streamChat(args: {
   const reader = response.body?.getReader();
   if (!reader) {
     throw new AiClientError('provider_error', 'Response body is not readable');
+  }
+
+  if (activeModel !== provider.model) {
+    yield { type: 'meta', servedModel: activeModel };
   }
 
   const decoder = new TextDecoder();
@@ -325,7 +373,10 @@ export async function* streamChat(args: {
           }
 
           if (text) {
-            const cleanText = stripper.process(text);
+            let cleanText = stripper.process(text);
+            if (!hasYieldedText && cleanText) {
+              cleanText = stripSafetyTags(cleanText);
+            }
             if (cleanText) {
               hasYieldedText = true;
               yield { type: 'text', text: cleanText };
@@ -337,7 +388,10 @@ export async function* streamChat(args: {
       }
     }
 
-    const finalClean = stripper.flush();
+    let finalClean = stripper.flush();
+    if (!hasYieldedText && finalClean) {
+      finalClean = stripSafetyTags(finalClean);
+    }
     if (finalClean) {
       hasYieldedText = true;
       yield { type: 'text', text: finalClean };
@@ -345,7 +399,8 @@ export async function* streamChat(args: {
 
     if (!hasYieldedText && completedSnapshot) {
       const snapshotStripper = createThinkStripper();
-      const snapshotClean = snapshotStripper.process(completedSnapshot) + snapshotStripper.flush();
+      let snapshotClean = snapshotStripper.process(completedSnapshot) + snapshotStripper.flush();
+      snapshotClean = stripSafetyTags(snapshotClean);
       if (snapshotClean) {
         hasYieldedText = true;
         yield { type: 'text', text: snapshotClean };
@@ -353,6 +408,12 @@ export async function* streamChat(args: {
     }
 
     if (!hasYieldedText) {
+      if (stripper.isInThink()) {
+        throw new AiClientError(
+          'empty_response',
+          'AI model reached its token limit while reasoning. Consider switching to the "Frontier" profile in Settings or selecting a non-reasoning chat model.'
+        );
+      }
       throw new AiClientError('empty_response', 'AI provider returned an empty response');
     }
   } finally {

@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD COLUMN "ai_ask_token_profile" text DEFAULT 'balanced' NOT NULL;
