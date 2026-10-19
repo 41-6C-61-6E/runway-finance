@@ -370,6 +370,13 @@ html.text-size-lg {
   outline: none !important;
 }
 
+/* Remove focus highlight outline and lines from advice composer textarea */
+#advice-composer-input:focus,
+#advice-composer-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* ── Tag / Badge Pill Utilities ────────────────────────────────────────────── */
 
 .tag-pill {

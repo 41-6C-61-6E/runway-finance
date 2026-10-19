@@ -55,7 +55,7 @@ export function AdviceComposer({ onSend, onStop, isStreaming, disabled }: Advice
 
   return (
     <div className="flex flex-col gap-1.5 p-3 border-t border-border bg-background">
-      <div className="relative flex items-end gap-2 bg-muted/30 border border-input rounded-xl px-3 py-2 focus-within:ring-1 focus-within:ring-ring focus-within:border-ring transition-all">
+      <div className="relative flex items-end gap-2 bg-muted/20 border border-border/70 rounded-xl px-3 py-2 focus-within:border-border focus-within:bg-muted/30 transition-colors">
         <textarea
           id="advice-composer-input"
           ref={textareaRef}
@@ -66,7 +66,8 @@ export function AdviceComposer({ onSend, onStop, isStreaming, disabled }: Advice
           disabled={disabled}
           rows={1}
           aria-label="Advice question input"
-          className="flex-1 bg-transparent border-0 resize-none outline-none text-xs leading-relaxed text-foreground placeholder:text-muted-foreground min-h-[36px] max-h-[140px] py-1"
+          style={{ outline: 'none', boxShadow: 'none' }}
+          className="flex-1 bg-transparent border-0 resize-none text-xs leading-relaxed text-foreground placeholder:text-muted-foreground min-h-[36px] max-h-[140px] py-1 outline-none ring-0 shadow-none focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none !outline-none !shadow-none"
         />
 
         {isStreaming ? (
