@@ -73,6 +73,7 @@ export async function GET(request: Request) {
 
   const decryptedWithHealth = decrypted.map((acc: any) => ({
     ...acc,
+    currency: (typeof acc.currency === 'string' && acc.currency.trim()) || 'USD',
     syncStatus: syncStatuses[acc.id] ?? { status: 'ok' },
   }));
 

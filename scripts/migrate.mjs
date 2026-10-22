@@ -116,6 +116,55 @@ async function runSelfHealingChecks(client) {
       await client.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS sensitive BOOLEAN NOT NULL DEFAULT FALSE`);
     }
 
+    // 3e. Check if current_balance and available_balance columns exist on accounts
+    const accountBalanceColsCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'accounts' AND column_name IN ('current_balance', 'available_balance')
+    `);
+    const accountBalanceColsFound = new Set(accountBalanceColsCheck.rows.map(r => r.column_name));
+    if (!accountBalanceColsFound.has('current_balance')) {
+      console.log('[migrate] [self-heal] Adding missing current_balance column to accounts...');
+      await client.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS current_balance TEXT`);
+    }
+    if (!accountBalanceColsFound.has('available_balance')) {
+      console.log('[migrate] [self-heal] Adding missing available_balance column to accounts...');
+      await client.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS available_balance TEXT`);
+    }
+
+    // 3f. Check if balance_source column exists on connections tables
+    const plaidBalanceSourceCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'plaid_connections' AND column_name = 'balance_source'
+    `);
+    if (plaidBalanceSourceCheck.rows.length === 0) {
+      console.log('[migrate] [self-heal] Adding missing balance_source column to plaid_connections...');
+      await client.query(`ALTER TABLE plaid_connections ADD COLUMN IF NOT EXISTS balance_source TEXT NOT NULL DEFAULT 'current'`);
+    }
+
+    const simplefinBalanceSourceCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'simplefin_connections' AND column_name = 'balance_source'
+    `);
+    if (simplefinBalanceSourceCheck.rows.length === 0) {
+      console.log('[migrate] [self-heal] Adding missing balance_source column to simplefin_connections...');
+      await client.query(`ALTER TABLE simplefin_connections ADD COLUMN IF NOT EXISTS balance_source TEXT NOT NULL DEFAULT 'current'`);
+    }
+
+    // 3g. Self-heal any accounts that have an empty string, whitespace, or NULL currency
+    const emptyCurrencyCheck = await client.query(`
+      SELECT id FROM accounts
+      WHERE currency IS NULL OR TRIM(currency) = ''
+      LIMIT 1
+    `);
+    if (emptyCurrencyCheck.rows.length > 0) {
+      console.log('[migrate] [self-heal] Fixing accounts with missing/empty currency to USD...');
+      await client.query(`
+        UPDATE accounts
+        SET currency = 'USD'
+        WHERE currency IS NULL OR TRIM(currency) = ''
+      `);
+    }
+
     // 4. Check if account_sharing_invitations table exists
     const tableCheck1 = await client.query(`
       SELECT table_name FROM information_schema.tables

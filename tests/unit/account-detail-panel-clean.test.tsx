@@ -86,4 +86,27 @@ describe('AccountDetailPanel Clean Styling', () => {
     // Only the top-level outer panel should have rounded-2xl
     expect(innerRounded2xlBoxes.length).toBe(1);
   });
+
+  it('renders without error when account currency is an empty string or invalid', () => {
+    const emptyCurrencyAccount: Account = {
+      ...mockAccount,
+      id: 'acc-empty-curr',
+      currency: '',
+      balance: 1250,
+    };
+
+    expect(() => {
+      render(
+        <AccountDetailPanel
+          account={emptyCurrencyAccount}
+          historyData={[
+            { date: '2026-01-01', 'acc-empty-curr': 1000 },
+            { date: '2026-02-01', 'acc-empty-curr': 1250 },
+          ]}
+          hierarchyTimeframe="all"
+          onClose={vi.fn()}
+        />
+      );
+    }).not.toThrow();
+  });
 });

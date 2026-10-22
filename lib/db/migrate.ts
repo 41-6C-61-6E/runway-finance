@@ -222,6 +222,21 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       await client.query(`ALTER TABLE simplefin_connections ADD COLUMN IF NOT EXISTS balance_source TEXT NOT NULL DEFAULT 'current'`);
     }
 
+    // 3g. Self-heal any accounts that have an empty string, whitespace, or NULL currency
+    const emptyCurrencyCheck = await client.query(`
+      SELECT id FROM accounts
+      WHERE currency IS NULL OR TRIM(currency) = ''
+      LIMIT 1
+    `);
+    if (emptyCurrencyCheck.rows.length > 0) {
+      logger.info('[migrate] [self-heal] Fixing accounts with missing/empty currency to USD...');
+      await client.query(`
+        UPDATE accounts
+        SET currency = 'USD'
+        WHERE currency IS NULL OR TRIM(currency) = ''
+      `);
+    }
+
     // 4. Check if account_sharing_invitations table exists
     const tableCheck1 = await client.query(`
       SELECT table_name FROM information_schema.tables

@@ -1,20 +1,45 @@
 const formatterCache = new Map<string, Intl.NumberFormat>();
 
+function sanitizeCurrency(currency?: string | null): string {
+  if (!currency || typeof currency !== 'string') return 'USD';
+  const trimmed = currency.trim();
+  return trimmed.length > 0 ? trimmed : 'USD';
+}
+
 function getCachedFormatter(
   locale: string,
   currency: string,
   options?: Intl.NumberFormatOptions
 ): Intl.NumberFormat {
-  const key = `${locale}-${currency}-${JSON.stringify(options || {})}`;
+  const safeCurrency = sanitizeCurrency(currency);
+  const safeLocale = (typeof locale === 'string' && locale.trim()) || 'en-US';
+  const key = `${safeLocale}-${safeCurrency}-${JSON.stringify(options || {})}`;
   let formatter = formatterCache.get(key);
   if (!formatter) {
-    formatter = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-      ...options,
-    });
+    try {
+      formatter = new Intl.NumberFormat(safeLocale, {
+        style: 'currency',
+        currency: safeCurrency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+        ...options,
+      });
+    } catch {
+      try {
+        formatter = new Intl.NumberFormat(safeLocale, {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+          ...options,
+        });
+      } catch {
+        formatter = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+        });
+      }
+    }
     formatterCache.set(key, formatter);
   }
   return formatter;
@@ -25,7 +50,7 @@ function getCachedFormatter(
  */
 export function formatCurrency(
   amount: number | string | undefined | null,
-  currency = 'USD',
+  currency: string | null | undefined = 'USD',
   locale = 'en-US',
   options?: Intl.NumberFormatOptions
 ): string {
@@ -33,7 +58,7 @@ export function formatCurrency(
   const num = typeof val === 'string' ? parseFloat(val) : val;
   const validNum = isNaN(num) ? 0 : num;
   
-  return getCachedFormatter(locale, currency, options).format(validNum);
+  return getCachedFormatter(locale, currency || 'USD', options).format(validNum);
 }
 
 /**
@@ -120,10 +145,10 @@ export function roundToCents(val: number | string | null | undefined): number {
 /** Whole dollars — use where a number represents a *position* (balance, net worth, card totals). */
 export function formatBalance(
   amount: number | string | null | undefined,
-  currency = 'USD',
+  currency: string | null | undefined = 'USD',
   locale = 'en-US'
 ): string {
-  return formatCurrency(amount, currency, locale, {
+  return formatCurrency(amount, currency || 'USD', locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
@@ -132,10 +157,10 @@ export function formatBalance(
 /** Exactly 2 decimals — use for individual movements (per-transaction amounts, ledger lines). */
 export function formatAmount(
   amount: number | string | null | undefined,
-  currency = 'USD',
+  currency: string | null | undefined = 'USD',
   locale = 'en-US'
 ): string {
-  return formatCurrency(amount, currency, locale, {
+  return formatCurrency(amount, currency || 'USD', locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -147,7 +172,7 @@ export function formatAmount(
  */
 export function formatProjected(
   amount: number | string | null | undefined,
-  currency = 'USD',
+  currency: string | null | undefined = 'USD',
   locale = 'en-US'
 ): string {
   const val = amount === undefined || amount === null ? 0 : amount;
@@ -156,8 +181,8 @@ export function formatProjected(
   const rounded = Math.round(safe * 10) / 10;
   const isWhole = rounded % 1 === 0;
   return isWhole
-    ? formatCurrency(rounded, currency, locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-    : formatCurrency(rounded, currency, locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    ? formatCurrency(rounded, currency || 'USD', locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    : formatCurrency(rounded, currency || 'USD', locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 /**

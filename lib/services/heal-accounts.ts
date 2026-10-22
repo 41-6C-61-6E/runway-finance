@@ -159,7 +159,21 @@ export async function healProductionAccounts(): Promise<void> {
       }
     }
 
-    // 3. Trigger full sync in the background for any connection that was healed/reset
+    // 3. Scan and heal accounts with missing or empty currency
+    const blankCurrencyAccounts = allAccounts.filter(
+      acc => !acc.currency || acc.currency.trim() === ''
+    );
+    if (blankCurrencyAccounts.length > 0) {
+      logger.info('[startup-healing] Healing accounts with empty currency to USD', { count: blankCurrencyAccounts.length });
+      for (const bAcc of blankCurrencyAccounts) {
+        await db
+          .update(accounts)
+          .set({ currency: 'USD' })
+          .where(eq(accounts.id, bAcc.id));
+      }
+    }
+
+    // 4. Trigger full sync in the background for any connection that was healed/reset
     if (connectionsToSync.size > 0) {
       logger.info('[startup-healing] Triggering background full re-sync for healed connections', { count: connectionsToSync.size });
       for (const connId of connectionsToSync) {

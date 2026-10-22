@@ -62,6 +62,7 @@ export async function GET() {
 
   const decryptedWithTags = decrypted.map((acc: any) => ({
     ...acc,
+    currency: (typeof acc.currency === 'string' && acc.currency.trim()) || 'USD',
     tags: tagsByAccountId.get(acc.id) ?? [],
   }));
 
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
       type: body.type,
       metadata: body.metadata,
       initialValue: body.initialValue,
-      currency: body.currency,
+      currency: (typeof body.currency === 'string' && body.currency.trim()) || 'USD',
       apiConfig,
     }, dek);
     logger.info('POST /api/manual-accounts - created', { userId: dataUserId, type: body.type, name: body.name, initialValue: body.initialValue });

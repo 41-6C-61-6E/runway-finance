@@ -3,6 +3,7 @@ import {
   formatBalance,
   formatAmount,
   formatProjected,
+  formatCurrency,
   formatCompactCurrency,
   formatPercent,
   formatPlainPercent,
@@ -16,6 +17,20 @@ describe('R-7 role formatters (G3 / W-3)', () => {
       expect(formatBalance(-482)).toBe('-$482');
       expect(formatBalance(98635.51)).toBe('$98,636');
       expect(formatBalance(0)).toBe('$0');
+    });
+
+    it('gracefully handles empty, whitespace, null, or invalid currency strings', () => {
+      expect(formatBalance(500, '')).toBe('$500');
+      expect(formatBalance(500, '   ')).toBe('$500');
+      expect(formatBalance(500, null)).toBe('$500');
+      expect(formatBalance(500, undefined)).toBe('$500');
+      expect(formatBalance(500, 'INVALID_CODE')).toBe('$500');
+      expect(formatCurrency(1234.56, '')).toBe('$1,235');
+      expect(formatCurrency(1234.56, '   ')).toBe('$1,235');
+      expect(formatCurrency(1234.56, null)).toBe('$1,235');
+      expect(formatCurrency(1234.56, 'XYZ123')).toBe('$1,235');
+      expect(formatAmount(42.5, '')).toBe('$42.50');
+      expect(formatProjected(150, '')).toBe('$150');
     });
   });
 

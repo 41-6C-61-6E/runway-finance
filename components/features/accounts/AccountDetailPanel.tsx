@@ -117,7 +117,7 @@ export default function AccountDetailPanel({
         {/* Balance + period delta — same line like combined chart */}
         <div className="flex items-baseline gap-2.5 mt-2.5 flex-wrap">
           <p className="text-xl sm:text-2xl font-bold font-mono text-sidebar-foreground blur-number">
-            {formatCurrency(account.balance, account.currency)}
+            {formatCurrency(account.balance, account.currency || 'USD')}
           </p>
           {trendStats && trendStats.change !== 0 && (
             <p
@@ -130,7 +130,7 @@ export default function AccountDetailPanel({
               ) : (
                 <ArrowDownRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
               )}
-              {formatCurrency(Math.abs(trendStats.change), account.currency)} (
+              {formatCurrency(Math.abs(trendStats.change), account.currency || 'USD')} (
               {formatPlainPercent(Math.abs(trendStats.percentChange))})
             </p>
           )}

@@ -426,7 +426,7 @@ export async function createManualAccount(input: {
     connectionId: null,
     externalId: manualExternalId(),
     name: input.name,
-    currency: input.currency ?? 'USD',
+    currency: (input.currency && input.currency.trim()) || 'USD',
     balance: formatToCents(initialValue),
     balanceDate: new Date(),
     type: accountType,

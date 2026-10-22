@@ -376,7 +376,7 @@ export async function GET(request: Request) {
         id: acc.id,
         name: acc.name,
         type: acc.type,
-        currency: acc.currency,
+        currency: (typeof acc.currency === 'string' && acc.currency.trim()) || 'USD',
         institution: acc.institution,
         balance: parseFloat(acc.balance),
         isHidden: acc.isHidden,
