@@ -445,10 +445,13 @@ export default function FilterBar({
   const categoryItems = parents.flatMap((parent) => {
     const children = getChildren(parent.id);
     if (children.length > 0) {
-      return children.map((child) => ({
-        id: child.id,
-        label: `${parent.name} › ${child.name}`,
-      }));
+      return [
+        { id: parent.id, label: parent.name },
+        ...children.map((child) => ({
+          id: child.id,
+          label: `${parent.name} › ${child.name}`,
+        })),
+      ];
     }
     return [{ id: parent.id, label: parent.name }];
   });
@@ -896,11 +899,17 @@ export default function FilterBar({
                           </label>
                         )}
                         {parents.map((parent) => {
-                          const children = getChildren(parent.id).filter(
+                          const allChildren = getChildren(parent.id);
+                          const matchingChildren = allChildren.filter(
                             (child) => matches(child.name) || matches(parent.name)
                           );
-                          if (!categorySearch && children.length === 0) {
-                            if (!matches(parent.name)) return null;
+                          const hasChildren = allChildren.length > 0;
+
+                          if (categorySearch && !matches(parent.name) && matchingChildren.length === 0) {
+                            return null;
+                          }
+
+                          if (!hasChildren) {
                             return (
                               <label
                                 key={parent.id}
@@ -925,30 +934,62 @@ export default function FilterBar({
                               </label>
                             );
                           }
-                          if (children.length === 0) return null;
+
+                          // Parent with children
+                          const allChildIds = allChildren.map((c) => c.id);
+                          const selectedChildCount = allChildIds.filter((id) => selectedCategoryIds.includes(id)).length;
+                          const isParentSelected = selectedCategoryIds.includes(parent.id);
+                          const isAllSelected = isParentSelected || (allChildIds.length > 0 && selectedChildCount === allChildIds.length);
+                          const isPartial = !isAllSelected && (selectedChildCount > 0 || isParentSelected);
+
                           return (
-                            <div key={parent.id}>
-                              <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/20">
-                                {parent.name}
-                              </div>
-                              {children.map((child) => (
+                            <div key={parent.id} className="border-b border-border/30 last:border-b-0">
+                              <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted/50 cursor-pointer transition-colors bg-muted/20">
+                                <input
+                                  type="checkbox"
+                                  checked={isAllSelected}
+                                  ref={(el) => {
+                                    if (el) el.indeterminate = isPartial;
+                                  }}
+                                  onChange={() => {
+                                    let next: string[];
+                                    if (isAllSelected || isParentSelected) {
+                                      // Deselect parent and its children
+                                      next = selectedCategoryIds.filter(
+                                        (id) => id !== parent.id && !allChildIds.includes(id)
+                                      );
+                                    } else {
+                                      // Select parent and its children
+                                      next = Array.from(new Set([...selectedCategoryIds, parent.id, ...allChildIds]));
+                                    }
+                                    handleCategoryIdsChange(next);
+                                  }}
+                                  className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
+                                />
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
+                                  style={{ backgroundColor: parent.color }}
+                                />
+                                <span className="uppercase tracking-wider">{parent.name}</span>
+                              </label>
+                              {matchingChildren.map((child) => (
                                 <label
                                   key={child.id}
-                                  className="flex items-center gap-2 px-3 py-2 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer ml-2 transition-colors border-b border-border/30 last:border-b-0"
+                                  className="flex items-center gap-2 pl-7 pr-3 py-1.5 text-sm text-foreground/80 hover:bg-muted/50 cursor-pointer transition-colors border-t border-border/20"
                                 >
                                   <input
                                     type="checkbox"
                                     checked={selectedCategoryIds.includes(child.id)}
                                     onChange={() => {
                                       const next = selectedCategoryIds.includes(child.id)
-                                        ? selectedCategoryIds.filter((id) => id !== child.id)
+                                        ? selectedCategoryIds.filter((id) => id !== child.id && id !== parent.id)
                                         : [...selectedCategoryIds, child.id];
                                       handleCategoryIdsChange(next);
                                     }}
                                     className="rounded border-border bg-background text-primary focus:ring-ring cursor-pointer"
                                   />
                                   <span
-                                    className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
+                                    className="w-2 h-2 rounded-full inline-block flex-shrink-0"
                                     style={{ backgroundColor: child.color }}
                                   />
                                   {child.name}

@@ -77,7 +77,7 @@ function AppTabsInner({
 
   if (variant === 'pills') {
     return (
-      <div className={cn('relative min-w-0 max-w-full', fullWidth ? 'w-full' : 'w-max', className)}>
+      <div className={cn('relative min-w-0 max-w-full', fullWidth ? 'w-full' : 'w-max mx-auto md:mx-0', className)}>
         <div
           ref={(node) => {
             pillsRef.current = node;
@@ -85,7 +85,7 @@ function AppTabsInner({
           }}
           onScroll={update}
           className={cn(
-            'flex items-center gap-1 p-1 rounded-full max-w-full overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x',
+            'flex items-center gap-1 p-1 rounded-full max-w-full overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x justify-center md:justify-start',
             glassSurface,
             fullWidth && 'w-full'
           )}
@@ -152,7 +152,7 @@ function AppTabsInner({
       ref={underlineRef}
       className={cn(
         'flex items-center border-b border-border/60 overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x w-full',
-        fullWidth ? 'gap-2 sm:gap-4' : 'gap-4 md:gap-6',
+        fullWidth ? 'gap-2 sm:gap-4' : 'gap-4 md:gap-6 justify-center md:justify-start',
         className
       )}
       role="tablist"

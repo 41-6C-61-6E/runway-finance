@@ -230,6 +230,7 @@ export function BudgetItemTransactionsIcon({
           align="start"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
+          onPointerDown={(e) => e.stopPropagation()}
           className="hidden md:block w-72 sm:w-80 p-0 overflow-hidden bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl z-[100]"
         >
           {/* Header */}
@@ -262,9 +263,16 @@ export function BudgetItemTransactionsIcon({
                 const displayTitle = tx.payee || tx.description || 'Transaction';
 
                 return (
-                  <div
+                  <Link
                     key={tx.id}
-                    className="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg hover:bg-accent/50 transition-colors gap-2"
+                    href={`/transactions?search=${encodeURIComponent(displayTitle)}`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpen(false);
+                      router.push(`/transactions?search=${encodeURIComponent(displayTitle)}`);
+                    }}
+                    className="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg hover:bg-accent/50 transition-colors gap-2 cursor-pointer"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-foreground truncate">{displayTitle}</div>
@@ -286,7 +294,7 @@ export function BudgetItemTransactionsIcon({
                     >
                       {formatCurrency(Math.abs(numAmt))}
                     </div>
-                  </div>
+                  </Link>
                 );
               })
             )}
@@ -296,8 +304,13 @@ export function BudgetItemTransactionsIcon({
           <div className="p-2 bg-muted/20 border-t border-border/50">
             <Link
               href={targetUrl}
-              onClick={() => setOpen(false)}
-              className="w-full py-1.5 px-3 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                router.push(targetUrl);
+              }}
+              className="w-full py-1.5 px-3 text-xs font-semibold text-primary hover:bg-primary/10 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <span>{txList.length > 0 ? `View All (${totalCount}) Transactions` : 'View Transactions Page'}</span>
               <ArrowRight className="w-3.5 h-3.5" />

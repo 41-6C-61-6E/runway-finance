@@ -94,6 +94,13 @@ export const queryKeys = {
     /** Matches `['recurring', ...]` (currently local-state only; kept for future RQ migration). */
     all: ['recurring'] as const,
   },
+
+  calendar: {
+    /** Matches `['daily-cash-flow', ...]`. */
+    dailyCashFlow: ['daily-cash-flow'] as const,
+    /** Matches `['calendar-day-transactions', ...]`. */
+    dayTransactions: ['calendar-day-transactions'] as const,
+  },
 } as const;
 
 /**
@@ -107,6 +114,8 @@ export const ACCOUNT_AFFECTED_PREFIXES = [
   queryKeys.accounts.transactions,
   queryKeys.budgets.all,
   queryKeys.budgets.topTransactions,
+  queryKeys.calendar.dailyCashFlow,
+  queryKeys.calendar.dayTransactions,
   queryKeys.netWorth.chart,
   queryKeys.investments.all,
   queryKeys.investments.history,
@@ -129,6 +138,8 @@ export const TRANSACTION_AFFECTED_PREFIXES = [
   queryKeys.accounts.transactions,
   queryKeys.budgets.all,
   queryKeys.budgets.topTransactions,
+  queryKeys.calendar.dailyCashFlow,
+  queryKeys.calendar.dayTransactions,
   queryKeys.netWorth.chart,
   queryKeys.investments.all,
   queryKeys.investments.history,
@@ -137,3 +148,4 @@ export const TRANSACTION_AFFECTED_PREFIXES = [
   queryKeys.cashFlow.cashVsCredit,
   queryKeys.cashFlow.savingsRate,
 ] as const;
+

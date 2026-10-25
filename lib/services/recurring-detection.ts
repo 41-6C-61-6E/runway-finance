@@ -444,8 +444,10 @@ export async function detectRecurringTransactions(
     const { frequency, regularity } = classifyFrequency(intervals);
     if (!frequency) continue;
 
-    // Minimum occurrences threshold
-    const minOccurrences = frequency === 'annual' || frequency === 'semi_annual' ? 2 : 3;
+    // Minimum occurrences threshold:
+    // Only annual subscriptions can ever be detected with 2 occurrences (e.g. annual renewals).
+    // Weekly, biweekly, monthly, quarterly, semi-annual MUST have at least 3 occurrences.
+    const minOccurrences = frequency === 'annual' ? 2 : 3;
     if (dedupedTxs.length < minOccurrences) continue;
 
     // Recency threshold check: omit lapsed/ended subscriptions
@@ -464,8 +466,16 @@ export async function detectRecurringTransactions(
     const amounts = dedupedTxs.map((t) => t.amount);
     const { mean, cv } = calculateMeanAndStdDev(amounts);
 
+    // For 2 occurrences: amounts must be virtually identical (within 5% of each other).
+    // Differently priced purchases must never be detected as a subscription.
+    if (dedupedTxs.length === 2) {
+      const maxAmt = Math.max(amounts[0], amounts[1]);
+      const diffRatio = maxAmt > 0 ? Math.abs(amounts[0] - amounts[1]) / maxAmt : 0;
+      if (diffRatio > 0.05) continue;
+    }
+
     // Skip high variance (unless high occurrence)
-    if (cv > 0.40 && dedupedTxs.length < 5) continue;
+    if (cv > 0.25 && dedupedTxs.length < 5) continue;
 
     // Compute confidence (0-100)
     let amtScore = 100;
@@ -479,6 +489,8 @@ export async function detectRecurringTransactions(
       100,
       Math.max(10, Math.round(0.45 * amtScore + 0.40 * (regularity * 100) + 0.15 * occScore))
     );
+
+    if (confidence < 60) continue;
 
     const nextExpected = calculateNextExpectedDate(lastTx.date, frequency, referenceDate);
 
@@ -495,6 +507,33 @@ export async function detectRecurringTransactions(
       if (count > maxCount) {
         maxCount = count;
         topCategoryId = catId;
+      }
+    }
+
+    // Retail/shopping filter: normal shopping at retailers should not be suggested as recurring subscriptions.
+    const RETAIL_KEYWORDS = [
+      'shopping', 'clothing', 'retail', 'department store', 'general merchandise',
+      'electronics', 'furniture', 'home improvement', 'groceries', 'supermarket',
+    ];
+    const RETAIL_MERCHANTS = [
+      'target', 'walmart', 'costco', 'amazon', 'best buy', 'home depot', 'lowes',
+      'ikea', 'nordstrom', 'macys', 'kohl', 'tj maxx', 'marshalls', 'ross', 'gap',
+      'old navy', 'zara', 'h&m', 'walgreens', 'cvs', 'kroger', 'safeway', 'trader joe',
+      'whole foods', 'aldi', 'ebay', 'etsy',
+    ];
+
+    const mName = group.merchantName.toLowerCase();
+    const isRetailMerchant = RETAIL_MERCHANTS.some((m) => mName.includes(m));
+    const topCatName = topCategoryId ? (userCategories.find((c) => c.id.toString() === topCategoryId)?.name.toLowerCase() || '') : '';
+    const isRetailCategory = RETAIL_KEYWORDS.some((kw) => topCatName.includes(kw));
+    const isExplicitSub =
+      /prime|membership|subscription|sub |club|pass|plus|circle 360/i.test(group.merchantName) ||
+      dedupedTxs.some((t) => /prime|membership|subscription|sub |club|pass|plus|circle 360/i.test(t.description || t.payee || ''));
+
+    if ((isRetailMerchant || isRetailCategory) && !isExplicitSub) {
+      // General retail shopping requires high occurrences and very tight amount consistency (e.g. Subscribe & Save)
+      if (dedupedTxs.length < 5 || cv > 0.05) {
+        continue;
       }
     }
 

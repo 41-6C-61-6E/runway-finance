@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterTransactionChange } from '@/lib/query-invalidation';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import {
   CalendarClock,
@@ -22,15 +24,19 @@ import type { RecurringItem } from '@/components/features/transactions/Recurring
 import { formatFrequencyLabel } from '@/components/features/transactions/RecurringCard';
 import { BillCalendarGrid } from '@/components/cash-flow/bill-calendar-grid';
 import RecurringDetailDrawer from '@/components/features/transactions/RecurringDetailDrawer';
+import TransactionDetailDrawer from '@/components/features/transactions/TransactionDetailDrawer';
 import { formatCurrency } from '@/lib/utils/format';
+import { useDailyCashFlow } from '@/lib/hooks/use-daily-cash-flow';
+import {
+  computeGridRange,
+  localDateStr,
+} from './calendar/calendar-cells';
 
 const formatNoCents = (amount: number) =>
   formatCurrency(Math.round(Number.isFinite(amount) ? amount : 0), 'USD', 'en-US');
 
-const localDateStr = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
 export function UpcomingBills() {
+  const queryClient = useQueryClient();
   const { privacyMode } = usePrivacyMode();
 
   const [bills, setBills] = useState<UpcomingBill[]>([]);
@@ -45,22 +51,38 @@ export function UpcomingBills() {
     'finance:upcoming-bills:flowFilter',
     'all'
   );
-  const [daysHorizon, setDaysHorizon] = usePersistentState<number>(
+  const [daysHorizon] = usePersistentState<number>(
     'finance:upcoming-bills:daysHorizon',
     60
   );
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search query by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Recurring drawer detail state
   const [selectedRecurringItem, setSelectedRecurringItem] = useState<RecurringItem | null>(null);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
+
+  // Transaction drawer detail state
+  const [selectedTx, setSelectedTx] = useState<any | null>(null);
+  const [txDrawerOpen, setTxDrawerOpen] = useState(false);
+
   const [categories, setCategories] = useState<{ id: string; name: string; color: string; isDiscretionary?: boolean }[]>([]);
+  const [hiddenFromTxCategoryIds, setHiddenFromTxCategoryIds] = useState<string>('');
 
   // Month navigation helpers
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const todayStr = useMemo(() => localDateStr(new Date()), []);
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -88,6 +110,13 @@ export function UpcomingBills() {
               isDiscretionary: c.isDiscretionary ?? true,
             }))
           );
+
+          const hiddenIds = data
+            .filter((c: any) => c.hideFromTransactions)
+            .map((c: any) => c.id);
+          if (hiddenIds.length > 0) {
+            setHiddenFromTxCategoryIds(hiddenIds.join(','));
+          }
         }
       })
       .catch(() => {});
@@ -116,10 +145,28 @@ export function UpcomingBills() {
     fetchUpcoming();
   }, [fetchUpcoming]);
 
+  // Compute actuals range for past days query
+  const gridRange = useMemo(() => computeGridRange(year, month), [year, month]);
+  const actualsRange = useMemo(() => {
+    if (gridRange.gridStart > todayStr) return null; // strictly future month
+    return {
+      startDate: gridRange.gridStart,
+      endDate: gridRange.gridEnd < todayStr ? gridRange.gridEnd : todayStr,
+    };
+  }, [gridRange, todayStr]);
+
+  // Fetch daily cash flow actuals for past days
+  const {
+    byDate: actualsByDate,
+    isLoading: isActualsLoading,
+    isError: isActualsError,
+    refetch: refetchActuals,
+  } = useDailyCashFlow(actualsRange, debouncedSearch);
+
   // Filter bills by search query
   const filteredBills = useMemo(() => {
-    if (!searchQuery.trim()) return bills;
-    const q = searchQuery.toLowerCase().trim();
+    if (!debouncedSearch.trim()) return bills;
+    const q = debouncedSearch.toLowerCase().trim();
     return bills.filter(
       (b) =>
         b.displayName?.toLowerCase().includes(q) ||
@@ -127,7 +174,8 @@ export function UpcomingBills() {
         b.categoryName?.toLowerCase().includes(q) ||
         b.accountName?.toLowerCase().includes(q)
     );
-  }, [bills, searchQuery]);
+  }, [bills, debouncedSearch]);
+
 
   // Open recurring drawer when a bill is selected
   const handleOpenBillDetails = async (bill: UpcomingBill) => {
@@ -177,14 +225,34 @@ export function UpcomingBills() {
     setDetailDrawerOpen(true);
   };
 
-  const handleDrawerSuccess = () => {
+  const handleRecurringDrawerSuccess = () => {
+    fetchUpcoming();
+  };
+
+  // Open transaction detail drawer
+  const handleOpenTxDetails = async (txStub: { id: string }) => {
+    try {
+      const res = await fetch(`/api/transactions/${txStub.id}`);
+      if (res.ok) {
+        const fullTx = await res.json();
+        setSelectedTx(fullTx);
+        setTxDrawerOpen(true);
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to fetch transaction details:', err);
+    }
+    setSelectedTx(txStub);
+    setTxDrawerOpen(true);
+  };
+
+  const handleTxDrawerSuccess = () => {
+    invalidateAfterTransactionChange(queryClient);
     fetchUpcoming();
   };
 
   // Group bills chronologically for Timeline view
   const groupedTimeline = useMemo(() => {
-    const todayStr = localDateStr(new Date());
-
     const tomorrowDate = new Date();
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowStr = localDateStr(tomorrowDate);
@@ -257,11 +325,11 @@ export function UpcomingBills() {
     }
 
     return groups;
-  }, [filteredBills]);
+  }, [filteredBills, todayStr]);
 
   return (
     <div className="w-full space-y-3">
-      {/* ── Persistent Navigation & View Controls Bar (Always Visible!) ── */}
+      {/* ── Persistent Navigation & View Controls Bar ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 py-1">
         {/* Left: Today Button, Chevrons & Month Title (only in Calendar view) */}
         {viewMode === 'calendar' ? (
@@ -346,7 +414,7 @@ export function UpcomingBills() {
             )}
           </div>
 
-          {/* View Mode Toggle: Calendar <-> Timeline (Always Accessible!) */}
+          {/* View Mode Toggle: Calendar <-> Timeline */}
           <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/50">
             <button
               onClick={() => setViewMode('calendar')}
@@ -378,6 +446,22 @@ export function UpcomingBills() {
         </div>
       </div>
 
+
+      {/* ── Non-blocking retry alert if daily cash flow error ── */}
+      {viewMode === 'calendar' && isActualsError && (
+        <div className="p-2.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2 text-xs text-amber-700 dark:text-amber-300">
+          <span>Could not load past activity details for this month.</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchActuals()}
+            className="h-6 px-2 text-[10px] font-semibold rounded-md border-amber-500/40 text-amber-800 dark:text-amber-200 hover:bg-amber-500/20"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* ── Main View (Calendar or Timeline) ── */}
       {loading ? (
         <div className="py-20 text-center text-sm text-muted-foreground bg-card border border-border/60 rounded-2xl p-8">
@@ -407,6 +491,12 @@ export function UpcomingBills() {
           currentDate={currentDate}
           onCurrentDateChange={setCurrentDate}
           onSelectBill={handleOpenBillDetails}
+          actualsByDate={actualsByDate}
+          actualsLoading={isActualsLoading}
+          flowFilter={flowFilter}
+          search={debouncedSearch}
+          excludeCategoryIds={hiddenFromTxCategoryIds}
+          onSelectTransaction={handleOpenTxDetails}
         />
       ) : (
         /* Chronological Timeline List View */
@@ -556,9 +646,23 @@ export function UpcomingBills() {
           setDetailDrawerOpen(false);
           setSelectedRecurringItem(null);
         }}
-        onSuccess={handleDrawerSuccess}
+        onSuccess={handleRecurringDrawerSuccess}
         categories={categories}
       />
+
+      {/* ── Connected Transaction Detail Drawer ── */}
+      {selectedTx && (
+        <TransactionDetailDrawer
+          transaction={selectedTx}
+          open={txDrawerOpen}
+          onClose={() => {
+            setTxDrawerOpen(false);
+            setSelectedTx(null);
+          }}
+          onSuccess={handleTxDrawerSuccess}
+          mode="edit"
+        />
+      )}
     </div>
   );
 }

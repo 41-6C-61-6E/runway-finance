@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { issues } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { UpdateIssueStatusSchema } from '@/lib/validations/issue';
+import { UpdateIssueSchema } from '@/lib/validations/issue';
 import { logger } from '@/lib/logger';
 import { apiNotFound, apiUnauthorized, apiValidation, handleApiError } from '@/lib/api/response';
 
@@ -29,21 +29,26 @@ export async function PATCH(
     return NextResponse.json({ error: 'bad_request', message: 'Invalid request body' }, { status: 400 });
   }
 
-  const parsed = UpdateIssueStatusSchema.safeParse(body);
+  const parsed = UpdateIssueSchema.safeParse(body);
   if (!parsed.success) {
     return apiValidation(parsed.error.flatten().fieldErrors, 'Validation failed');
   }
 
-  const { status } = parsed.data;
+  const { status, title, description, type } = parsed.data;
 
   try {
-    // Server-wide bug reports: any authenticated user can triage any report.
+    const updateData: Record<string, any> = {
+      updatedAt: new Date(),
+    };
+    if (status !== undefined) updateData.status = status;
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (type !== undefined) updateData.type = type;
+
+    // Server-wide bug reports: any authenticated user can triage or edit any report.
     const [updated] = await getDb()
       .update(issues)
-      .set({
-        status,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(issues.id, id))
       .returning();
 
@@ -51,10 +56,10 @@ export async function PATCH(
       return apiNotFound('Issue not found');
     }
 
-    logger.info('PATCH /api/bug-reporting/[id] - updated status', {
+    logger.info('PATCH /api/bug-reporting/[id] - updated issue', {
       actorUserId: session.user.id,
       issueId: id,
-      status,
+      updatedFields: Object.keys(updateData),
     });
 
     return NextResponse.json(updated);

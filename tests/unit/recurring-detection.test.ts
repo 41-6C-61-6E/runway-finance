@@ -523,6 +523,42 @@ describe('Recurring Detection Engine', () => {
         // Only the 3 untagged children form the group
         expect(mockDetectState.created![0].occurrenceCount).toBe(3);
       });
+
+      it('rejects two differently priced shopping purchases from a retailer as a subscription', async () => {
+        await buildEncryptedFixtures(
+          [
+            { ...baseTx('tx-target-1', '2026-02-15'), payee: 'Target', amount: '-45.50' },
+            { ...baseTx('tx-target-2', '2026-08-15'), payee: 'Target', amount: '-120.00' },
+          ],
+          [],
+          []
+        );
+
+        const res = await detectRecurringTransactions('user-1', testDek, {
+          referenceDate: '2026-08-19',
+        });
+
+        expect(res.totalDetected).toBe(0);
+        expect(mockDetectState.created).toHaveLength(0);
+      });
+
+      it('accepts true annual subscriptions with 2 identical payments', async () => {
+        await buildEncryptedFixtures(
+          [
+            { ...baseTx('tx-annual-1', '2025-08-15'), payee: '1Password Annual', amount: '-60.00' },
+            { ...baseTx('tx-annual-2', '2026-08-15'), payee: '1Password Annual', amount: '-60.00' },
+          ],
+          [],
+          []
+        );
+
+        const res = await detectRecurringTransactions('user-1', testDek, {
+          referenceDate: '2026-08-19',
+        });
+
+        expect(res.totalDetected).toBe(1);
+        expect(mockDetectState.created).toHaveLength(1);
+      });
     });
 
   describe('mergeRecurringExclusions', () => {

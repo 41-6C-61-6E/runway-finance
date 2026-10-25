@@ -173,6 +173,19 @@ export async function pruneDuplicateProposals(userId: string): Promise<number> {
         )
     `);
 
+    // 2b. Delete orphaned pending categorize proposals where the transaction no longer exists
+    const deleteOrphaned = await db.execute(sql`
+      DELETE FROM ${aiProposals}
+      WHERE user_id = ${dataUserId}
+        AND status = 'pending'
+        AND type = 'categorize'
+        AND (payload->>'transactionId') IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM ${transactions}
+          WHERE (${transactions.id})::text = (${aiProposals.payload}->>'transactionId')
+        )
+    `);
+
     // 3. Delete duplicate pending create_category proposals
     const dedupCategory = await db.execute(sql`
       DELETE FROM ${aiProposals}
@@ -216,6 +229,7 @@ export async function pruneDuplicateProposals(userId: string): Promise<number> {
     const totalPruned =
       (Number(dedupCategorize.rowCount) || 0) +
       (Number(markCategorized.rowCount) || 0) +
+      (Number(deleteOrphaned.rowCount) || 0) +
       (Number(dedupCategory.rowCount) || 0) +
       (Number(dedupRules.rowCount) || 0);
 

@@ -37,7 +37,7 @@ export function PaginationDots({
     <nav
       aria-label="Pagination"
       className={cn(
-        'inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-background/80 dark:bg-card/80 backdrop-blur-lg border border-border/50 shadow-sm select-none',
+        'inline-flex items-center gap-0.5 px-1 py-0.5 select-none',
         className
       )}
     >

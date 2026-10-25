@@ -20,6 +20,10 @@ vi.mock('@tanstack/react-query', () => ({
     isLoading: false,
     error: null,
   }),
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+    setQueryData: vi.fn(),
+  }),
 }));
 
 vi.mock('@/lib/hooks/use-date-window', () => ({

@@ -227,4 +227,36 @@ describe('BugReportingDropdown status update', () => {
       );
     });
   });
+
+  it('allows editing an issue via the edit button', async () => {
+    currentIssues = [makeIssue({ id: 'bug-1', title: 'Old Title', description: 'Old Description' })];
+    renderDropdown();
+
+    await openTrackTab();
+
+    const editBtn = screen.getByLabelText('Edit report');
+    fireEvent.click(editBtn);
+
+    const titleInput = screen.getByLabelText('Edit title') as HTMLInputElement;
+    expect(titleInput.value).toBe('Old Title');
+    fireEvent.change(titleInput, { target: { value: 'Updated Title' } });
+
+    const saveBtn = screen.getByText('Save');
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/bug-reporting/bug-1',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({
+            title: 'Updated Title',
+            description: 'Old Description',
+            type: 'bug',
+            status: 'reported',
+          }),
+        }),
+      );
+    });
+  });
 });

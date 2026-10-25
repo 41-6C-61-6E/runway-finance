@@ -186,16 +186,17 @@ function TransactionsContent() {
       setPendingAiIds([]);
       return;
     }
-    fetch('/api/ai/proposals?status=pending', { credentials: 'include' })
+    fetch(`/api/ai/proposals?status=pending&_t=${Date.now()}`, { credentials: 'include', cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
           const ids = data.map((p: any) => p.id);
-          setPendingAiCount(data.length);
+          const activeIds = ids.filter((id: string) => !dismissedIdsRef.current.includes(id));
+          setPendingAiCount(activeIds.length);
           setPendingAiIds(ids);
           // A fresh run's proposals must reappear even if an older pill was
           // dismissed earlier in the session.
-          if (ids.some((id: string) => !dismissedIdsRef.current.includes(id))) {
+          if (activeIds.length > 0) {
             setAiSuggestionsDismissed(false);
           }
         } else {
@@ -342,17 +343,21 @@ useEffect(() => {
     if (dismissed) {
       setAiSuggestionsDismissed(true);
       setDismissedSuggestionIds((prev) => Array.from(new Set([...(prev || []), ...pendingAiIds])));
+      setPendingAiCount(0);
     }
   }, [pendingAiIds, setDismissedSuggestionIds]);
 
   const handleAiModalOpenChange = useCallback((open: boolean) => {
     setAiModalOpen(open);
+    if (!open) {
+      fetchPendingAi();
+    }
     if (!open && searchParams.get('aiSuggestions') === 'true') {
       const params = new URLSearchParams(searchParams.toString());
       params.delete('aiSuggestions');
       router.replace(`/transactions${params.toString() ? '?' + params.toString() : ''}`, { scroll: false });
     }
-  }, [router, searchParams]);
+  }, [router, searchParams, fetchPendingAi]);
 
   const hasNewSuggestions = pendingAiIds.length > 0 && pendingAiIds.some(id => !dismissedSuggestionIds.includes(id));
   const isSuggestionsDismissed = aiSuggestionsDismissed || !hasNewSuggestions;

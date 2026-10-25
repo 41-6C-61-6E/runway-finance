@@ -525,9 +525,9 @@ html.text-size-lg {
   border-color: var(--border) !important;
 }
 
-/* Hide mobile bottom navigation bar when keyboard is open (i.e. an input is focused) to prevent it from covering content on iOS */
-body:has(input:focus, textarea:focus, select:focus) nav.fixed,
-body:has(input:focus, textarea:focus, select:focus) .fixed-pagination-dots {
+/* Hide mobile bottom navigation bar when virtual keyboard is active (editable text input focused in form or dialog) */
+body:has([role="dialog"] input:focus, [role="dialog"] textarea:focus, form input[type="text"]:focus-visible, form input[type="search"]:focus-visible, form input[type="password"]:focus-visible, form textarea:focus-visible) nav.fixed:not(:focus-within),
+body:has([role="dialog"] input:focus, [role="dialog"] textarea:focus, form input[type="text"]:focus-visible, form input[type="search"]:focus-visible, form input[type="password"]:focus-visible, form textarea:focus-visible) .fixed-pagination-dots {
   display: none !important;
 }
 

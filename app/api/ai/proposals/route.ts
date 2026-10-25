@@ -157,5 +157,9 @@ export async function GET(request: Request) {
   );
 
   logger.info('GET /api/ai/proposals', { userId, count: proposals.length, status, type });
-  return NextResponse.json(proposals);
+  return NextResponse.json(proposals, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+    },
+  });
 }

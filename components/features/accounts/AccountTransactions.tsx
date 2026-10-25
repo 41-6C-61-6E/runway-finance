@@ -1,19 +1,21 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { Receipt, ArrowRight } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Receipt, ArrowRight, ChevronDown, Search, Check, Loader2 } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select } from '@/components/ui/select';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, formatChartDateRange } from '@/lib/utils/chart-format';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/chart-tooltip';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
+import { invalidateAfterTransactionChange } from '@/lib/query-invalidation';
 import { cn } from '@/lib/utils';
 
 export interface AccountTransactionsProps {
@@ -26,6 +28,17 @@ export interface AccountTransactionsProps {
 }
 
 export function AccountTransactions({ accountId, historyData, isLiability, hierarchyTimeframe, onHierarchyTimeframeChange, className }: AccountTransactionsProps) {
+  const queryClient = useQueryClient();
+  const [openCategoryTxId, setOpenCategoryTxId] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(null);
+  const [newCategoryColor, setNewCategoryColor] = useState('#6366f1');
+  const [newCategoryIsIncome, setNewCategoryIsIncome] = useState(false);
+  const [creatingCategoryLoading, setCreatingCategoryLoading] = useState(false);
+
   const {
     timeframe,
     windowEnd,
@@ -53,6 +66,109 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
     if (timeframe === 'all') return undefined;
     return txDateRange.end;
   }, [timeframe, txDateRange.end]);
+
+  const { data: rawCategories = [] } = useQuery<any>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await fetch('/api/categories', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch categories');
+      return res.json();
+    },
+  });
+
+  const categories = useMemo(() => {
+    if (Array.isArray(rawCategories)) return rawCategories;
+    if (Array.isArray(rawCategories?.data)) return rawCategories.data;
+    return [];
+  }, [rawCategories]);
+
+  const parents = useMemo(() => categories.filter((c: any) => !c.parentId), [categories]);
+  const getChildren = useCallback(
+    (parentId: string) => categories.filter((c: any) => c.parentId === parentId),
+    [categories]
+  );
+
+  const handleSetCategory = async (
+    txId: string,
+    categoryId: string | null,
+    categoryName?: string | null,
+    categoryColor?: string | null
+  ) => {
+    try {
+      const res = await fetch(`/api/transactions/${txId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ categoryId }),
+      });
+      if (res.ok) {
+        queryClient.setQueryData(
+          ['account-transactions', accountId, queryStartDate, queryEndDate],
+          (old: any) => {
+            if (!old?.data) return old;
+            return {
+              ...old,
+              data: old.data.map((t: any) =>
+                t.id === txId
+                  ? {
+                      ...t,
+                      categoryId,
+                      category: categoryId
+                        ? {
+                            id: categoryId,
+                            name: categoryName ?? '',
+                            color: categoryColor ?? '#6366f1',
+                          }
+                        : null,
+                    }
+                  : t
+              ),
+            };
+          }
+        );
+        invalidateAfterTransactionChange(queryClient);
+      }
+    } catch (err) {
+      console.error('Failed to update transaction category', err);
+    } finally {
+      setOpenCategoryTxId(null);
+      setDropdownPos(null);
+      setCategoryFilter('');
+      setIsCreatingCategory(false);
+    }
+  };
+
+  const handleCreateCategory = async (txId: string) => {
+    if (!newCategoryName.trim()) return;
+    setCreatingCategoryLoading(true);
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          parentId: newCategoryParentId || null,
+          color: newCategoryColor,
+          isIncome: newCategoryIsIncome,
+        }),
+      });
+      if (res.ok) {
+        const createdData = await res.json();
+        queryClient.invalidateQueries({ queryKey: ['categories'] });
+        await handleSetCategory(
+          txId,
+          createdData.id,
+          newCategoryName.trim(),
+          newCategoryColor
+        );
+      }
+    } catch (err) {
+      console.error('Failed to create category', err);
+    } finally {
+      setCreatingCategoryLoading(false);
+    }
+  };
 
   const { data: txData, isLoading, error } = useQuery({
     queryKey: ['account-transactions', accountId, queryStartDate, queryEndDate],
@@ -262,17 +378,51 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
                           <p className="font-medium text-foreground truncate text-xs sm:text-sm">{tx.payee || tx.description || 'Unidentified Transaction'}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-[11px] text-muted-foreground">{formatDate(tx.date)}</span>
-                            {tx.category && (
-                              <span
-                                className="px-1.5 py-0.2 text-micro rounded-full font-medium"
-                                style={{
-                                  backgroundColor: `${tx.category.color}15`,
-                                  color: tx.category.color,
-                                }}
-                              >
-                                {tx.category.name}
-                              </span>
-                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (openCategoryTxId === tx.id) {
+                                  setOpenCategoryTxId(null);
+                                  setDropdownPos(null);
+                                } else {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const left = Math.min(rect.left, window.innerWidth - 260);
+                                  const spaceBelow = window.innerHeight - rect.bottom;
+                                  const top = spaceBelow < 290 ? Math.max(8, rect.top - 290) : rect.bottom + 4;
+                                  setDropdownPos({ top, left });
+                                  setOpenCategoryTxId(tx.id);
+                                  setCategoryFilter('');
+                                  setIsCreatingCategory(false);
+                                }
+                              }}
+                              className="group/cat inline-flex items-center gap-1 px-1.5 py-0.5 text-micro rounded-full font-medium border border-transparent transition-all cursor-pointer hover:border-border/60 hover:opacity-90 active:scale-95"
+                              style={
+                                tx.category
+                                  ? {
+                                      backgroundColor: `${tx.category.color}15`,
+                                      color: tx.category.color,
+                                    }
+                                  : undefined
+                              }
+                              title="Click to change category"
+                            >
+                              {tx.category ? (
+                                <>
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: tx.category.color }}
+                                  />
+                                  <span>{tx.category.name}</span>
+                                  <ChevronDown className="h-2.5 w-2.5 opacity-50 group-hover/cat:opacity-100 transition-opacity" />
+                                </>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                                  <span>Uncategorized</span>
+                                  <ChevronDown className="h-2.5 w-2.5 opacity-50 group-hover/cat:opacity-100 transition-opacity" />
+                                </span>
+                              )}
+                            </button>
                           </div>
                         </div>
                         <span className="font-mono text-xs sm:text-sm font-semibold text-foreground blur-number">{text}</span>
@@ -283,6 +433,222 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
               )}
             </div>
         </div>
+
+        {/* Category Dropdown Popover */}
+        {openCategoryTxId && dropdownPos && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenCategoryTxId(null);
+                setDropdownPos(null);
+                setCategoryFilter('');
+                setIsCreatingCategory(false);
+              }}
+            />
+            <div
+              className="fixed z-50 w-64 bg-card border border-border rounded-xl shadow-2xl max-h-80 flex flex-col text-xs overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+              style={{ top: dropdownPos.top, left: dropdownPos.left }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {isCreatingCategory ? (
+                <div className="p-3 space-y-2.5 flex flex-col text-xs">
+                  <div className="font-semibold text-foreground uppercase tracking-wider text-[10px]">
+                    New Category
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">
+                      Name
+                    </label>
+                    <input
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Category name"
+                      className="w-full px-2 py-1 bg-background border border-input rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">
+                      Parent Category
+                    </label>
+                    <Select
+                      className="h-8 text-xs rounded px-2"
+                      value={newCategoryParentId || ''}
+                      onChange={(e) => setNewCategoryParentId(e.target.value || null)}
+                    >
+                      <option value="">None (top-level)</option>
+                      {parents.map((p: any) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="color"
+                        value={newCategoryColor}
+                        onChange={(e) => setNewCategoryColor(e.target.value)}
+                        className="w-5 h-5 rounded cursor-pointer border border-input"
+                      />
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {newCategoryColor}
+                      </span>
+                    </div>
+
+                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newCategoryIsIncome}
+                        onChange={(e) => setNewCategoryIsIncome(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-ring"
+                      />
+                      Income
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2 pt-2 border-t border-border/50">
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingCategory(false)}
+                      className="flex-1 py-1 text-xs text-foreground bg-muted hover:bg-accent rounded-md transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCreateCategory(openCategoryTxId)}
+                      disabled={creatingCategoryLoading || !newCategoryName.trim()}
+                      className="flex-1 py-1 text-xs font-semibold text-primary-foreground bg-primary rounded-md hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1"
+                    >
+                      {creatingCategoryLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="relative p-2 border-b border-border bg-muted/20">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                    <input
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      placeholder="Search categories..."
+                      className="w-full pl-7 pr-2 py-1 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto max-h-56 divide-y divide-border/20">
+                    <button
+                      type="button"
+                      onClick={() => handleSetCategory(openCategoryTxId, null, null, null)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors text-left"
+                    >
+                      None
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingCategory(true);
+                        setNewCategoryName('');
+                        setNewCategoryParentId(null);
+                        setNewCategoryColor('#6366f1');
+                        setNewCategoryIsIncome(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-muted font-medium transition-colors text-left"
+                    >
+                      + Create new category
+                    </button>
+
+                    {(() => {
+                      const filter = categoryFilter.toLowerCase();
+                      const filteredParents = filter
+                        ? parents.filter(
+                            (p: any) =>
+                              p.name.toLowerCase().includes(filter) ||
+                              getChildren(p.id).some((c: any) => c.name.toLowerCase().includes(filter))
+                          )
+                        : parents;
+                      const activeTx = txs.find((t: any) => t.id === openCategoryTxId);
+
+                      if (filteredParents.length === 0) {
+                        return (
+                          <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                            No categories found
+                          </div>
+                        );
+                      }
+
+                      return filteredParents.map((parent: any) => {
+                        const childList = filter
+                          ? getChildren(parent.id).filter((c: any) =>
+                              c.name.toLowerCase().includes(filter)
+                            )
+                          : getChildren(parent.id);
+
+                        return (
+                          <div key={parent.id} className="py-1">
+                            <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-semibold text-muted-foreground/80 uppercase tracking-wider bg-muted/30">
+                              <div
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: parent.color }}
+                              />
+                              {parent.name}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSetCategory(openCategoryTxId, parent.id, parent.name, parent.color)}
+                              className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
+                                activeTx?.categoryId === parent.id || activeTx?.category?.id === parent.id
+                                  ? 'text-primary bg-primary/10 font-medium'
+                                  : 'text-foreground/80 hover:bg-muted'
+                              }`}
+                            >
+                              <div
+                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                style={{ backgroundColor: parent.color }}
+                              />
+                              <span className="flex-1 truncate">{parent.name}</span>
+                              {(activeTx?.categoryId === parent.id || activeTx?.category?.id === parent.id) && (
+                                <Check className="h-3 w-3 text-primary ml-auto" />
+                              )}
+                            </button>
+                            {childList.map((child: any) => (
+                              <button
+                                key={child.id}
+                                type="button"
+                                onClick={() => handleSetCategory(openCategoryTxId, child.id, child.name, child.color)}
+                                className={`w-full flex items-center gap-2 pl-6 pr-4 py-1.5 text-xs transition-colors text-left ${
+                                  activeTx?.categoryId === child.id || activeTx?.category?.id === child.id
+                                    ? 'text-primary bg-primary/10 font-medium'
+                                    : 'text-foreground/80 hover:bg-muted'
+                                  }`}
+                              >
+                                <div
+                                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: child.color }}
+                                />
+                                <span className="flex-1 truncate">{child.name}</span>
+                                {(activeTx?.categoryId === child.id || activeTx?.category?.id === child.id) && (
+                                  <Check className="h-3 w-3 text-primary ml-auto" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

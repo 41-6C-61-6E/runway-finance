@@ -3,7 +3,7 @@ import { pruneDuplicateProposals, analyzeUncategorized } from '@/lib/services/ai
 
 const mockDbState = vi.hoisted(() => ({
   executeCalls: [] as any[],
-  rowCountPerCall: [3, 2, 1, 0] as number[],
+  rowCountPerCall: [3, 2, 1, 0, 0] as number[],
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -32,7 +32,7 @@ vi.mock('@/lib/logger', () => ({
 describe('AI Proposal Deduplication', () => {
   beforeEach(() => {
     mockDbState.executeCalls = [];
-    mockDbState.rowCountPerCall = [3, 2, 1, 0];
+    mockDbState.rowCountPerCall = [3, 2, 1, 0, 0];
     vi.clearAllMocks();
   });
 
@@ -40,9 +40,9 @@ describe('AI Proposal Deduplication', () => {
     it('executes deduplication and stale proposal cleanup queries', async () => {
       const totalPruned = await pruneDuplicateProposals('user-123');
 
-      // 4 queries: dedup categorize, mark applied for categorized, dedup create_category, dedup create_rule
-      expect(mockDbState.executeCalls.length).toBe(4);
-      expect(totalPruned).toBe(6); // 3 + 2 + 1 + 0
+      // 5 queries: dedup categorize, cleanup proposals for deleted/missing transactions, mark applied for categorized, dedup create_category, dedup create_rule
+      expect(mockDbState.executeCalls.length).toBe(5);
+      expect(totalPruned).toBe(6); // 3 + 2 + 1 + 0 + 0
     });
 
     it('returns 0 on database error without throwing', async () => {

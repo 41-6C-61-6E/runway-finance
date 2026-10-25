@@ -72,7 +72,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         style={{
           top: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 10px))',
         } as React.CSSProperties}
-        className={`fixed right-4 z-40 md:hidden flex items-center gap-0.5 py-1 px-1.5 rounded-full ${glassBar} transition-all duration-300 ease-out ${
+        className={`fixed right-4 z-40 md:hidden flex items-center gap-1.5 py-1 px-2.5 rounded-full ${glassBar} transition-all duration-300 ease-out ${
           isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
         }`}
       >
@@ -106,7 +106,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
           {leftExtra}
         </div>
         {children && (
-          <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar justify-start pb-1">
+          <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar justify-center pb-1">
             {children}
           </div>
         )}

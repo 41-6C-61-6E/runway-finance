@@ -12,7 +12,8 @@ import {
   Check, 
   ChevronDown, 
   ChevronUp,
-  Copy
+  Copy,
+  Pencil
 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -66,6 +67,11 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editingIssueId, setEditingIssueId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editType, setEditType] = useState<'bug' | 'feature'>('bug');
+  const [editStatus, setEditStatus] = useState<string>('reported');
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -171,6 +177,38 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
       setDeleteConfirmId(null);
     },
   });
+
+  // 6. Mutation: Update Full Issue
+  const updateIssueMutation = useMutation({
+    mutationFn: async ({ id, title, description, type, status }: { id: string; title: string; description: string; type: 'bug' | 'feature'; status: string }) => {
+      const res = await fetch(`/api/bug-reporting/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, type, status }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || errorData.details ? JSON.stringify(errorData.details) : 'Failed to update report');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      toast.success('Report updated successfully!');
+      setEditingIssueId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update report');
+    },
+  });
+
+  const handleStartEdit = (issue: Issue) => {
+    setEditingIssueId(issue.id);
+    setEditTitle(issue.title);
+    setEditDescription(issue.description);
+    setEditType(issue.type);
+    setEditStatus(issue.status);
+  };
 
   // Handle outside click & escape key
   useEffect(() => {
@@ -465,6 +503,114 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                         {displayedIssues.map((issue) => {
                           const isExpanded = expandedIssueId === issue.id;
                           const isConfirmingDelete = deleteConfirmId === issue.id;
+                          const isEditingThis = editingIssueId === issue.id;
+
+                          if (isEditingThis) {
+                            return (
+                              <div
+                                key={issue.id}
+                                className="p-3 border border-primary/40 bg-card/90 rounded-lg space-y-2.5 shadow-sm"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                    Edit Issue
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditType('bug')}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                                        editType === 'bug'
+                                          ? 'bg-destructive/15 text-destructive border border-destructive/30'
+                                          : 'text-muted-foreground hover:bg-muted'
+                                      }`}
+                                    >
+                                      Bug
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditType('feature')}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all cursor-pointer ${
+                                        editType === 'feature'
+                                          ? 'bg-primary/15 text-primary border border-primary/30'
+                                          : 'text-muted-foreground hover:bg-muted'
+                                      }`}
+                                    >
+                                      Feature
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <input
+                                  type="text"
+                                  value={editTitle}
+                                  onChange={(e) => setEditTitle(e.target.value)}
+                                  placeholder="Issue title"
+                                  className="w-full px-2.5 py-1 text-xs bg-muted/40 border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+                                  required
+                                  aria-label="Edit title"
+                                />
+
+                                <textarea
+                                  value={editDescription}
+                                  onChange={(e) => setEditDescription(e.target.value)}
+                                  placeholder="Issue description"
+                                  className="w-full px-2.5 py-1 text-xs bg-muted/40 border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring min-h-[60px] resize-none"
+                                  required
+                                  aria-label="Edit description"
+                                />
+
+                                <div className="flex items-center justify-between pt-1 border-t border-border/40">
+                                  <Select
+                                    className={`text-[10px] font-semibold h-auto pl-2 pr-7 py-0.5 rounded border cursor-pointer ${getStatusStyles(editStatus)}`}
+                                    value={editStatus}
+                                    onChange={(e) => setEditStatus(e.target.value)}
+                                    aria-label="Edit status"
+                                  >
+                                    {(editType === 'bug' ? statuses.bug : statuses.feature).map((st) => (
+                                      <option key={st} value={st} className="bg-card text-foreground">
+                                        {statusLabels[st] ?? st}
+                                      </option>
+                                    ))}
+                                  </Select>
+
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingIssueId(null)}
+                                      disabled={updateIssueMutation.isPending}
+                                      className="px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!editTitle.trim() || !editDescription.trim()) return;
+                                        updateIssueMutation.mutate({
+                                          id: issue.id,
+                                          title: editTitle.trim(),
+                                          description: editDescription.trim(),
+                                          type: editType,
+                                          status: editStatus,
+                                        });
+                                      }}
+                                      disabled={updateIssueMutation.isPending || !editTitle.trim() || !editDescription.trim()}
+                                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                                    >
+                                      {updateIssueMutation.isPending ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Check className="w-3 h-3" />
+                                      )}
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div 
                               key={issue.id} 
@@ -527,8 +673,17 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                                   </Select>
                                 </div>
 
-                                {/* Delete Button */}
-                                <div className="flex items-center">
+                                {/* Edit & Delete Buttons */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEdit(issue)}
+                                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-all cursor-pointer"
+                                    title="Edit report"
+                                    aria-label="Edit report"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
                                   {isConfirmingDelete ? (
                                     <button
                                       type="button"

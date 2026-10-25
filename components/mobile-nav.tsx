@@ -125,16 +125,9 @@ export function MobileNav() {
   // removed — nothing ever gets clipped.
   const HOME_BAR_ITEM_GAP_PX = 8;
   const HOME_BUTTON_MIN_WIDTH_PX = 44;
-  const [homeNavSlotCount, setHomeNavSlotCount] = useState(3);
+  const [homeNavSlotCount, setHomeNavSlotCount] = useState(4);
   useEffect(() => {
-    // md (768px) matches the desktop sidebar breakpoint (hidden md:flex):
-    // at md and wider the left sidebar owns navigation and the bottom bar
-    // is hidden, so no slots are computed there.
     const computeHomeNavSlots = () => {
-      if (window.innerWidth >= MD_BREAKPOINT_PX) {
-        setHomeNavSlotCount(0);
-        return;
-      }
       const barWidth = Math.max(240, Math.min(window.innerWidth - 32, 512));
       const contentWidth = barWidth - 24 - 2;
       // The rendered row is N page buttons PLUS the hamburger, so the total
@@ -283,8 +276,8 @@ export function MobileNav() {
 
   // Limit the bar to the number of slots that fit at the current width
   // (extra saved items stay in localStorage and reappear at wider sizes).
-  activeHomeNavItems = activeHomeNavItems.slice(0, homeNavSlotCount);
-  if (homeNavSlotCount === 0) activeHomeNavItems = [];
+  const effectiveSlots = Math.max(3, homeNavSlotCount);
+  activeHomeNavItems = activeHomeNavItems.slice(0, effectiveSlots);
 
   // Pages used to auto-fill the bar (dev-mode and preview pages are
   // never added to the home bar automatically).
