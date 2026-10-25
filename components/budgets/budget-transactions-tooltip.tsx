@@ -9,10 +9,16 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
 import { useUserSettings } from '@/components/user-settings-provider';
+import { isValidPeriodKey, convertPeriodKeyForType, type PeriodType } from './budget-period-selector';
 
 export function getPeriodDateRange(periodType: string, periodKey: string) {
-  if (periodType === 'monthly') {
-    const [y, m] = periodKey.split('-').map(Number);
+  const safeType = (periodType as PeriodType) || 'monthly';
+  const safeKey = isValidPeriodKey(safeType, periodKey)
+    ? periodKey
+    : convertPeriodKeyForType(periodKey, safeType);
+
+  if (safeType === 'monthly') {
+    const [y, m] = safeKey.split('-').map(Number);
     const start = `${y}-${String(m).padStart(2, '0')}-01`;
     const lastDay = new Date(y, m, 0).getDate();
     const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
@@ -20,8 +26,8 @@ export function getPeriodDateRange(periodType: string, periodKey: string) {
     const label = dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     return { startDate: start, endDate: end, label };
   }
-  if (periodType === 'quarterly') {
-    const [y, q] = periodKey.split('-Q').map(Number);
+  if (safeType === 'quarterly') {
+    const [y, q] = safeKey.split('-Q').map(Number);
     const startMonth = (q - 1) * 3 + 1;
     const endMonth = q * 3;
     const start = `${y}-${String(startMonth).padStart(2, '0')}-01`;
@@ -31,7 +37,7 @@ export function getPeriodDateRange(periodType: string, periodKey: string) {
     return { startDate: start, endDate: end, label };
   }
   // yearly
-  const y = Number(periodKey) || new Date().getFullYear();
+  const y = Number(safeKey) || new Date().getFullYear();
   const start = `${y}-01-01`;
   const end = `${y}-12-31`;
   return { startDate: start, endDate: end, label: `${y}` };
@@ -266,9 +272,11 @@ export function BudgetItemTransactionsIcon({
                   <Link
                     key={tx.id}
                     href={`/transactions?search=${encodeURIComponent(displayTitle)}`}
-                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
-                      e.stopPropagation();
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+                        return;
+                      }
+                      e.preventDefault();
                       setOpen(false);
                       router.push(`/transactions?search=${encodeURIComponent(displayTitle)}`);
                     }}
@@ -304,9 +312,11 @@ export function BudgetItemTransactionsIcon({
           <div className="p-2 bg-muted/20 border-t border-border/50">
             <Link
               href={targetUrl}
-              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
-                e.stopPropagation();
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+                  return;
+                }
+                e.preventDefault();
                 setOpen(false);
                 router.push(targetUrl);
               }}

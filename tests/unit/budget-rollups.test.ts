@@ -521,4 +521,41 @@ describe('Budget Timeframe Rollups', () => {
     expect(item.actual).toBe(75);
     expect(item.remaining).toBe(375); // $450 available - $75 actual
   });
+
+  it('safely handles mismatched quarterly periodType with monthly periodKey (e.g. 2026-10) without throwing 500', async () => {
+    mockDbState.budgets = [
+      {
+        id: 'b-1',
+        userId: 'test-user-id',
+        categoryId: 'cat-groceries',
+        amount: '300.00',
+        periodType: 'monthly',
+        isRecurring: true,
+        effectiveFrom: null,
+        effectiveTo: null,
+        yearMonth: null,
+      },
+    ];
+
+    // Request quarterly with monthly key: 2026-10 (should resolve to 2026-Q4 without throwing RangeError)
+    const req = new Request('http://localhost:3000/api/budgets?periodType=quarterly&periodKey=2026-10');
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.period.yearMonth).toBe('2026-Q4');
+    expect(data.period.startDate).toBe('2026-10-01');
+    expect(data.period.endDate).toBe('2027-01-01');
+    expect(data.budgets).toHaveLength(1);
+    expect(data.budgets[0].budgeted).toBe(900); // 3x monthly rolled into quarterly
+  });
+
+  it('safely handles literal "undefined" or malformed periodKey without throwing 500', async () => {
+    const req = new Request('http://localhost:3000/api/budgets?periodType=quarterly&periodKey=undefined');
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.period.yearMonth).toMatch(/^\d{4}-Q[1-4]$/);
+    expect(data.period.startDate).toMatch(/^\d{4}-\d{2}-01$/);
+    expect(data.period.endDate).toMatch(/^\d{4}-\d{2}-01$/);
+  });
 });

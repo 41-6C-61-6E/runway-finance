@@ -24,67 +24,159 @@ export function useBudgetPeriod() {
   return ctx;
 }
 
-function getCurrentKey(type: PeriodType): string {
-  const now = new Date();
-  if (type === 'monthly') return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  if (type === 'quarterly') {
-    const q = Math.floor(now.getMonth() / 3) + 1;
-    return `${now.getFullYear()}-Q${q}`;
-  }
-  return String(now.getFullYear());
+export function isValidPeriodKey(type: PeriodType, key: string | null | undefined): boolean {
+  if (!key || typeof key !== 'string') return false;
+  if (key === 'undefined' || key === 'null' || key.includes('NaN')) return false;
+  if (type === 'monthly') return /^\d{4}-(0[1-9]|1[0-2])$/.test(key);
+  if (type === 'quarterly') return /^\d{4}-Q[1-4]$/.test(key);
+  if (type === 'yearly') return /^\d{4}$/.test(key);
+  return false;
 }
 
-function getNextKey(type: PeriodType, key: string): string {
+export function getCurrentKey(type: PeriodType, refDate = new Date()): string {
+  const y = refDate.getFullYear();
+  if (type === 'monthly') return `${y}-${String(refDate.getMonth() + 1).padStart(2, '0')}`;
+  if (type === 'quarterly') {
+    const q = Math.floor(refDate.getMonth() / 3) + 1;
+    return `${y}-Q${q}`;
+  }
+  return String(y);
+}
+
+export function convertPeriodKeyForType(currentKey: string | null | undefined, targetType: PeriodType): string {
+  const now = new Date();
+  if (!currentKey || typeof currentKey !== 'string' || currentKey === 'undefined' || currentKey === 'null' || currentKey.includes('NaN')) {
+    return getCurrentKey(targetType, now);
+  }
+
+  if (isValidPeriodKey(targetType, currentKey)) {
+    return currentKey;
+  }
+
+  const yearMatch = currentKey.match(/^(\d{4})/);
+  const y = yearMatch ? parseInt(yearMatch[1], 10) : now.getFullYear();
+
+  if (targetType === 'yearly') {
+    return String(y);
+  }
+
+  if (targetType === 'quarterly') {
+    const mMatch = currentKey.match(/^\d{4}-(0[1-9]|1[0-2])$/);
+    if (mMatch) {
+      const m = parseInt(mMatch[1], 10);
+      const q = Math.floor((m - 1) / 3) + 1;
+      return `${y}-Q${q}`;
+    }
+    const qMatch = currentKey.match(/-Q([1-4])/);
+    if (qMatch) {
+      return `${y}-Q${qMatch[1]}`;
+    }
+    const q = y === now.getFullYear() ? Math.floor(now.getMonth() / 3) + 1 : 1;
+    return `${y}-Q${q}`;
+  }
+
+  // targetType === 'monthly'
+  const qMatch = currentKey.match(/^(\d{4})-Q([1-4])$/);
+  if (qMatch) {
+    const q = parseInt(qMatch[2], 10);
+    const m = (q - 1) * 3 + 1;
+    return `${y}-${String(m).padStart(2, '0')}`;
+  }
+  const m = y === now.getFullYear() ? now.getMonth() + 1 : 1;
+  return `${y}-${String(m).padStart(2, '0')}`;
+}
+
+export function getNextKey(type: PeriodType, key: string): string {
+  const safeKey = isValidPeriodKey(type, key) ? key : convertPeriodKeyForType(key, type);
   if (type === 'monthly') {
-    const [y, m] = key.split('-').map(Number);
+    const [y, m] = safeKey.split('-').map(Number);
     const d = new Date(y, m - 1 + 1, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
   if (type === 'quarterly') {
-    const [y, q] = key.split('-Q').map(Number);
+    const [y, q] = safeKey.split('-Q').map(Number);
     if (q === 4) return `${y + 1}-Q1`;
     return `${y}-Q${q + 1}`;
   }
-  return String(parseInt(key) + 1);
+  const y = parseInt(safeKey, 10) || new Date().getFullYear();
+  return String(y + 1);
 }
 
-function getPrevKey(type: PeriodType, key: string): string {
+export function getPrevKey(type: PeriodType, key: string): string {
+  const safeKey = isValidPeriodKey(type, key) ? key : convertPeriodKeyForType(key, type);
   if (type === 'monthly') {
-    const [y, m] = key.split('-').map(Number);
+    const [y, m] = safeKey.split('-').map(Number);
     const d = new Date(y, m - 1 - 1, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
   if (type === 'quarterly') {
-    const [y, q] = key.split('-Q').map(Number);
+    const [y, q] = safeKey.split('-Q').map(Number);
     if (q === 1) return `${y - 1}-Q4`;
     return `${y}-Q${q - 1}`;
   }
-  return String(parseInt(key) - 1);
+  const y = parseInt(safeKey, 10) || new Date().getFullYear();
+  return String(y - 1);
 }
 
-function getKeyLabel(type: PeriodType, key: string): string {
+export function getKeyLabel(type: PeriodType, key: string): string {
+  if (!key || typeof key !== 'string' || key === 'undefined' || key === 'null' || key.includes('NaN')) {
+    return getKeyLabel(type, getCurrentKey(type));
+  }
   if (type === 'monthly') {
-    const [y, m] = key.split('-').map(Number);
+    const match = key.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+    if (match) {
+      const y = Number(match[1]);
+      const m = Number(match[2]);
+      return new Date(y, m - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+    const safeKey = convertPeriodKeyForType(key, 'monthly');
+    const [y, m] = safeKey.split('-').map(Number);
     return new Date(y, m - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }
-  if (type === 'quarterly') return `Q${key.split('-Q')[1]} ${key.split('-Q')[0]}`;
-  return key;
+  if (type === 'quarterly') {
+    const match = key.match(/^(\d{4})-Q([1-4])$/);
+    if (match) {
+      return `Q${match[2]} ${match[1]}`;
+    }
+    const safeKey = convertPeriodKeyForType(key, 'quarterly');
+    const match2 = safeKey.match(/^(\d{4})-Q([1-4])$/);
+    if (match2) {
+      return `Q${match2[2]} ${match2[1]}`;
+    }
+    return safeKey;
+  }
+  const match = key.match(/^(\d{4})$/);
+  if (match) return match[1];
+  return convertPeriodKeyForType(key, 'yearly');
 }
 
 export function BudgetPeriodProvider({ children }: { children: ReactNode }) {
   const [periodType, setPeriodType] = usePersistentState<PeriodType>('finance:budgets:periodType', 'monthly');
-  const [periodKey, setPeriodKey] = usePersistentState<string>('finance:budgets:periodKey', getCurrentKey('monthly'));
+  const [storedPeriodKey, setStoredPeriodKey] = usePersistentState<string>('finance:budgets:periodKey', getCurrentKey('monthly'));
+
+  // Ensure periodKey provided to components is always strictly valid for active periodType
+  const periodKey = isValidPeriodKey(periodType, storedPeriodKey)
+    ? storedPeriodKey
+    : convertPeriodKeyForType(storedPeriodKey, periodType);
+
+  // Reconcile stored value if it was mismatched or invalid
+  const handleSetPeriodKey = useCallback((newKey: string | ((prev: string) => string)) => {
+    setStoredPeriodKey((prev) => {
+      const resolved = typeof newKey === 'function' ? newKey(prev) : newKey;
+      return isValidPeriodKey(periodType, resolved) ? resolved : convertPeriodKeyForType(resolved, periodType);
+    });
+  }, [periodType, setStoredPeriodKey]);
 
   const handleSetPeriodType = useCallback((type: PeriodType) => {
     setPeriodType(type);
-    setPeriodKey(getCurrentKey(type));
-  }, [setPeriodType, setPeriodKey]);
+    setStoredPeriodKey((prevKey) => convertPeriodKeyForType(prevKey, type));
+  }, [setPeriodType, setStoredPeriodKey]);
 
-  const goNext = useCallback(() => setPeriodKey((k) => getNextKey(periodType, k)), [periodType, setPeriodKey]);
-  const goPrev = useCallback(() => setPeriodKey((k) => getPrevKey(periodType, k)), [periodType, setPeriodKey]);
+  const goNext = useCallback(() => handleSetPeriodKey((k) => getNextKey(periodType, k)), [periodType, handleSetPeriodKey]);
+  const goPrev = useCallback(() => handleSetPeriodKey((k) => getPrevKey(periodType, k)), [periodType, handleSetPeriodKey]);
 
   return (
-    <PeriodContext.Provider value={{ periodType, periodKey, setPeriodType: handleSetPeriodType, setPeriodKey, goNext, goPrev }}>
+    <PeriodContext.Provider value={{ periodType, periodKey, setPeriodType: handleSetPeriodType, setPeriodKey: handleSetPeriodKey, goNext, goPrev }}>
       {children}
     </PeriodContext.Provider>
   );

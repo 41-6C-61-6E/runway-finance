@@ -17,7 +17,10 @@ Personal finance dashboard for tracking net worth, cash flow, investments, budge
 - **Unit & Integration Tests**: `pnpm test` (Vitest)
 - **E2E Tests**: `pnpm test:e2e` (Playwright)
 - **CI Suite**: `pnpm ci` (Lint, typecheck, test, and build)
-- **Production Deploymets**: external and not reachable from this dev server
+- **Production Deploymets**: external and not reachable from this dev server: from your workspace you can use:
+alias runway-dev='docker exec $([ -t 0 ] && echo "-it") -u abc -w /config/workspace/runway-finance code-server bash -lc "pnpm dev"'
+alias runway-restart='docker exec $([ -t 0 ] && echo "-it") -u abc -w /config/workspace/runway-finance code-server bash -lc "pnpm restart"'
+alias runway-shell='docker exec -it -u abc -w /config/workspace/runway-finance code-server bash -l'
 
 ## Database & ORM Workflows
 - **Connection**: Requires `DATABASE_URL` (configured in `.env` / `.env.local`). Docker service runs via `compose.yml` on port `5432`.

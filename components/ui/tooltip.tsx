@@ -72,18 +72,32 @@ function Tooltip({
 
     window.addEventListener('scroll', handleGlobalScroll, { passive: true, capture: true });
 
+    let handleGlobalDismiss: ((e: Event) => void) | null = null;
     const timer = setTimeout(() => {
-      const handleGlobalDismiss = () => {
+      handleGlobalDismiss = (e: Event) => {
+        const target = e.target as HTMLElement | null;
+        if (
+          target &&
+          target.closest(
+            '[data-radix-tooltip-content], [data-radix-popper-content-wrapper], [role="tooltip"], [data-slot="tooltip-content"]'
+          )
+        ) {
+          return;
+        }
         setOpen(false);
       };
 
-      window.addEventListener('pointerdown', handleGlobalDismiss, { capture: true, once: true });
-      window.addEventListener('touchstart', handleGlobalDismiss, { capture: true, once: true });
+      window.addEventListener('pointerdown', handleGlobalDismiss, { capture: true });
+      window.addEventListener('touchstart', handleGlobalDismiss, { capture: true });
     }, 50);
 
     return () => {
       clearTimeout(timer);
       window.removeEventListener('scroll', handleGlobalScroll, true);
+      if (handleGlobalDismiss) {
+        window.removeEventListener('pointerdown', handleGlobalDismiss, true);
+        window.removeEventListener('touchstart', handleGlobalDismiss, true);
+      }
     };
   }, [open, setOpen]);
 
@@ -144,11 +158,19 @@ const TooltipContent = React.forwardRef<
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     onClick?.(e);
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('a, button, input, select, textarea, [role="button"], [data-interactive]')) {
+      return;
+    }
     setOpen(false);
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     onPointerDown?.(e);
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('a, button, input, select, textarea, [role="button"], [data-interactive]')) {
+      return;
+    }
     setOpen(false);
   };
 

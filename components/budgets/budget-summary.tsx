@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { useBudgetPeriod } from './budget-period-selector';
+import { useBudgetPeriod, isValidPeriodKey, convertPeriodKeyForType, type PeriodType } from './budget-period-selector';
 import { getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
@@ -65,6 +65,11 @@ function getPeriodConfig(periodType: string) {
 }
 
 function getPeriodPacingInfo(periodType: string, periodKey: string) {
+  const safeType = (periodType as PeriodType) || 'monthly';
+  const safeKey = isValidPeriodKey(safeType, periodKey)
+    ? periodKey
+    : convertPeriodKeyForType(periodKey, safeType);
+
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -75,8 +80,8 @@ function getPeriodPacingInfo(periodType: string, periodKey: string) {
   let isPast = false;
   let isFuture = false;
 
-  if (periodType === 'monthly') {
-    const parts = periodKey.split('-').map(Number);
+  if (safeType === 'monthly') {
+    const parts = safeKey.split('-').map(Number);
     const y = parts[0] || currentYear;
     const m = parts[1] || currentMonth;
     totalDays = new Date(y, m, 0).getDate();
@@ -89,8 +94,8 @@ function getPeriodPacingInfo(periodType: string, periodKey: string) {
       daysElapsed = 0;
       isFuture = true;
     }
-  } else if (periodType === 'quarterly') {
-    const parts = periodKey.split('-Q').map(Number);
+  } else if (safeType === 'quarterly') {
+    const parts = safeKey.split('-Q').map(Number);
     const y = parts[0] || currentYear;
     const q = parts[1] || 1;
     const startMonth = (q - 1) * 3 + 1;
@@ -117,7 +122,7 @@ function getPeriodPacingInfo(periodType: string, periodKey: string) {
     }
   } else {
     // yearly
-    const y = Number(periodKey) || currentYear;
+    const y = Number(safeKey) || currentYear;
     const isLeapYear = (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
     totalDays = isLeapYear ? 366 : 365;
     const startDate = new Date(y, 0, 1, 0, 0, 0, 0);

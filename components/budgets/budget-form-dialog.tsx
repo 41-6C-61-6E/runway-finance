@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { useBudgetPeriod, type PeriodType } from './budget-period-selector';
+import { useBudgetPeriod, convertPeriodKeyForType, type PeriodType } from './budget-period-selector';
 import { CategoryCombobox } from './category-combobox';
 
 interface Category {
@@ -54,28 +54,6 @@ interface BudgetFormDialogProps {
   };
 }
 
-function convertPeriodKeyForType(currentKey: string, targetType: PeriodType): string {
-  const parts = currentKey.split('-');
-  const y = parseInt(parts[0], 10) || new Date().getFullYear();
-  if (targetType === 'yearly') {
-    return String(y);
-  }
-  if (targetType === 'quarterly') {
-    if (currentKey.includes('-Q')) return currentKey;
-    const m = parseInt(parts[1], 10) || (new Date().getMonth() + 1);
-    const q = Math.floor((m - 1) / 3) + 1;
-    return `${y}-Q${q}`;
-  }
-  // monthly
-  if (/^\d{4}-\d{2}$/.test(currentKey)) return currentKey;
-  if (currentKey.includes('-Q')) {
-    const q = parseInt(currentKey.split('-Q')[1], 10) || 1;
-    const m = (q - 1) * 3 + 1;
-    return `${y}-${String(m).padStart(2, '0')}`;
-  }
-  const m = new Date().getMonth() + 1;
-  return `${y}-${String(m).padStart(2, '0')}`;
-}
 
 export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBudget }: BudgetFormDialogProps) {
   const { periodType: activePeriodType, periodKey } = useBudgetPeriod();

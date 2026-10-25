@@ -9,64 +9,104 @@ import { decryptField, decryptRows, encryptRow } from '@/lib/crypto';
 import { formatToCents } from '@/lib/services/account-history';
 import { ensureCategoryDiscretionaryColumn } from '@/lib/db/seed-categories';
 
-function getPeriodBounds(periodType: string, periodKey: string | null, now: Date) {
-  let start: Date;
-  let next: Date;
-  let yearMonth: string;
+function sanitizePeriodKey(periodType: string, periodKey: string | null | undefined, now: Date): { yearMonth: string; start: Date; next: Date } {
+  const currentY = now.getFullYear();
+  const currentM = now.getMonth() + 1;
+  const currentQ = Math.floor(now.getMonth() / 3) + 1;
 
-  if (periodKey) {
-    if (periodType === 'monthly') {
-      const [y, m] = periodKey.split('-').map(Number);
-      start = new Date(Date.UTC(y, m - 1, 1));
-      next = new Date(Date.UTC(y, m, 1));
-      yearMonth = periodKey;
+  if (periodType === 'quarterly') {
+    let y = currentY;
+    let q = currentQ;
+    if (periodKey && typeof periodKey === 'string') {
+      const qMatch = periodKey.match(/^(\d{4})-Q([1-4])$/);
+      if (qMatch) {
+        y = parseInt(qMatch[1], 10);
+        q = parseInt(qMatch[2], 10);
+      } else {
+        const mMatch = periodKey.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+        if (mMatch) {
+          y = parseInt(mMatch[1], 10);
+          q = Math.floor((parseInt(mMatch[2], 10) - 1) / 3) + 1;
+        } else {
+          const yMatch = periodKey.match(/^(\d{4})/);
+          if (yMatch) {
+            y = parseInt(yMatch[1], 10);
+            q = y === currentY ? currentQ : 1;
+          }
+        }
+      }
     }
-    else if (periodType === 'quarterly') {
-      const [y, q] = periodKey.split('-Q').map(Number);
-      start = new Date(Date.UTC(y, (q - 1) * 3, 1));
-      next = new Date(Date.UTC(y, q * 3, 1));
-      yearMonth = periodKey;
+    const start = new Date(Date.UTC(y, (q - 1) * 3, 1));
+    const next = new Date(Date.UTC(y, q * 3, 1));
+    const yearMonth = `${y}-Q${q}`;
+    return { yearMonth, start, next };
+  }
+
+  if (periodType === 'yearly') {
+    let y = currentY;
+    if (periodKey && typeof periodKey === 'string') {
+      const yMatch = periodKey.match(/^(\d{4})/);
+      if (yMatch) {
+        y = parseInt(yMatch[1], 10);
+      }
     }
-    else { // yearly
-      const y = Number(periodKey);
-      start = new Date(Date.UTC(y, 0, 1));
-      next = new Date(Date.UTC(y + 1, 0, 1));
-      yearMonth = periodKey;
-    }
-  } else {
-    const y = now.getFullYear();
-    const m = now.getMonth();
-    if (periodType === 'monthly') {
-      start = new Date(Date.UTC(y, m, 1));
-      next = new Date(Date.UTC(y, m + 1, 1));
-      yearMonth = `${y}-${String(m + 1).padStart(2, '0')}`;
-    } else if (periodType === 'quarterly') {
-      const q = Math.floor(m / 3);
-      start = new Date(Date.UTC(y, q * 3, 1));
-      next = new Date(Date.UTC(y, (q + 1) * 3, 1));
-      yearMonth = `${y}-Q${q + 1}`;
-    } else { // yearly
-      start = new Date(Date.UTC(y, 0, 1));
-      next = new Date(Date.UTC(y + 1, 0, 1));
-      yearMonth = String(y);
+    const start = new Date(Date.UTC(y, 0, 1));
+    const next = new Date(Date.UTC(y + 1, 0, 1));
+    const yearMonth = String(y);
+    return { yearMonth, start, next };
+  }
+
+  // monthly (default)
+  let y = currentY;
+  let m = currentM;
+  if (periodKey && typeof periodKey === 'string') {
+    const mMatch = periodKey.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+    if (mMatch) {
+      y = parseInt(mMatch[1], 10);
+      m = parseInt(mMatch[2], 10);
+    } else {
+      const qMatch = periodKey.match(/^(\d{4})-Q([1-4])$/);
+      if (qMatch) {
+        y = parseInt(qMatch[1], 10);
+        m = (parseInt(qMatch[2], 10) - 1) * 3 + 1;
+      } else {
+        const yMatch = periodKey.match(/^(\d{4})/);
+        if (yMatch) {
+          y = parseInt(yMatch[1], 10);
+          m = y === currentY ? currentM : 1;
+        }
+      }
     }
   }
+  const start = new Date(Date.UTC(y, m - 1, 1));
+  const next = new Date(Date.UTC(y, m, 1));
+  const yearMonth = `${y}-${String(m).padStart(2, '0')}`;
+  return { yearMonth, start, next };
+}
+
+function getPeriodBounds(periodType: string, periodKey: string | null, now: Date) {
+  const { yearMonth, start, next } = sanitizePeriodKey(periodType, periodKey, now);
+
+  const safeStart = isNaN(start.getTime()) ? new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)) : start;
+  const safeNext = isNaN(next.getTime()) ? new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)) : next;
 
   return {
     yearMonth,
-    startDate: start.toISOString().split('T')[0],
-    endDate: next.toISOString().split('T')[0],
+    startDate: safeStart.toISOString().split('T')[0],
+    endDate: safeNext.toISOString().split('T')[0],
     label: yearMonth,
   };
 }
 
 function parsePeriodRange(keyOrDate: string | null | undefined): { start: string; end: string } {
-  if (!keyOrDate) {
+  if (!keyOrDate || typeof keyOrDate !== 'string') {
     return { start: '1970-01-01', end: '9999-12-31' };
   }
   const s = keyOrDate.trim();
-  if (s.includes('-Q')) {
-    const [y, q] = s.split('-Q').map(Number);
+  const qMatch = s.match(/^(\d{4})-Q([1-4])$/);
+  if (qMatch) {
+    const y = Number(qMatch[1]);
+    const q = Number(qMatch[2]);
     const startMonth = (q - 1) * 3 + 1;
     const endMonth = q * 3;
     const start = `${y}-${String(startMonth).padStart(2, '0')}-01`;
@@ -74,8 +114,10 @@ function parsePeriodRange(keyOrDate: string | null | undefined): { start: string
     const end = `${y}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     return { start, end };
   }
-  if (/^\d{4}-\d{2}$/.test(s)) {
-    const [y, m] = s.split('-').map(Number);
+  const mMatch = s.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+  if (mMatch) {
+    const y = Number(mMatch[1]);
+    const m = Number(mMatch[2]);
     const start = `${y}-${String(m).padStart(2, '0')}-01`;
     const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
     const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
@@ -118,17 +160,19 @@ function resolveEnvelopeForRollDown(budget: { nativeAmount: number; nativePeriod
 }
 
 function getPreviousPeriodKey(periodType: string, periodKey: string): string {
-  if (periodType === 'monthly') {
-    const [y, m] = periodKey.split('-').map(Number);
-    const d = new Date(Date.UTC(y, m - 2, 1));
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-  }
+  const now = new Date();
+  const safePeriod = sanitizePeriodKey(periodType, periodKey, now).yearMonth;
   if (periodType === 'quarterly') {
-    const [y, q] = periodKey.split('-Q').map(Number);
+    const [y, q] = safePeriod.split('-Q').map(Number);
     if (q === 1) return `${y - 1}-Q4`;
     return `${y}-Q${q - 1}`;
   }
-  return String(Number(periodKey) - 1);
+  if (periodType === 'yearly') {
+    return String(Number(safePeriod) - 1);
+  }
+  const [y, m] = safePeriod.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 2, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 export async function GET(request: Request) {
