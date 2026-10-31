@@ -51,6 +51,7 @@ import {
   sentNotifications,
   pushSubscriptions,
   syncLogs,
+  equityGrants,
 } from '@/lib/db/schema';
 
 const USER_TABLES: { table: any; dbName: string }[] = [
@@ -74,6 +75,7 @@ const USER_TABLES: { table: any; dbName: string }[] = [
   { table: importLog, dbName: 'import_log' },
   { table: holdings, dbName: 'holdings' },
   { table: holdingSnapshots, dbName: 'holding_snapshots' },
+  { table: equityGrants, dbName: 'equity_grants' },
   { table: goalAllocationHistory, dbName: 'goal_allocation_history' },
   { table: paystubs, dbName: 'paystubs' },
   { table: paystubLineItems, dbName: 'paystub_line_items' },

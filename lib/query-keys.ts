@@ -69,6 +69,8 @@ export const queryKeys = {
     history: ['investments-history'] as const,
     /** Matches `['investments-quotes', ...]`. */
     quotes: ['investments-quotes'] as const,
+    /** Matches `['equity-grants']`. */
+    equityGrants: ['equity-grants'] as const,
   },
 
   cashFlow: {
@@ -121,6 +123,7 @@ export const ACCOUNT_AFFECTED_PREFIXES = [
   queryKeys.investments.history,
   queryKeys.investments.income,
   queryKeys.investments.quotes,
+  queryKeys.investments.equityGrants,
   queryKeys.cashFlow.categories,
   queryKeys.cashFlow.cashVsCredit,
   queryKeys.cashFlow.savingsRate,

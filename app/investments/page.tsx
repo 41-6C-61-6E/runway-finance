@@ -10,6 +10,7 @@ import { MobileTabSwipeContainer, MobileViewSwitcher } from '@/components/ui/mob
 const INVESTMENT_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'holdings', label: 'Holdings' },
+  { id: 'equity', label: 'Equity' },
   { id: 'allocation', label: 'Allocation' },
   { id: 'income', label: 'Activity' },
 ];
@@ -22,7 +23,8 @@ import { IncomeDividendsPanel } from '@/components/investments/income-dividends-
 import { RecentActivity } from '@/components/investments/recent-activity';
 import { HoldingsTable } from '@/components/investments/holdings-table';
 import { HoldingDetailSheet } from '@/components/investments/holding-detail-modal';
-import { CandlestickChart, ShieldCheck, ArrowRight } from 'lucide-react';
+import { EquityOptionsPanel } from '@/components/investments/equity-options-panel';
+import { CandlestickChart, ShieldCheck, ArrowRight, Rocket } from 'lucide-react';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
 import { useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
@@ -153,6 +155,7 @@ export default function InvestmentsPage() {
     const set = new Set<string>();
     const mapping = new Map<string, string>();
     for (const h of holdingsArr) {
+      if (String(h.securityId ?? '').startsWith('grant-')) continue;
       const dt = getDisplayTicker(h);
       if (dt) set.add(dt);
       const eq = (h.publicEquivalent ?? '').trim().toUpperCase();
@@ -212,6 +215,7 @@ export default function InvestmentsPage() {
   }
 
   const hasAccounts = data && data.accounts && data.accounts.length > 0;
+  const showTabbedDashboard = hasAccounts || activeTab === 'equity';
 
   const selectedDisplayTicker = getDisplayTicker(selectedHolding ?? {});
   const selectedQuote = selectedDisplayTicker
@@ -222,7 +226,7 @@ export default function InvestmentsPage() {
     <div className="min-h-screen w-full">
       <PageHeader title="Investments" icon={CandlestickChart} />
       <PageContent>
-        {hasAccounts && data ? (
+        {showTabbedDashboard && data ? (
           <div className="space-y-5 sm:space-y-6">
             {/* ── Tabs & Sub-Navigation ── */}
             <MobileTabSwipeContainer
@@ -266,6 +270,13 @@ export default function InvestmentsPage() {
                   {isVisible('holdingsAllocationChart') && (
                     <HoldingsAllocation holdings={data.holdings} accounts={data.accounts} />
                   )}
+                </div>
+              )}
+
+              {/* ── Equity & Options Tab Content ── */}
+              {activeTab === 'equity' && (
+                <div className="space-y-5 sm:space-y-6">
+                  <EquityOptionsPanel />
                 </div>
               )}
 
@@ -376,7 +387,7 @@ export default function InvestmentsPage() {
               ))}
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
               <a
                 href="/settings?tab=accounts"
                 className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-semibold text-primary-foreground bg-primary shadow-sm hover:opacity-90 transition-all group"
@@ -384,6 +395,14 @@ export default function InvestmentsPage() {
                 <span>Link Brokerage in Settings</span>
                 <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 duration-200" />
               </a>
+              <button
+                type="button"
+                onClick={() => setActiveTab('equity')}
+                className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-semibold text-foreground bg-accent border border-border hover:bg-accent/80 transition-all cursor-pointer"
+              >
+                <Rocket className="w-3.5 h-3.5 text-primary" />
+                <span>Track Stock Options & Equity</span>
+              </button>
             </div>
           </div>
         )}

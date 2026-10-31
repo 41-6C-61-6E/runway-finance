@@ -33,6 +33,7 @@ export const ASSET_ACCOUNT_TYPES = [
   'hsa',
   'hsachecking',
   'health',
+  'stock_option',
 ];
 
 import { REAL_ESTATE_SUBTYPES } from '@/lib/constants/account-types';
@@ -72,6 +73,7 @@ export const ASSET_CATEGORY_MAP: Record<string, string> = {
   crypto: 'Other Investments',
   metals: 'Other Investments',
   '529': 'Other Investments',
+  stock_option: 'Taxable Brokerage',
   otherAsset: 'Other Investments',
   other: 'Other Investments',
 };
@@ -91,7 +93,7 @@ export const LIABILITY_CATEGORY_MAP: Record<string, string> = {
 
 export const isInvestmentAccount = (type: string) => ['investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment',
   'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529',
-  'hsa', 'health',
+  'hsa', 'health', 'stock_option',
 ].includes(type.toLowerCase());
 
 export const LIABILITY_ACCOUNT_TYPES = [

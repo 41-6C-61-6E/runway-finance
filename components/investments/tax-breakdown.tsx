@@ -40,6 +40,7 @@ const TAX_WRAPPER_MAP: Record<string, TaxWrapper> = {
   retirement: 'Tax-Deferred',
   investment: 'Taxable',
   brokerage: 'Taxable',
+  stock_option: 'Taxable',
   '529': 'Other',
   otherAsset: 'Other',
   otherinvestment: 'Other',

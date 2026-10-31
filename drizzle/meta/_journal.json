@@ -729,6 +729,13 @@
       "when": 1792367394197,
       "tag": "0103_rename_ask_to_advice",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1793486400000,
+      "tag": "0104_add_equity_grants",
+      "breakpoints": true
     }
   ]
 }

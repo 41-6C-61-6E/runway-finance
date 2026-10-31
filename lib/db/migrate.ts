@@ -462,6 +462,7 @@ async function runSelfHealingChecks(client: any): Promise<void> {
         { tag: '0086_sharing_join_tokens', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'account_sharing_invitations' AND column_name = 'join_token_hash'` },
         { tag: '0087_accounts_sensitive', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'accounts' AND column_name = 'sensitive'` },
         { tag: '0088_rate_limits', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'rate_limits'` },
+        { tag: '0104_add_equity_grants', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'equity_grants'` },
       ];
       for (const { tag, check } of migrationArtifacts) {
         if (appliedTagsMap.has(tag)) continue;
@@ -585,6 +586,39 @@ async function runSelfHealingChecks(client: any): Promise<void> {
     await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_fkey`);
     await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_user_id_fk`);
     await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_fkey`);
+
+    // 11. Ensure equity_grants table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "equity_grants" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "user_id" text NOT NULL,
+        "account_id" uuid NOT NULL REFERENCES "accounts"("id") ON DELETE CASCADE,
+        "company_name" text NOT NULL,
+        "grant_name" text NOT NULL,
+        "grant_type" text DEFAULT 'iso' NOT NULL,
+        "grant_date" date NOT NULL,
+        "vesting_start_date" date NOT NULL,
+        "expiration_date" date,
+        "total_shares" text NOT NULL,
+        "exercised_shares" text DEFAULT '0' NOT NULL,
+        "sold_shares" text DEFAULT '0' NOT NULL,
+        "strike_price" text DEFAULT '0' NOT NULL,
+        "current_fmv" text DEFAULT '0' NOT NULL,
+        "preferred_price" text,
+        "valuation_mode" text DEFAULT 'fmv' NOT NULL,
+        "vesting_schedule" text NOT NULL,
+        "early_exercise_allowed" boolean DEFAULT false NOT NULL,
+        "filed_83b" boolean DEFAULT false NOT NULL,
+        "early_exercise_date" date,
+        "logo_url" text,
+        "notes" text,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      ALTER TABLE "equity_grants" ADD COLUMN IF NOT EXISTS "logo_url" text;
+      CREATE INDEX IF NOT EXISTS "equity_grants_user_id_idx" ON "equity_grants" ("user_id");
+      CREATE INDEX IF NOT EXISTS "equity_grants_account_id_idx" ON "equity_grants" ("account_id");
+    `);
   } catch (err) {
     logger.error('[migrate] Self-healing checks failed', { error: err instanceof Error ? err.message : String(err) });
     // Don't crash startup on self-healing check failure, but log it

@@ -14,6 +14,7 @@ export const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }>
   sepira:         { group: 'Investments',   subGroup: 'SEP IRA' },
   simpleira:      { group: 'Investments',   subGroup: 'Simple IRA' },
   529:        { group: 'Investments',   subGroup: '529 Account' },
+  stock_option:   { group: 'Investments',   subGroup: 'Stock Options & Equity' },
   otherAsset: { group: 'Assets',        subGroup: 'Other Assets' },
   vehicle:    { group: 'Assets',        subGroup: 'Vehicles' },
   crypto:     { group: 'Assets',        subGroup: 'Crypto Currency' },
@@ -61,6 +62,7 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   sepira: 'SEP IRA',
   simpleira: 'Simple IRA',
   '529': '529 Account',
+  stock_option: 'Stock Options & Equity',
   otherAsset: 'Other Asset',
   otherasset: 'Other Asset',
   otherInvestment: 'Other Investments',
@@ -120,7 +122,7 @@ export function getTypesByGroup(): { group: string; types: { value: string; labe
 
 export const ACCOUNT_GROUP_MAP: Record<string, string[]> = {
   BANKING: ['checking', 'savings', 'cash', 'other', 'hsachecking'],
-  INVESTMENTS: ['investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529', 'hsa', 'health'],
+  INVESTMENTS: ['investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529', 'hsa', 'health', 'stock_option'],
   CREDIT: ['credit', 'loan', 'mortgage', 'studentloan', 'autoloan', 'otherloan', 'otherLiability'],
   ASSETS: ['vehicle', 'crypto', 'metals', 'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'single-family', 'condo', 'townhouse', 'multi-family', 'otherAsset', 'otherasset'],
 };

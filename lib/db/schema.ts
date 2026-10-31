@@ -10,4 +10,6 @@ export * from './schema/notifications';
 export * from './schema/retirement-planning';
 export * from './schema/recurring';
 export * from './schema/rate-limits';
+export * from './schema/equity';
+
 

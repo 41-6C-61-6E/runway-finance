@@ -54,6 +54,7 @@ import {
   userNotifications,
   sentNotifications,
   pushSubscriptions,
+  equityGrants,
 } from '@/lib/db/schema';
 
 interface BackupPayload {
@@ -73,6 +74,7 @@ const DELETE_ORDER: { table: any; dbName: string }[] = [
   { table: categoryIncomeSummary, dbName: 'category_income_summary' },
   { table: holdings, dbName: 'holdings' },
   { table: holdingSnapshots, dbName: 'holding_snapshots' },
+  { table: equityGrants, dbName: 'equity_grants' },
   { table: goalAllocationHistory, dbName: 'goal_allocation_history' },
   { table: paystubs, dbName: 'paystubs' },
   { table: paystubFieldMappings, dbName: 'paystub_field_mappings' },

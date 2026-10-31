@@ -360,6 +360,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   plan_flows: ['name', 'ruleValue', 'matchRate', 'matchLimit', 'startTriggerValue', 'endTriggerValue'],
   plan_settings: ['fixedInflationRate', 'fixedBenefitCola', 'withholdingDeferred', 'withholdingTaxable', 'incomeTaxModifier', 'stateTaxTable', 'projectionMode', 'enableAmt', 'capGainsTaxModifier', 'heirFlatIncomeTaxRate', 'realEstateLiquidationRate', 'administrativeCostRate', 'charitableGiving'],
   recurring_transactions: ['merchantName', 'matchPattern', 'averageAmount', 'lastAmount', 'customName', 'notes'],
+  equity_grants: ['companyName', 'grantName', 'totalShares', 'exercisedShares', 'soldShares', 'strikePrice', 'currentFmv', 'preferredPrice', 'vestingSchedule', 'logoUrl', 'notes'],
 };
 
 export async function encryptRow<T extends Record<string, any>>(table: string, row: T, key: Uint8Array): Promise<T> {
