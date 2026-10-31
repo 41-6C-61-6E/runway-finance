@@ -6,7 +6,7 @@ import { encryptRow } from '@/lib/crypto';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
-import { apiUnauthorized, apiForbidden, apiBadRequest, apiTooManyRequests, handleApiError } from '@/lib/api/response';
+import { apiUnauthorized, apiBadRequest, apiTooManyRequests, handleApiError } from '@/lib/api/response';
 import {
   accounts,
   categories,
@@ -159,12 +159,6 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-  const isMember = dataUserId !== userId;
-
-  if (isMember) {
-    return apiForbidden('Sharing members cannot import backups over household financial data');
-  }
 
   const { checkRateLimit } = await import('@/lib/rate-limit');
   if (!(await checkRateLimit(`backup-import:${userId}`, 5, 60_000))) {
@@ -217,10 +211,8 @@ export async function POST(request: Request) {
   try {
     await db.transaction(async (tx) => {
       // Delete existing data
-      for (const { table, dbName } of DELETE_ORDER) {
-        const isPersonalTable = dbName === 'ai_providers' || dbName === 'simplefin_connections' || dbName === 'plaid_connections';
-        const targetUserId = isPersonalTable ? userId : dataUserId;
-        await tx.delete(table).where(eq(table.userId, targetUserId));
+      for (const { table } of DELETE_ORDER) {
+        await tx.delete(table).where(eq(table.userId, userId));
       }
 
       // Parse user_settings from backup
@@ -256,9 +248,8 @@ export async function POST(request: Request) {
 
         const restoredRows = rows.map((row) => restoreTimestamps(row));
 
-        const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
         const encrypted = await Promise.all(
-          restoredRows.map((row) => encryptRow(dbName, { ...row, userId: targetUserId }, dek)),
+          restoredRows.map((row) => encryptRow(dbName, { ...row, userId }, dek)),
         );
         const batchSize = dbName === 'categories' ? encrypted.length : 50;
         for (let i = 0; i < encrypted.length; i += batchSize) {
@@ -286,7 +277,7 @@ export async function POST(request: Request) {
       }
 
       // Audit log: record the restore in import_log so there is a durable
-      // trail of when household data was replaced by a backup. We do not store
+      // trail of when user data was replaced by a backup. We do not store
       // the (potentially huge) backup payload in fileContent — that column is
       // intended for CSV imports.
       const totalRestored = Object.values(backup.data).reduce<number>(
@@ -295,7 +286,7 @@ export async function POST(request: Request) {
       );
       await tx.insert(importLog).values({
         id: randomUUID(),
-        userId: dataUserId,
+        userId,
         fileName: 'backup-restore',
         importType: 'restore',
         status: 'completed',
@@ -306,7 +297,7 @@ export async function POST(request: Request) {
     });
 
     // Invalidate the search cache so restored data is immediately searchable.
-    invalidateUserSearchCache(dataUserId);
+    invalidateUserSearchCache(userId);
 
     return NextResponse.json({
       success: true,

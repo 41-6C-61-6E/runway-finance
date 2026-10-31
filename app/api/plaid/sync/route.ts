@@ -3,7 +3,6 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { plaidConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { resolveDataUserId } from '@/lib/sharing';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { syncPlaidConnection } from '@/lib/services/plaid-sync';
 import { logger } from '@/lib/logger';
@@ -46,9 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'not_found', message: 'Plaid connection not found' }, { status: 404 });
     }
 
-    const dataUserId = await resolveDataUserId(userId);
-    const connectionDataUserId = await resolveDataUserId(connection.userId);
-    if (connectionDataUserId !== dataUserId) {
+    if (connection.userId !== userId) {
       return NextResponse.json({ error: 'not_found', message: 'Plaid connection not found' }, { status: 404 });
     }
 

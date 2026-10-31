@@ -5,8 +5,8 @@ import { getAdviceSnapshot } from '@/lib/advice/snapshot';
 import { selectPacks } from '@/lib/advice/router';
 import { formatInTimezone } from '@/lib/utils/timeframe';
 
-export const GET = withAuthAndDek(async (req, { userId, dataUserId, dek }) => {
-  const ctx = await buildFinanceContext({ userId, dataUserId, dek });
+export const GET = withAuthAndDek(async (req, { userId, dek }) => {
+  const ctx = await buildFinanceContext({ userId, dek });
   const url = new URL(req.url);
   const path = url.searchParams.get('path') || undefined;
 

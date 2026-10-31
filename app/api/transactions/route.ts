@@ -42,7 +42,6 @@ import {
   updateMonthlyCashFlowSummaries,
 } from "@/lib/services/sync";
 import { getSearchMatchingTransactionIds, invalidateUserSearchCache } from "@/lib/services/search-cache";
-import { getHiddenAccountIdsForUser, isAccountHiddenFromUser } from "@/lib/data-visibility";
 
 const UNCATEGORIZED_CATEGORY_IDS = new Set([
   "uncategorized",
@@ -272,7 +271,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
@@ -332,7 +330,7 @@ export async function GET(request: Request) {
   const userSettingsList = await getDb()
     .select()
     .from(userSettings)
-    .where(eq(userSettings.userId, dataUserId))
+    .where(eq(userSettings.userId, userId))
     .limit(1);
 
   const userSetting = userSettingsList[0];
@@ -365,7 +363,7 @@ export async function GET(request: Request) {
   // Build where clause (excluding encrypted field filters — applied in memory).
   // Hidden and excluded accounts are global exclusions for user-facing data.
   const whereConditions = [
-    eq(transactions.userId, dataUserId),
+    eq(transactions.userId, userId),
     or(
       and(
         eq(accounts.isHidden, false),
@@ -383,14 +381,8 @@ export async function GET(request: Request) {
     whereConditions.push(eq(transactions.ignored, false));
   }
 
-  // Sensitive accounts are hidden from plain sharing members (server-side).
-  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
-  if (hiddenAccountIds.length > 0) {
-    whereConditions.push(notInArray(transactions.accountId, hiddenAccountIds));
-  }
-
   if (filters.search) {
-    const matchingSearchIds = await getSearchMatchingTransactionIds(dataUserId, dek, filters.search);
+    const matchingSearchIds = await getSearchMatchingTransactionIds(userId, dek, filters.search);
     if (matchingSearchIds.size === 0) {
       if (filters.idsOnly) {
         return NextResponse.json({ ids: [] });
@@ -1190,7 +1182,6 @@ export async function PATCH(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;
@@ -1245,7 +1236,7 @@ export async function PATCH(request: Request) {
     const userSettingsList = await getDb()
       .select()
       .from(userSettings)
-      .where(eq(userSettings.userId, dataUserId))
+      .where(eq(userSettings.userId, userId))
       .limit(1);
 
     const userSetting = userSettingsList[0];
@@ -1265,7 +1256,7 @@ export async function PATCH(request: Request) {
       importSettings.cashFlowProjections !== false;
 
     const whereConditions = [
-      eq(transactions.userId, dataUserId),
+      eq(transactions.userId, userId),
       or(
         and(
           eq(accounts.isHidden, false),
@@ -1275,12 +1266,6 @@ export async function PATCH(request: Request) {
       ),
       eq(transactions.deleted, false),
     ];
-
-    // Sensitive accounts are hidden from plain sharing members (server-side).
-    const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
-    if (hiddenAccountIds.length > 0) {
-      whereConditions.push(notInArray(transactions.accountId, hiddenAccountIds));
-    }
 
     if (!isImportTransactionsEnabled) {
       whereConditions.push(eq(transactions.isImported, false));
@@ -1429,7 +1414,7 @@ export async function PATCH(request: Request) {
           .set(updateData)
           .where(
             and(
-              eq(transactions.userId, dataUserId),
+              eq(transactions.userId, userId),
               inArray(transactions.id, matchingIds),
             ),
           )
@@ -1443,7 +1428,7 @@ export async function PATCH(request: Request) {
       .update(transactions)
       .set(updateData)
       .where(
-        and(eq(transactions.userId, dataUserId), inArray(transactions.id, ids!)),
+        and(eq(transactions.userId, userId), inArray(transactions.id, ids!)),
       )
       .returning();
   }
@@ -1471,8 +1456,8 @@ export async function PATCH(request: Request) {
     });
   }
 
-  invalidateUserSearchCache(dataUserId);
-  triggerUserSummariesRebuild(dataUserId, dek);
+  invalidateUserSearchCache(userId);
+  triggerUserSummariesRebuild(userId, dek);
 
   logger.info("Transactions patched", { updatedCount: updated.length });
   return NextResponse.json({ updated: updated.length });
@@ -1488,7 +1473,6 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;
@@ -1517,7 +1501,7 @@ export async function POST(request: Request) {
   const [account] = await getDb()
     .select({ id: accounts.id })
     .from(accounts)
-    .where(and(eq(accounts.id, accountId), eq(accounts.userId, dataUserId)))
+    .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
     .limit(1);
 
   if (!account) {
@@ -1527,18 +1511,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Sensitive accounts are invisible to plain sharing members (same 404 as missing).
-  if (await isAccountHiddenFromUser(userId, dataUserId, accountId)) {
-    return NextResponse.json(
-      { error: "not_found", message: "Account not found" },
-      { status: 404 },
-    );
-  }
-
   const externalId = crypto.randomUUID();
 
   const txData = {
-    userId: dataUserId,
+    userId,
     accountId,
     externalId,
     date,
@@ -1568,8 +1544,8 @@ export async function POST(request: Request) {
     );
   }
 
-  invalidateUserSearchCache(dataUserId);
-  triggerUserSummariesRebuild(dataUserId, dek);
+  invalidateUserSearchCache(userId);
+  triggerUserSummariesRebuild(userId, dek);
 
   return NextResponse.json(created, { status: 201 });
 }
@@ -1584,7 +1560,6 @@ export async function DELETE(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;
@@ -1625,7 +1600,7 @@ export async function DELETE(request: Request) {
     const userSettingsList = await getDb()
       .select()
       .from(userSettings)
-      .where(eq(userSettings.userId, dataUserId))
+      .where(eq(userSettings.userId, userId))
       .limit(1);
 
     const userSetting = userSettingsList[0];
@@ -1645,7 +1620,7 @@ export async function DELETE(request: Request) {
       importSettings.cashFlowProjections !== false;
 
     const whereConditions = [
-      eq(transactions.userId, dataUserId),
+      eq(transactions.userId, userId),
       or(
         and(
           eq(accounts.isHidden, false),
@@ -1655,12 +1630,6 @@ export async function DELETE(request: Request) {
       ),
       eq(transactions.deleted, false),
     ];
-
-    // Sensitive accounts are hidden from plain sharing members (server-side).
-    const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
-    if (hiddenAccountIds.length > 0) {
-      whereConditions.push(notInArray(transactions.accountId, hiddenAccountIds));
-    }
 
     if (!isImportTransactionsEnabled) {
       whereConditions.push(eq(transactions.isImported, false));
@@ -1809,7 +1778,7 @@ export async function DELETE(request: Request) {
           .set({ deleted: true, updatedAt: new Date() })
           .where(
             and(
-              eq(transactions.userId, dataUserId),
+              eq(transactions.userId, userId),
               inArray(transactions.id, matchingIds),
             ),
           )
@@ -1823,13 +1792,13 @@ export async function DELETE(request: Request) {
       .update(transactions)
       .set({ deleted: true, updatedAt: new Date() })
       .where(
-        and(eq(transactions.userId, dataUserId), inArray(transactions.id, ids!)),
+        and(eq(transactions.userId, userId), inArray(transactions.id, ids!)),
       )
       .returning();
   }
 
-  invalidateUserSearchCache(dataUserId);
-  triggerUserSummariesRebuild(dataUserId, dek);
+  invalidateUserSearchCache(userId);
+  triggerUserSummariesRebuild(userId, dek);
 
   logger.info("Transactions deleted", { deletedCount: updated.length });
   return NextResponse.json({ updated: updated.length });

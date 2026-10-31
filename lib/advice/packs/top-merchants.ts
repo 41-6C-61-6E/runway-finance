@@ -78,14 +78,14 @@ export const topMerchantsPack: AskPack<TopMerchantsParams> = {
         .from(transactions)
         .where(
           and(
-            eq(transactions.userId, ctx.dataUserId),
+            eq(transactions.userId, ctx.userId),
             eq(transactions.deleted, false),
             eq(transactions.ignored, false),
             gte(transactions.date, startDateStr),
             lte(transactions.date, endDateStr)
           )
         ),
-      db.select().from(categories).where(eq(categories.userId, ctx.dataUserId)),
+      db.select().from(categories).where(eq(categories.userId, ctx.userId)),
       ctx.getAccounts(),
     ]);
 
@@ -100,8 +100,6 @@ export const topMerchantsPack: AskPack<TopMerchantsParams> = {
     let totalAllMerchants = 0;
 
     for (const tx of decTxs) {
-      if (tx.accountId && ctx.hiddenAccountIds.has(tx.accountId)) continue;
-
       const cat = tx.categoryId ? catMap.get(tx.categoryId) : undefined;
       if (cat?.excludeFromReports || cat?.categoryType === 'transfer') continue;
 

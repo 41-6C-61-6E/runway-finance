@@ -1,12 +1,10 @@
 import {
   boolean,
-  date,
   integer,
   jsonb,
   pgTable,
   text,
   timestamp,
-  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -28,80 +26,9 @@ export const userEncryptionKeys = pgTable('user_encryption_keys', {
   serverWrappingIv: text('server_wrapping_iv'),
   serverWrappingTag: text('server_wrapping_tag'),
   salt: text('salt').notNull(),
-  // When set, this user is a share member whose DEK wraps the primary user's raw key.
-  primaryUserId: text('primary_user_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
-
-// ── Account Sharing Invitations ───────────────────────────────────────────────
-export const accountSharingInvitations = pgTable('account_sharing_invitations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  inviterUserId: text('inviter_user_id').notNull(),
-  inviteeEmail: text('invitee_email').notNull(),
-  pinHash: text('pin_hash').notNull(),
-  pin: text('pin'),
-  status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'revoked'
-  attempts: integer('attempts').notNull().default(0),
-  joinTokenHash: text('join_token_hash'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-// ── Household DEK Versions (key rotation chain) ──────────────────────────────
-export const dekVersions = pgTable('dek_versions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  primaryUserId: text('primary_user_id').notNull(),
-  version: integer('version').notNull().default(1),
-  dekWrappedServer: text('dek_wrapped_server').notNull(),
-  wrappingIv: text('wrapping_iv').notNull(),
-  wrappingTag: text('wrapping_tag').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const dekVersionWraps = pgTable(
-  'dek_version_wraps',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    versionId: uuid('version_id')
-      .notNull()
-      .references(() => dekVersions.id, { onDelete: 'cascade' }),
-    memberUserId: text('member_user_id').notNull(),
-    wrappedDek: text('wrapped_dek').notNull(),
-    wrappingIv: text('wrapping_iv').notNull(),
-    wrappingTag: text('wrapping_tag').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [unique().on(t.versionId, t.memberUserId)]
-);
-
-// ── Share Audit Log ──────────────────────────────────────────────────────────
-export const shareAuditLog = pgTable('share_audit_log', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  dataUserId: text('data_user_id').notNull(),
-  actorUserId: text('actor_user_id').notNull(),
-  action: text('action').notNull(),
-  targetTable: text('target_table'),
-  targetId: text('target_id'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-// ── Account Share Members ─────────────────────────────────────────────────────
-export const accountShareMembers = pgTable(
-  'account_share_members',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    primaryUserId: text('primary_user_id').notNull(),
-    memberUserId: text('member_user_id').notNull(),
-    invitationId: uuid('invitation_id').references(() => accountSharingInvitations.id, { onDelete: 'set null' }),
-    status: text('status').notNull().default('active'), // 'active' | 'removed'
-    role: text('role').notNull().default('member'), // 'admin' | 'member' (primary is implicit)
-    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
-    removedAt: timestamp('removed_at', { withTimezone: true }),
-    removedBy: text('removed_by'),
-  },
-  (t) => [unique().on(t.primaryUserId, t.memberUserId)]
-);
 
 // ── Next Auth Tables (existing) ──────────────────────────────────────────────
 export const user = pgTable('user', {

@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const includeHidden = searchParams.get('includeHidden') === 'true';
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   logger.info(`${LOG_TAG} Fetching investments`, { includeHidden });
 
   try {
-    const whereConditions = [eq(accounts.userId, dataUserId)];
+    const whereConditions = [eq(accounts.userId, userId)];
     if (!includeHidden) {
       whereConditions.push(eq(accounts.isHidden, false));
     }
@@ -158,7 +158,7 @@ export async function GET(request: Request) {
           .from(transactions)
           .where(
             and(
-              eq(transactions.userId, dataUserId),
+              eq(transactions.userId, userId),
               eq(transactions.deleted, false),
               inArray(transactions.accountId, accountIds)
             )
@@ -234,7 +234,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
 
   let body: unknown;
   try {
@@ -282,7 +282,7 @@ export async function POST(request: Request) {
     const { securityId } = parsed.data;
     await updateHoldingOverrides(
       securityId,
-      dataUserId,
+      userId,
       cleanedOverride,
       cleanedEquivalent,
     );

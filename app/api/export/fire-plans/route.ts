@@ -19,12 +19,11 @@ export async function GET(req: NextRequest) {
   const format = searchParams.get('format') || 'txt'; // 'txt' | 'csv'
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? userId;
   const db = getDb();
   const dek = await getSessionDEK();
 
   try {
-    const planConditions = [eq(plans.userId, dataUserId)];
+    const planConditions = [eq(plans.userId, userId)];
     if (planId && planId !== 'all') {
       planConditions.push(eq(plans.id, planId));
     }

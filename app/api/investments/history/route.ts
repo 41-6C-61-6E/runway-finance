@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     const userAccounts = await getDb()
       .select()
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
 
     const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
     const reportableAccounts = filterReportableAccounts(decryptedAccounts);
@@ -50,7 +50,6 @@ export async function GET(request: Request) {
 
     const accountIds = investmentAccounts.map((acc) => acc.id);
 
-    const userId = session.user.id;
     const userSettingsList = await getDb()
       .select({ timezone: userSettings.timezone })
       .from(userSettings)
@@ -68,7 +67,7 @@ export async function GET(request: Request) {
         .from(accountSnapshots)
         .where(
           and(
-            eq(accountSnapshots.userId, dataUserId),
+            eq(accountSnapshots.userId, userId),
             inArray(accountSnapshots.accountId, accountIds)
           )
         )
@@ -98,7 +97,7 @@ export async function GET(request: Request) {
       .from(accountSnapshots)
       .where(
         and(
-          eq(accountSnapshots.userId, dataUserId),
+          eq(accountSnapshots.userId, userId),
           inArray(accountSnapshots.accountId, accountIds),
           lt(accountSnapshots.snapshotDate, startStr)
         )
@@ -115,7 +114,7 @@ export async function GET(request: Request) {
       .from(accountSnapshots)
       .where(
         and(
-          eq(accountSnapshots.userId, dataUserId),
+          eq(accountSnapshots.userId, userId),
           inArray(accountSnapshots.accountId, accountIds),
           gte(accountSnapshots.snapshotDate, startStr),
           lte(accountSnapshots.snapshotDate, endStr)
@@ -133,7 +132,7 @@ export async function GET(request: Request) {
       .from(transactions)
       .where(
         and(
-          eq(transactions.userId, dataUserId),
+          eq(transactions.userId, userId),
           inArray(transactions.accountId, accountIds),
           eq(transactions.deleted, false),
           gte(transactions.date, startStr),

@@ -11,19 +11,18 @@ export async function GET() {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  const cacheKey = `user:${userId}:cash-flow-summary:${dataUserId}:${currentMonth}`;
+  const cacheKey = `user:${userId}:cash-flow-summary:${currentMonth}`;
   const cached = getCached<any>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
 
   try {
-    const ctx = await buildFinanceContext({ userId, dataUserId, dek, now });
+    const ctx = await buildFinanceContext({ userId, dek, now });
     const payload = await getCashFlowSummary(ctx);
 
     setCached(cacheKey, payload, 2 * 60 * 1000);

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { User, Lock, Mail, Eye, EyeOff, KeyRound, Users2, ChevronDown } from 'lucide-react';
+import { User, Lock, Mail, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 export default function SignInPage() {
   const router = useRouter();
@@ -16,48 +16,15 @@ export default function SignInPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Sharing join mode
-  const [isSharingJoin, setIsSharingJoin] = useState(false);
-  const [sharingEmail, setSharingEmail] = useState('');
-  const [sharingPin, setSharingPin] = useState('');
-  const [joinToken, setJoinToken] = useState('');
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode');
-    const join = params.get('join');
-    const email = params.get('email');
-    const pinVal = params.get('pin');
-    const tokenVal = params.get('token');
 
-    if (mode === 'register' || mode === 'join' || join === 'true' || tokenVal) {
+    if (mode === 'register') {
       setIsLogin(false);
     }
-    if (mode === 'join' || join === 'true' || tokenVal) {
-      setIsSharingJoin(true);
-      if (email) setSharingEmail(email);
-      if (pinVal) setSharingPin(pinVal);
-      if (tokenVal) setJoinToken(tokenVal);
-    }
-
-    // M-13 (2026-08-27 security review): the join token / invite PIN arrive in
-    // the URL query string (shareable link). Scrub them from location
-    // immediately after capturing so they don't linger in the address bar or
-    // leak into anything that logs window.location on refresh/navigation.
-    if (tokenVal || pinVal || email || join === 'true') {
-      try {
-        const url = new URL(window.location.href);
-        url.search = '';
-        url.hash = '';
-        window.history.replaceState(window.history.state, '', url.pathname);
-      } catch {
-        // best-effort cleanup
-      }
-    }
   }, []);
-
-  const hasJoinToken = joinToken.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,17 +49,6 @@ export default function SignInPage() {
         const body: Record<string, string> = { username, password, timezone: tz };
         if (email) body.email = email;
         if (pin) body.pin = pin;
-
-        // Sharing join: pass the one-time join token (shareable link) or,
-        // for legacy invitations, the invitee email + 8-digit PIN.
-        if (isSharingJoin) {
-          if (hasJoinToken) {
-            body.joinToken = joinToken.trim();
-          } else {
-            body.sharingEmail = sharingEmail.trim();
-            body.sharingPin = sharingPin.trim();
-          }
-        }
 
         const response = await fetch('/api/register', {
           method: 'POST',
@@ -125,7 +81,6 @@ export default function SignInPage() {
 
   const toggleForm = () => {
     setIsLogin(!isLogin);
-    setIsSharingJoin(false);
     setError('');
   };
 
@@ -140,13 +95,9 @@ export default function SignInPage() {
               <h1 className="text-xl font-bold text-foreground">Sign In</h1>
             ) : (
               <>
-                <h1 className="text-xl font-bold text-foreground">
-                  {isSharingJoin ? 'Join a shared account' : 'Create account'}
-                </h1>
+                <h1 className="text-xl font-bold text-foreground">Create account</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {isSharingJoin
-                    ? 'You have been invited to share a financial account'
-                    : 'Start managing your finances'}
+                  Start managing your finances
                 </p>
               </>
             )}
@@ -204,7 +155,7 @@ export default function SignInPage() {
             </div>
 
             {/* Standard registration fields */}
-            {!isLogin && !isSharingJoin && (
+            {!isLogin && (
               <>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -239,58 +190,6 @@ export default function SignInPage() {
               </>
             )}
 
-            {/* Sharing join fields */}
-            {!isLogin && isSharingJoin && (
-              hasJoinToken ? (
-                <div className="p-3 bg-primary/8 border border-primary/20 rounded-lg">
-                  <p className="text-xs text-muted-foreground">
-                    You&apos;ve been invited to join a shared account with a one-time link.
-                    Choose a username and password to create your account.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="p-3 bg-primary/8 border border-primary/20 rounded-lg">
-                    <p className="text-xs text-muted-foreground">
-                      Enter the <strong className="text-foreground">email address the invitation was sent to</strong> and the{' '}
-                      <strong className="text-foreground">8-digit PIN</strong> shared with you by the account owner.
-                    </p>
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <input
-                      type="email"
-                      id="sharingEmail"
-                      value={sharingEmail}
-                      onChange={(e) => setSharingEmail(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                      placeholder="Invitation email address"
-                      required={isSharingJoin}
-                    />
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <KeyRound className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <input
-                      type="text"
-                      id="sharingPin"
-                      value={sharingPin}
-                      onChange={(e) => setSharingPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                      className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                      placeholder="8-digit PIN"
-                      maxLength={8}
-                      required={isSharingJoin}
-                    />
-                  </div>
-                </>
-              )
-            )}
-
             <button
               type="submit"
               disabled={isLoading}
@@ -302,10 +201,10 @@ export default function SignInPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  {isLogin ? 'Signing in...' : isSharingJoin ? 'Joining account...' : 'Creating account...'}
+                  {isLogin ? 'Signing in...' : 'Creating account...'}
                 </span>
               ) : (
-                isLogin ? 'Sign In' : isSharingJoin ? 'Join Shared Account' : 'Create Account'
+                isLogin ? 'Sign In' : 'Create Account'
               )}
             </button>
           </form>
@@ -320,31 +219,6 @@ export default function SignInPage() {
                 ? "Don't have an account? Sign Up"
                 : 'Already have an account? Sign In'}
             </button>
-
-            {/* Sharing join toggle (only on register mode) */}
-            {!isLogin && (
-              <div>
-                <button
-                  onClick={() => {
-                    setIsSharingJoin(!isSharingJoin);
-                    setError('');
-                  }}
-                  className="flex items-center gap-1.5 mx-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {isSharingJoin ? (
-                    <>
-                      <ChevronDown className="w-3.5 h-3.5 rotate-90" />
-                      Create a new account instead
-                    </>
-                  ) : (
-                    <>
-                      <Users2 className="w-3.5 h-3.5" />
-                      I have a sharing invitation
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

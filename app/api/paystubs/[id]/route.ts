@@ -15,7 +15,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+  const userId = session?.user?.id;
   if (!session?.user?.id) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -26,7 +26,7 @@ export async function GET(
   const [paystub] = await db
     .select()
     .from(paystubs)
-    .where(and(eq(paystubs.id, id), eq(paystubs.userId, dataUserId)))
+    .where(and(eq(paystubs.id, id), eq(paystubs.userId, userId)))
     .limit(1);
 
   if (!paystub) {
@@ -46,7 +46,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+  const userId = session?.user?.id;
   if (!session?.user?.id) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -58,7 +58,7 @@ export async function PATCH(
   const [existing] = await db
     .select()
     .from(paystubs)
-    .where(and(eq(paystubs.id, id), eq(paystubs.userId, dataUserId)))
+    .where(and(eq(paystubs.id, id), eq(paystubs.userId, userId)))
     .limit(1);
 
   if (!existing) {
@@ -149,7 +149,7 @@ export async function PATCH(
     const userAccounts = await db
       .select({ id: accounts.id, type: accounts.type })
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
     const accountTypeById = new Map(userAccounts.map((a) => [a.id, a.type]));
 
     const { isAssetAccount } = await import('@/lib/utils/account-scope');
@@ -167,12 +167,12 @@ export async function PATCH(
         await db
           .update(transactions)
           .set(encrypted)
-          .where(and(eq(transactions.id, txnId), eq(transactions.userId, dataUserId)));
+          .where(and(eq(transactions.id, txnId), eq(transactions.userId, userId)));
       } else {
         await db
           .update(transactions)
           .set(txnValues)
-          .where(and(eq(transactions.id, txnId), eq(transactions.userId, dataUserId)));
+          .where(and(eq(transactions.id, txnId), eq(transactions.userId, userId)));
       }
     }
 
@@ -203,12 +203,12 @@ export async function PATCH(
         await db
           .update(transactions)
           .set(encrypted)
-          .where(and(eq(transactions.id, li.transactionId), eq(transactions.userId, dataUserId)));
+          .where(and(eq(transactions.id, li.transactionId), eq(transactions.userId, userId)));
       } else {
         await db
           .update(transactions)
           .set(txnValues)
-          .where(and(eq(transactions.id, li.transactionId), eq(transactions.userId, dataUserId)));
+          .where(and(eq(transactions.id, li.transactionId), eq(transactions.userId, userId)));
       }
     }
   }
@@ -233,12 +233,12 @@ export async function PATCH(
 
   // Refresh summaries
   if (dek) {
-    await updateCategorySpendingSummaries(dataUserId, dek).catch(() => {});
-    await updateCategoryIncomeSummaries(dataUserId, dek).catch(() => {});
-    await updateMonthlyCashFlowSummaries(dataUserId, dek).catch(() => {});
+    await updateCategorySpendingSummaries(userId, dek).catch(() => {});
+    await updateCategoryIncomeSummaries(userId, dek).catch(() => {});
+    await updateMonthlyCashFlowSummaries(userId, dek).catch(() => {});
   }
 
-  invalidateUserSearchCache(dataUserId);
+  invalidateUserSearchCache(userId);
   return Response.json({ ...updated, lineItems: finalLineItems });
 }
 
@@ -247,7 +247,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+  const userId = session?.user?.id;
   if (!session?.user?.id) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -259,7 +259,7 @@ export async function DELETE(
   const [existing] = await db
     .select()
     .from(paystubs)
-    .where(and(eq(paystubs.id, id), eq(paystubs.userId, dataUserId)))
+    .where(and(eq(paystubs.id, id), eq(paystubs.userId, userId)))
     .limit(1);
 
   if (!existing) {
@@ -270,12 +270,12 @@ export async function DELETE(
   await db
     .delete(transactions)
     .where(
-      and(eq(transactions.paystubId, id), eq(transactions.userId, dataUserId))
+      and(eq(transactions.paystubId, id), eq(transactions.userId, userId))
     );
 
   // Delete the paystub (cascade will delete line items)
   await db.delete(paystubs).where(eq(paystubs.id, id));
 
-  invalidateUserSearchCache(dataUserId);
+  invalidateUserSearchCache(userId);
   return Response.json({ success: true });
 }

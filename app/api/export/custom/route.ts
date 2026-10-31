@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow } from '@/lib/crypto';
-import { eq, and, gte, lte, notInArray } from 'drizzle-orm';
+import { eq, and, gte, lte } from 'drizzle-orm';
 import {
   accounts,
   categories,
@@ -23,7 +23,6 @@ import {
 } from '@/lib/db/schema';
 import { ZipArchive } from 'archiver';
 import { toCsv, formatFirePlanTxt } from '@/lib/utils/export-formatter';
-import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -32,12 +31,8 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? userId;
   const db = getDb();
   const dek = await getSessionDEK();
-
-  // M-1: sensitive accounts hidden from plain members stay out of exports.
-  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
 
   try {
     const body = await req.json();
@@ -57,12 +52,7 @@ export async function POST(req: NextRequest) {
       archive.on('error', reject);
     });
 
-    // M-1: hidden accounts are not exported (and never enter the name map).
-    const accountConditions = [eq(accounts.userId, dataUserId)];
-    if (hiddenAccountIds.length > 0) {
-      accountConditions.push(notInArray(accounts.id, hiddenAccountIds));
-    }
-    const accountsRaw = await db.select().from(accounts).where(and(...accountConditions));
+    const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, userId));
     const decryptedAccounts = await Promise.all(
       accountsRaw.map((r) => decryptRow('accounts', r as Record<string, unknown>, dek))
     );
@@ -70,7 +60,7 @@ export async function POST(req: NextRequest) {
       decryptedAccounts.map((a) => [a.id as string, a.name as string])
     );
 
-    const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, dataUserId));
+    const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, userId));
     const decryptedCategories = await Promise.all(
       categoriesRaw.map((r) => decryptRow('categories', r as Record<string, unknown>, dek))
     );
@@ -80,10 +70,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Transactions
     if (datasets.includes('transactions')) {
-      const conds = [eq(transactions.userId, dataUserId), eq(transactions.deleted, false)];
-      if (hiddenAccountIds.length > 0) {
-        conds.push(notInArray(transactions.accountId, hiddenAccountIds));
-      }
+      const conds = [eq(transactions.userId, userId), eq(transactions.deleted, false)];
       if (startDate) conds.push(gte(transactions.date, startDate));
       if (endDate) conds.push(lte(transactions.date, endDate));
 
@@ -134,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     // 4. Net Worth & Account Snapshots
     if (datasets.includes('snapshots')) {
-      const nwRaw = await db.select().from(netWorthSnapshots).where(eq(netWorthSnapshots.userId, dataUserId));
+      const nwRaw = await db.select().from(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId));
       const decNw = await Promise.all(nwRaw.map((r) => decryptRow('net_worth_snapshots', r as Record<string, unknown>, dek)));
       decNw.sort((a, b) => (b.snapshotDate as string).localeCompare(a.snapshotDate as string));
 
@@ -146,11 +133,7 @@ export async function POST(req: NextRequest) {
       }));
       archive.append(toCsv(mappedNw), { name: 'net_worth_snapshots.csv' });
 
-      const accSnapConds = [eq(accountSnapshots.userId, dataUserId)];
-      if (hiddenAccountIds.length > 0) {
-        accSnapConds.push(notInArray(accountSnapshots.accountId, hiddenAccountIds));
-      }
-      const accSnapRaw = await db.select().from(accountSnapshots).where(and(...accSnapConds));
+      const accSnapRaw = await db.select().from(accountSnapshots).where(eq(accountSnapshots.userId, userId));
       const decAccSnap = await Promise.all(accSnapRaw.map((r) => decryptRow('account_snapshots', r as Record<string, unknown>, dek)));
       const mappedAccSnap = decAccSnap.map((s) => ({
         Date: s.snapshotDate || '',
@@ -162,7 +145,7 @@ export async function POST(req: NextRequest) {
 
     // 5. Budgets
     if (datasets.includes('budgets')) {
-      const bRaw = await db.select().from(budgets).where(eq(budgets.userId, dataUserId));
+      const bRaw = await db.select().from(budgets).where(eq(budgets.userId, userId));
       const decBudgets = await Promise.all(bRaw.map((r) => decryptRow('budgets', r as Record<string, unknown>, dek)));
       const mappedBudgets = decBudgets.map((b) => ({
         Category: categoryMap.get(b.categoryId as string) || b.categoryId || 'Global',
@@ -175,7 +158,7 @@ export async function POST(req: NextRequest) {
 
     // 6. FIRE Plans
     if (datasets.includes('fire_plans')) {
-      const pRaw = await db.select().from(plans).where(eq(plans.userId, dataUserId));
+      const pRaw = await db.select().from(plans).where(eq(plans.userId, userId));
       let txtAll = '';
       for (const pRow of pRaw) {
         const decPlan = await decryptRow('plans', pRow as Record<string, unknown>, dek);
@@ -205,7 +188,7 @@ export async function POST(req: NextRequest) {
 
     // 7. Paystubs
     if (datasets.includes('paystubs')) {
-      const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, dataUserId));
+      const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, userId));
       const decPaystubs = await Promise.all(paystubsRaw.map((r) => decryptRow('paystubs', r as Record<string, unknown>, dek)));
       const mappedPaystubs = decPaystubs.map((p) => ({
         Employer: p.employerName || '',

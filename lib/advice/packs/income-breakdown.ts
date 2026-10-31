@@ -30,13 +30,13 @@ export const incomeBreakdownPack: AskPack<IncomeBreakdownParams> = {
 
     // 1. Category income summaries
     const [allCats, incRows] = await Promise.all([
-      db.select().from(categories).where(eq(categories.userId, ctx.dataUserId)),
+      db.select().from(categories).where(eq(categories.userId, ctx.userId)),
       db
         .select()
         .from(categoryIncomeSummary)
         .where(
           and(
-            eq(categoryIncomeSummary.userId, ctx.dataUserId),
+            eq(categoryIncomeSummary.userId, ctx.userId),
             gte(categoryIncomeSummary.yearMonth, startStr),
             lte(categoryIncomeSummary.yearMonth, endStr)
           )
@@ -48,7 +48,6 @@ export const incomeBreakdownPack: AskPack<IncomeBreakdownParams> = {
 
     const catTotals = new Map<string, number>();
     for (const row of incRows) {
-      if (row.accountId && ctx.hiddenAccountIds.has(row.accountId)) continue;
       const amtStr = await decryptField(row.amount, ctx.dek).catch(() => '0');
       const amt = parseFloat(amtStr) || 0;
       const catName = catMap.get(row.categoryId) || 'Other Income';
@@ -67,7 +66,7 @@ export const incomeBreakdownPack: AskPack<IncomeBreakdownParams> = {
       .from(paystubs)
       .where(
         and(
-          eq(paystubs.userId, ctx.dataUserId),
+          eq(paystubs.userId, ctx.userId),
           gte(paystubs.checkDate, startDateFull)
         )
       );

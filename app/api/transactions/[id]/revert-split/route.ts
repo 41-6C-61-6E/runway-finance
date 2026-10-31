@@ -21,7 +21,6 @@ export async function POST(
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -36,7 +35,7 @@ export async function POST(
     .where(
       and(
         eq(transactions.id, id),
-        eq(transactions.userId, dataUserId),
+        eq(transactions.userId, userId),
         eq(transactions.deleted, false)
       )
     )
@@ -60,7 +59,7 @@ export async function POST(
     .where(
       and(
         eq(transactions.id, parentId),
-        eq(transactions.userId, dataUserId),
+        eq(transactions.userId, userId),
         eq(transactions.deleted, false)
       )
     )
@@ -101,15 +100,15 @@ export async function POST(
         .where(eq(transactions.id, parentTx.id));
     });
 
-    invalidateUserSearchCache(dataUserId);
+    invalidateUserSearchCache(userId);
 
     // Rebuild summaries asynchronously
     Promise.all([
-      updateCategorySpendingSummaries(dataUserId, dek),
-      updateCategoryIncomeSummaries(dataUserId, dek),
-      updateMonthlyCashFlowSummaries(dataUserId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
+      updateMonthlyCashFlowSummaries(userId, dek),
     ]).catch((err) => {
-      logger.error('Background summaries rebuild failed after revert split', { userId: dataUserId, error: err });
+      logger.error('Background summaries rebuild failed after revert split', { userId, error: err });
     });
 
     logger.info('Transaction split reverted successfully', { parentId: parentTx.id });

@@ -15,12 +15,11 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const dek = await getSessionDEK();
 
     let client;
     try {
-      client = await getPlaidClient(dataUserId, dek);
+      client = await getPlaidClient(userId, dek);
     } catch (err: any) {
       logger.warn(`${LOG_TAG} Failed to init Plaid client`, { userId, error: err.message });
       return NextResponse.json({
@@ -31,7 +30,7 @@ export async function POST(request: Request) {
 
     const configs = {
       user: {
-        client_user_id: dataUserId,
+        client_user_id: userId,
       },
       client_name: 'This App',
       products: [Products.Transactions],

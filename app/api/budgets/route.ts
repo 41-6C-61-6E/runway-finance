@@ -177,7 +177,7 @@ function getPreviousPeriodKey(periodType: string, periodKey: string): string {
 
 export async function GET(request: Request) {
   const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+  const userId = session?.user?.id;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
@@ -220,7 +220,7 @@ export async function GET(request: Request) {
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
       .where(
         and(
-          eq(budgets.userId, dataUserId),
+          eq(budgets.userId, userId),
           or(eq(categories.excludeFromReports, false), isNull(categories.excludeFromReports)),
         )
       );
@@ -434,7 +434,7 @@ export async function GET(request: Request) {
         isDiscretionary: categories.isDiscretionary,
       })
       .from(categories)
-      .where(eq(categories.userId, dataUserId));
+      .where(eq(categories.userId, userId));
 
     const decryptedAllCategories = await Promise.all(allCategories.map(async (c) => ({
       ...c,
@@ -491,7 +491,7 @@ export async function GET(request: Request) {
     const userSettingsList = await db
       .select()
       .from(userSettings)
-      .where(eq(userSettings.userId, dataUserId))
+      .where(eq(userSettings.userId, userId))
       .limit(1);
 
     const userSetting = userSettingsList[0];
@@ -530,7 +530,7 @@ export async function GET(request: Request) {
         isExcludedFromNetWorth: accounts.isExcludedFromNetWorth,
       })
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
 
     const excludedAccountIds = new Set(
       userAccounts.filter((a) => a.isHidden || a.isExcludedFromNetWorth).map((a) => a.id)
@@ -538,7 +538,7 @@ export async function GET(request: Request) {
 
     // Fetch all active period transactions
     const txConditions = [
-      eq(transactions.userId, dataUserId),
+      eq(transactions.userId, userId),
       gte(transactions.date, bounds.startDate),
       lt(transactions.date, bounds.endDate),
       eq(transactions.deleted, false),
@@ -679,7 +679,7 @@ export async function GET(request: Request) {
             : (coveredCategoriesMap.get(row.categoryId) || [row.categoryId]);
 
           const envTxConditions = [
-            eq(transactions.userId, dataUserId),
+            eq(transactions.userId, userId),
             gte(transactions.date, envStart),
             lt(transactions.date, stopDate),
             eq(transactions.deleted, false),
@@ -767,7 +767,7 @@ export async function GET(request: Request) {
             const priorCoveredCatIds = coveredCategoriesMap.get(row.categoryId) || [row.categoryId];
 
             const priorTxConditions = [
-              eq(transactions.userId, dataUserId),
+              eq(transactions.userId, userId),
               gte(transactions.date, earliestMonthStart),
               lt(transactions.date, bounds.startDate),
               eq(transactions.deleted, false),
@@ -990,8 +990,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
-  if (!session?.user || !dataUserId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = session?.user?.id;
+  if (!session?.user || !userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
   let body: Record<string, unknown>;
@@ -1019,7 +1019,7 @@ export async function POST(request: Request) {
       const userCategories = await db
         .select()
         .from(categories)
-        .where(eq(categories.userId, dataUserId));
+        .where(eq(categories.userId, userId));
 
       const decryptedCategories = await Promise.all(
         userCategories.map(async (c) => ({
@@ -1033,7 +1033,7 @@ export async function POST(request: Request) {
         const encryptedCat = await encryptRow(
           'categories',
           {
-            userId: dataUserId,
+            userId,
             name: 'Everything Else',
             color: '#64748b',
             isIncome: false,
@@ -1055,7 +1055,7 @@ export async function POST(request: Request) {
       .from(budgets)
       .where(
         and(
-          eq(budgets.userId, dataUserId),
+          eq(budgets.userId, userId),
           eq(budgets.categoryId, targetCategoryId),
           eq(budgets.periodType, targetPeriodType),
           targetPeriodKey ? eq(budgets.yearMonth, targetPeriodKey) : isNull(budgets.yearMonth)
@@ -1071,7 +1071,7 @@ export async function POST(request: Request) {
     }
 
     const encryptedValues = await encryptRow('budgets', {
-      userId: dataUserId,
+      userId,
       categoryId: targetCategoryId,
       periodType: targetPeriodType,
       yearMonth: body.isRecurring !== false ? null : targetPeriodKey,
@@ -1089,7 +1089,7 @@ export async function POST(request: Request) {
       await db
         .update(categories)
         .set({ isDiscretionary: body.isDiscretionary })
-        .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, dataUserId)));
+        .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, userId)));
     }
 
     const [budget] = await db
@@ -1109,7 +1109,7 @@ export async function PATCH(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
 
   let body: Record<string, unknown>;
@@ -1128,7 +1128,7 @@ export async function PATCH(request: Request) {
   const [existing] = await db
     .select()
     .from(budgets)
-    .where(and(eq(budgets.id, id), eq(budgets.userId, dataUserId)))
+    .where(and(eq(budgets.id, id), eq(budgets.userId, userId)))
     .limit(1);
 
   if (!existing) {
@@ -1140,7 +1140,7 @@ export async function PATCH(request: Request) {
     await db
       .update(categories)
       .set({ isDiscretionary: body.isDiscretionary })
-      .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, dataUserId)));
+      .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, userId)));
   }
 
   const applyMode = (body.applyMode as string) || 'future';
@@ -1157,7 +1157,7 @@ export async function PATCH(request: Request) {
         .where(eq(budgets.id, id));
 
       const newEncryptedData = await encryptRow('budgets', {
-        userId: dataUserId,
+        userId,
         categoryId: targetCategoryId,
         periodType: periodType,
         yearMonth: null,
@@ -1209,8 +1209,8 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
-  if (!session?.user || !dataUserId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = session?.user?.id;
+  if (!session?.user || !userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
@@ -1220,7 +1220,7 @@ export async function DELETE(request: Request) {
 
   try {
     if (action === 'reset') {
-      await db.delete(budgets).where(eq(budgets.userId, dataUserId));
+      await db.delete(budgets).where(eq(budgets.userId, userId));
       return NextResponse.json({ success: true, message: 'All budgets reset' });
     }
 
@@ -1229,7 +1229,7 @@ export async function DELETE(request: Request) {
         .delete(budgets)
         .where(
           and(
-            eq(budgets.userId, dataUserId),
+            eq(budgets.userId, userId),
             or(
               lt(budgets.effectiveTo, periodKey),
               lt(budgets.yearMonth, periodKey)
@@ -1240,7 +1240,7 @@ export async function DELETE(request: Request) {
       await db
         .update(budgets)
         .set({ effectiveFrom: periodKey, effectiveTo: null })
-        .where(eq(budgets.userId, dataUserId));
+        .where(eq(budgets.userId, userId));
 
       return NextResponse.json({ success: true, message: 'Budget history removed' });
     }

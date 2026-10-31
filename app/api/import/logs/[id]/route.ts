@@ -20,7 +20,7 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const { id } = await params;
 
   try {
@@ -30,7 +30,7 @@ export async function GET(
     const [log] = await db
       .select()
       .from(importLog)
-      .where(and(eq(importLog.id, id), eq(importLog.userId, dataUserId)))
+      .where(and(eq(importLog.id, id), eq(importLog.userId, userId)))
       .limit(1);
 
     if (!log) {
@@ -61,7 +61,6 @@ export async function DELETE(
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   try {
@@ -72,7 +71,7 @@ export async function DELETE(
     const log = await db
       .select()
       .from(importLog)
-      .where(and(eq(importLog.id, id), eq(importLog.userId, dataUserId)))
+      .where(and(eq(importLog.id, id), eq(importLog.userId, userId)))
       .limit(1);
 
     if (log.length === 0) {
@@ -83,12 +82,12 @@ export async function DELETE(
     const affectedAccounts = await db
       .select({ accountId: transactions.accountId })
       .from(transactions)
-      .where(and(eq(transactions.importId, id), eq(transactions.userId, dataUserId)));
+      .where(and(eq(transactions.importId, id), eq(transactions.userId, userId)));
 
     const affectedSnapshots = await db
       .select({ accountId: accountSnapshots.accountId })
       .from(accountSnapshots)
-      .where(and(eq(accountSnapshots.importId, id), eq(accountSnapshots.userId, dataUserId)));
+      .where(and(eq(accountSnapshots.importId, id), eq(accountSnapshots.userId, userId)));
 
     const affectedAccountIds = new Set<string>();
     for (const t of affectedAccounts) {
@@ -102,17 +101,17 @@ export async function DELETE(
       // Delete linked transactions
       await tx
         .delete(transactions)
-        .where(and(eq(transactions.importId, id), eq(transactions.userId, dataUserId)));
+        .where(and(eq(transactions.importId, id), eq(transactions.userId, userId)));
 
       // Delete linked account snapshots
       await tx
         .delete(accountSnapshots)
-        .where(and(eq(accountSnapshots.importId, id), eq(accountSnapshots.userId, dataUserId)));
+        .where(and(eq(accountSnapshots.importId, id), eq(accountSnapshots.userId, userId)));
 
       // Delete the import log
       await tx
         .delete(importLog)
-        .where(and(eq(importLog.id, id), eq(importLog.userId, dataUserId)));
+        .where(and(eq(importLog.id, id), eq(importLog.userId, userId)));
     });
 
     // Step 5: Post-delete processing (recalculating snapshots & balances)
@@ -125,7 +124,7 @@ export async function DELETE(
           const fromDateStr = earliestTx || todayStr;
           await generateHistoricalAccountSnapshots(
             acctId,
-            dataUserId,
+            userId,
             fromDateStr,
             todayStr,
             dek
@@ -138,7 +137,7 @@ export async function DELETE(
             .where(
               and(
                 eq(accountSnapshots.accountId, acctId),
-                eq(accountSnapshots.userId, dataUserId)
+                eq(accountSnapshots.userId, userId)
               )
             )
             .orderBy(desc(accountSnapshots.snapshotDate))
@@ -169,19 +168,19 @@ export async function DELETE(
       }
 
       // Historically recalculate the daily net worth snapshots table
-      await recalculateNetWorthSnapshots(dataUserId, dek);
+      await recalculateNetWorthSnapshots(userId, dek);
 
       // Update cash flow, category spending, and category income summaries for charts
-      await updateMonthlyCashFlowSummaries(dataUserId, dek);
-      await updateCategorySpendingSummaries(dataUserId, dek);
-      await updateCategoryIncomeSummaries(dataUserId, dek);
+      await updateMonthlyCashFlowSummaries(userId, dek);
+      await updateCategorySpendingSummaries(userId, dek);
+      await updateCategoryIncomeSummaries(userId, dek);
     } catch (postError) {
       const msg = postError instanceof Error ? postError.message : String(postError);
       logger.error(`[import/logs] Error in post-delete snapshot/summary updates`, { error: msg });
       postWarnings.push(`Post-delete processing warning: ${msg}. Snapshots and summaries may be stale. You can recalculate them from Settings > Analytics > Data Sources.`);
     }
 
-    invalidateUserSearchCache(dataUserId);
+    invalidateUserSearchCache(userId);
     return NextResponse.json({ success: true, warnings: postWarnings.length > 0 ? postWarnings : undefined });
   } catch (error) {
     return handleApiError(error, 'Failed to delete import');

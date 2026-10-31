@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { withAuth, withAuthAndDek, requireDeleteConfirmation, getUserId, getDataUserId } from '@/lib/utils/require-auth';
+import { withAuth, withAuthAndDek, requireDeleteConfirmation, getUserId } from '@/lib/utils/require-auth';
 import { DEK_ERRORS } from './mocks/crypto-context';
 
 vi.mock('@/lib/auth', () => ({
@@ -44,24 +44,15 @@ describe('Security & Auth Wrappers (require-auth.ts)', () => {
     });
   });
 
-  describe('getUserId and getDataUserId helpers', () => {
+  describe('getUserId helper', () => {
     it('returns null when session or user is missing', () => {
       expect(getUserId(null)).toBeNull();
       expect(getUserId({})).toBeNull();
-      expect(getDataUserId(null)).toBeNull();
-      expect(getDataUserId({})).toBeNull();
     });
 
-    it('extracts primary user id and data user id for standard sessions', () => {
+    it('extracts user id for standard sessions', () => {
       const session = { user: { id: 'user_abc' } };
       expect(getUserId(session)).toBe('user_abc');
-      expect(getDataUserId(session)).toBe('user_abc');
-    });
-
-    it('extracts distinct dataUserId for shared member sessions', () => {
-      const session = { user: { id: 'member_123', dataUserId: 'primary_owner' } };
-      expect(getUserId(session)).toBe('member_123');
-      expect(getDataUserId(session)).toBe('primary_owner');
     });
   });
 
@@ -80,7 +71,7 @@ describe('Security & Auth Wrappers (require-auth.ts)', () => {
       expect(handler).not.toHaveBeenCalled();
     });
 
-    it('returns 401 when session user is undefined (revoked share)', async () => {
+    it('returns 401 when session user is undefined', async () => {
       const { auth } = await import('@/lib/auth');
       vi.mocked(auth).mockResolvedValue({ user: undefined } as any);
 
@@ -94,7 +85,7 @@ describe('Security & Auth Wrappers (require-auth.ts)', () => {
 
     it('calls inner handler with auth context on valid session', async () => {
       const { auth } = await import('@/lib/auth');
-      vi.mocked(auth).mockResolvedValue({ user: { id: 'user_1', dataUserId: 'owner_1' } } as any);
+      vi.mocked(auth).mockResolvedValue({ user: { id: 'user_1' } } as any);
 
       const handler = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
       const wrapped = withAuth(handler);
@@ -104,7 +95,6 @@ describe('Security & Auth Wrappers (require-auth.ts)', () => {
       expect(res.status).toBe(200);
       expect(handler).toHaveBeenCalledWith(req, expect.objectContaining({
         userId: 'user_1',
-        dataUserId: 'owner_1',
       }));
     });
   });
@@ -132,7 +122,7 @@ describe('Security & Auth Wrappers (require-auth.ts)', () => {
       const { getSessionDEK } = await import('@/lib/crypto-context');
       const testDek = new Uint8Array(32).fill(0x55);
 
-      vi.mocked(auth).mockResolvedValue({ user: { id: 'user_1', dataUserId: 'user_1' } } as any);
+      vi.mocked(auth).mockResolvedValue({ user: { id: 'user_1' } } as any);
       vi.mocked(getSessionDEK).mockResolvedValue(testDek);
 
       const handler = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
@@ -143,7 +133,6 @@ describe('Security & Auth Wrappers (require-auth.ts)', () => {
       expect(res.status).toBe(200);
       expect(handler).toHaveBeenCalledWith(req, expect.objectContaining({
         userId: 'user_1',
-        dataUserId: 'user_1',
         dek: testDek,
       }));
     });

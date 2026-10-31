@@ -15,11 +15,11 @@ export async function GET() {
   }
 
   const db = getDb();
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const result = await db
     .select()
     .from(paystubAutoGenerateSettings)
-    .where(eq(paystubAutoGenerateSettings.userId, dataUserId));
+    .where(eq(paystubAutoGenerateSettings.userId, userId));
 
   return Response.json(result);
 }
@@ -32,7 +32,6 @@ export async function POST(request: Request) {
 
   const db = getDb();
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
 
   let body: Record<string, any>;
   try {
@@ -53,7 +52,7 @@ export async function POST(request: Request) {
     .from(paystubAutoGenerateSettings)
     .where(
       and(
-        eq(paystubAutoGenerateSettings.userId, dataUserId),
+        eq(paystubAutoGenerateSettings.userId, userId),
         eq(paystubAutoGenerateSettings.mappingId, mappingId)
       )
     )
@@ -79,7 +78,7 @@ export async function POST(request: Request) {
   const [created] = await db
     .insert(paystubAutoGenerateSettings)
     .values({
-      userId: dataUserId,
+      userId,
       mappingId,
       isEnabled: isEnabled ?? false,
       frequency: frequency || 'biweekly',
@@ -99,11 +98,10 @@ export async function PATCH(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const force = searchParams.get('force') === 'true';
-  const generated = await runAutoGenerate(userId, dek, dataUserId, force);
+  const generated = await runAutoGenerate(userId, dek, force);
 
   return Response.json({ generated });
 }
@@ -115,7 +113,7 @@ export async function DELETE(request: Request) {
   }
 
   const db = getDb();
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 
@@ -129,7 +127,7 @@ export async function DELETE(request: Request) {
     .where(
       and(
         eq(paystubAutoGenerateSettings.id, id),
-        eq(paystubAutoGenerateSettings.userId, dataUserId),
+        eq(paystubAutoGenerateSettings.userId, userId),
       )
     )
     .limit(1);

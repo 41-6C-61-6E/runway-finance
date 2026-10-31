@@ -848,13 +848,13 @@ export async function PATCH(request: Request) {
 
     if (netWorthChanged || investmentsChanged || realEstateChanged) {
       const today = new Date().toISOString().split('T')[0];
-      const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+      const userId = session.user.id;
 
       (async () => {
         const userAccounts = await db
           .select()
           .from(accounts)
-          .where(eq(accounts.userId, dataUserId));
+          .where(eq(accounts.userId, userId));
         const decrypted = await decryptRows('accounts', userAccounts, dek);
 
         const MODEL_SNAPSHOT_TYPES = [
@@ -879,7 +879,7 @@ export async function PATCH(request: Request) {
             if (standardIds.length > 0) {
               await db.delete(accountSnapshots).where(
                 and(
-                  eq(accountSnapshots.userId, dataUserId),
+                  eq(accountSnapshots.userId, userId),
                   eq(accountSnapshots.isSynthetic, true),
                   inArray(accountSnapshots.accountId, standardIds)
                 )
@@ -888,8 +888,8 @@ export async function PATCH(request: Request) {
           } else {
             for (const acc of standardAccounts) {
               try {
-                const fromDate = await getAccountEarliestCalculationDate(acc.id, dataUserId, acc.metadata, dek);
-                await generateHistoricalAccountSnapshots(acc.id, dataUserId, fromDate, today, dek);
+                const fromDate = await getAccountEarliestCalculationDate(acc.id, userId, acc.metadata, dek);
+                await generateHistoricalAccountSnapshots(acc.id, userId, fromDate, today, dek);
               } catch (err) {
                 console.error(`Failed to recalculate synthetic netWorth snapshots for ${acc.id}:`, err);
               }
@@ -906,7 +906,7 @@ export async function PATCH(request: Request) {
             if (investmentIds.length > 0) {
               await db.delete(accountSnapshots).where(
                 and(
-                  eq(accountSnapshots.userId, dataUserId),
+                  eq(accountSnapshots.userId, userId),
                   eq(accountSnapshots.isSynthetic, true),
                   inArray(accountSnapshots.accountId, investmentIds)
                 )
@@ -915,8 +915,8 @@ export async function PATCH(request: Request) {
           } else {
             for (const acc of investmentAccounts) {
               try {
-                const fromDate = await getAccountEarliestCalculationDate(acc.id, dataUserId, acc.metadata, dek);
-                await generateHistoricalAccountSnapshots(acc.id, dataUserId, fromDate, today, dek);
+                const fromDate = await getAccountEarliestCalculationDate(acc.id, userId, acc.metadata, dek);
+                await generateHistoricalAccountSnapshots(acc.id, userId, fromDate, today, dek);
               } catch (err) {
                 console.error(`Failed to recalculate synthetic investments snapshots for ${acc.id}:`, err);
               }
@@ -933,7 +933,7 @@ export async function PATCH(request: Request) {
             if (modelIds.length > 0) {
               await db.delete(accountSnapshots).where(
                 and(
-                  eq(accountSnapshots.userId, dataUserId),
+                  eq(accountSnapshots.userId, userId),
                   eq(accountSnapshots.isSynthetic, true),
                   inArray(accountSnapshots.accountId, modelIds)
                 )
@@ -946,7 +946,7 @@ export async function PATCH(request: Request) {
                 const meta = typeof acc.metadata === 'string'
                   ? JSON.parse(acc.metadata)
                   : (typeof acc.metadata === 'object' && acc.metadata !== null ? acc.metadata : {});
-                await generateAssetHistorySnapshots(acc.id, dataUserId, acc.type, meta, apiConfig, dek);
+                await generateAssetHistorySnapshots(acc.id, userId, acc.type, meta, apiConfig, dek);
               } catch (err) {
                 console.error(`Failed to recalculate synthetic realEstate snapshots for ${acc.id}:`, err);
               }
@@ -955,7 +955,7 @@ export async function PATCH(request: Request) {
         }
 
         // 4. Rebuild Net Worth Snapshots
-        await recalculateNetWorthSnapshots(dataUserId, dek);
+        await recalculateNetWorthSnapshots(userId, dek);
 
       })().catch(e => {
         console.error('Failed to update synthetic snapshots in background settings change:', e);

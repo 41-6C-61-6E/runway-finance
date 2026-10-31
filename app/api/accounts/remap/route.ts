@@ -26,8 +26,6 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   let body: { sourceAccountId?: string; targetAccountId?: string };
   try {
     body = await request.json();
@@ -65,7 +63,7 @@ export async function POST(request: Request) {
       const [sourceAccount] = await tx
         .select()
         .from(accounts)
-        .where(and(eq(accounts.id, sourceAccountId), eq(accounts.userId, dataUserId)))
+        .where(and(eq(accounts.id, sourceAccountId), eq(accounts.userId, userId)))
         .limit(1);
 
       if (!sourceAccount) {
@@ -76,7 +74,7 @@ export async function POST(request: Request) {
       const [targetAccount] = await tx
         .select()
         .from(accounts)
-        .where(and(eq(accounts.id, targetAccountId), eq(accounts.userId, dataUserId)))
+        .where(and(eq(accounts.id, targetAccountId), eq(accounts.userId, userId)))
         .limit(1);
 
       if (!targetAccount) {
@@ -225,11 +223,11 @@ export async function POST(request: Request) {
     // 9. Recompute cache and snapshots in background
     const today = new Date().toISOString().split('T')[0];
     Promise.all([
-      createAccountSnapshots(dataUserId, dek, today),
-      createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true }),
-      updateMonthlyCashFlowSummaries(dataUserId, dek),
-      updateCategorySpendingSummaries(dataUserId, dek),
-      updateCategoryIncomeSummaries(dataUserId, dek),
+      createAccountSnapshots(userId, dek, today),
+      createNetWorthSnapshot(userId, dek, today, { skipNotifications: true }),
+      updateMonthlyCashFlowSummaries(userId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
     ]).catch((err) => {
       logger.error('Error in background sync/recalc after account remap', {
         userId,
@@ -237,7 +235,7 @@ export async function POST(request: Request) {
       });
     });
 
-    invalidateUserSearchCache(dataUserId);
+    invalidateUserSearchCache(userId);
     return NextResponse.json({ success: true, message: 'Account remapped successfully' });
   } catch (error) {
     logger.error('Failed to remap accounts', {

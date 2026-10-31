@@ -27,7 +27,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { id } = await params;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
 
   let body: Record<string, unknown>;
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const [existing] = await db
     .select()
     .from(budgets)
-    .where(and(eq(budgets.id, id), eq(budgets.userId, dataUserId)))
+    .where(and(eq(budgets.id, id), eq(budgets.userId, userId)))
     .limit(1);
 
   if (!existing) {
@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await db
       .update(categories)
       .set({ isDiscretionary: body.isDiscretionary })
-      .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, dataUserId)));
+      .where(and(eq(categories.id, targetCategoryId), eq(categories.userId, userId)));
   }
 
   const applyMode = (body.applyMode as string) || 'future';
@@ -70,7 +70,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .where(eq(budgets.id, id));
 
       const newEncryptedData = await encryptRow('budgets', {
-        userId: dataUserId,
+        userId,
         categoryId: targetCategoryId,
         periodType: periodType,
         yearMonth: null,
@@ -123,13 +123,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const { id } = await params;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
 
   const db = getDb();
   const [existing] = await db
     .select()
     .from(budgets)
-    .where(and(eq(budgets.id, id), eq(budgets.userId, dataUserId)))
+    .where(and(eq(budgets.id, id), eq(budgets.userId, userId)))
     .limit(1);
 
   if (!existing) {

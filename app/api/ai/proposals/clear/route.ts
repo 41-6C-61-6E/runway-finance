@@ -13,13 +13,11 @@ export async function POST() {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   const result = await getDb()
     .delete(aiProposals)
     .where(
       and(
-        eq(aiProposals.userId, dataUserId),
+        eq(aiProposals.userId, userId),
         eq(aiProposals.status, 'approved'),
       )
     );
@@ -28,12 +26,12 @@ export async function POST() {
     .delete(aiProposals)
     .where(
       and(
-        eq(aiProposals.userId, dataUserId),
+        eq(aiProposals.userId, userId),
         eq(aiProposals.status, 'rejected'),
       )
     );
 
-  const prunedCount = await pruneDuplicateProposals(dataUserId);
+  const prunedCount = await pruneDuplicateProposals(userId);
   const deletedCount = (result.rowCount ?? 0) + (rejectedResult.rowCount ?? 0) + prunedCount;
 
   logger.info('POST /api/ai/proposals/clear', { userId, deletedCount, prunedCount });

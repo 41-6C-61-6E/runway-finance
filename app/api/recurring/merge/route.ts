@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { resolveDataUserId } from '@/lib/sharing';
 import { logger } from '@/lib/logger';
 import { RecurringMergeSchema } from '@/lib/validations/recurring';
 import { mergeRecurringTransactions } from '@/lib/services/recurring-detection';
@@ -15,14 +14,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const dataUserId = await resolveDataUserId(session.user.id);
+    const userId = session.user.id;
     const dek = await getSessionDEK();
     const body = await req.json();
 
     const { targetId, sourceIds, customName } = RecurringMergeSchema.parse(body);
 
     const result = await mergeRecurringTransactions(
-      dataUserId,
+      userId,
       dek,
       targetId,
       sourceIds,

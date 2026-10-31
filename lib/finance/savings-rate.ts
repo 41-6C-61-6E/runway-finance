@@ -63,7 +63,7 @@ export async function getSavingsRate(
   const allAccounts = await db
     .select()
     .from(accounts)
-    .where(eq(accounts.userId, ctx.dataUserId));
+    .where(eq(accounts.userId, ctx.userId));
   const decryptedAccounts = await decryptRows('accounts', allAccounts, ctx.dek);
   const accountMap = new Map<string, typeof decryptedAccounts[0]>();
   for (const acc of decryptedAccounts) {
@@ -74,7 +74,7 @@ export async function getSavingsRate(
   const allCategories = await db
     .select()
     .from(categories)
-    .where(eq(categories.userId, ctx.dataUserId));
+    .where(eq(categories.userId, ctx.userId));
   const decryptedCategories = await decryptRows('categories', allCategories, ctx.dek);
   const categoryMap = new Map<string, typeof decryptedCategories[0]>();
   for (const cat of decryptedCategories) {
@@ -91,7 +91,7 @@ export async function getSavingsRate(
   const activeAccountIds = new Set(activeAccounts.map((a) => a.id));
 
   // 4. Fetch decrypted transactions from cache
-  const decryptedTxns = await getUserTransactionsFromCache(ctx.dataUserId, ctx.dek);
+  const decryptedTxns = await getUserTransactionsFromCache(ctx.userId, ctx.dek);
 
   const accountsWithTransactions = new Set<string>();
   for (const tx of decryptedTxns) {

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
 
   let body: {
     propertyId?: string;
@@ -30,9 +30,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const apiConfig = await readApiConfig(dataUserId);
+    const apiConfig = await readApiConfig(userId);
 
-    logger.info('Redfin property validation request', { userId: dataUserId, propertyId });
+    logger.info('Redfin property validation request', { userId, propertyId });
 
     const estimates = await fetchRedfinValuationDetails({ propertyId }, apiConfig);
 
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ valid: true, price, estimates, propertyId: estimates.propertyId });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Address validation failed';
-    logger.warn('Redfin property validation failed', { userId: dataUserId, propertyId, error: errMsg });
+    logger.warn('Redfin property validation failed', { userId, propertyId, error: errMsg });
     return NextResponse.json({ valid: false, message: errMsg });
   }
 }

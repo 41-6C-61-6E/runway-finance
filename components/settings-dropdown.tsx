@@ -13,7 +13,6 @@ import {
   Sparkles, 
   UploadCloud, 
   FileText, 
-  Users2,
   Bell,
   ShieldAlert 
 } from 'lucide-react';
@@ -29,7 +28,6 @@ const settingsSections = [
   { id: 'ai', label: 'AI Suggestions', icon: Sparkles },
   { id: 'import', label: 'Import', icon: UploadCloud },
   { id: 'payroll', label: 'Payroll', icon: FileText },
-  { id: 'sharing', label: 'Sharing', icon: Users2 },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'advanced', label: 'Advanced', icon: ShieldAlert },
 ] as const;

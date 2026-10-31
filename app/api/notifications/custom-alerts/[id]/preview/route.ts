@@ -86,8 +86,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Use dataUserId for financial data queries (shared data), session.user.id for alert rule ownership
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
 
   try {
     const { id } = await params;
@@ -131,7 +130,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         .from(transactions)
         .where(
           and(
-            eq(transactions.userId, dataUserId),
+            eq(transactions.userId, userId),
             eq(transactions.deleted, false),
             gte(transactions.date, startDate)
           )
@@ -143,7 +142,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       const accountRows = await db
         .select({ id: accounts.id, name: accounts.name, type: accounts.type, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
         .from(accounts)
-        .where(eq(accounts.userId, dataUserId));
+        .where(eq(accounts.userId, userId));
       const visibleAccountIds = new Set(
         filterReportableAccounts(accountRows).map(a => a.id)
       );
@@ -214,7 +213,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       const accountRows = await db
         .select({ id: accounts.id, name: accounts.name, type: accounts.type, balance: accounts.balance, isHidden: accounts.isHidden, isExcludedFromNetWorth: accounts.isExcludedFromNetWorth })
         .from(accounts)
-        .where(eq(accounts.userId, dataUserId));
+        .where(eq(accounts.userId, userId));
 
       const decryptedAccounts = await Promise.all(
         accountRows.map(async (acc) => ({
@@ -280,7 +279,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       const recentCashFlows = await db
         .select()
         .from(monthlyCashFlow)
-        .where(eq(monthlyCashFlow.userId, dataUserId))
+        .where(eq(monthlyCashFlow.userId, userId))
         .orderBy(desc(monthlyCashFlow.yearMonth))
         .limit(12);
 

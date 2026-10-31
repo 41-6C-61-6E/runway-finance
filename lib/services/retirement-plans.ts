@@ -51,7 +51,7 @@ export async function loadEnginePlan(
     const rows = await db
       .select()
       .from(plans)
-      .where(and(eq(plans.id, planId), eq(plans.userId, ctx.dataUserId)))
+      .where(and(eq(plans.id, planId), eq(plans.userId, ctx.userId)))
       .limit(1);
     planRow = rows[0] ?? null;
   } else {
@@ -59,7 +59,7 @@ export async function loadEnginePlan(
     const defaultRows = await db
       .select()
       .from(plans)
-      .where(and(eq(plans.userId, ctx.dataUserId), eq(plans.isDefault, true)))
+      .where(and(eq(plans.userId, ctx.userId), eq(plans.isDefault, true)))
       .limit(1);
 
     if (defaultRows[0]) {
@@ -68,7 +68,7 @@ export async function loadEnginePlan(
       const anyRows = await db
         .select()
         .from(plans)
-        .where(eq(plans.userId, ctx.dataUserId))
+        .where(eq(plans.userId, ctx.userId))
         .limit(1);
       planRow = anyRows[0] ?? null;
     }

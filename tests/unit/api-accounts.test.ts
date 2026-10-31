@@ -53,7 +53,7 @@ describe('API Route: /api/accounts (GET)', () => {
     expect(json.error).toBe('unauthenticated');
   });
 
-  it('returns accounts list with decrypted balances and dataUserId scope', async () => {
+  it('returns accounts list with decrypted balances and userId scope', async () => {
     mockAccounts.push(
       { id: 'acc_1', userId: 'user-1', name: 'Primary Checking', balance: '2500.00', type: 'checking', isHidden: false },
       { id: 'acc_2', userId: 'user-1', name: 'Savings Reserve', balance: '10000.00', type: 'savings', isHidden: false }

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { resolveDataUserId } from '@/lib/sharing';
 import { logger } from '@/lib/logger';
 import { RecurringDetectSchema } from '@/lib/validations/recurring';
 import { detectRecurringTransactions } from '@/lib/services/recurring-detection';
@@ -15,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const dataUserId = await resolveDataUserId(session.user.id);
+    const userId = session.user.id;
     const dek = await getSessionDEK();
 
     let body: unknown = {};
@@ -38,13 +37,13 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await detectRecurringTransactions(
-      dataUserId,
+      userId,
       dek,
       lookbackMonths ? { lookbackMonths } : undefined
     );
 
     logger.info(`${LOG_TAG} Detection triggered manually`, {
-      userId: dataUserId,
+      userId,
       ...result,
     });
 

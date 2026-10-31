@@ -32,11 +32,7 @@ export async function GET(
     return NextResponse.json({ error: 'not_found', message: 'SimpleFIN connection not found' }, { status: 404 });
   }
 
-  const { resolveDataUserId } = await import('@/lib/sharing');
-  const requestingDataUserId = await resolveDataUserId(userId);
-  const connectionDataUserId = await resolveDataUserId(connection.userId);
-
-  if (connectionDataUserId !== requestingDataUserId) {
+  if (connection.userId !== userId) {
     return NextResponse.json({ error: 'forbidden', message: 'Unauthorized access to connection' }, { status: 403 });
   }
 

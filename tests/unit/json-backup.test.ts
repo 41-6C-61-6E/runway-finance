@@ -77,11 +77,6 @@ vi.mock('@/lib/db', () => ({
   }),
 }));
 
-// M-1: backup export is admin/primary only.
-vi.mock('@/lib/utils/require-auth', () => ({
-  requireMinRole: vi.fn().mockResolvedValue(null),
-}));
-
 describe('JSON Backup Export / Import API', () => {
   beforeAll(() => {
     process.env.ENCRYPTION_KEY = 'a'.repeat(64);

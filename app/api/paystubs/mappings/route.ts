@@ -10,13 +10,11 @@ export async function GET() {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   const db = getDb();
   const result = await db
     .select()
     .from(paystubFieldMappings)
-    .where(eq(paystubFieldMappings.userId, dataUserId));
+    .where(eq(paystubFieldMappings.userId, userId));
 
   return Response.json(result);
 }
@@ -29,8 +27,6 @@ export async function POST(request: Request) {
 
   const db = getDb();
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   let body: Record<string, any>;
   try {
     body = await request.json();
@@ -51,7 +47,7 @@ export async function POST(request: Request) {
       .set({ isDefault: false, updatedAt: new Date() })
       .where(
         and(
-          eq(paystubFieldMappings.userId, dataUserId),
+          eq(paystubFieldMappings.userId, userId),
           eq(paystubFieldMappings.isDefault, true)
         )
       );
@@ -60,7 +56,7 @@ export async function POST(request: Request) {
   const [created] = await db
     .insert(paystubFieldMappings)
     .values({
-      userId: dataUserId,
+      userId,
       name,
       employerName: employerName || '',
       isDefault: isDefault || false,

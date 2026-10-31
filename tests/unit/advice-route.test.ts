@@ -9,7 +9,7 @@ import * as orchestratorModule from '@/lib/advice/orchestrator';
 vi.mock('@/lib/auth', () => ({
   auth: () =>
     Promise.resolve({
-      user: { id: 'test-user-id', dataUserId: 'test-data-user-id' },
+      user: { id: 'test-user-id' },
     }),
 }));
 
@@ -43,10 +43,7 @@ describe('POST /api/ai/advice Route', () => {
 
     vi.spyOn(financeContextModule, 'buildFinanceContext').mockResolvedValue({
       userId: 'test-user-id',
-      dataUserId: 'test-data-user-id',
       dek: new Uint8Array(32),
-      role: 'primary',
-      hiddenAccountIds: new Set(),
       settings: { ...baseSettings } as any,
       now: new Date(),
       getAccounts: vi.fn().mockResolvedValue([]),
@@ -91,10 +88,7 @@ describe('POST /api/ai/advice Route', () => {
   it('enforces Gate 1: returns not_available when aiAdviceEnabled is false', async () => {
     vi.spyOn(financeContextModule, 'buildFinanceContext').mockResolvedValue({
       userId: 'test-user-id',
-      dataUserId: 'test-data-user-id',
       dek: new Uint8Array(32),
-      role: 'primary',
-      hiddenAccountIds: new Set(),
       settings: { ...baseSettings, aiAdviceEnabled: false } as any,
       now: new Date(),
       getAccounts: vi.fn().mockResolvedValue([]),
@@ -116,10 +110,7 @@ describe('POST /api/ai/advice Route', () => {
   it('enforces Gate 1: returns not_available when master aiEnabled is false', async () => {
     vi.spyOn(financeContextModule, 'buildFinanceContext').mockResolvedValue({
       userId: 'test-user-id',
-      dataUserId: 'test-data-user-id',
       dek: new Uint8Array(32),
-      role: 'primary',
-      hiddenAccountIds: new Set(),
       settings: { ...baseSettings, aiEnabled: false } as any,
       now: new Date(),
       getAccounts: vi.fn().mockResolvedValue([]),
@@ -130,31 +121,6 @@ describe('POST /api/ai/advice Route', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: [{ role: 'user', content: 'What is my net worth?' }],
-      }),
-    });
-
-    const res = await POST(req);
-    const text = await readSSEStream(res);
-    expect(text).toContain('not_available');
-  });
-
-  it('enforces Gate 2: returns not_available for role member (v1)', async () => {
-    vi.spyOn(financeContextModule, 'buildFinanceContext').mockResolvedValue({
-      userId: 'test-user-id',
-      dataUserId: 'test-data-user-id',
-      dek: new Uint8Array(32),
-      role: 'member',
-      hiddenAccountIds: new Set(),
-      settings: { ...baseSettings } as any,
-      now: new Date(),
-      getAccounts: vi.fn().mockResolvedValue([]),
-    });
-
-    const req = new Request('http://localhost:3001/api/ai/advice', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: 'What is my budget?' }],
       }),
     });
 
@@ -182,10 +148,7 @@ describe('POST /api/ai/advice Route', () => {
   it('enforces Gate 4: returns consent_required when host does not match consented host', async () => {
     vi.spyOn(financeContextModule, 'buildFinanceContext').mockResolvedValue({
       userId: 'test-user-id',
-      dataUserId: 'test-data-user-id',
       dek: new Uint8Array(32),
-      role: 'primary',
-      hiddenAccountIds: new Set(),
       settings: { ...baseSettings, aiAdviceConsentHost: 'old-host.com' } as any,
       now: new Date(),
       getAccounts: vi.fn().mockResolvedValue([]),

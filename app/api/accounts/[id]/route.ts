@@ -13,7 +13,6 @@ import {
   updateCategorySpendingSummaries,
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
-import { getEffectiveRole, roleAtLeast } from '@/lib/utils/require-auth';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -25,7 +24,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -34,7 +32,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const [account] = await db
       .select()
       .from(accounts)
-      .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
+      .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
       .limit(1);
 
     if (!account) {
@@ -42,17 +40,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         { error: 'not_found', message: 'Account not found' },
         { status: 404 }
       );
-    }
-
-    // Sensitive accounts are invisible to plain sharing members (same 404 as missing).
-    if (account.sensitive) {
-      const role = await getEffectiveRole(userId);
-      if (role === 'member') {
-        return NextResponse.json(
-          { error: 'not_found', message: 'Account not found' },
-          { status: 404 }
-        );
-      }
     }
 
     const decrypted = await decryptRow('accounts', account as Record<string, unknown>, dek);
@@ -93,14 +80,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const db = getDb();
   const [account] = await db
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
     .limit(1);
 
   if (!account) {
@@ -131,13 +117,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.metadata !== undefined) updateData.metadata = body.metadata;
   if (body.connectionId !== undefined) updateData.connectionId = body.connectionId;
   if (body.plaidConnectionId !== undefined) updateData.plaidConnectionId = body.plaidConnectionId;
-  if (body.sensitive !== undefined) {
-    // Only admins/primary may change the sensitive flag; strip it for members.
-    const role = await getEffectiveRole(userId);
-    if (roleAtLeast(role, 'admin')) {
-      updateData.sensitive = Boolean(body.sensitive);
-    }
-  }
 
   const hasTagUpdate = body.tagIds !== undefined;
 
@@ -321,7 +300,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           const oldMeta = typeof oldDecrypted.metadata === 'string' ? JSON.parse(oldDecrypted.metadata) : (oldDecrypted.metadata || {});
           await generateAssetHistorySnapshots(
             id,
-            dataUserId,
+            userId,
             decrypted.type,
             meta,
             apiConfig,
@@ -346,18 +325,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               const today = new Date().toISOString().split('T')[0];
               const fromDate = await getAccountEarliestCalculationDate(
                 id,
-                dataUserId,
+                userId,
                 decrypted.metadata,
                 dek
               );
               await generateHistoricalAccountSnapshots(
                 id,
-                dataUserId,
+                userId,
                 fromDate,
                 today,
                 dek
               );
-              await recalculateNetWorthSnapshots(dataUserId, dek);
+              await recalculateNetWorthSnapshots(userId, dek);
             }
           }
         }
@@ -377,11 +356,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   ) {
     const today = new Date().toISOString().split('T')[0];
     Promise.all([
-      createAccountSnapshots(dataUserId, dek, today),
-      createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true }),
-      updateMonthlyCashFlowSummaries(dataUserId, dek),
-      updateCategorySpendingSummaries(dataUserId, dek),
-      updateCategoryIncomeSummaries(dataUserId, dek),
+      createAccountSnapshots(userId, dek, today),
+      createNetWorthSnapshot(userId, dek, today, { skipNotifications: true }),
+      updateMonthlyCashFlowSummaries(userId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
     ]).catch((err) => {
       logger.error('Error in background sync/recalc after account PATCH', {
         accountId: id,
@@ -391,7 +370,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
 
     import('@/lib/services/goal-allocation').then(({ updateGoalAllocations }) => {
-      return updateGoalAllocations(dataUserId);
+      return updateGoalAllocations(userId);
     }).catch(() => {});
   }
 
@@ -408,13 +387,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const [account] = await getDb()
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
     .limit(1);
 
   if (!account) {
@@ -439,7 +417,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       const userAccts = await tx
         .select()
         .from(accounts)
-        .where(eq(accounts.userId, dataUserId));
+        .where(eq(accounts.userId, userId));
       for (const a of userAccts) {
         let metaObj: any = null;
         if (typeof a.metadata === 'string') {
@@ -457,7 +435,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       const userMortgages = await tx
         .select()
         .from(accounts)
-        .where(and(eq(accounts.userId, dataUserId), eq(accounts.type, 'mortgage')));
+        .where(and(eq(accounts.userId, userId), eq(accounts.type, 'mortgage')));
       for (const m of userMortgages) {
         let mMetaObj: any = null;
         if (typeof m.metadata === 'string') {
@@ -476,12 +454,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     await tx.delete(accountSnapshots).where(eq(accountSnapshots.accountId, id));
     await tx.delete(accountTags).where(eq(accountTags.accountId, id));
     await tx.delete(holdingSnapshots).where(eq(holdingSnapshots.accountId, id));
-    await tx.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)));
+    await tx.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, userId)));
   });
 
   // Invalidate search cache
   const { invalidateUserSearchCache } = await import('@/lib/services/search-cache');
-  invalidateUserSearchCache(dataUserId);
+  invalidateUserSearchCache(userId);
 
 
   // Recalculate snapshots and summaries in the background
@@ -489,11 +467,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const today = new Date().toISOString().split('T')[0];
   try {
     await Promise.all([
-      createAccountSnapshots(dataUserId, dek, today),
-      createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true }),
-      updateMonthlyCashFlowSummaries(dataUserId, dek),
-      updateCategorySpendingSummaries(dataUserId, dek),
-      updateCategoryIncomeSummaries(dataUserId, dek),
+      createAccountSnapshots(userId, dek, today),
+      createNetWorthSnapshot(userId, dek, today, { skipNotifications: true }),
+      updateMonthlyCashFlowSummaries(userId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
     ]);
   } catch (err) {
     logger.error('Error in background sync/recalc after account DELETE', {
@@ -504,7 +482,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   import('@/lib/services/goal-allocation').then(({ updateGoalAllocations }) => {
-    return updateGoalAllocations(dataUserId);
+    return updateGoalAllocations(userId);
   }).catch(() => {});
 
   logger.info('DELETE /api/accounts/[id]', { userId, id });

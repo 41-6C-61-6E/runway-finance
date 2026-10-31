@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
@@ -116,7 +116,7 @@ export async function GET(request: Request) {
     const userAccounts = await getDb()
       .select()
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
 
     const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
     const investmentAccounts = decryptedAccounts.filter((acc) =>
@@ -150,7 +150,7 @@ export async function GET(request: Request) {
 
     // 3. Fetch snapshots for fallback / non-ticker holdings
     const snapshotConditions = [
-      eq(holdingSnapshots.userId, dataUserId),
+      eq(holdingSnapshots.userId, userId),
       inArray(holdingSnapshots.accountId, accountIds),
       gte(holdingSnapshots.snapshotDate, startStr),
     ];

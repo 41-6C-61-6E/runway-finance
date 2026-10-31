@@ -736,6 +736,13 @@
       "when": 1793486400000,
       "tag": "0104_add_equity_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1793490000000,
+      "tag": "0105_remove_account_sharing",
+      "breakpoints": true
     }
   ]
 }

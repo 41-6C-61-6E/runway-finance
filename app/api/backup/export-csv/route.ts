@@ -29,7 +29,6 @@ import { toCsv } from '@/lib/utils/export-formatter';
 import { ZipArchive } from 'archiver';
 import { apiUnauthorized, apiTooManyRequests, handleApiError } from '@/lib/api/response';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { requireMinRole } from '@/lib/utils/require-auth';
 
 const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: accounts, dbName: 'accounts', label: 'accounts' },
@@ -63,18 +62,11 @@ export async function GET(request: Request) {
       return apiTooManyRequests('Too many export requests. Please wait a moment.');
     }
 
-    // M-1: full CSV dumps include sensitive accounts — admin/primary only.
-    const forbidden = await requireMinRole('admin', userId);
-    if (forbidden) {
-      return forbidden;
-    }
-
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const db = getDb();
     const dek = await getSessionDEK();
 
     // Load lookup tables to decode IDs
-    const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
+    const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, userId));
     const decryptedAccounts = await Promise.all(
       accountsRaw.map((row) => decryptRow('accounts', row as Record<string, unknown>, dek)),
     );
@@ -82,7 +74,7 @@ export async function GET(request: Request) {
       decryptedAccounts.map((a) => [a.id as string, a.name as string]),
     );
 
-    const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, dataUserId));
+    const categoriesRaw = await db.select().from(categories).where(eq(categories.userId, userId));
     const decryptedCategories = await Promise.all(
       categoriesRaw.map((row) => decryptRow('categories', row as Record<string, unknown>, dek)),
     );
@@ -90,17 +82,17 @@ export async function GET(request: Request) {
       decryptedCategories.map((c) => [c.id as string, c.name as string]),
     );
 
-    const connectionsRaw = await db.select().from(simplifinConnections).where(eq(simplifinConnections.userId, dataUserId));
+    const connectionsRaw = await db.select().from(simplifinConnections).where(eq(simplifinConnections.userId, userId));
     const connectionMap = new Map<string, string>(
       connectionsRaw.map((c) => [c.id as string, c.label as string]),
     );
 
-    const importsRaw = await db.select().from(importLog).where(eq(importLog.userId, dataUserId));
+    const importsRaw = await db.select().from(importLog).where(eq(importLog.userId, userId));
     const importMap = new Map<string, string>(
       importsRaw.map((i) => [i.id as string, i.fileName as string]),
     );
 
-    const tagsRaw = await db.select().from(tags).where(eq(tags.userId, dataUserId));
+    const tagsRaw = await db.select().from(tags).where(eq(tags.userId, userId));
     const decryptedTags = await Promise.all(
       tagsRaw.map((row) => decryptRow('tags', row as Record<string, unknown>, dek)),
     );
@@ -108,7 +100,7 @@ export async function GET(request: Request) {
       decryptedTags.map((t) => [t.id as string, t.name as string]),
     );
 
-    const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, dataUserId));
+    const paystubsRaw = await db.select().from(paystubs).where(eq(paystubs.userId, userId));
     const paystubMap = new Map<string, string>(
       paystubsRaw.map((p) => [p.id as string, `${p.employerName} (${p.checkDate})`]),
     );
@@ -163,8 +155,7 @@ export async function GET(request: Request) {
     });
 
     for (const { table, dbName, label } of CSV_TABLES) {
-      const targetUserId = dbName === 'ai_providers' ? userId : dataUserId;
-      const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
+      const rows = await db.select().from(table).where(eq(table.userId, userId));
       const decrypted = await Promise.all(
         rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
       );

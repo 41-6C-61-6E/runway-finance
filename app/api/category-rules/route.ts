@@ -67,7 +67,6 @@ export async function GET() {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   const rules = await getDb()
@@ -81,7 +80,7 @@ export async function GET() {
     })
     .from(categoryRules)
     .leftJoin(categories, eq(categoryRules.setCategoryId, categories.id))
-    .where(eq(categoryRules.userId, dataUserId))
+    .where(eq(categoryRules.userId, userId))
     .orderBy(asc(categoryRules.priority));
 
   const decryptedRules = await decryptRows('category_rules', rules.map((r) => r.rule), dek);
@@ -109,7 +108,6 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   let body: unknown;
   try {
@@ -136,7 +134,7 @@ export async function POST(request: Request) {
     caseSensitive: conditionCaseSensitive,
   }];
 
-  const duplicate = await findDuplicateRule(dataUserId, dek, {
+  const duplicate = await findDuplicateRule(userId, dek, {
     conditionField,
     conditionOperator,
     conditionValue,
@@ -163,7 +161,7 @@ export async function POST(request: Request) {
   }
 
   const encryptedValues = await encryptRow('category_rules', {
-    userId: dataUserId,
+    userId,
     name,
     priority,
     isActive,

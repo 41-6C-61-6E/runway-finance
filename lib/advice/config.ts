@@ -40,7 +40,6 @@ export const ADVICE_CONFIG = {
     '/reports',
     '/tax',
     '/rules',
-    '/sharing',
     '/sync',
   ] as const,
 };

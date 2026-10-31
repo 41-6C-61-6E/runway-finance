@@ -3,10 +3,9 @@ import { auth } from '../../../lib/auth';
 import { requireDeleteConfirmation } from '../../../lib/utils/require-auth';
 import { getDb } from '../../../lib/db';
 import { simplifinConnections, plaidConnections } from '../../../lib/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { logger } from '../../../lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
-import { getShareGroup } from '@/lib/sharing';
 
 export async function GET() {
   const session = await auth();
@@ -15,8 +14,6 @@ export async function GET() {
   }
 
   const userId = session.user.id;
-  const group = await getShareGroup(userId);
-  const userIds = group ? group.allUserIds : [userId];
 
   // Fetch SimpleFIN connections
   const sfConnections = await getDb()
@@ -32,7 +29,7 @@ export async function GET() {
       userId: simplifinConnections.userId,
     })
     .from(simplifinConnections)
-    .where(inArray(simplifinConnections.userId, userIds));
+    .where(eq(simplifinConnections.userId, userId));
 
   // Fetch Plaid connections
   const pConnections = await getDb()
@@ -48,7 +45,7 @@ export async function GET() {
       userId: plaidConnections.userId,
     })
     .from(plaidConnections)
-    .where(inArray(plaidConnections.userId, userIds));
+    .where(eq(plaidConnections.userId, userId));
 
   const allConnections = [
     ...sfConnections.map((c) => ({ ...c, provider: 'simplefin' })),

@@ -14,8 +14,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   let dek: Uint8Array;
   try {
     dek = await getSessionDEK();
@@ -56,7 +54,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await calculateWealthFlow(dataUserId, startDate, endDate, dek, accountIds, timeframe);
+    const data = await calculateWealthFlow(userId, startDate, endDate, dek, accountIds, timeframe);
     return NextResponse.json(data);
   } catch (error) {
     logger.error('[api-wealth-flow] Error calculating wealth flow', {

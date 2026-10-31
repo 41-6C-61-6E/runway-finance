@@ -12,13 +12,11 @@ export async function GET() {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   try {
     const logs = await getDb()
       .select()
       .from(importLog)
-      .where(eq(importLog.userId, dataUserId))
+      .where(eq(importLog.userId, userId))
       .orderBy(desc(importLog.createdAt));
 
     return NextResponse.json(logs);

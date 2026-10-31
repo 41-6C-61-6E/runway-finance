@@ -52,10 +52,10 @@ export async function getCashFlowSummary(ctx: FinanceContext): Promise<CashFlowS
 
   if (isImportTransactionsEnabled) {
     const [current] = await db.select().from(monthlyCashFlow).where(
-      and(eq(monthlyCashFlow.userId, ctx.dataUserId), eq(monthlyCashFlow.yearMonth, currentMonth))
+      and(eq(monthlyCashFlow.userId, ctx.userId), eq(monthlyCashFlow.yearMonth, currentMonth))
     );
     const [previous] = await db.select().from(monthlyCashFlow).where(
-      and(eq(monthlyCashFlow.userId, ctx.dataUserId), eq(monthlyCashFlow.yearMonth, previousMonth))
+      and(eq(monthlyCashFlow.userId, ctx.userId), eq(monthlyCashFlow.yearMonth, previousMonth))
     );
 
     if (current) {
@@ -93,7 +93,7 @@ export async function getCashFlowSummary(ctx: FinanceContext): Promise<CashFlowS
       .select()
       .from(accounts)
       .where(and(
-        eq(accounts.userId, ctx.dataUserId),
+        eq(accounts.userId, ctx.userId),
         eq(accounts.isHidden, false),
         eq(accounts.isExcludedFromNetWorth, false)
       ));
@@ -104,7 +104,7 @@ export async function getCashFlowSummary(ctx: FinanceContext): Promise<CashFlowS
       const allCategories = await db
         .select()
         .from(categories)
-        .where(eq(categories.userId, ctx.dataUserId));
+        .where(eq(categories.userId, ctx.userId));
       const catById = new Map(allCategories.map(cat => [cat.id.toString(), cat]));
 
       const allTransactions = await db
@@ -233,7 +233,7 @@ export async function getMonthlyCashFlow(ctx: FinanceContext, months: number = 1
       .from(monthlyCashFlow)
       .where(
         and(
-          eq(monthlyCashFlow.userId, ctx.dataUserId),
+          eq(monthlyCashFlow.userId, ctx.userId),
           gte(monthlyCashFlow.yearMonth, startYearMonth)
         )
       )
@@ -251,7 +251,7 @@ export async function getMonthlyCashFlow(ctx: FinanceContext, months: number = 1
       .select()
       .from(accounts)
       .where(and(
-        eq(accounts.userId, ctx.dataUserId),
+        eq(accounts.userId, ctx.userId),
         or(
           and(
             eq(accounts.isHidden, false),
@@ -267,7 +267,7 @@ export async function getMonthlyCashFlow(ctx: FinanceContext, months: number = 1
       const allCategories = await db
         .select()
         .from(categories)
-        .where(eq(categories.userId, ctx.dataUserId));
+        .where(eq(categories.userId, ctx.userId));
       const catById = new Map(allCategories.map(cat => [cat.id.toString(), cat]));
 
       const startDateStr = `${startYearMonth}-01`;

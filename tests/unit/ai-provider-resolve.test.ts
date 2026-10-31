@@ -4,11 +4,6 @@ import { aiProviders } from '@/lib/db/schema';
 
 const state = vi.hoisted(() => ({
   providers: [] as any[],
-  dataUserId: 'household-user-id',
-}));
-
-vi.mock('@/lib/sharing', () => ({
-  resolveDataUserId: vi.fn(async () => state.dataUserId),
 }));
 
 vi.mock('@/lib/db/seed-ai-providers', () => ({
@@ -39,7 +34,6 @@ describe('resolveAiProvider', () => {
 
   beforeEach(() => {
     state.providers = [];
-    state.dataUserId = 'household-user-id';
   });
 
   it('returns null when no providers are configured', async () => {

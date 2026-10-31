@@ -11,8 +11,6 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   try {
     const { updates } = await req.json();
 
@@ -26,7 +24,7 @@ export async function POST(req: NextRequest) {
       .select({ id: financialGoals.id })
       .from(financialGoals)
       .where(and(
-        eq(financialGoals.userId, dataUserId),
+        eq(financialGoals.userId, userId),
         inArray(financialGoals.id, goalIds)
       ));
 
@@ -48,7 +46,7 @@ export async function POST(req: NextRequest) {
         .where(eq(financialGoals.id, update.id as any));
     }
 
-    invalidateUserServerCache(dataUserId);
+    invalidateUserServerCache(userId);
     return NextResponse.json({ success: true, updated: validUpdates.length });
   } catch (err) {
     logger.error('POST /api/goals/bulk-reorder', { error: err });

@@ -4,12 +4,11 @@ import bcrypt from "bcryptjs";
 import { findUser } from "./users";
 import { deriveKeyFromPassword, unwrapKey, getServerKey, generateDEK, wrapKey } from "./crypto";
 import { getDb } from "./db";
-import { userEncryptionKeys, dekVersions, dekVersionWraps } from "./db/schema";
-import { and, eq } from "drizzle-orm";
+import { userEncryptionKeys } from "./db/schema";
+import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { authConfig } from "./auth.config";
 import { seedUserAiProviders } from "./db/seed-ai-providers";
-import { resolveDataUserId } from "./sharing";
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -21,63 +20,6 @@ function hexToBytes(hex: string): Uint8Array {
 
 // Cost 12 dummy bcrypt hash for timing attack mitigation on unknown usernames
 const DUMMY_HASH = '$2a$12$e8wVfW4uN0sMvB2dZ.kYquVwFkQ.nOeP.u98L44OQ4n3f1oJ15UeS';
-
-type DekVersionRow = {
-  id: string;
-  version: number;
-  dekWrappedServer: string;
-  wrappingIv: string;
-  wrappingTag: string;
-};
-
-// Fetch the household's highest-version DEK row (or null for legacy households).
-async function getLatestDekVersion(db: ReturnType<typeof getDb>, householdId: string): Promise<DekVersionRow | null> {
-  const rows = await db
-    .select({
-      id: dekVersions.id,
-      version: dekVersions.version,
-      dekWrappedServer: dekVersions.dekWrappedServer,
-      wrappingIv: dekVersions.wrappingIv,
-      wrappingTag: dekVersions.wrappingTag,
-    })
-    .from(dekVersions)
-    .where(eq(dekVersions.primaryUserId, householdId));
-
-  if (rows.length === 0) return null;
-  return rows.reduce((a, b) => ((b.version ?? 0) > (a.version ?? 0) ? b : a));
-}
-
-// Idempotently record the member's wrap of the given DEK version under their
-// password KEK (a no-op when the wrap row already exists).
-async function ensureDekVersionWrap(
-  db: ReturnType<typeof getDb>,
-  version: DekVersionRow,
-  memberUserId: string,
-  dek: Uint8Array,
-  kek: Uint8Array
-): Promise<void> {
-  const [existing] = await db
-    .select({ id: dekVersionWraps.id })
-    .from(dekVersionWraps)
-    .where(
-      and(
-        eq(dekVersionWraps.versionId, version.id),
-        eq(dekVersionWraps.memberUserId, memberUserId)
-      )
-    )
-    .limit(1);
-
-  if (existing) return;
-
-  const wrap = await wrapKey(dek, kek);
-  await db.insert(dekVersionWraps).values({
-    versionId: version.id,
-    memberUserId,
-    wrappedDek: wrap.ciphertext,
-    wrappingIv: wrap.iv,
-    wrappingTag: wrap.tag,
-  });
-}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -134,52 +76,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   wrappingTag: pwdWrapped.tag,
                   updatedAt: new Date(),
                 }).where(eq(userEncryptionKeys.userId, user.username));
-
-                // Self-heal: a rotation may have advanced the household chain
-                // while this user was away — make sure their wrap of the
-                // current version exists.
-                try {
-                  const householdId = keyRow.primaryUserId ?? user.username;
-                  const latestVersion = await getLatestDekVersion(db, householdId);
-                  if (latestVersion) {
-                    await ensureDekVersionWrap(db, latestVersion, user.username, dek, kek);
-                  }
-                } catch (err) {
-                  logger.warn('Auth: DEK version self-heal failed (login unaffected)', {
-                    username: user.username,
-                    error: err instanceof Error ? err.message : String(err),
-                  });
-                }
               } else {
                 const kek = await deriveKeyFromPassword(password, salt);
-
-                // If the household has a DEK version chain, the latest
-                // version's server wrap is authoritative — this user's
-                // password wrap may predate a rotation.
-                let latestVersion: DekVersionRow | null = null;
-                try {
-                  const householdId = keyRow.primaryUserId ?? user.username;
-                  latestVersion = await getLatestDekVersion(db, householdId);
-                } catch (err) {
-                  logger.warn('Auth: DEK version lookup failed, falling back to password wrap', {
-                    username: user.username,
-                    error: err instanceof Error ? err.message : String(err),
-                  });
-                }
-
-                if (latestVersion) {
-                  dek = await unwrapKey({
-                    ciphertext: latestVersion.dekWrappedServer,
-                    iv: latestVersion.wrappingIv,
-                    tag: latestVersion.wrappingTag,
-                  }, getServerKey());
-                } else {
-                  dek = await unwrapKey({
-                    ciphertext: keyRow.wrappedDek,
-                    iv: keyRow.wrappingIv,
-                    tag: keyRow.wrappingTag,
-                  }, kek);
-                }
+                dek = await unwrapKey({
+                  ciphertext: keyRow.wrappedDek,
+                  iv: keyRow.wrappingIv,
+                  tag: keyRow.wrappingTag,
+                }, kek);
 
                 const serverKey = getServerKey();
                 const serverWrapped = await wrapKey(dek, serverKey);
@@ -192,17 +95,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                   wrappingIv: pwdWrapped.iv,
                   wrappingTag: pwdWrapped.tag,
                 }).where(eq(userEncryptionKeys.userId, user.username));
-
-                if (latestVersion) {
-                  try {
-                    await ensureDekVersionWrap(db, latestVersion, user.username, dek, kek);
-                  } catch (err) {
-                    logger.warn('Auth: DEK version self-heal failed (login unaffected)', {
-                      username: user.username,
-                      error: err instanceof Error ? err.message : String(err),
-                    });
-                  }
-                }
               }
             } else {
               dek = generateDEK();
@@ -276,19 +168,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             logger.error('Auth: Failed to reschedule sync timers or auto-generate paystubs', { error: err instanceof Error ? err.message : String(err) });
           }
 
-          // Resolve the data user ID for share members
-          let dataUserId = user.username;
-          try {
-            dataUserId = await resolveDataUserId(user.username);
-          } catch (err) {
-            logger.warn('Auth: could not resolve dataUserId', { error: err instanceof Error ? err.message : String(err) });
-          }
-
           return {
             id: user.username,
             name: user.username,
             email: user.email,
-            dataUserId,
           };
         }
         logger.warn('Auth: failed login attempt', { username })
@@ -300,41 +183,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig.callbacks,
     async session({ session, token }) {
       if (session.user) {
-        const userId = token.sub;
-        const currentDataUserId = (token as any).dataUserId ?? token.sub;
-
-        if (currentDataUserId !== userId) {
-          try {
-            const { resolveDataUserId } = await import('@/lib/sharing');
-            const dbDataUserId = await resolveDataUserId(userId);
-            if (dbDataUserId !== currentDataUserId) {
-              logger.warn('Session invalidated: user has been removed from share group', { userId });
-              return {
-                ...session,
-                user: undefined as any,
-              };
-            }
-          } catch (err) {
-            // L-9 (2026-08-27 security review): be strict in ALL envs. A DB
-            // error resolving the share group must not leave a stale
-            // dataUserId in the session (previously dev-only leniency).
-            logger.error('Error verifying share group membership in session callback', { error: err });
-            return {
-              ...session,
-              user: undefined as any,
-            };
-          }
-        }
-
         session.user.id = token.sub;
-        (session.user as any).dataUserId = currentDataUserId;
       }
       return session;
     },
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        (token as any).dataUserId = (user as any).dataUserId ?? user.id;
       }
       return token;
     }

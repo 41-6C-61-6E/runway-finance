@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const { searchParams } = new URL(request.url);
   const now = new Date();
   const month = searchParams.get('month') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
       .where(
         and(
-          eq(budgets.userId, dataUserId),
+          eq(budgets.userId, userId),
           eq(categories.excludeFromReports, false)
         )
       );
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
         .from(table)
         .where(
           and(
-            eq(table.userId, dataUserId),
+            eq(table.userId, userId),
             eq(table.yearMonth, month),
             inArray(idCol, catIds)
           )

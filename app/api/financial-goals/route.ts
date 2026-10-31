@@ -19,15 +19,13 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status');
   const type = searchParams.get('type');
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
-  const cacheKey = `user:${userId}:financial-goals:${dataUserId}:${status || ''}:${type || ''}`;
+  const cacheKey = `user:${userId}:financial-goals:${status || ''}:${type || ''}`;
   const cached = getCached<any>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
 
-  const conditions = [eq(financialGoals.userId, dataUserId)];
+  const conditions = [eq(financialGoals.userId, userId)];
   if (status) conditions.push(eq(financialGoals.status, status));
   if (type) conditions.push(eq(financialGoals.type, type));
 
@@ -55,7 +53,7 @@ export async function GET(req: NextRequest) {
     })
     .from(goalTags)
     .innerJoin(tags, eq(goalTags.tagId, tags.id))
-    .where(eq(tags.userId, dataUserId));
+    .where(eq(tags.userId, userId));
 
   // Decrypt tag names
   const decryptedTags = await Promise.all(
@@ -98,7 +96,7 @@ export async function GET(req: NextRequest) {
   // Compute allocations for goals with linked accounts
   const allocationMap = new Map<string, any>();
   try {
-    const allocation = await computeGoalAllocations(dataUserId);
+    const allocation = await computeGoalAllocations(userId);
     for (const account of allocation.accounts) {
       for (const goal of account.goals) {
         allocationMap.set(goal.goalId, goal);
@@ -134,7 +132,6 @@ export async function POST(req: NextRequest) {
     const dek = await getSessionDEK();
     const body = await req.json();
     const userId = session.user.id;
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const { name, description, type, targetAmount, currentAmount, targetDate, categoryId, tagIds, status, linkedAccountId, percentage, reserve, sortOrder } = body;
 
     if (!name || !type || !targetAmount) {
@@ -142,7 +139,7 @@ export async function POST(req: NextRequest) {
     }
 
     const encryptedValues = await encryptRow('financial_goals', {
-      userId: dataUserId,
+      userId,
       name,
       description: description || null,
       type,
@@ -168,7 +165,7 @@ export async function POST(req: NextRequest) {
 
     const decrypted = await decryptRow('financial_goals', goal[0], dek);
 
-    invalidateUserServerCache(dataUserId);
+    invalidateUserServerCache(userId);
     logger.info('POST /api/financial-goals', { goalId: goal[0].id });
     return NextResponse.json(decrypted, { status: 201 });
   } catch (err) {
@@ -187,7 +184,6 @@ export async function PATCH(req: NextRequest) {
     const dek = await getSessionDEK();
     const body = await req.json();
     const userId = session.user.id;
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const { id, ...updates } = body;
 
     const goalId = id || searchParams.get('id');
@@ -201,7 +197,7 @@ export async function PATCH(req: NextRequest) {
       .from(financialGoals)
       .where(and(
         eq(financialGoals.id, goalId),
-        eq(financialGoals.userId, dataUserId)
+        eq(financialGoals.userId, userId)
       ))
       .limit(1);
 
@@ -225,7 +221,7 @@ export async function PATCH(req: NextRequest) {
     // When marking as completed, persist the current allocation so the release logic can read it
     if (updates.status === 'completed' && existing[0].linkedAccountId) {
       try {
-        const currentAllocation = await getGoalAllocation(goalId, dataUserId);
+        const currentAllocation = await getGoalAllocation(goalId, userId);
         if (currentAllocation) {
           updateData.allocatedAmount = String(currentAllocation.allocatedAmount);
         }
@@ -254,7 +250,7 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    invalidateUserServerCache(dataUserId);
+    invalidateUserServerCache(userId);
     logger.info('PATCH /api/financial-goals', { goalId: id });
     const decrypted = updated[0] ? await decryptRow('financial_goals', updated[0], dek) : updated[0];
     return NextResponse.json(decrypted);
@@ -277,13 +273,12 @@ export async function DELETE(req: NextRequest) {
     }
 
     const userId = session.user.id;
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const existing = await getDb()
       .select()
       .from(financialGoals)
       .where(and(
         eq(financialGoals.id, id),
-        eq(financialGoals.userId, dataUserId)
+        eq(financialGoals.userId, userId)
       ))
       .limit(1);
 
@@ -295,7 +290,7 @@ export async function DELETE(req: NextRequest) {
       .delete(financialGoals)
       .where(eq(financialGoals.id, id));
 
-    invalidateUserServerCache(dataUserId);
+    invalidateUserServerCache(userId);
     logger.info('DELETE /api/financial-goals', { goalId: id });
     return NextResponse.json({ success: true });
   } catch (err) {

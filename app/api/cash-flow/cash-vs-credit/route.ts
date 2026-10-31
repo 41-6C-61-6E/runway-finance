@@ -23,7 +23,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
@@ -61,7 +60,7 @@ export async function GET(request: Request) {
       earliestSnap = await getDb()
         .select({ snapshotDate: accountSnapshots.snapshotDate })
         .from(accountSnapshots)
-        .where(eq(accountSnapshots.userId, dataUserId))
+        .where(eq(accountSnapshots.userId, userId))
         .orderBy(accountSnapshots.snapshotDate)
         .limit(1);
       if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
@@ -81,7 +80,7 @@ export async function GET(request: Request) {
     const userAccounts = await getDb()
       .select()
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
 
     const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
     const reportableAccounts = filterReportableAccounts(decryptedAccounts);
@@ -122,7 +121,7 @@ export async function GET(request: Request) {
     }
 
     const snapshotsConditionsBefore = [
-      eq(accountSnapshots.userId, dataUserId),
+      eq(accountSnapshots.userId, userId),
       inArray(accountSnapshots.accountId, accountIds),
       lt(accountSnapshots.snapshotDate, startStr),
     ];
@@ -138,7 +137,7 @@ export async function GET(request: Request) {
       .orderBy(accountSnapshots.accountId, desc(accountSnapshots.snapshotDate));
 
     const snapshotsInRangeConditions = [
-      eq(accountSnapshots.userId, dataUserId),
+      eq(accountSnapshots.userId, userId),
       inArray(accountSnapshots.accountId, accountIds),
       gte(accountSnapshots.snapshotDate, startStr),
       lte(accountSnapshots.snapshotDate, endStr),

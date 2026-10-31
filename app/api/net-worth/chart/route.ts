@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, netWorthSnapshots, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, lte, notInArray } from 'drizzle-orm';
+import { eq, and, gte, lte } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
-import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
@@ -23,7 +22,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
@@ -38,17 +36,13 @@ export async function GET(request: Request) {
   const userTz = userSettingsList[0]?.timezone || 'America/New_York';
   const baseCurrency = userSettingsList[0]?.currency || 'USD';
 
-  const cacheKey = `user:${userId}:net-worth-chart:${timeframe}:${explicitStart || ''}:${explicitEnd || ''}:${dataUserId}:${userTz}:${baseCurrency}`;
+  const cacheKey = `user:${userId}:net-worth-chart:${timeframe}:${explicitStart || ''}:${explicitEnd || ''}:${userTz}:${baseCurrency}`;
   const cached = getCached<any>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
 
-  // Sensitive accounts are excluded from live balance math for plain members.
-  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
-  const accountsWhere = hiddenAccountIds.length > 0
-    ? and(eq(accounts.userId, dataUserId), notInArray(accounts.id, hiddenAccountIds))
-    : eq(accounts.userId, dataUserId);
+  const accountsWhere = eq(accounts.userId, userId);
 
   let [startDate, endDate] = getDateRange(timeframe);
   if (explicitStart && explicitEnd) {
@@ -58,7 +52,7 @@ export async function GET(request: Request) {
     const earliestSnap = await getDb()
       .select({ snapshotDate: netWorthSnapshots.snapshotDate })
       .from(netWorthSnapshots)
-      .where(eq(netWorthSnapshots.userId, dataUserId))
+      .where(eq(netWorthSnapshots.userId, userId))
       .orderBy(netWorthSnapshots.snapshotDate)
       .limit(1);
     if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
@@ -81,7 +75,7 @@ export async function GET(request: Request) {
       .from(netWorthSnapshots)
       .where(
         and(
-          eq(netWorthSnapshots.userId, dataUserId),
+          eq(netWorthSnapshots.userId, userId),
           gte(netWorthSnapshots.snapshotDate, startDate.toISOString().split('T')[0]),
           lte(netWorthSnapshots.snapshotDate, endDate.toISOString().split('T')[0])
         )

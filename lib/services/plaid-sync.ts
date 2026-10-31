@@ -19,7 +19,6 @@ import { decryptField, encryptField, encryptRow, decryptRows } from '@/lib/crypt
 import { getSessionDEK } from '@/lib/crypto-context';
 import { getPlaidClient } from '@/lib/plaid';
 import { logger } from '@/lib/logger';
-import { resolveDataUserId } from '@/lib/sharing';
 import { parseProviderBalance, resolveEffectiveBalance } from '@/lib/utils/balance-source';
 import {
   createAccountSnapshots,
@@ -59,8 +58,6 @@ export async function syncPlaidConnection(
   const startedAt = Date.now();
   logger.info(`${LOG_TAG} Plaid Sync started`, { connectionId, userId });
 
-  const dataUserId = await resolveDataUserId(userId);
-
   let dek: Uint8Array;
   try {
     dek = dekOverride ?? (await getSessionDEK());
@@ -79,7 +76,7 @@ export async function syncPlaidConnection(
   const [log] = await getDb()
     .insert(syncLogs)
     .values({
-      userId: dataUserId,
+      userId: userId,
       plaidConnectionId: connectionId,
       status: 'running',
       accountsSynced: '0',
@@ -100,17 +97,16 @@ export async function syncPlaidConnection(
       throw new Error('Plaid connection not found');
     }
 
-    const connectionDataUserId = await resolveDataUserId(connection.userId);
-    if (connectionDataUserId !== dataUserId) {
+    if (connection.userId !== userId) {
       throw new Error('Plaid connection unauthorized');
     }
 
-    const client = await getPlaidClient(dataUserId, dek);
+    const client = await getPlaidClient(userId, dek);
     const accessToken = await decryptField(connection.accessTokenEncrypted, dek);
 
     // Pre-seed category configurations
-    await ensureCompoundCategories(dataUserId, dek);
-    await ensureEmployerContributions(dataUserId, dek);
+    await ensureCompoundCategories(userId, dek);
+    await ensureEmployerContributions(userId, dek);
 
     let hasMore = true;
     let currentCursor = connection.cursor || undefined;
@@ -307,7 +303,7 @@ export async function syncPlaidConnection(
       const [existingAccount] = await getDb()
         .select({ id: accounts.id, metadata: accounts.metadata, type: accounts.type })
         .from(accounts)
-        .where(and(eq(accounts.userId, dataUserId), eq(accounts.externalId, plaidAcc.account_id)))
+        .where(and(eq(accounts.userId, userId), eq(accounts.externalId, plaidAcc.account_id)))
         .limit(1);
 
       // Prefer the stored (possibly user-edited) type over Plaid's type/subtype.
@@ -329,7 +325,7 @@ export async function syncPlaidConnection(
         .from(accounts)
         .where(
           and(
-            eq(accounts.userId, dataUserId),
+            eq(accounts.userId, userId),
             eq(accounts.externalId, plaidAcc.account_id),
             isNull(accounts.connectionId),
             isNull(accounts.plaidConnectionId)
@@ -376,7 +372,7 @@ export async function syncPlaidConnection(
         [upserted] = await getDb()
           .insert(accounts)
           .values({
-            userId: dataUserId,
+            userId: userId,
             plaidConnectionId: connectionId,
             externalId: plaidAcc.account_id,
             name: await encryptField(plaidAcc.name, dek),
@@ -420,7 +416,7 @@ export async function syncPlaidConnection(
 
       // Trigger custom account balance alerts check
       const { checkAccountBalanceAlerts } = await import('@/lib/services/notifications');
-      checkAccountBalanceAlerts(dataUserId, upserted.id, parseFloat(balance) || 0, dek).catch((e) => {
+      checkAccountBalanceAlerts(userId, upserted.id, parseFloat(balance) || 0, dek).catch((e) => {
         logger.error('[plaid-sync] Failed to check custom account balance alerts:', e);
       });
 
@@ -515,7 +511,7 @@ export async function syncPlaidConnection(
             await getDb()
               .insert(holdings)
               .values({
-                userId: dataUserId,
+                userId: userId,
                 accountId: upserted.id,
                 securityId: h.securityId,
                 ticker: h.ticker,
@@ -547,7 +543,7 @@ export async function syncPlaidConnection(
             await getDb()
               .insert(holdingSnapshots)
               .values({
-                userId: dataUserId,
+                userId: userId,
                 accountId: upserted.id,
                 snapshotDate: todayStr,
                 securityId: h.securityId,
@@ -602,7 +598,7 @@ export async function syncPlaidConnection(
         largeTransactionThreshold: userSettings.largeTransactionThreshold,
       })
       .from(userSettings)
-      .where(eq(userSettings.userId, dataUserId))
+      .where(eq(userSettings.userId, userId))
       .limit(1);
     const plaidLargeTxEnabled = plaidLargeTxSettingsRow?.notifyLargeTransactions ?? false;
     const plaidLargeTxThreshold = plaidLargeTxSettingsRow?.largeTransactionThreshold ?? 100;
@@ -617,7 +613,7 @@ export async function syncPlaidConnection(
       const isPending = pt.pending ?? false;
 
       const txData = {
-        userId: dataUserId,
+        userId: userId,
         accountId,
         externalId: pt.transaction_id,
         date: pt.date,
@@ -650,7 +646,7 @@ export async function syncPlaidConnection(
         .from(transactions)
         .where(
           and(
-            eq(transactions.userId, dataUserId),
+            eq(transactions.userId, userId),
             eq(transactions.accountId, accountId),
             eq(transactions.externalId, pt.transaction_id)
           )
@@ -678,7 +674,7 @@ export async function syncPlaidConnection(
 
         // Trigger custom transaction alerts check
         const { checkTransactionAlerts } = await import('@/lib/services/notifications');
-        checkTransactionAlerts(dataUserId, {
+        checkTransactionAlerts(userId, {
           externalId: pt.transaction_id,
           accountId,
           description: pt.original_description || pt.name || '',
@@ -706,7 +702,7 @@ export async function syncPlaidConnection(
             const linkUrl = `/transactions?search=${encodedDesc}&startDate=${pt.date}&endDate=${pt.date}`;
             const { sendPushNotification } = await import('@/lib/services/notifications');
             sendPushNotification(
-              dataUserId,
+              userId,
               `Transaction Alert`,
               `New transaction of $${absAmount.toFixed(2)} at ${decDesc}.`,
               linkUrl,
@@ -734,7 +730,7 @@ export async function syncPlaidConnection(
         await getDb()
           .update(transactions)
           .set({ deleted: true, updatedAt: new Date() })
-          .where(and(eq(transactions.userId, dataUserId), eq(transactions.externalId, rt.transaction_id)));
+          .where(and(eq(transactions.userId, userId), eq(transactions.externalId, rt.transaction_id)));
       }
     }
 
@@ -769,7 +765,7 @@ export async function syncPlaidConnection(
       const uncategorized = syncedWithPlaintext.filter((t) => !t.categoryId);
       let ruleCategorizedTxIds = new Set<string>();
       if (syncedWithPlaintext.length > 0) {
-        const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, dataUserId, dek);
+        const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, userId, dek);
         ruleCategorizedTxIds = new Set(
           Array.from(ruleResults.entries())
             .filter(([, action]) => action.shouldUpdateCategory && action.categoryId)
@@ -865,8 +861,8 @@ export async function syncPlaidConnection(
 
     // 6. Recalculate downstream calculations
     const today = new Date().toISOString().split('T')[0];
-    await createNetWorthSnapshot(dataUserId, dek, today);
-    await createAccountSnapshots(dataUserId, dek, today);
+    await createNetWorthSnapshot(userId, dek, today);
+    await createAccountSnapshots(userId, dek, today);
 
     // Historical snapshot generation
     // On first sync or new accounts, generate full history.
@@ -889,7 +885,7 @@ export async function syncPlaidConnection(
       if (earliestTx < toDateStr) {
         await generateHistoricalAccountSnapshots(
           accountId,
-          dataUserId,
+          userId,
           earliestTx,
           toDateStr,
           dek,
@@ -900,7 +896,7 @@ export async function syncPlaidConnection(
 
     if (hasNewAccounts) {
       const { recalculateNetWorthSnapshots } = await import('@/lib/services/account-history');
-      await recalculateNetWorthSnapshots(dataUserId, dek);
+      await recalculateNetWorthSnapshots(userId, dek);
       logger.info(`${LOG_TAG} Recalculated net worth snapshots historically for new Plaid accounts`, { userId });
     }
 
@@ -910,52 +906,52 @@ export async function syncPlaidConnection(
     });
 
     // Rebuild summary tables (coalesced); wait for the fresh data before running alerts
-    const summariesReady = triggerUserSummariesRebuild(dataUserId, dek);
+    const summariesReady = triggerUserSummariesRebuild(userId, dek);
 
     // Trigger custom cash flow alerts check
     const { checkCashFlowAlerts, checkRecurringPriceChangesAndNotify, checkUpcomingBillsAndNotify, checkMonthlySummaryAndNotify, healSyncAlerts } = await import('@/lib/services/notifications');
     await summariesReady;
-    checkCashFlowAlerts(dataUserId, dek).catch((e) => {
+    checkCashFlowAlerts(userId, dek).catch((e) => {
       logger.error('[plaid-sync] Failed to check cash flow alerts:', e);
     });
 
     // R1: re-arm sync-failure alerts now that this connection synced OK, and
     // mark the resolved sync_error inbox rows read.
-    healSyncAlerts(dataUserId, connectionId).catch((e) => {
+    healSyncAlerts(userId, connectionId).catch((e) => {
       logger.debug('[plaid-sync] Failed to heal sync alerts (non-fatal):', e);
     });
 
     // R12a: month-boundary cash flow summary (fires at most once per month).
-    checkMonthlySummaryAndNotify(dataUserId, dek).catch((e) => {
+    checkMonthlySummaryAndNotify(userId, dek).catch((e) => {
       logger.error('[plaid-sync] Failed to check monthly summary:', e);
     });
 
     // Run recurring transaction detection, price alerts & bill reminders (non-fatal)
     if (transactionsNew + transactionsUpdated > 0) {
-      if (activeDetectionUsers.has(dataUserId)) {
-        logger.info(`${LOG_TAG} Skipping recurring detection (concurrent sync already running)`, { userId: dataUserId });
+      if (activeDetectionUsers.has(userId)) {
+        logger.info(`${LOG_TAG} Skipping recurring detection (concurrent sync already running)`, { userId: userId });
       } else {
         try {
           const { detectRecurringTransactions } = await import('@/lib/services/recurring-detection');
-          activeDetectionUsers.add(dataUserId);
-          detectRecurringTransactions(dataUserId, dek)
-            .then(() => checkRecurringPriceChangesAndNotify(dataUserId, dek))
-            .then(() => checkUpcomingBillsAndNotify(dataUserId, dek))
+          activeDetectionUsers.add(userId);
+          detectRecurringTransactions(userId, dek)
+            .then(() => checkRecurringPriceChangesAndNotify(userId, dek))
+            .then(() => checkUpcomingBillsAndNotify(userId, dek))
             .catch((err) => {
               logger.warn(`${LOG_TAG} Recurring detection failed (non-fatal):`, err);
             })
             .finally(() => {
-              activeDetectionUsers.delete(dataUserId);
+              activeDetectionUsers.delete(userId);
             });
         } catch (err) {
-          activeDetectionUsers.delete(dataUserId);
+          activeDetectionUsers.delete(userId);
           logger.warn(`${LOG_TAG} Failed to load recurring detection:`, err);
         }
       }
     }
 
     if (transactionsNew > 0 || transactionsUpdated > 0) {
-      invalidateUserSearchCache(dataUserId);
+      invalidateUserSearchCache(userId);
     }
 
     logger.info(`${LOG_TAG} Plaid Sync completed successfully`, {

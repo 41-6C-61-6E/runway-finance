@@ -16,10 +16,6 @@ vi.mock('@/lib/db', () => ({
   })),
 }));
 
-vi.mock('@/lib/sharing', () => ({
-  resolveDataUserId: vi.fn(async (userId: string) => userId),
-}));
-
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),

@@ -16,14 +16,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [account] = await getDb()
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
     .limit(1);
 
   if (!account) {
@@ -31,7 +30,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const apiConfig = await readApiConfig(userId);
-  const result = await syncManualAccount(id, dataUserId, apiConfig, dek);
+  const result = await syncManualAccount(id, userId, apiConfig, dek);
 
   logger.info('POST /api/manual-accounts/[id]/sync', { userId, id, accountType: account.type, status: result.status });
 
@@ -56,7 +55,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         const meta = JSON.parse(raw) as Record<string, unknown>;
         syncFrequency = (meta.syncFrequency as string) || 'manual';
       } catch {}
-      await manualAccountScheduler.schedule(id, dataUserId, syncFrequency, refreshed.balanceDate);
+      await manualAccountScheduler.schedule(id, userId, syncFrequency, refreshed.balanceDate);
     }
   }
 

@@ -362,7 +362,6 @@ async function seed() {
       institution: a.institution ?? null,
       isHidden: false,
       isExcludedFromNetWorth: false,
-      sensitive: false,
       displayOrder: a.displayOrder,
     };
     const enc = await encryptRow('accounts', row, dek);

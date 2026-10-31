@@ -8,12 +8,10 @@ export async function GET(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   try {
     const [allocations, sharedAccounts] = await Promise.all([
-      computeGoalAllocations(dataUserId),
-      findSharedAccounts(dataUserId),
+      computeGoalAllocations(userId),
+      findSharedAccounts(userId),
     ]);
 
     return NextResponse.json({
@@ -35,10 +33,8 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   try {
-    await snapshotAllocationsToHistory(dataUserId);
+    await snapshotAllocationsToHistory(userId);
     return NextResponse.json({ success: true });
   } catch (err) {
     logger.error('POST /api/goals/allocation', { error: err });

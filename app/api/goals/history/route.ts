@@ -8,8 +8,6 @@ export async function GET(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-  
   const { searchParams } = new URL(req.url);
   const goalId = searchParams.get('goalId');
   const limit = parseInt(searchParams.get('limit') || '30');
@@ -19,7 +17,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const history = await getGoalAllocationHistory(goalId, dataUserId, limit);
+    const history = await getGoalAllocationHistory(goalId, userId, limit);
     
     return NextResponse.json({ history });
   } catch (err) {

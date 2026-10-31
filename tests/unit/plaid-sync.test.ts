@@ -79,11 +79,6 @@ vi.mock('@/lib/db', () => {
   };
 });
 
-// Mock sharing module
-vi.mock('@/lib/sharing', () => ({
-  resolveDataUserId: vi.fn((uid) => Promise.resolve(uid)),
-}));
-
 // Mock crypto context
 vi.mock('@/lib/crypto-context', () => ({
   getSessionDEK: vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3]))),

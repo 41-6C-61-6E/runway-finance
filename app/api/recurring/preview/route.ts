@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { resolveDataUserId } from '@/lib/sharing';
 import { previewMatchingTransactions } from '@/lib/services/recurring-detection';
 import { logger } from '@/lib/logger';
 
@@ -14,7 +13,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const dataUserId = await resolveDataUserId(session.user.id);
+    const userId = session.user.id;
     const dek = await getSessionDEK();
 
     const { searchParams } = new URL(req.url);
@@ -32,7 +31,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const preview = await previewMatchingTransactions(dataUserId, dek, pattern, accountId);
+    const preview = await previewMatchingTransactions(userId, dek, pattern, accountId);
     return NextResponse.json(preview);
   } catch (err) {
     logger.error(`${LOG_TAG} GET failed:`, err);

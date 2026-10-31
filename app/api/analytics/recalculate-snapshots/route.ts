@@ -18,10 +18,10 @@ export async function GET() {
     if (!session?.user) {
       return apiUnauthorized();
     }
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+    const userId = session.user.id;
 
     // Only report runs this user owns/triggered (or system-wide startup runs).
-    const visible = !recalculationStatus.owner || recalculationStatus.owner === dataUserId;
+    const visible = !recalculationStatus.owner || recalculationStatus.owner === userId;
     return NextResponse.json({
       success: true,
       status: visible ? recalculationStatus : { ...recalculationStatus, currentUser: null, errors: [] },
@@ -41,14 +41,14 @@ export async function POST(request: Request) {
       return apiUnauthorized();
     }
 
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+    const userId = session.user.id;
     const dek = await getSessionDEK();
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'netWorth';
 
     // L-3: per-user cooldown.
-    const last = lastRecalcStart.get(dataUserId) ?? 0;
+    const last = lastRecalcStart.get(userId) ?? 0;
     const now = Date.now();
     if (now - last < RECALC_COOLDOWN_MS) {
       const retryInSec = Math.ceil((RECALC_COOLDOWN_MS - (now - last)) / 1000);
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       );
     }
 
-    logger.info('Triggering manual snapshot recalculation in background', { userId: dataUserId, type });
+    logger.info('Triggering manual snapshot recalculation in background', { userId, type });
 
     if (recalculationStatus.status === 'running') {
       return NextResponse.json(
@@ -67,11 +67,11 @@ export async function POST(request: Request) {
       );
     }
 
-    lastRecalcStart.set(dataUserId, Date.now());
+    lastRecalcStart.set(userId, Date.now());
 
     // Trigger in the background without awaiting
-    runBackgroundRecalculation(true, dataUserId, type, dek).catch((err) => {
-      logger.error('Error in manual background recalculation run', { userId: dataUserId, error: String(err) });
+    runBackgroundRecalculation(true, userId, type, dek).catch((err) => {
+      logger.error('Error in manual background recalculation run', { userId, error: String(err) });
     });
 
     return NextResponse.json({

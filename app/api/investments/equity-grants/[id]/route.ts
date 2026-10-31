@@ -28,7 +28,7 @@ export async function PATCH(
   }
 
   const { id } = await context.params;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;
@@ -54,7 +54,7 @@ export async function PATCH(
   }
 
   try {
-    const updated = await updateEquityGrant(id, dataUserId, parsed.data, dek);
+    const updated = await updateEquityGrant(id, userId, parsed.data, dek);
     return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof Error && error.message === 'grant_not_found') {
@@ -87,11 +87,11 @@ export async function DELETE(
   }
 
   const { id } = await context.params;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
 
   try {
-    await deleteEquityGrant(id, dataUserId, dek);
+    await deleteEquityGrant(id, userId, dek);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof Error && error.message === 'grant_not_found') {

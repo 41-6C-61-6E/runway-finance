@@ -35,7 +35,6 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const monthsRaw = parseInt(searchParams.get('months') || '24', 10);
@@ -54,7 +53,7 @@ export async function GET(request: Request) {
       .select()
       .from(accounts)
       .where(and(
-        eq(accounts.userId, dataUserId),
+        eq(accounts.userId, userId),
         eq(accounts.isHidden, false),
         eq(accounts.isExcludedFromNetWorth, false)
       ))
@@ -119,7 +118,7 @@ export async function GET(request: Request) {
         const saleProceeds = propertyValue * (1 - sellerClosingCostPercent / 100) - Math.abs(totalMortgageBalance);
 
         const snapshotsConditions = [
-          eq(accountSnapshots.userId, dataUserId),
+          eq(accountSnapshots.userId, userId),
           eq(accountSnapshots.accountId, property.id),
           sql`${accountSnapshots.snapshotDate} >= ${cutoffDate}::date`
         ];
@@ -149,7 +148,7 @@ export async function GET(request: Request) {
         ]));
 
         const mortgageSnapshotsConditions = [
-          eq(accountSnapshots.userId, dataUserId),
+          eq(accountSnapshots.userId, userId),
           inArray(accountSnapshots.accountId, allLinkedIds),
           sql`${accountSnapshots.snapshotDate} >= ${cutoffDate}::date`
         ];

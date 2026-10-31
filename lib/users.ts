@@ -9,8 +9,8 @@ function drizzleOnClient(client: PoolClient) {
 import { getPool } from './db';
 import { deriveKeyFromPassword, unwrapKey, wrapKey, generateDEK, getServerKey } from './crypto';
 import { getDb } from './db';
-import { userEncryptionKeys, dekVersions, dekVersionWraps } from './db/schema';
-import { and, eq } from 'drizzle-orm';
+import { userEncryptionKeys } from './db/schema';
+import { eq } from 'drizzle-orm';
 import { checkPasswordPolicy } from './password-policy';
 
 // Drizzle instance type (without the concrete $client brand, so a db bound to
@@ -181,40 +181,6 @@ export async function updatePassword(username: string, currentPassword: string, 
             salt: bytesToHex(newSalt),
             updatedAt: new Date(),
           }).where(eq(userEncryptionKeys.userId, username));
-
-          // Refresh this user's wrap of the household's current DEK version under
-          // the new KEK so the version chain stays readable after the change.
-          const householdId = keyRow.primaryUserId ?? username;
-          const versionRows = await tx
-            .select({
-              id: dekVersions.id,
-              version: dekVersions.version,
-              dekWrappedServer: dekVersions.dekWrappedServer,
-              wrappingIv: dekVersions.wrappingIv,
-              wrappingTag: dekVersions.wrappingTag,
-            })
-            .from(dekVersions)
-            .where(eq(dekVersions.primaryUserId, householdId));
-
-          if (versionRows.length > 0) {
-            const latest = versionRows.reduce((a, b) => ((b.version ?? 0) > (a.version ?? 0) ? b : a));
-            const versionDek = await unwrapKey({
-              ciphertext: latest.dekWrappedServer,
-              iv: latest.wrappingIv,
-              tag: latest.wrappingTag,
-            }, serverKey);
-            const versionWrap = await wrapKey(versionDek, newKek);
-            await tx
-              .delete(dekVersionWraps)
-              .where(and(eq(dekVersionWraps.versionId, latest.id), eq(dekVersionWraps.memberUserId, username)));
-            await tx.insert(dekVersionWraps).values({
-              versionId: latest.id,
-              memberUserId: username,
-              wrappedDek: versionWrap.ciphertext,
-              wrappingIv: versionWrap.iv,
-              wrappingTag: versionWrap.tag,
-            });
-          }
         }
       }
 
@@ -249,77 +215,4 @@ export async function createUserEncryptionKeys(username: string, password: strin
     serverWrappingTag: serverWrapped.tag,
     salt: bytesToHex(salt),
   });
-}
-
-/**
- * For the sharing join flow: wrap the primary user's DEK with a new member's
- * password and store it in user_encryption_keys for the new member.
- *
- * The new member's row points back to the primary via `primaryUserId` so that
- * the auth layer knows to route data queries to the primary's ID.
- */
-export async function rewrapDekForUser(
-  newUsername: string,
-  newPassword: string,
-  primaryUsername: string,
-  db: Db = getDb()
-): Promise<void> {
-  // Retrieve the primary's server-wrapped DEK
-  const [primaryKeyRow] = await db
-    .select()
-    .from(userEncryptionKeys)
-    .where(eq(userEncryptionKeys.userId, primaryUsername))
-    .limit(1);
-
-  if (!primaryKeyRow?.serverWrappedDek || !primaryKeyRow.serverWrappingIv) {
-    throw new Error('Primary user encryption key not found or missing server wrap');
-  }
-
-  // Unwrap primary's DEK using the server key
-  const serverKey = getServerKey();
-  const dek = await unwrapKey(
-    {
-      ciphertext: primaryKeyRow.serverWrappedDek,
-      iv: primaryKeyRow.serverWrappingIv,
-      tag: primaryKeyRow.serverWrappingTag ?? '',
-    },
-    serverKey
-  );
-
-  // Wrap primary's DEK with the new member's password
-  const salt = crypto.getRandomValues(new Uint8Array(32));
-  const kek = await deriveKeyFromPassword(newPassword, salt);
-  const pwdWrapped = await wrapKey(dek, kek);
-  const serverWrapped = await wrapKey(dek, serverKey);
-
-  await db.insert(userEncryptionKeys).values({
-    userId: newUsername,
-    wrappedDek: pwdWrapped.ciphertext,
-    wrappingIv: pwdWrapped.iv,
-    wrappingTag: pwdWrapped.tag,
-    serverWrappedDek: serverWrapped.ciphertext,
-    serverWrappingIv: serverWrapped.iv,
-    serverWrappingTag: serverWrapped.tag,
-    salt: bytesToHex(salt),
-    primaryUserId: primaryUsername,
-  });
-
-  // Record this member's wrap of the household's current DEK version so they
-  // can decrypt via the version chain on their next login. Legacy households
-  // have no version rows, so this is a no-op for them.
-  const versionRows = await db
-    .select({ id: dekVersions.id, version: dekVersions.version })
-    .from(dekVersions)
-    .where(eq(dekVersions.primaryUserId, primaryUsername));
-
-  if (versionRows.length > 0) {
-    const latest = versionRows.reduce((a, b) => ((b.version ?? 0) > (a.version ?? 0) ? b : a));
-    await db.insert(dekVersionWraps).values({
-      versionId: latest.id,
-      memberUserId: newUsername,
-      wrappedDek: pwdWrapped.ciphertext,
-      wrappingIv: pwdWrapped.iv,
-      wrappingTag: pwdWrapped.tag,
-    });
-  }
 }

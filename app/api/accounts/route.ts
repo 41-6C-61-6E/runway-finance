@@ -2,12 +2,11 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, accountTags, tags } from '@/lib/db/schema';
-import { eq, and, asc, or, like, inArray, notInArray } from 'drizzle-orm';
+import { eq, and, asc, or, like, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
 import { filterReportableAccounts, isReportableAccount } from '@/lib/utils/account-scope';
-import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -19,7 +18,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const includeHidden = searchParams.get('includeHidden') === 'true';
@@ -28,7 +26,7 @@ export async function GET(request: Request) {
 
   logger.info('Fetching accounts', { includeHidden, includeVirtual, type: typeFilter });
 
-  const whereConditions = [eq(accounts.userId, dataUserId)];
+  const whereConditions = [eq(accounts.userId, userId)];
 
   if (!includeHidden) {
     if (includeVirtual) {
@@ -48,12 +46,6 @@ export async function GET(request: Request) {
     whereConditions.push(eq(accounts.type, typeFilter));
   }
 
-  // Sensitive accounts are hidden from plain sharing members (server-side).
-  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
-  if (hiddenAccountIds.length > 0) {
-    whereConditions.push(notInArray(accounts.id, hiddenAccountIds));
-  }
-
   const result = await getDb()
     .select()
     .from(accounts)
@@ -66,7 +58,7 @@ export async function GET(request: Request) {
   let syncStatuses: Record<string, any> = {};
   try {
     const { getAccountsSyncStatus } = await import('@/lib/services/sync-health');
-    syncStatuses = await getAccountsSyncStatus(userId, dataUserId, dek, decrypted);
+    syncStatuses = await getAccountsSyncStatus(userId, dek, decrypted);
   } catch (err: any) {
     logger.error('Failed to compute sync health statuses', { error: err.message });
   }

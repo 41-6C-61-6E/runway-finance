@@ -58,11 +58,11 @@ export async function GET() {
     );
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
 
   try {
-    const result = await listUserEquityGrants(dataUserId, dek);
+    const result = await listUserEquityGrants(userId, dek);
     return NextResponse.json(result);
   } catch (error) {
     logger.error(`${LOG_TAG} Error listing equity grants`, {
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
 
   let body: unknown;
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const created = await createEquityGrant(dataUserId, parsed.data, dek);
+    const created = await createEquityGrant(userId, parsed.data, dek);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     logger.error(`${LOG_TAG} Error creating equity grant`, {

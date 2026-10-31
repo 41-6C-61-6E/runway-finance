@@ -8,7 +8,6 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { ENCRYPTED_FIELDS, decryptRows } from '@/lib/crypto';
 import { handleApiError } from '@/lib/api/response';
-import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 type PgTable = any;
 
@@ -374,9 +373,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-  const isMember = dataUserId !== userId;
-  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
 
@@ -415,10 +411,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'invalid_table', message: `Unknown table: ${tableKey}` }, { status: 400 });
   }
 
-  if (isMember && config.group === 'System') {
-    return NextResponse.json({ error: 'forbidden', message: 'Sharing members cannot access system and connection configuration' }, { status: 403 });
-  }
-
   const { table } = config;
 
   try {
@@ -426,18 +418,10 @@ export async function GET(request: Request) {
     const tableCols = getTableColumns(table);
 
     const userIdCol = tableCols['userId'] || (table as any).userId;
-    const baseConditions = userIdCol ? [eq(userIdCol, dataUserId)] : [];
+    const baseConditions = userIdCol ? [eq(userIdCol, userId)] : [];
     const encryptedFields = ENCRYPTED_FIELDS[tableKey];
 
     const pushdownConditions = [...baseConditions];
-
-    // Sensitive accounts are hidden from plain sharing members (server-side).
-    if (hiddenAccountIds.length > 0) {
-      const sensitiveFilterCol = tableCols['accountId'] || (table as any).accountId || tableCols['id'];
-      if (sensitiveFilterCol) {
-        pushdownConditions.push(notInArray(sensitiveFilterCol, hiddenAccountIds));
-      }
-    }
 
     const inMemoryFilters: typeof parsedFilters = [];
 
@@ -705,12 +689,6 @@ export async function DELETE(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-  const isMember = dataUserId !== userId;
-
-  if (isMember) {
-    return NextResponse.json({ error: 'forbidden', message: 'Sharing members cannot delete household records' }, { status: 403 });
-  }
 
   const { searchParams } = new URL(request.url);
   const tableKey = searchParams.get('table');
@@ -747,7 +725,7 @@ export async function DELETE(request: Request) {
     const db = getDb();
     const conditions = [eq(idCol, id)];
     if (userIdCol) {
-      conditions.push(eq(userIdCol, dataUserId));
+      conditions.push(eq(userIdCol, userId));
     }
 
     // Perform delete query

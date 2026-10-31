@@ -61,7 +61,7 @@ function sseErrorResponse(code: string, message: string, status = 200): Response
   });
 }
 
-export const POST = withAuthAndDek(async (req, { userId, dataUserId, dek }) => {
+export const POST = withAuthAndDek(async (req, { userId, dek }) => {
   const startTime = Date.now();
 
   let body: unknown;
@@ -93,7 +93,7 @@ export const POST = withAuthAndDek(async (req, { userId, dataUserId, dek }) => {
     }
   }
 
-  const ctx = await buildFinanceContext({ userId, dataUserId, dek });
+  const ctx = await buildFinanceContext({ userId, dek });
 
   // Gate 1: aiEnabled & aiAdviceEnabled
   const adviceEnabled = ctx.settings.aiAdviceEnabled ?? (ctx.settings as any).aiAskEnabled;
@@ -101,12 +101,7 @@ export const POST = withAuthAndDek(async (req, { userId, dataUserId, dek }) => {
     return sseErrorResponse('not_available', 'Advice is disabled in settings');
   }
 
-  // Gate 2: role !== 'member' (v1)
-  if (ctx.role === 'member') {
-    return sseErrorResponse('not_available', 'Advice is not available for household members in v1');
-  }
-
-  // Gate 3: provider resolves
+  // Gate 2: provider resolves
   const provider = await resolveAiProvider(userId, dek);
   if (!provider) {
     return sseErrorResponse('not_configured', 'No AI provider configured');

@@ -21,7 +21,6 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const db = getDb();
 
@@ -79,7 +78,6 @@ export async function POST(request: Request) {
 
     logger.info(`[import/execute] Received import request`, {
       userId,
-      dataUserId,
       importType,
       csvTextLength: csvText ? csvText.length : 0,
       accountMappingCount: Object.keys(accountMapping || {}).length,
@@ -92,17 +90,17 @@ export async function POST(request: Request) {
     const warnings: string[] = [];
 
     // Step 1: Pre-generate IDs for new accounts and populate accountIdByRef
-    // Validate that mapped accounts and categories belong to dataUserId
+    // Validate that mapped accounts and categories belong to userId
     const existingAccounts = await db
       .select({ id: accounts.id })
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
     const validAccountIds = new Set(existingAccounts.map((a) => a.id));
 
     const existingCategories = await db
       .select({ id: categories.id })
       .from(categories)
-      .where(eq(categories.userId, dataUserId));
+      .where(eq(categories.userId, userId));
     const validCategoryIds = new Set(existingCategories.map((c) => c.id));
 
     // Treat empty/unmapped account selections as excluded
@@ -116,7 +114,7 @@ export async function POST(request: Request) {
         } else if (validAccountIds.has(accountId as string)) {
           accountIdByRef.set(csvRef, accountId as string);
         } else {
-          logger.warn(`[import/execute] Account ID ${accountId} does not belong to user ${dataUserId} - skipping`);
+          logger.warn(`[import/execute] Account ID ${accountId} does not belong to user ${userId} - skipping`);
           excludedAccountCount++;
           accountIdByRef.set(csvRef, EXCLUDED);
         }
@@ -140,7 +138,7 @@ export async function POST(request: Request) {
             // Valid existing category ID belonging to user — map it directly
             categoryIdByName.set(csvName, categoryId);
           } else {
-            logger.warn(`[import/execute] Category ID ${categoryId} does not belong to user ${dataUserId} - marking uncategorized`, { csvName });
+            logger.warn(`[import/execute] Category ID ${categoryId} does not belong to user ${userId} - marking uncategorized`, { csvName });
             unmappedCategories.push(csvName);
           }
         } else if (categoryId === 'new') {
@@ -260,7 +258,7 @@ export async function POST(request: Request) {
               return {
                 type: 'transaction',
                 data: {
-                  userId: dataUserId,
+                  userId,
                   accountId: resolvedAccountId,
                   externalId,
                   date: dateVal,
@@ -296,7 +294,7 @@ export async function POST(request: Request) {
               return {
                 type: 'snapshot',
                 data: {
-                  userId: dataUserId,
+                  userId,
                   accountId: resolvedAccountId,
                   snapshotDate,
                   balance: encryptedBalance,
@@ -345,7 +343,7 @@ export async function POST(request: Request) {
           .from(transactions)
           .where(
             and(
-              eq(transactions.userId, dataUserId),
+              eq(transactions.userId, userId),
               inArray(transactions.externalId, batch)
             )
           );
@@ -386,7 +384,7 @@ export async function POST(request: Request) {
       // Step 1: Create import log entry FIRST so FK constraints on import_id are satisfied
       await tx.insert(importLog).values({
         id: importId,
-        userId: dataUserId,
+        userId,
         fileName: body.fileName || 'unknown.csv',
         importType: importType as ImportType,
         status: recordsErrored > 0 && recordsImported > 0 ? 'partial' : recordsErrored > 0 ? 'failed' : 'completed',
@@ -414,7 +412,7 @@ export async function POST(request: Request) {
 
           await tx.insert(accounts).values({
             id: newAccountId,
-            userId: dataUserId,
+            userId,
             externalId: 'imported-' + randomUUID(),
             name: encryptedName,
             balance: encryptedBalance,
@@ -434,7 +432,7 @@ export async function POST(request: Request) {
 
           await tx.insert(categories).values({
             id: newCategoryId,
-            userId: dataUserId,
+            userId,
             name: await encryptField(data.name, dek),
             color: data.color || '#6366f1',
             isIncome: data.isIncome ?? false,
@@ -509,7 +507,7 @@ export async function POST(request: Request) {
             .from(transactions)
             .where(
               and(
-                eq(transactions.userId, dataUserId),
+                eq(transactions.userId, userId),
                 eq(transactions.isImported, false),
                 inArray(transactions.accountId, batch),
                 dupDateFilter
@@ -561,7 +559,7 @@ export async function POST(request: Request) {
           const fromDateStr = earliestTx || todayStr;
           await generateHistoricalAccountSnapshots(
             acctId,
-            dataUserId,
+            userId,
             fromDateStr,
             todayStr,
             dek
@@ -574,7 +572,7 @@ export async function POST(request: Request) {
             .where(
               and(
                 eq(accountSnapshots.accountId, acctId),
-                eq(accountSnapshots.userId, dataUserId)
+                eq(accountSnapshots.userId, userId)
               )
             )
             .orderBy(desc(accountSnapshots.snapshotDate))
@@ -591,7 +589,7 @@ export async function POST(request: Request) {
               .where(
                 and(
                   eq(accounts.id, acctId),
-                  eq(accounts.userId, dataUserId)
+                  eq(accounts.userId, userId)
                 )
               );
           }
@@ -599,10 +597,10 @@ export async function POST(request: Request) {
       }
 
       // Historically recalculate the daily net worth snapshots table
-      await recalculateNetWorthSnapshots(dataUserId, dek);
+      await recalculateNetWorthSnapshots(userId, dek);
 
       // Schedule coalesced summary rebuilds (cash flow, category spending, category income)
-      triggerUserSummariesRebuild(dataUserId, dek);
+      triggerUserSummariesRebuild(userId, dek);
       logger.info(`[import/execute] Snapshots regenerated; summaries rebuild scheduled.`);
     } catch (postImportError) {
       const msg = postImportError instanceof Error ? postImportError.message : String(postImportError);
@@ -611,7 +609,7 @@ export async function POST(request: Request) {
     }
 
     if (transactionsToInsert.length > 0) {
-      invalidateUserSearchCache(dataUserId);
+      invalidateUserSearchCache(userId);
     }
 
     return NextResponse.json({

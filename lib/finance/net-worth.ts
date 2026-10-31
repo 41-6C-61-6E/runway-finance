@@ -63,7 +63,7 @@ export async function getNetWorthSeries(
     .from(netWorthSnapshots)
     .where(
       and(
-        eq(netWorthSnapshots.userId, ctx.dataUserId),
+        eq(netWorthSnapshots.userId, ctx.userId),
         gte(netWorthSnapshots.snapshotDate, startStr),
         lte(netWorthSnapshots.snapshotDate, todayStr)
       )

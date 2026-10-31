@@ -133,17 +133,14 @@ describe('Advice Snapshot', () => {
   it('caches the snapshot result per user for 5 minutes', async () => {
     const dummyCtx = {
       userId: 'user-abc',
-      dataUserId: 'data-user-xyz',
       dek: new Uint8Array(32),
-      role: 'primary',
-      hiddenAccountIds: new Set(),
       settings: {} as any,
       now: new Date('2026-10-15T12:00:00Z'),
       getAccounts: vi.fn().mockResolvedValue([]),
     } as unknown as FinanceContext;
 
     // Pre-populate cache
-    const cacheKey = `user:${dummyCtx.dataUserId}:advice:snapshot:${dummyCtx.userId}`;
+    const cacheKey = `user:${dummyCtx.userId}:advice:snapshot`;
     const cachedContent = '## Cached Snapshot Content';
     clearServerCache();
 

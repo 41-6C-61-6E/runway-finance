@@ -16,16 +16,12 @@ vi.mock('@/lib/db', () => ({
 describe('Top Merchants Data Pack', () => {
   const dummyCtx: FinanceContext = {
     userId: 'u-1',
-    dataUserId: 'u-1',
     dek: new Uint8Array(32),
-    role: 'primary',
-    hiddenAccountIds: new Set(['hidden-acc-1']),
     settings: {} as any,
     now: new Date('2026-10-15T12:00:00Z'),
     getAccounts: vi.fn().mockResolvedValue([
       { id: 'acc-1', type: 'checking', balance: 5000 },
       { id: 'acc-2', type: 'credit', balance: -1200 },
-      { id: 'hidden-acc-1', type: 'checking', balance: 1000 },
     ]),
   };
 
@@ -70,14 +66,6 @@ describe('Top Merchants Data Pack', () => {
         amount: 'enc-amt-3',
         payee: 'COSTCO WHSE #1234',
         description: 'COSTCO WHSE',
-        categoryId: 'cat-1',
-      },
-      {
-        id: 'tx-hidden',
-        accountId: 'hidden-acc-1',
-        amount: 'enc-amt-hidden',
-        payee: 'Secret Store',
-        description: 'Secret',
         categoryId: 'cat-1',
       },
       {
@@ -131,14 +119,6 @@ describe('Top Merchants Data Pack', () => {
             categoryId: 'cat-1',
           },
           {
-            id: 'tx-hidden',
-            accountId: 'hidden-acc-1',
-            amount: '-500.00',
-            payee: 'Secret Store',
-            description: 'Secret',
-            categoryId: 'cat-1',
-          },
-          {
             id: 'tx-transfer',
             accountId: 'acc-1',
             amount: '-1000.00',
@@ -163,8 +143,7 @@ describe('Top Merchants Data Pack', () => {
     expect(result.text).toContain('Costco Whse');
     expect(result.text).toContain('$120');
 
-    // Hidden account and transfer should be excluded
-    expect(result.text).not.toContain('Secret Store');
+    // Transfer should be excluded
     expect(result.text).not.toContain('Credit Card Payoff');
 
     // Total should be $320 across 3 transactions

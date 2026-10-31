@@ -21,12 +21,6 @@ vi.mock('@/lib/crypto', () => ({
   decryptRows: vi.fn(async (_table, rows) => rows),
 }));
 
-vi.mock('@/lib/sharing', () => ({
-  getShareGroup: vi.fn(async () => null),
-  getShareGroupUserIds: vi.fn(async (userId: string) => [userId]),
-  resolveDataUserId: vi.fn(async (userId: string) => userId),
-}));
-
 function getTableName(table: any): string | null {
   if (!table) return null;
   const symbols = Object.getOwnPropertySymbols(table);
@@ -218,7 +212,7 @@ describe('Sync Problem Alerting Suite', () => {
         },
       ];
 
-      const statuses = await getAccountsSyncStatus(userId, userId, dummyDek, accounts);
+      const statuses = await getAccountsSyncStatus(userId, dummyDek, accounts);
       expect(statuses['acc_1']).toBeDefined();
       expect(statuses['acc_1'].status).toBe('warning');
       expect(statuses['acc_1'].reason).toBe('Temporary 500 error');
@@ -252,7 +246,7 @@ describe('Sync Problem Alerting Suite', () => {
         },
       ];
 
-      const statuses = await getAccountsSyncStatus(userId, userId, dummyDek, accounts);
+      const statuses = await getAccountsSyncStatus(userId, dummyDek, accounts);
       expect(statuses['acc_1']).toBeDefined();
       expect(statuses['acc_1'].status).toBe('error');
       expect(statuses['acc_1'].reason).toBe('Invalid credentials');
@@ -285,7 +279,7 @@ describe('Sync Problem Alerting Suite', () => {
         },
       ];
 
-      const statuses = await getAccountsSyncStatus(userId, userId, dummyDek, accounts);
+      const statuses = await getAccountsSyncStatus(userId, dummyDek, accounts);
       expect(statuses['acc_crypto_recent'].status).toBe('warning');
       expect(statuses['acc_crypto_stale'].status).toBe('error');
     });

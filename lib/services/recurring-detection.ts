@@ -4,7 +4,6 @@ import { eq, and, sql, desc, gte, inArray } from 'drizzle-orm';
 import { decryptRows, encryptRow } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { getUserTransactionsFromCache } from '@/lib/services/search-cache';
-import { getShareGroupUserIds } from '@/lib/sharing';
 
 import {
   type FrequencyType,
@@ -235,16 +234,10 @@ export async function detectRecurringTransactions(
     .from(categories)
     .where(eq(categories.userId, userId));
 
-    // Personalization rule: exclusion settings are stored per session user, so a
-    // shared group can have multiple configured rows (primary + members). Merge
-    // the group's rows and treat the union as the effective exclusions — member
-    // exclusions are no longer silently ignored. getShareGroupUserIds returns
-    // [userId, ...activeMembers]; [userId] for a user with no share group.
-    const groupIds = await getShareGroupUserIds(userId);
   const settingsRows = await db
     .select()
     .from(userSettings)
-    .where(inArray(userSettings.userId, groupIds));
+    .where(eq(userSettings.userId, userId));
 
   const customExcl = mergeRecurringExclusions(settingsRows as Array<{ recurringExclusions?: unknown }>);
 

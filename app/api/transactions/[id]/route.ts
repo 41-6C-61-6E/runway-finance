@@ -10,7 +10,6 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, encryptRow, decryptRows } from '@/lib/crypto';
 import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries, triggerUserSummariesRebuild } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
-import { isAccountHiddenFromUser } from '@/lib/data-visibility';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -22,7 +21,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -41,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .from(transactions)
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(and(eq(transactions.id, id), eq(transactions.userId, dataUserId), eq(transactions.deleted, false)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, userId), eq(transactions.deleted, false)))
     .limit(1);
 
   if (result.length === 0) {
@@ -53,14 +51,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const row = result[0];
-
-  // Transactions on sensitive accounts are invisible to plain sharing members.
-  if (await isAccountHiddenFromUser(userId, dataUserId, row.transaction?.accountId ?? null)) {
-    return NextResponse.json(
-      { error: 'not_found', message: 'Transaction not found' },
-      { status: 404 }
-    );
-  }
 
   // Decrypt transaction fields
   const decryptedTx = await decryptRow('transactions', row.transaction, dek);
@@ -110,7 +100,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -141,18 +130,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const [existing] = await getDb()
     .select()
     .from(transactions)
-    .where(and(eq(transactions.id, id), eq(transactions.userId, dataUserId)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
     .limit(1);
 
   if (!existing) {
     logger.warn('Transaction not found for PATCH', { transactionId: id });
-    return NextResponse.json(
-      { error: 'not_found', message: 'Transaction not found' },
-      { status: 404 }
-    );
-  }
-
-  if (await isAccountHiddenFromUser(userId, dataUserId, existing.accountId)) {
     return NextResponse.json(
       { error: 'not_found', message: 'Transaction not found' },
       { status: 404 }
@@ -282,11 +264,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   });
 
-  invalidateUserSearchCache(dataUserId);
+  invalidateUserSearchCache(userId);
 
   // Rebuild summaries since categories/transactions changed (coalesced background task)
   if (dek) {
-    void triggerUserSummariesRebuild(dataUserId, dek);
+    void triggerUserSummariesRebuild(userId, dek);
   }
 
   return NextResponse.json(updated);
@@ -302,7 +284,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -311,18 +292,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const [existing] = await getDb()
     .select()
     .from(transactions)
-    .where(and(eq(transactions.id, id), eq(transactions.userId, dataUserId), eq(transactions.deleted, false)))
+    .where(and(eq(transactions.id, id), eq(transactions.userId, userId), eq(transactions.deleted, false)))
     .limit(1);
 
   if (!existing) {
     logger.warn('Transaction not found for DELETE', { transactionId: id });
-    return NextResponse.json(
-      { error: 'not_found', message: 'Transaction not found' },
-      { status: 404 }
-    );
-  }
-
-  if (await isAccountHiddenFromUser(userId, dataUserId, existing.accountId)) {
     return NextResponse.json(
       { error: 'not_found', message: 'Transaction not found' },
       { status: 404 }
@@ -358,11 +332,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     updated = res;
   });
 
-  invalidateUserSearchCache(dataUserId);
+  invalidateUserSearchCache(userId);
 
   // Rebuild summaries since categories/transactions changed (coalesced background task)
   if (dek) {
-    void triggerUserSummariesRebuild(dataUserId, dek);
+    void triggerUserSummariesRebuild(userId, dek);
   }
 
   return NextResponse.json(updated);

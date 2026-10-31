@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { requireMinRole } from '@/lib/utils/require-auth';
-import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { getDb } from '@/lib/db';
 import { accounts, accountTags, tags } from '@/lib/db/schema';
-import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { deleteManualAccount, readApiConfig } from '@/lib/services/manual-accounts';
 import { generateAssetHistorySnapshots } from '@/lib/services/asset-estimator';
 import { logger } from '@/lib/logger';
@@ -26,14 +24,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
   const [account] = await getDb()
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
     .limit(1);
 
   if (!account) {
@@ -76,13 +73,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const [account] = await getDb()
     .select()
     .from(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.userId, dataUserId)))
+    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
     .limit(1);
 
   if (!account) {
@@ -169,7 +165,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const decrypted = await decryptRow('accounts', updated, dek);
     const meta = typeof decrypted.metadata === 'string' ? JSON.parse(decrypted.metadata) : (decrypted.metadata || {});
     const syncFrequency = (meta.syncFrequency as string) || 'manual';
-    await manualAccountScheduler.schedule(id, dataUserId, syncFrequency, decrypted.balanceDate);
+    await manualAccountScheduler.schedule(id, userId, syncFrequency, decrypted.balanceDate);
 
     // Regenerate synthetic history snapshots if the account type is supported
     const SNAPSHOT_TYPES = ['realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'vehicle', 'metals', 'mortgage'];
@@ -180,7 +176,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const oldMeta = typeof oldDecrypted.metadata === 'string' ? JSON.parse(oldDecrypted.metadata) : (oldDecrypted.metadata || {});
         await generateAssetHistorySnapshots(
           id,
-          dataUserId,
+          userId,
           decrypted.type,
           meta,
           apiConfig,
@@ -201,11 +197,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   ) {
     const today = new Date().toISOString().split('T')[0];
     Promise.all([
-      createAccountSnapshots(dataUserId, dek, today),
-      createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true }),
-      updateMonthlyCashFlowSummaries(dataUserId, dek),
-      updateCategorySpendingSummaries(dataUserId, dek),
-      updateCategoryIncomeSummaries(dataUserId, dek),
+      createAccountSnapshots(userId, dek, today),
+      createNetWorthSnapshot(userId, dek, today, { skipNotifications: true }),
+      updateMonthlyCashFlowSummaries(userId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
     ]).catch((err) => {
       logger.error('Error in background sync/recalc after manual account PATCH', {
         accountId: id,
@@ -227,7 +223,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -238,14 +233,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
-  const forbidden = await requireMinRole('admin', userId);
-  if (forbidden) {
-    return forbidden;
-  }
-
-  await deleteManualAccount(id, dataUserId, false, dek);
+  await deleteManualAccount(id, userId, false, dek);
   manualAccountScheduler.cancel(id);
-  await logShareAudit(dataUserId, userId, SHARE_AUDIT_ACTIONS.ACCOUNT_DELETED, 'accounts', id);
 
   logger.info('DELETE /api/manual-accounts/[id]', { userId, id });
   return NextResponse.json({ success: true });

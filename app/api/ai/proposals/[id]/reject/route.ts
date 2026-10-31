@@ -15,7 +15,6 @@ export async function POST(
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const db = getDb();
@@ -23,7 +22,7 @@ export async function POST(
   const [proposal] = await db
     .select()
     .from(aiProposals)
-    .where(and(eq(aiProposals.id, id), eq(aiProposals.userId, dataUserId)))
+    .where(and(eq(aiProposals.id, id), eq(aiProposals.userId, userId)))
     .limit(1);
 
   if (!proposal) {

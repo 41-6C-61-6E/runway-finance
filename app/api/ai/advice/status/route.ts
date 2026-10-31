@@ -11,7 +11,6 @@ export async function GET() {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK().catch(() => null);
 
   if (!dek) {
@@ -21,17 +20,7 @@ export async function GET() {
     );
   }
 
-  const ctx = await buildFinanceContext({ userId, dataUserId, dek });
-
-  // TODO(ask-members): Shared-household members are disabled in v1 because rollup tables aggregate sensitive accounts
-  if (ctx.role === 'member') {
-    return NextResponse.json({
-      available: false,
-      reason: 'member',
-      readOnly: true,
-      includeAccountNames: false,
-    });
-  }
+  const ctx = await buildFinanceContext({ userId, dek });
 
   const adviceEnabled = ctx.settings.aiAdviceEnabled ?? (ctx.settings as any).aiAskEnabled;
   if (ctx.settings.aiEnabled === false || adviceEnabled === false) {

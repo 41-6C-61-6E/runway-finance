@@ -6,7 +6,7 @@ import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
 export async function populatePlanWithUserFinances(
   planId: string,
-  dataUserId: string,
+  userId: string,
   dek: Uint8Array,
   sourcePlanId?: string,
   accountInclusions?: Record<string, boolean>
@@ -47,7 +47,7 @@ export async function populatePlanWithUserFinances(
           ...decAcc,
           isIncluded: incVal,
           planId,
-          userId: dataUserId,
+          userId: userId,
         }, dek);
         delete encAcc.id;
         const insertedAcc = await db.insert(planAccounts).values(encAcc).returning();
@@ -61,7 +61,7 @@ export async function populatePlanWithUserFinances(
         const encEv = await encryptRow('plan_events', {
           ...decEv,
           planId,
-          userId: dataUserId,
+          userId: userId,
         }, dek);
         delete encEv.id;
         await db.insert(planEvents).values(encEv);
@@ -72,7 +72,7 @@ export async function populatePlanWithUserFinances(
         const encFl = await encryptRow('plan_flows', {
           ...decFl,
           planId,
-          userId: dataUserId,
+          userId: userId,
           targetAccountId: decFl.targetAccountId ? (accountIdMap[decFl.targetAccountId] || decFl.targetAccountId) : undefined,
           matchAccountId: decFl.matchAccountId ? (accountIdMap[decFl.matchAccountId] || decFl.matchAccountId) : undefined,
         }, dek);
@@ -85,7 +85,7 @@ export async function populatePlanWithUserFinances(
         const encSt = await encryptRow('plan_settings', {
           ...decSt,
           planId,
-          userId: dataUserId,
+          userId: userId,
         }, dek);
         delete (encSt as any).id;
         await db.insert(planSettings).values(encSt);
@@ -96,11 +96,11 @@ export async function populatePlanWithUserFinances(
   }
 
   // 1. Fetch & decrypt user accounts
-  const rawUserAccs = await db.select().from(accounts).where(eq(accounts.userId, dataUserId));
+  const rawUserAccs = await db.select().from(accounts).where(eq(accounts.userId, userId));
   const userAccs = await Promise.all(rawUserAccs.map((a) => decryptRow('accounts', a, dek)));
 
   // 2. Fetch & decrypt recent paystubs for salary estimate
-  const rawPaystubs = await db.select().from(paystubs).where(eq(paystubs.userId, dataUserId)).limit(5);
+  const rawPaystubs = await db.select().from(paystubs).where(eq(paystubs.userId, userId)).limit(5);
   const userPaystubs = await Promise.all(rawPaystubs.map((p) => decryptRow('paystubs', p, dek)));
 
   let estimatedSalary = 85000; // default benchmark
@@ -185,7 +185,7 @@ export async function populatePlanWithUserFinances(
 
     const encryptedAcc = await encryptRow('plan_accounts', {
       planId,
-      userId: dataUserId,
+      userId: userId,
       name: acc.name || 'Account',
       owner: 'primary',
       type,
@@ -220,7 +220,7 @@ export async function populatePlanWithUserFinances(
     for (const dAcc of defaultAccs) {
       const encryptedAcc = await encryptRow('plan_accounts', {
         planId,
-        userId: dataUserId,
+        userId: userId,
         name: dAcc.name,
         owner: 'primary',
         type: dAcc.type,
@@ -286,7 +286,7 @@ export async function populatePlanWithUserFinances(
   for (const ev of autoEvents) {
     const encryptedEv = await encryptRow('plan_events', {
       planId,
-      userId: dataUserId,
+      userId: userId,
       name: ev.name,
       category: ev.category,
       type: ev.type,
@@ -339,7 +339,7 @@ export async function populatePlanWithUserFinances(
   for (const fl of autoFlows) {
     const encryptedFl = await encryptRow('plan_flows', {
       planId,
-      userId: dataUserId,
+      userId: userId,
       name: fl.name,
       type: fl.type,
       rank: fl.rank,
@@ -359,7 +359,7 @@ export async function populatePlanWithUserFinances(
   // 6. Create default plan_settings
   const encryptedSettings = await encryptRow('plan_settings', {
     planId,
-    userId: dataUserId,
+    userId: userId,
     ratesMode: 'fixed',
     fixedInflationRate: '3.0',
     fixedBenefitCola: '0.0',
@@ -387,7 +387,7 @@ export async function populatePlanWithUserFinances(
   const encryptedPlanSalary = await encryptRow('plans', {
     primarySalary: String(Math.round(estimatedSalary)),
     primarySalaryYear: new Date().getFullYear(),
-    userId: dataUserId,
+    userId: userId,
   }, dek);
   delete encryptedPlanSalary.userId;
   await db.update(plans).set(encryptedPlanSalary).where(eq(plans.id, planId));

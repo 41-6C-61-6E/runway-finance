@@ -27,8 +27,8 @@ export const budgetsPack: AskPack<BudgetsParams> = {
     const targetMonth = params.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     const [budgetList, allCats, actualSpending] = await Promise.all([
-      db.select().from(budgets).where(eq(budgets.userId, ctx.dataUserId)),
-      db.select().from(categories).where(eq(categories.userId, ctx.dataUserId)),
+      db.select().from(budgets).where(eq(budgets.userId, ctx.userId)),
+      db.select().from(categories).where(eq(categories.userId, ctx.userId)),
       getCategorySpending(ctx, { startMonth: targetMonth, endMonth: targetMonth, groupBy: 'total' }),
     ]);
 

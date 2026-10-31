@@ -17,8 +17,6 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   let body: unknown;
   try {
     body = await request.json();
@@ -39,7 +37,7 @@ export async function POST(request: Request) {
   const result = await getDb()
     .update(categoryRules)
     .set({ isActive: active, updatedAt: new Date() })
-    .where(and(eq(categoryRules.userId, dataUserId), eq(categoryRules.isSystem, true)));
+    .where(and(eq(categoryRules.userId, userId), eq(categoryRules.isSystem, true)));
 
   logger.info('POST /api/category-rules/toggle-system', { userId, active, updated: result.rowCount ?? 0 });
   return NextResponse.json({ success: true, active, updated: result.rowCount ?? 0 });

@@ -3,10 +3,9 @@ import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow } from '@/lib/crypto';
-import { eq, and, gte, lte, notInArray } from 'drizzle-orm';
+import { eq, and, gte, lte } from 'drizzle-orm';
 import { accounts, netWorthSnapshots, accountSnapshots, holdingSnapshots } from '@/lib/db/schema';
 import { toCsv } from '@/lib/utils/export-formatter';
-import { getHiddenAccountIdsForUser } from '@/lib/data-visibility';
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -21,19 +20,11 @@ export async function GET(req: NextRequest) {
   const accountId = searchParams.get('accountId');
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? userId;
   const db = getDb();
   const dek = await getSessionDEK();
 
-  // M-1: sensitive accounts hidden from plain members stay out of exports.
-  const hiddenAccountIds = await getHiddenAccountIdsForUser(userId, dataUserId);
-
   try {
-    const accountConditions = [eq(accounts.userId, dataUserId)];
-    if (hiddenAccountIds.length > 0) {
-      accountConditions.push(notInArray(accounts.id, hiddenAccountIds));
-    }
-    const accountsRaw = await db.select().from(accounts).where(and(...accountConditions));
+    const accountsRaw = await db.select().from(accounts).where(eq(accounts.userId, userId));
     const decryptedAccounts = await Promise.all(
       accountsRaw.map((r) => decryptRow('accounts', r as Record<string, unknown>, dek))
     );
@@ -45,10 +36,7 @@ export async function GET(req: NextRequest) {
     const dateStr = new Date().toISOString().split('T')[0];
 
     if (snapshotType === 'account') {
-      const conditions = [eq(accountSnapshots.userId, dataUserId)];
-      if (hiddenAccountIds.length > 0) {
-        conditions.push(notInArray(accountSnapshots.accountId, hiddenAccountIds));
-      }
+      const conditions = [eq(accountSnapshots.userId, userId)];
       if (startDate) conditions.push(gte(accountSnapshots.snapshotDate, startDate));
       if (endDate) conditions.push(lte(accountSnapshots.snapshotDate, endDate));
       if (accountId && accountId !== 'all') conditions.push(eq(accountSnapshots.accountId, accountId));
@@ -68,10 +56,7 @@ export async function GET(req: NextRequest) {
         Source: s.source || 'auto',
       }));
     } else if (snapshotType === 'holding') {
-      const conditions = [eq(holdingSnapshots.userId, dataUserId)];
-      if (hiddenAccountIds.length > 0) {
-        conditions.push(notInArray(holdingSnapshots.accountId, hiddenAccountIds));
-      }
+      const conditions = [eq(holdingSnapshots.userId, userId)];
       if (startDate) conditions.push(gte(holdingSnapshots.snapshotDate, startDate));
       if (endDate) conditions.push(lte(holdingSnapshots.snapshotDate, endDate));
 
@@ -92,7 +77,7 @@ export async function GET(req: NextRequest) {
       }));
     } else {
       // Net Worth snapshots
-      const conditions = [eq(netWorthSnapshots.userId, dataUserId)];
+      const conditions = [eq(netWorthSnapshots.userId, userId)];
       if (startDate) conditions.push(gte(netWorthSnapshots.snapshotDate, startDate));
       if (endDate) conditions.push(lte(netWorthSnapshots.snapshotDate, endDate));
 

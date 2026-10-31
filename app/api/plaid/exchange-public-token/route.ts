@@ -19,7 +19,6 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const dek = await getSessionDEK();
 
     let body: { publicToken?: string; institutionName?: string; institutionId?: string };
@@ -34,7 +33,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'validation_error', message: 'publicToken is required' }, { status: 400 });
     }
 
-    const client = await getPlaidClient(dataUserId, dek);
+    const client = await getPlaidClient(userId, dek);
 
     // Exchange public token for access token
     const exchangeResponse = await client.itemPublicTokenExchange({

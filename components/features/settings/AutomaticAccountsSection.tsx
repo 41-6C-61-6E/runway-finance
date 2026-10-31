@@ -81,7 +81,6 @@ interface AutomaticAccountsSectionProps {
    *  tab); 'management' = account management table (Settings > Accounts > Automatic Accounts tab). */
   accountView?: 'transactions' | 'management';
   currentUserId?: string;
-  sharingGroup: any;
   fetchAccounts: () => Promise<void>;
   fetchConnections: () => Promise<void>;
   onOpenAccountDrawer: (account: SettingsAccount) => void;
@@ -94,7 +93,6 @@ export default function AutomaticAccountsSection({
   connectionsLoading,
   accountView = 'management',
   currentUserId,
-  sharingGroup,
   fetchAccounts,
   fetchConnections,
   onOpenAccountDrawer,

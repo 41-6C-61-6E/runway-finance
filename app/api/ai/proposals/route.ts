@@ -15,7 +15,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status'); // optional filter
   const type = searchParams.get('type'); // optional filter
@@ -23,14 +22,14 @@ export async function GET(request: Request) {
   // Self-heal: prune duplicate or stale proposals before fetching
   if (!status || status === 'pending') {
     try {
-      await pruneDuplicateProposals(dataUserId);
+      await pruneDuplicateProposals(userId);
     } catch (err) {
       logger.error('Failed to prune duplicate proposals in GET /api/ai/proposals', { error: err });
     }
   }
 
   const whereConditions = [
-    eq(aiProposals.userId, dataUserId),
+    eq(aiProposals.userId, userId),
     or(
       isNull(accounts.id),
       and(
@@ -75,7 +74,7 @@ export async function GET(request: Request) {
     .leftJoin(
       transactions,
       and(
-        eq(transactions.userId, dataUserId),
+        eq(transactions.userId, userId),
         sql`(${transactions.id})::text = (${aiProposals.payload}->>'transactionId')`
       )
     )

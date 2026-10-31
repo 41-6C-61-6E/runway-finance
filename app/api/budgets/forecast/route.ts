@@ -19,7 +19,6 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '6', 10);
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
         showImportedData: userSettings.showImportedData,
       })
       .from(userSettings)
-      .where(eq(userSettings.userId, dataUserId))
+      .where(eq(userSettings.userId, userId))
       .limit(1);
 
     const userSetting = settingsRows[0];
@@ -60,7 +59,7 @@ export async function GET(request: Request) {
       .select()
       .from(accounts)
       .where(and(
-        eq(accounts.userId, dataUserId),
+        eq(accounts.userId, userId),
         eq(accounts.isHidden, false),
         eq(accounts.isExcludedFromNetWorth, false)
       ));
@@ -100,7 +99,7 @@ export async function GET(request: Request) {
       .leftJoin(categories, eq(budgets.categoryId, categories.id))
       .where(
         and(
-          eq(budgets.userId, dataUserId),
+          eq(budgets.userId, userId),
           sql`${budgets.fundingAccountId} IS NOT NULL`,
           eq(budgets.isRecurring, true),
           eq(categories.excludeFromReports, false),
@@ -118,11 +117,11 @@ export async function GET(request: Request) {
     const allCategories = await db
       .select()
       .from(categories)
-      .where(eq(categories.userId, dataUserId));
+      .where(eq(categories.userId, userId));
     const catById = new Map(allCategories.map((cat) => [cat.id.toString(), cat]));
 
     const txConditions = [
-      eq(transactions.userId, dataUserId),
+      eq(transactions.userId, userId),
       sql`${transactions.date} >= CURRENT_DATE - make_interval(months => ${lookbackMonths})`,
       inArray(transactions.accountId, fundingAccountIds),
       eq(transactions.pending, false),
@@ -308,7 +307,7 @@ export async function GET(request: Request) {
     const snapshotStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const snapshotStartStr = snapshotStart.toISOString().split('T')[0];
     const snapshotConditions = [
-      eq(accountSnapshots.userId, dataUserId),
+      eq(accountSnapshots.userId, userId),
       sql`${accountSnapshots.snapshotDate} >= ${snapshotStartStr}`,
       inArray(accountSnapshots.accountId, fundingAccountIds),
     ];

@@ -29,7 +29,7 @@ export async function getCategorySpending(
   const allCategories = await db
     .select()
     .from(categories)
-    .where(eq(categories.userId, ctx.dataUserId));
+    .where(eq(categories.userId, ctx.userId));
   const decCategories = await decryptRows('categories', allCategories, ctx.dek);
   const catMap = new Map(decCategories.map((c) => [c.id, c]));
 
@@ -45,7 +45,7 @@ export async function getCategorySpending(
     .from(categorySpendingSummary)
     .where(
       and(
-        eq(categorySpendingSummary.userId, ctx.dataUserId),
+        eq(categorySpendingSummary.userId, ctx.userId),
         gte(categorySpendingSummary.yearMonth, startMonth),
         lte(categorySpendingSummary.yearMonth, endMonth)
       )
@@ -57,8 +57,6 @@ export async function getCategorySpending(
     const monthCatMap = new Map<string, { categoryId: string; name: string; color?: string | null; amount: number; count: number; yearMonth: string }>();
 
     for (const row of rows) {
-      if (row.accountId && ctx.hiddenAccountIds.has(row.accountId)) continue;
-
       const cat = catMap.get(row.categoryId);
       if (!cat || cat.excludeFromReports) continue;
       if (cat.parentId) {
@@ -108,8 +106,6 @@ export async function getCategorySpending(
   const summaryMap = new Map<string, { categoryId: string; name: string; color?: string | null; amount: number; count: number }>();
 
   for (const row of rows) {
-    if (row.accountId && ctx.hiddenAccountIds.has(row.accountId)) continue;
-
     const cat = catMap.get(row.categoryId);
     if (!cat || cat.excludeFromReports) continue;
     if (cat.parentId) {

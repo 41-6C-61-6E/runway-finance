@@ -276,11 +276,10 @@ async function generatePaystub(
 export async function runAutoGenerate(
   userId: string,
   dek: Uint8Array,
-  dataUserId?: string,
   force?: boolean,
 ): Promise<number> {
   const db = getDb();
-  const effectiveUserId = dataUserId ?? userId;
+  const effectiveUserId = userId;
   const today = new Date().toISOString().split('T')[0];
 
   let generated = 0;

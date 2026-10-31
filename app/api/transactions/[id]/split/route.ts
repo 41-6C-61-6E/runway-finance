@@ -23,7 +23,6 @@ export async function POST(
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { id } = await params;
 
@@ -36,7 +35,7 @@ export async function POST(
     .where(
       and(
         eq(transactions.id, id),
-        eq(transactions.userId, dataUserId),
+        eq(transactions.userId, userId),
         eq(transactions.deleted, false)
       )
     )
@@ -165,7 +164,7 @@ export async function POST(
         const parentMemo = parentTx.memo ? await decryptField(parentTx.memo, dek) : null;
 
         const childValues = {
-          userId: dataUserId,
+          userId,
           accountId: parentTx.accountId,
           externalId: `${parentTx.externalId}_split_${i}`,
           date: parentTx.date,
@@ -209,15 +208,15 @@ export async function POST(
       }
     });
 
-    invalidateUserSearchCache(dataUserId);
+    invalidateUserSearchCache(userId);
 
     // Rebuild summaries asynchronously
     Promise.all([
-      updateCategorySpendingSummaries(dataUserId, dek),
-      updateCategoryIncomeSummaries(dataUserId, dek),
-      updateMonthlyCashFlowSummaries(dataUserId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
+      updateMonthlyCashFlowSummaries(userId, dek),
     ]).catch((err) => {
-      logger.error('Background summaries rebuild failed after split', { userId: dataUserId, error: err });
+      logger.error('Background summaries rebuild failed after split', { userId, error: err });
     });
 
     logger.info('Transaction split successfully', {

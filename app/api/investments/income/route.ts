@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'unauthenticated', message: 'Authentication required' }, { status: 401 });
   }
 
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+  const userId = session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = searchParams.get('timeframe') || '1y';
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
     const userAccounts = await getDb()
       .select()
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
 
     const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
     const investmentAccounts = filterReportableAccounts(decryptedAccounts).filter((acc) =>
@@ -118,7 +118,7 @@ export async function GET(request: Request) {
       .from(transactions)
       .where(
         and(
-          eq(transactions.userId, dataUserId),
+          eq(transactions.userId, userId),
           eq(transactions.deleted, false),
           eq(transactions.ignored, false),
           inArray(transactions.accountId, accountIds),
@@ -142,7 +142,7 @@ export async function GET(request: Request) {
       .from(accountSnapshots)
       .where(
         and(
-          eq(accountSnapshots.userId, dataUserId),
+          eq(accountSnapshots.userId, userId),
           inArray(accountSnapshots.accountId, accountIds),
           lte(accountSnapshots.snapshotDate, endStr)
         )

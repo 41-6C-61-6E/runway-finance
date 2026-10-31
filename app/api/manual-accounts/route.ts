@@ -16,7 +16,7 @@ export async function GET() {
     return apiError('Authentication required', 401);
   }
 
-  const { userId, dataUserId } = authUser;
+  const { userId } = authUser;
   const dek = await getSessionDEK();
 
 
@@ -25,7 +25,7 @@ export async function GET() {
     .from(accounts)
     .where(
       and(
-        eq(accounts.userId, dataUserId),
+        eq(accounts.userId, userId),
         isNull(accounts.connectionId),
         isNull(accounts.plaidConnectionId),
         ne(accounts.type, 'paystub'),
@@ -48,7 +48,7 @@ export async function GET() {
         })
         .from(accountTags)
         .leftJoin(tags, eq(accountTags.tagId, tags.id))
-        .where(and(inArray(accountTags.accountId, accountIds), eq(tags.userId, dataUserId)))
+        .where(and(inArray(accountTags.accountId, accountIds), eq(tags.userId, userId)))
     : [];
 
   const tagsByAccountId = new Map<string, any[]>();
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     return apiError('Authentication required', 401);
   }
 
-  const { userId, dataUserId } = authUser;
+  const { userId } = authUser;
   const dek = await getSessionDEK();
 
 
@@ -102,9 +102,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const apiConfig = await readApiConfig(dataUserId);
+    const apiConfig = await readApiConfig(userId);
     const account = await createManualAccount({
-      userId: dataUserId,
+      userId,
       name: body.name,
       type: body.type,
       metadata: body.metadata,
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       currency: (typeof body.currency === 'string' && body.currency.trim()) || 'USD',
       apiConfig,
     }, dek);
-    logger.info('POST /api/manual-accounts - created', { userId: dataUserId, type: body.type, name: body.name, initialValue: body.initialValue });
+    logger.info('POST /api/manual-accounts - created', { userId, type: body.type, name: body.name, initialValue: body.initialValue });
 
     // Associate tags if specified
     const tagIds = body.tagIds;
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
 
     // Schedule auto-sync if the account has a sync frequency
     const syncFrequency = (body.metadata?.syncFrequency as string) || 'manual';
-    await manualAccountScheduler.schedule(account.id, dataUserId, syncFrequency, account.balanceDate);
+    await manualAccountScheduler.schedule(account.id, userId, syncFrequency, account.balanceDate);
 
     return NextResponse.json({ ...account, tags: attachedTags }, { status: 201 });
   } catch (err) {

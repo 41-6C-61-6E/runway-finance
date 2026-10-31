@@ -15,7 +15,6 @@ vi.mock('@/lib/crypto-context', () => ({
 vi.mock('@/lib/finance/context', () => ({
   buildFinanceContext: vi.fn().mockResolvedValue({
     userId: 'user_1',
-    dataUserId: 'user_1',
     dek: new Uint8Array(32),
   }),
 }));

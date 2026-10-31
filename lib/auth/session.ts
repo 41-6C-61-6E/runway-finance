@@ -2,7 +2,6 @@ import { auth } from "@/lib/auth";
 
 export interface AuthenticatedUser {
   userId: string;
-  dataUserId: string;
   email?: string | null;
 }
 
@@ -12,12 +11,8 @@ export async function getAuthUser(): Promise<AuthenticatedUser | null> {
     return null;
   }
 
-  const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId || userId;
-
   return {
-    userId,
-    dataUserId,
+    userId: session.user.id,
     email: session.user.email,
   };
 }

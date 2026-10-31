@@ -13,14 +13,13 @@ export async function POST() {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const db = getDb();
 
   await db
     .delete(categoryRules)
-    .where(eq(categoryRules.userId, dataUserId));
+    .where(eq(categoryRules.userId, userId));
 
-  await seedUserDefaultRules(dataUserId);
+  await seedUserDefaultRules(userId);
 
   logger.info('POST /api/category-rules/reset', { userId });
   return NextResponse.json({ success: true, message: 'Rules reset to defaults' });

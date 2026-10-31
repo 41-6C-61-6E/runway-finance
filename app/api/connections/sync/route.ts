@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { simplifinConnections, plaidConnections, accounts } from '@/lib/db/schema';
-import { inArray, eq, and, isNull, ne } from 'drizzle-orm';
+import { eq, and, isNull, ne } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
-import { getShareGroup } from '@/lib/sharing';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
@@ -19,12 +18,7 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const { resolveDataUserId } = await import('@/lib/sharing');
-    const dataUserId = await resolveDataUserId(userId);
     const dek = await getSessionDEK();
-
-    const group = await getShareGroup(userId);
-    const userIds = group ? group.allUserIds : [userId];
 
     // Fetch SimpleFIN connections
     const sfConnections = await getDb()
@@ -34,7 +28,7 @@ export async function POST(request: Request) {
         userId: simplifinConnections.userId,
       })
       .from(simplifinConnections)
-      .where(inArray(simplifinConnections.userId, userIds));
+      .where(eq(simplifinConnections.userId, userId));
 
     // Fetch Plaid connections
     const pConnections = await getDb()
@@ -44,7 +38,7 @@ export async function POST(request: Request) {
         userId: plaidConnections.userId,
       })
       .from(plaidConnections)
-      .where(inArray(plaidConnections.userId, userIds));
+      .where(eq(plaidConnections.userId, userId));
 
     // Fetch manual accounts to find those pulling via API
     const manualAccountsRaw = await getDb()
@@ -58,7 +52,7 @@ export async function POST(request: Request) {
       .from(accounts)
       .where(
         and(
-          eq(accounts.userId, dataUserId),
+          eq(accounts.userId, userId),
           isNull(accounts.connectionId),
           isNull(accounts.plaidConnectionId),
           ne(accounts.type, 'paystub')
@@ -99,7 +93,6 @@ export async function POST(request: Request) {
 
     logger.info('Sync all started', {
       userId,
-      dataUserId,
       simplefinCount: sfConnections.length,
       plaidCount: pConnections.length,
       manualCount: syncableManualAccounts.length,
@@ -183,7 +176,7 @@ export async function POST(request: Request) {
 
     const manualPromises = syncableManualAccounts.map(async (acc) => {
       try {
-        const result = await syncManualAccount(acc.id, dataUserId, apiConfig, dek);
+        const result = await syncManualAccount(acc.id, userId, apiConfig, dek);
 
         if (result.status === 'success') {
           const [refreshed] = await getDb()

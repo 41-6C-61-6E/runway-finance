@@ -21,14 +21,6 @@ vi.mock('@/lib/users', () => ({
   addUser: vi.fn().mockResolvedValue({ username: 'testuser' }),
   findUser: vi.fn().mockResolvedValue(undefined),
   createUserEncryptionKeys: vi.fn().mockResolvedValue(undefined),
-  rewrapDekForUser: vi.fn().mockResolvedValue(undefined),
-}));
-
-// Mock sharing operations
-vi.mock('@/lib/sharing', () => ({
-  validateInvitation: vi.fn().mockResolvedValue({ valid: true, invitationId: '1', inviterUserId: 'primary' }),
-  validateJoinToken: vi.fn().mockResolvedValue({ valid: false, error: 'Invalid or expired join link.' }),
-  acceptInvitation: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock other seeds/setup

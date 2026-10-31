@@ -23,7 +23,7 @@ export const goalsPack: AskPack<GoalsParams> = {
     const rawGoals = await db
       .select()
       .from(financialGoals)
-      .where(eq(financialGoals.userId, ctx.dataUserId))
+      .where(eq(financialGoals.userId, ctx.userId))
       .orderBy(asc(financialGoals.sortOrder), asc(financialGoals.id));
 
     const decGoals = await decryptRows('financial_goals', rawGoals, ctx.dek);
@@ -36,7 +36,7 @@ export const goalsPack: AskPack<GoalsParams> = {
     // Attempt to compute projections
     let projectionMap = new Map<string, { projectedDate: string | null; isFunded: boolean }>();
     try {
-      const projResult = await computeGoalProjections(ctx.dataUserId);
+      const projResult = await computeGoalProjections(ctx.userId);
       for (const acc of projResult.accounts) {
         for (const g of acc.goals) {
           projectionMap.set(g.goalId, {

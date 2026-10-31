@@ -16,7 +16,6 @@ export async function POST() {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
 
   const allTxns = await getDb()
@@ -29,14 +28,14 @@ export async function POST() {
       categoryId: transactions.categoryId,
     })
     .from(transactions)
-    .where(and(eq(transactions.userId, dataUserId), eq(transactions.deleted, false), isNull(transactions.parentId), eq(transactions.ignored, false)));
+    .where(and(eq(transactions.userId, userId), eq(transactions.deleted, false), isNull(transactions.parentId), eq(transactions.ignored, false)));
 
   if (allTxns.length === 0) {
     return NextResponse.json({ updated: 0, total: 0 });
   }
 
   const decryptedTxns = await decryptRows('transactions', allTxns, dek);
-  const ruleResults = await applyRulesToTransactions(decryptedTxns, dataUserId, dek);
+  const ruleResults = await applyRulesToTransactions(decryptedTxns, userId, dek);
 
   if (ruleResults.size > 0) {
     for (const [txId, action] of ruleResults) {
@@ -73,7 +72,7 @@ export async function POST() {
 
   logger.info('POST /api/category-rules/apply-all', { userId, updated: ruleResults.size, total: allTxns.length });
   if (ruleResults.size > 0) {
-    invalidateUserSearchCache(dataUserId);
+    invalidateUserSearchCache(userId);
   }
   return NextResponse.json({
     updated: ruleResults.size,

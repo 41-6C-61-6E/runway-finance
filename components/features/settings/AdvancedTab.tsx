@@ -110,10 +110,8 @@ export default function AdvancedTab() {
 
   const { refreshSettings } = useUserSettings() || {};
 
-  // Danger zone & sharing status states
+  // Danger zone states
   const [currentUser, setCurrentUser] = useState<string | null>(null);
-  const [sharingGroup, setSharingGroup] = useState<any>(null);
-  const [loadingSharing, setLoadingSharing] = useState(true);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -134,29 +132,22 @@ export default function AdvancedTab() {
     }
   }, []);
 
-  const loadSharingStatus = useCallback(async () => {
+  const loadSession = useCallback(async () => {
     try {
-      const res = await fetch('/api/sharing', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setSharingGroup(data.group ?? null);
-      }
       const sessRes = await fetch('/api/auth/session', { credentials: 'include' });
       if (sessRes.ok) {
         const sess = await sessRes.json();
         setCurrentUser(sess?.user?.id ?? null);
       }
     } catch (err) {
-      console.error('Failed to load sharing status/session:', err);
-    } finally {
-      setLoadingSharing(false);
+      console.error('Failed to load session:', err);
     }
   }, []);
 
   useEffect(() => {
     loadSettings();
-    loadSharingStatus();
-  }, [loadSettings, loadSharingStatus]);
+    loadSession();
+  }, [loadSettings, loadSession]);
 
   const handleDeleteAccount = useCallback(async () => {
     setDeleting(true);
@@ -438,7 +429,6 @@ export default function AdvancedTab() {
               setConfirmText('');
               setConfirmDeleteOpen(true);
             }}
-            disabled={loadingSharing}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 rounded-lg transition-colors disabled:opacity-50"
           >
             Delete Account
@@ -473,21 +463,9 @@ export default function AdvancedTab() {
 
       {/* Deletion Dialog */}
       {(() => {
-        const isOwner = sharingGroup && sharingGroup.primaryUserId === currentUser;
-        const isMember = sharingGroup && sharingGroup.primaryUserId !== currentUser;
-
-        let warningTitle = 'Delete Your Account?';
-        let warningDescription = 'This will permanently delete your user account, login credentials, and all settings. All financial data (connections, manual accounts, transactions, budgets, category rules) and encryption keys will be deleted forever. This action is irreversible.';
+        const warningTitle = 'Delete Your Account?';
+        const warningDescription = 'This will permanently delete your user account, login credentials, and all settings. All financial data (connections, manual accounts, transactions, budgets, category rules) and encryption keys will be deleted forever. This action is irreversible.';
         const requiredConfirmText = currentUser || '';
-
-        if (isOwner) {
-          warningTitle = 'Delete Account & Dismantle Share Group?';
-          warningDescription = 'This will permanently delete your user account and dismantle your share group. Group members will be immediately disconnected, their access to the shared financial data will be revoked, and their encryption keys will be reset (giving them empty standalone accounts). All shared financial data (connections, manual accounts, transactions, budgets, category rules) will be deleted forever. This action is irreversible.';
-        } else if (isMember) {
-          warningTitle = 'Delete Account & Leave Share Group?';
-          warningDescription = 'This will permanently delete your user account and remove you from the shared group. Your personal settings and sync connections will be deleted. You will lose access to the shared financial data. Note: The financial data owned by the primary user (including transactions and accounts they own) will remain with the primary user. This action is irreversible.';
-        }
-
         const isConfirmDisabled = confirmText !== requiredConfirmText || deleting;
 
         return (

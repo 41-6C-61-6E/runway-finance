@@ -1,7 +1,6 @@
 import { getDb } from '@/lib/db';
 import { simplifinConnections, plaidConnections, accountSnapshots, accounts } from '@/lib/db/schema';
-import { eq, and, gte, inArray } from 'drizzle-orm';
-import { getShareGroup } from '@/lib/sharing';
+import { eq, and, gte } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 
@@ -44,12 +43,11 @@ export function invalidateSyncHealthCache(userId?: string): void {
 
 export async function getAccountsSyncStatus(
   userId: string,
-  dataUserId: string,
   dek: Uint8Array,
   decryptedAccounts: any[]
 ): Promise<Record<string, SyncStatus>> {
   const isTest = process.env.NODE_ENV === 'test' || !!process.env.VITEST;
-  const cacheKey = `${userId}:${dataUserId}:${decryptedAccounts.length}`;
+  const cacheKey = `${userId}:${decryptedAccounts.length}`;
   if (!isTest) {
     const cached = syncHealthCache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
@@ -59,11 +57,8 @@ export async function getAccountsSyncStatus(
 
   try {
     const db = getDb();
-    
-    // 1. Fetch all connection IDs associated with the user/share-group
-    const group = await getShareGroup(userId);
-    const userIds = group ? group.allUserIds : [userId];
 
+    // 1. Fetch all connection IDs associated with the user
     const sfConns = await db
       .select({
         id: simplifinConnections.id,
@@ -75,7 +70,7 @@ export async function getAccountsSyncStatus(
         createdAt: simplifinConnections.createdAt,
       })
       .from(simplifinConnections)
-      .where(inArray(simplifinConnections.userId, userIds));
+      .where(eq(simplifinConnections.userId, userId));
 
     const pConns = await db
       .select({
@@ -88,7 +83,7 @@ export async function getAccountsSyncStatus(
         createdAt: plaidConnections.createdAt,
       })
       .from(plaidConnections)
-      .where(inArray(plaidConnections.userId, userIds));
+      .where(eq(plaidConnections.userId, userId));
 
     // Create maps for quick lookup
     const connectionsMap = new Map<string, typeof sfConns[number]>();
@@ -99,7 +94,7 @@ export async function getAccountsSyncStatus(
       connectionsMap.set(conn.id, conn);
     }
 
-    // 2. Fetch all historical snapshots for this dataUser in the last 7 calendar days
+    // 2. Fetch all historical snapshots for this user in the last 7 calendar days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
@@ -113,7 +108,7 @@ export async function getAccountsSyncStatus(
       .from(accountSnapshots)
       .where(
         and(
-          eq(accountSnapshots.userId, dataUserId),
+          eq(accountSnapshots.userId, userId),
           gte(accountSnapshots.snapshotDate, sevenDaysAgoStr)
         )
       );

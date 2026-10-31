@@ -14,7 +14,6 @@ import { toCashFlowAmount, computeNetWorthTotals, computeCategoryBreakdown } fro
 import { parseProviderBalance, resolveEffectiveBalance } from '@/lib/utils/balance-source';
 
 import { isSimilarDescription } from '@/lib/utils/description-matching';
-import { resolveDataUserId } from '@/lib/sharing';
 
 const LOG_TAG = '[sync]';
 
@@ -669,7 +668,6 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
 }
 
 export async function deleteOldPendingTransactions(userId: string): Promise<void> {
-  const dataUserId = await resolveDataUserId(userId);
   const db = getDb();
 
   // Check if user enabled deletion of old pending transactions
@@ -699,7 +697,7 @@ export async function deleteOldPendingTransactions(userId: string): Promise<void
     .delete(transactions)
     .where(
       and(
-        eq(transactions.userId, dataUserId),
+        eq(transactions.userId, userId),
         eq(transactions.pending, true),
         lt(transactions.date, cutoffDateStr)
       )
@@ -739,7 +737,6 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
   const startedAt = Date.now();
 
   logger.info(`${LOG_TAG} Sync started`, { connectionId, userId });
-  const dataUserId = await resolveDataUserId(userId);
 
   const [settings] = await getDb()
     .select({
@@ -768,7 +765,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
   const [log] = await getDb()
     .insert(syncLogs)
     .values({
-      userId: dataUserId,
+      userId: userId,
       connectionId,
       status: 'running',
       accountsSynced: String(0),
@@ -789,8 +786,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       throw new Error('Connection not found');
     }
 
-    const connectionDataUserId = await resolveDataUserId(connection.userId);
-    if (connectionDataUserId !== dataUserId) {
+    if (connection.userId !== userId) {
       throw new Error('Connection unauthorized');
     }
 
@@ -800,8 +796,8 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     );
 
     // Ensure compound categories exist for this user
-    await ensureCompoundCategories(dataUserId, dek);
-    await ensureEmployerContributions(dataUserId, dek);
+    await ensureCompoundCategories(userId, dek);
+    await ensureEmployerContributions(userId, dek);
 
     const now = new Date();
     const startDate = connection.lastSyncAt
@@ -880,7 +876,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         .from(accounts)
         .where(
           and(
-            eq(accounts.userId, dataUserId),
+            eq(accounts.userId, userId),
             eq(accounts.externalId, sfAccount.id)
           )
         )
@@ -966,7 +962,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         .from(accounts)
         .where(
           and(
-            eq(accounts.userId, dataUserId),
+            eq(accounts.userId, userId),
             eq(accounts.externalId, sfAccount.id),
             isNull(accounts.connectionId)
           )
@@ -993,7 +989,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         [upserted] = await getDb()
           .insert(accounts)
           .values({
-            userId: dataUserId,
+            userId: userId,
             connectionId,
             externalId: sfAccount.id,
             name: await encryptField(sfAccount.name, dek),
@@ -1028,7 +1024,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
       // Trigger custom account balance alerts check
       const { checkAccountBalanceAlerts } = await import('@/lib/services/notifications');
-      checkAccountBalanceAlerts(dataUserId, upserted.id, balanceNum, dek).catch((e) => {
+      checkAccountBalanceAlerts(userId, upserted.id, balanceNum, dek).catch((e) => {
         logger.error('[sync] Failed to check custom account balance alerts:', e);
       });
 
@@ -1073,7 +1069,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
           // Encrypt sensitive fields before storing
           const txData = {
-            userId: dataUserId,
+            userId: userId,
             accountId,
             externalId: sfTx.id,
             date: txDate,
@@ -1101,7 +1097,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             .from(transactions)
             .where(
               and(
-                eq(transactions.userId, dataUserId),
+                eq(transactions.userId, userId),
                 eq(transactions.accountId, accountId),
                 eq(transactions.externalId, sfTx.id)
               )
@@ -1130,7 +1126,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
             // Custom transaction alerts check
             const { checkTransactionAlerts } = await import('@/lib/services/notifications');
-            checkTransactionAlerts(dataUserId, {
+            checkTransactionAlerts(userId, {
               externalId: sfTx.id,
               accountId,
               description: sfTx.description,
@@ -1215,7 +1211,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       const uncategorized = syncedWithPlaintext.filter((t) => !t.categoryId);
       let ruleCategorizedTxIds = new Set<string>();
       if (syncedWithPlaintext.length > 0) {
-        const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, dataUserId, dek);
+        const ruleResults = await applyRulesToTransactions(syncedWithPlaintext, userId, dek);
         ruleCategorizedTxIds = new Set(
           Array.from(ruleResults.entries())
             .filter(([, action]) => action.shouldUpdateCategory && action.categoryId)
@@ -1329,17 +1325,17 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       .where(eq(syncLogs.id, log.id));
 
     const today = new Date().toISOString().split('T')[0];
-    await createNetWorthSnapshot(dataUserId, dek, today);
+    await createNetWorthSnapshot(userId, dek, today);
     logger.debug(`${LOG_TAG} Net worth snapshot created`, { userId, date: today, durationMs: ms(startedAt) });
 
-    await createAccountSnapshots(dataUserId, dek, today);
+    await createAccountSnapshots(userId, dek, today);
     logger.debug(`${LOG_TAG} Account snapshots created`, { userId, date: today, durationMs: ms(startedAt) });
 
     // Refresh goal allocations and milestone alerts in the background (non-fatal)
     import('@/lib/services/goal-allocation').then(({ updateGoalAllocations }) => {
       // Pass the DEK explicitly: this runs in the background and for cron
       // syncs there is no request scope, so getSessionDEK() (auth()) would throw.
-      return updateGoalAllocations(dataUserId, dek);
+      return updateGoalAllocations(userId, dek);
     }).catch((err) => {
       logger.error(`${LOG_TAG} Failed to update goal allocations (non-fatal):`, err);
     });
@@ -1358,7 +1354,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
       if (earliestTx < toDateStr) {
         const result = await generateHistoricalAccountSnapshots(
           accountId,
-          dataUserId,
+          userId,
           earliestTx,
           toDateStr,
           dek,
@@ -1377,7 +1373,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
     if (hasNewAccounts) {
       const { recalculateNetWorthSnapshots } = await import('@/lib/services/account-history');
-      await recalculateNetWorthSnapshots(dataUserId, dek);
+      await recalculateNetWorthSnapshots(userId, dek);
       logger.info(`${LOG_TAG} Recalculated net worth snapshots historically for new accounts`, { userId });
     }
 
@@ -1387,45 +1383,45 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
     });
 
     // Rebuild summary tables (coalesced); wait for the fresh data before running alerts
-    const summariesReady = triggerUserSummariesRebuild(dataUserId, dek);
+    const summariesReady = triggerUserSummariesRebuild(userId, dek);
 
     // Trigger custom cash flow alerts check
     const { checkCashFlowAlerts, checkRecurringPriceChangesAndNotify, checkUpcomingBillsAndNotify, checkMonthlySummaryAndNotify, healSyncAlerts } = await import('@/lib/services/notifications');
     await summariesReady;
-    checkCashFlowAlerts(dataUserId, dek).catch((e) => {
+    checkCashFlowAlerts(userId, dek).catch((e) => {
       logger.error('[sync] Failed to check cash flow alerts:', e);
     });
 
     // R1: re-arm sync-failure alerts now that this connection synced OK, and
     // mark the resolved sync_error inbox rows read.
-    healSyncAlerts(dataUserId, connectionId).catch((e) => {
+    healSyncAlerts(userId, connectionId).catch((e) => {
       logger.debug('[sync] Failed to heal sync alerts (non-fatal):', e);
     });
 
     // R12a: month-boundary cash flow summary (fires at most once per month).
-    checkMonthlySummaryAndNotify(dataUserId, dek).catch((e) => {
+    checkMonthlySummaryAndNotify(userId, dek).catch((e) => {
       logger.error('[sync] Failed to check monthly summary:', e);
     });
 
     // Run recurring transaction detection, price alerts & bill reminders (non-fatal)
     if (transactionsNew + transactionsUpdated > 0) {
-      if (activeDetectionUsers.has(dataUserId)) {
-        logger.info(`${LOG_TAG} Skipping recurring detection (concurrent sync already running)`, { userId: dataUserId });
+      if (activeDetectionUsers.has(userId)) {
+        logger.info(`${LOG_TAG} Skipping recurring detection (concurrent sync already running)`, { userId: userId });
       } else {
         try {
           const { detectRecurringTransactions } = await import('@/lib/services/recurring-detection');
-          activeDetectionUsers.add(dataUserId);
-          detectRecurringTransactions(dataUserId, dek)
-            .then(() => checkRecurringPriceChangesAndNotify(dataUserId, dek))
-            .then(() => checkUpcomingBillsAndNotify(dataUserId, dek))
+          activeDetectionUsers.add(userId);
+          detectRecurringTransactions(userId, dek)
+            .then(() => checkRecurringPriceChangesAndNotify(userId, dek))
+            .then(() => checkUpcomingBillsAndNotify(userId, dek))
             .catch((err) => {
               logger.warn(`${LOG_TAG} Recurring detection failed (non-fatal):`, err);
             })
             .finally(() => {
-              activeDetectionUsers.delete(dataUserId);
+              activeDetectionUsers.delete(userId);
             });
         } catch (err) {
-          activeDetectionUsers.delete(dataUserId);
+          activeDetectionUsers.delete(userId);
           logger.warn(`${LOG_TAG} Failed to load recurring detection:`, err);
         }
       }
@@ -1435,7 +1431,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
 
     const totalDurationMs = Date.now() - startedAt;
     if (transactionsNew > 0 || transactionsUpdated > 0) {
-      invalidateUserSearchCache(dataUserId);
+      invalidateUserSearchCache(userId);
     }
 
     logger.info(`${LOG_TAG} Sync completed successfully`, {

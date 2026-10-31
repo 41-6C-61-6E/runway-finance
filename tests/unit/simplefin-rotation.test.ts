@@ -6,10 +6,6 @@ vi.mock('@/lib/auth', () => ({
   }),
 }));
 
-vi.mock('@/lib/sharing', () => ({
-  resolveDataUserId: vi.fn().mockImplementation((id: string) => Promise.resolve(id)),
-}));
-
 vi.mock('@/lib/services/sync-scheduler', () => ({
   syncScheduler: {
     schedule: vi.fn().mockResolvedValue(undefined),

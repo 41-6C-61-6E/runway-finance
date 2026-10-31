@@ -23,7 +23,6 @@ type Account = {
   institution: string | null;
   isHidden: boolean;
   isExcludedFromNetWorth: boolean;
-  sensitive?: boolean;
   balanceDate: string | null;
   metadata?: Record<string, any> | string | null;
   connectionId?: string | null;
@@ -120,8 +119,6 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
   const [majorType, setMajorType] = useState('banking');
   const [isHidden, setIsHidden] = useState(account?.isHidden ?? false);
   const [isExcludedFromNetWorth, setIsExcludedFromNetWorth] = useState(account?.isExcludedFromNetWorth ?? false);
-  const [sensitive, setSensitive] = useState(account?.sensitive ?? false);
-  const [canEditSensitive, setCanEditSensitive] = useState<boolean | null>(null);
   const [splitRoth, setSplitRoth] = useState(false);
   const [rothPercentage, setRothPercentage] = useState<number>(0);
   const [saving, setSaving] = useState(false);
@@ -241,27 +238,6 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     }
   }, [open, allTags.length]);
 
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [sharingRes, sessionRes] = await Promise.all([
-          fetch('/api/sharing', { credentials: 'include' }),
-          fetch('/api/auth/session', { credentials: 'include' }),
-        ]);
-        if (cancelled) return;
-        const group = sharingRes.ok ? (await sharingRes.json()).group ?? null : null;
-        const currentUser = sessionRes.ok ? (await sessionRes.json())?.user?.id ?? null : null;
-        // Role is not exposed to the client; only the primary is reliably identifiable.
-        setCanEditSensitive(!group || (currentUser !== null && group.primaryUserId === currentUser));
-      } catch {
-        if (!cancelled) setCanEditSensitive(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [open]);
-
   const handleDeleteAccount = useCallback(async () => {
     if (!account) return;
     if (
@@ -298,7 +274,6 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     setMajorType(findMajorType(account.type));
     setIsHidden(account.isHidden);
     setIsExcludedFromNetWorth(account.isExcludedFromNetWorth);
-    setSensitive(account.sensitive ?? false);
     setTagIds(account.tags?.map((t) => t.id) ?? []);
 
     let mObj: Record<string, any> = {};
@@ -354,7 +329,6 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
         isExcludedFromNetWorth,
         tagIds,
       };
-      if (canEditSensitive) payload.sensitive = sensitive;
 
       let currentMetadata: Record<string, any> = {};
       const rawMeta = account.metadata as any;
@@ -433,7 +407,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     } finally {
       setSaving(false);
     }
-  }, [account, name, type, isHidden, isExcludedFromNetWorth, sensitive, canEditSensitive, tagIds, mortgageMeta, ignoreSettlementTransactions, muteSyncWarnings, onSuccess, queryClient, splitRoth, rothPercentage]);
+  }, [account, name, type, isHidden, isExcludedFromNetWorth, tagIds, mortgageMeta, ignoreSettlementTransactions, muteSyncWarnings, onSuccess, queryClient, splitRoth, rothPercentage]);
 
   if (!account || !open) return null;
 
@@ -847,21 +821,6 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                   Completely removes the account from dashboards, filters, and lists. Its transactions and data are hidden globally.
                 </p>
               </div>
-
-              {canEditSensitive && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-foreground/80">Hide from members</span>
-                    <Switch
-                      checked={sensitive}
-                      onCheckedChange={setSensitive}
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-normal">
-                    Keeps this account and its transactions hidden from shared-access members. You still see it in all lists and calculations.
-                  </p>
-                </div>
-              )}
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">

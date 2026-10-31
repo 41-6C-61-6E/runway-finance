@@ -216,12 +216,12 @@ export async function getDailyCashFlow(
   const isPaystubEnabled = ctx.settings?.paystubEnabled ?? false;
 
   // Reportable accounts query
-  const userAccounts = await db
+  const reportableAccounts = await db
     .select()
     .from(accounts)
     .where(
       and(
-        eq(accounts.userId, ctx.dataUserId),
+        eq(accounts.userId, ctx.userId),
         or(
           and(eq(accounts.isHidden, false), eq(accounts.isExcludedFromNetWorth, false)),
           eq(accounts.type, 'paystub')
@@ -229,7 +229,6 @@ export async function getDailyCashFlow(
       )
     );
 
-  const reportableAccounts = userAccounts.filter((a) => !ctx.hiddenAccountIds.has(a.id));
   if (reportableAccounts.length === 0) {
     return { startDate, endDate, days: [] };
   }
@@ -239,7 +238,7 @@ export async function getDailyCashFlow(
   // Search matching IDs filter
   let searchMatchingIds: Set<string> | null = null;
   if (search && search.trim()) {
-    searchMatchingIds = await getSearchMatchingTransactionIds(ctx.dataUserId, ctx.dek, search.trim());
+    searchMatchingIds = await getSearchMatchingTransactionIds(ctx.userId, ctx.dek, search.trim());
     if (searchMatchingIds.size === 0) {
       return { startDate, endDate, days: [] };
     }
@@ -249,7 +248,7 @@ export async function getDailyCashFlow(
   const allCategories = await db
     .select()
     .from(categories)
-    .where(eq(categories.userId, ctx.dataUserId));
+    .where(eq(categories.userId, ctx.userId));
 
   const decCategories = await decryptRows('categories', allCategories, ctx.dek);
   const catById = new Map<string, DecryptedCategoryInfo>();

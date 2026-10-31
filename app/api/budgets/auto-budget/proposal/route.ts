@@ -11,8 +11,8 @@ import { ensureCategoryDiscretionaryColumn } from '@/lib/db/seed-categories';
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
-    if (!session?.user || !dataUserId) {
+    const userId = session?.user?.id;
+    if (!session?.user || !userId) {
       return NextResponse.json({ error: 'unauthorized', message: 'User is not authenticated' }, { status: 401 });
     }
 
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     const userSettingsList = await db
       .select()
       .from(userSettings)
-      .where(eq(userSettings.userId, dataUserId))
+      .where(eq(userSettings.userId, userId))
       .limit(1);
 
     const userSetting = userSettingsList[0];
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         isExcludedFromNetWorth: accounts.isExcludedFromNetWorth,
       })
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
 
     const BANKING_AND_CREDIT_TYPES = new Set([
       'checking',
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
         totalTxCount: count(transactions.id),
       })
       .from(transactions)
-      .where(and(eq(transactions.userId, dataUserId), eq(transactions.deleted, false)));
+      .where(and(eq(transactions.userId, userId), eq(transactions.deleted, false)));
 
     const oldestRaw: any = oldestTxRow?.oldestDate;
     const oldestTransactionDate = oldestRaw
@@ -174,7 +174,7 @@ export async function POST(request: Request) {
         isDiscretionary: categories.isDiscretionary,
       })
       .from(categories)
-      .where(eq(categories.userId, dataUserId));
+      .where(eq(categories.userId, userId));
 
     const decryptedCategories = await Promise.all(
       userCategories.map(async (c) => ({
@@ -215,7 +215,7 @@ export async function POST(request: Request) {
         yearMonth: budgets.yearMonth,
       })
       .from(budgets)
-      .where(eq(budgets.userId, dataUserId));
+      .where(eq(budgets.userId, userId));
 
     const decryptedExistingBudgets = await Promise.all(
       existingBudgets.map(async (b) => {
@@ -236,7 +236,7 @@ export async function POST(request: Request) {
 
     // 5. Fetch transactions within lookback period
     const txConditions = [
-      eq(transactions.userId, dataUserId),
+      eq(transactions.userId, userId),
       gte(transactions.date, requestedStartIso),
       lt(transactions.date, endIso),
       eq(transactions.deleted, false),

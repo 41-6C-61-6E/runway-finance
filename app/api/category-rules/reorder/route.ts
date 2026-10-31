@@ -20,8 +20,6 @@ export async function POST(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   let body: unknown;
   try {
     body = await request.json();
@@ -41,7 +39,7 @@ export async function POST(request: Request) {
     await getDb()
       .update(categoryRules)
       .set({ priority })
-      .where(and(eq(categoryRules.id, id), eq(categoryRules.userId, dataUserId)));
+      .where(and(eq(categoryRules.id, id), eq(categoryRules.userId, userId)));
   }
 
   logger.info('POST /api/category-rules/reorder', { userId, ruleCount: parsed.data.rules.length });

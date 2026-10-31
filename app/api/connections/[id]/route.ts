@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { requireDeleteConfirmation, requireMinRole } from '@/lib/utils/require-auth';
+import { requireDeleteConfirmation } from '@/lib/utils/require-auth';
 import { getDb } from '@/lib/db';
 import { simplifinConnections, plaidConnections, accounts, syncLogs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
-import { logShareAudit, SHARE_AUDIT_ACTIONS } from '@/lib/share-audit';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
 import { isBalanceSource } from '@/lib/utils/balance-source';
 
@@ -44,11 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     );
   }
 
-  const { resolveDataUserId } = await import('@/lib/sharing');
-  const requestingDataUserId = await resolveDataUserId(userId);
-  const connectionDataUserId = await resolveDataUserId(connection.userId);
-
-  if (connectionDataUserId !== requestingDataUserId) {
+  if (connection.userId !== userId) {
     return NextResponse.json(
       { error: 'forbidden', message: 'You do not own this connection' },
       { status: 403 }
@@ -204,8 +199,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const { createAccountSnapshots, createNetWorthSnapshot } = await import('@/lib/services/sync');
       const dek = await getSessionDEK();
       const today = new Date().toISOString().split('T')[0];
-      await createAccountSnapshots(connectionDataUserId, dek, today);
-      await createNetWorthSnapshot(connectionDataUserId, dek, today, { skipNotifications: true });
+      await createAccountSnapshots(userId, dek, today);
+      await createNetWorthSnapshot(userId, dek, today, { skipNotifications: true });
 
       logger.info('Connection balance source applied', { connectionId: id, balanceSource: updateData.balanceSource, updatedCount });
     } catch (err) {
@@ -267,22 +262,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 
-  const { resolveDataUserId } = await import('@/lib/sharing');
-  const requestingDataUserId = await resolveDataUserId(userId);
-  const connectionDataUserId = await resolveDataUserId(connection.userId);
-
-  if (connectionDataUserId !== requestingDataUserId) {
+  if (connection.userId !== userId) {
     return NextResponse.json(
       { error: 'forbidden', message: 'You do not own this connection' },
       { status: 403 }
     );
-  }
-
-  // Deleting a connection affects the whole share group, so plain members
-  // are not allowed.
-  const forbidden = await requireMinRole('admin', userId);
-  if (forbidden) {
-    return forbidden;
   }
 
   if (isSimplefin) {
@@ -306,7 +290,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   syncScheduler.cancel(id);
-  await logShareAudit(requestingDataUserId, userId, SHARE_AUDIT_ACTIONS.CONNECTION_DELETED, isSimplefin ? 'simplefin_connections' : 'plaid_connections', id);
   logger.info('Connection deleted', { connectionId: id, keepData, isSimplefin });
   return new NextResponse(null, { status: 204 });
 }

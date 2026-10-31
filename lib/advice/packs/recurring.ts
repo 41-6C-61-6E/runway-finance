@@ -20,10 +20,10 @@ export const recurringPack: AskPack<RecurringParams> = {
   maxTokens: 400,
   async build(ctx: FinanceContext) {
     const [summary, upcoming, rawItems, dbCats] = await Promise.all([
-      getRecurringSummary(ctx.dataUserId, ctx.dek).catch(() => null),
-      getUpcomingBills(ctx.dataUserId, ctx.dek, 30).catch(() => null),
-      getRecurringTransactions(ctx.dataUserId, ctx.dek, { status: 'active', flowType: 'expense' }).catch(() => []),
-      getDb().select().from(categories).where(eq(categories.userId, ctx.dataUserId)),
+      getRecurringSummary(ctx.userId, ctx.dek).catch(() => null),
+      getUpcomingBills(ctx.userId, ctx.dek, 30).catch(() => null),
+      getRecurringTransactions(ctx.userId, ctx.dek, { status: 'active', flowType: 'expense' }).catch(() => []),
+      getDb().select().from(categories).where(eq(categories.userId, ctx.userId)),
     ]);
 
     const decCats = await decryptRows('categories', dbCats, ctx.dek);

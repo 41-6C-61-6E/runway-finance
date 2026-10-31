@@ -17,7 +17,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { searchParams } = new URL(request.url);
 
   const parsed = DailyCashFlowQuerySchema.safeParse({
@@ -41,7 +40,7 @@ export async function GET(request: Request) {
 
   // Cache key includes viewer userId because hidden account visibility varies per viewer
   const cacheKey = !search
-    ? `user:${dataUserId}:daily-cash-flow:${userId}:${startDate}:${endDate}`
+    ? `user:${userId}:daily-cash-flow:${startDate}:${endDate}`
     : null;
 
   if (cacheKey) {
@@ -53,7 +52,7 @@ export async function GET(request: Request) {
 
   try {
     const dek = await getSessionDEK();
-    const ctx = await buildFinanceContext({ userId, dataUserId, dek });
+    const ctx = await buildFinanceContext({ userId, dek });
     const result = await getDailyCashFlow(ctx, { startDate, endDate, search });
 
     if (cacheKey) {

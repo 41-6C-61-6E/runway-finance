@@ -21,7 +21,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const timeframe = (searchParams.get('timeframe') as TimeFrame) || '1y';
@@ -40,7 +39,7 @@ export async function GET(request: Request) {
     earliestSnap = await getDb()
       .select({ snapshotDate: accountSnapshots.snapshotDate })
       .from(accountSnapshots)
-      .where(eq(accountSnapshots.userId, dataUserId))
+      .where(eq(accountSnapshots.userId, userId))
       .orderBy(accountSnapshots.snapshotDate)
       .limit(1);
     if (earliestSnap.length > 0 && earliestSnap[0].snapshotDate) {
@@ -61,7 +60,7 @@ export async function GET(request: Request) {
     const userAccounts = await getDb()
       .select()
       .from(accounts)
-      .where(eq(accounts.userId, dataUserId));
+      .where(eq(accounts.userId, userId));
 
     // Decrypt account balances and other encrypted fields
     const decryptedAccounts = await decryptRows('accounts', userAccounts, dek);
@@ -169,7 +168,7 @@ export async function GET(request: Request) {
 
     // 2. Fetch baseline snapshots before the range using DISTINCT ON to only load the latest snapshot per account
     const snapshotsConditionsBefore = [
-      eq(accountSnapshots.userId, dataUserId),
+      eq(accountSnapshots.userId, userId),
       inArray(accountSnapshots.accountId, accountIds),
       lt(accountSnapshots.snapshotDate, startStr),
     ];
@@ -188,7 +187,7 @@ export async function GET(request: Request) {
 
     // 3. Fetch snapshots in range scoped strictly to reportable accounts
     const snapshotsConditionsInRange = [
-      eq(accountSnapshots.userId, dataUserId),
+      eq(accountSnapshots.userId, userId),
       inArray(accountSnapshots.accountId, accountIds),
       gte(accountSnapshots.snapshotDate, startStr),
       lte(accountSnapshots.snapshotDate, endStr),

@@ -59,10 +59,7 @@ describe('loadEnginePlan', () => {
   const dek = new Uint8Array([1, 2, 3]);
   const mockCtx: FinanceContext = {
     userId: 'user-1',
-    dataUserId: 'user-1',
     dek,
-    role: 'primary',
-    hiddenAccountIds: new Set(),
     settings: {} as any,
     now: new Date('2026-06-01T00:00:00Z'),
     getAccounts: async () => [],

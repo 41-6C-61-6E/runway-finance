@@ -11,8 +11,8 @@ import { formatToCents } from '@/lib/services/account-history';
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
-    if (!session?.user || !dataUserId) {
+    const userId = session?.user?.id;
+    if (!session?.user || !userId) {
       return NextResponse.json({ error: 'unauthorized', message: 'User is not authenticated' }, { status: 401 });
     }
 
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     const userCategories = await db
       .select()
       .from(categories)
-      .where(eq(categories.userId, dataUserId));
+      .where(eq(categories.userId, userId));
 
     const decryptedCategories = await Promise.all(
       userCategories.map(async (c) => ({
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
           const encryptedCat = await encryptRow(
             'categories',
             {
-              userId: dataUserId,
+              userId,
               name: 'Everything Else',
               color: '#64748b',
               isIncome: false,
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
         .from(budgets)
         .where(
           and(
-            eq(budgets.userId, dataUserId),
+            eq(budgets.userId, userId),
             eq(budgets.categoryId, catId),
             eq(budgets.periodType, targetPeriodType),
             periodCondition
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
           .delete(budgets)
           .where(
             and(
-              eq(budgets.userId, dataUserId),
+              eq(budgets.userId, userId),
               eq(budgets.categoryId, catId),
               ne(budgets.periodType, targetPeriodType)
             )
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
       const encryptedData = await encryptRow(
         'budgets',
         {
-          userId: dataUserId,
+          userId,
           categoryId: catId,
           periodType: targetPeriodType,
           yearMonth: isRecurring ? null : targetPeriodKey,
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
         await db
           .update(categories)
           .set({ isDiscretionary: item.isDiscretionary })
-          .where(and(eq(categories.id, catId), eq(categories.userId, dataUserId)));
+          .where(and(eq(categories.id, catId), eq(categories.userId, userId)));
       }
 
       appliedCount++;

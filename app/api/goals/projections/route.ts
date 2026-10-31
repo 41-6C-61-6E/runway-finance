@@ -9,15 +9,13 @@ export async function GET(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
-
   const { searchParams } = new URL(req.url);
   const monthlyInflowParam = searchParams.get('monthlyInflow');
   const accountInflowsParam = searchParams.get('accountInflows');
   const lookbackMonthsParam = searchParams.get('lookbackMonths');
   const projectionMonthsParam = searchParams.get('projectionMonths');
 
-  const cacheKey = `user:${userId}:goals-projections:${dataUserId}:${monthlyInflowParam || ''}:${accountInflowsParam || ''}:${lookbackMonthsParam || ''}:${projectionMonthsParam || ''}`;
+  const cacheKey = `user:${userId}:goals-projections:${monthlyInflowParam || ''}:${accountInflowsParam || ''}:${lookbackMonthsParam || ''}:${projectionMonthsParam || ''}`;
   const cached = getCached<any>(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
@@ -63,7 +61,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const projections = await computeGoalProjections(dataUserId, overrides);
+    const projections = await computeGoalProjections(userId, overrides);
     setCached(cacheKey, projections, 2 * 60 * 1000);
     return NextResponse.json(projections);
   } catch (err) {

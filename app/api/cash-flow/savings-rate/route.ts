@@ -12,7 +12,6 @@ export async function GET(request: Request) {
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '12', 10);
@@ -26,7 +25,7 @@ export async function GET(request: Request) {
   const adjustIncomeDenominator = searchParams.get('adjustIncomeDenominator') === 'true';
 
   try {
-    const ctx = await buildFinanceContext({ userId, dataUserId, dek });
+    const ctx = await buildFinanceContext({ userId, dek });
     const result = await getSavingsRate(ctx, {
       months,
       excludedAccounts,

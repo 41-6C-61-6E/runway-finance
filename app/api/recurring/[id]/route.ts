@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { resolveDataUserId } from '@/lib/sharing';
 import { logger } from '@/lib/logger';
 import { RecurringPatchSchema } from '@/lib/validations/recurring';
 import {
@@ -23,10 +22,10 @@ export async function GET(
 
   try {
     const { id } = await params;
-    const dataUserId = await resolveDataUserId(session.user.id);
+    const userId = session.user.id;
     const dek = await getSessionDEK();
 
-    const detail = await getRecurringTransactionById(id, dataUserId, dek);
+    const detail = await getRecurringTransactionById(id, userId, dek);
     if (!detail) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -52,13 +51,13 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const dataUserId = await resolveDataUserId(session.user.id);
+    const userId = session.user.id;
     const dek = await getSessionDEK();
 
     const json = await req.json();
     const parsed = RecurringPatchSchema.parse(json);
 
-    const updated = await updateRecurringTransaction(id, dataUserId, dek, parsed);
+    const updated = await updateRecurringTransaction(id, userId, dek, parsed);
     if (!updated) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -84,12 +83,12 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    const dataUserId = await resolveDataUserId(session.user.id);
+    const userId = session.user.id;
 
-    await deleteRecurringTransaction(id, dataUserId);
+    await deleteRecurringTransaction(id, userId);
 
     logger.info(`${LOG_TAG} Deleted recurring transaction`, {
-      userId: dataUserId,
+      userId,
       id,
     });
 

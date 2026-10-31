@@ -5,7 +5,6 @@ import { decryptField } from '@/lib/crypto';
 import { calculateWealthFlow } from '@/lib/services/wealth-flow';
 import { formatCurrency } from '@/lib/utils/format';
 import { logger } from '@/lib/logger';
-import { getShareGroupUserIds, resolveDataUserId } from '@/lib/sharing';
 import webpush from 'web-push';
 
 // Initialize web-push if VAPID keys are available in process.env
@@ -991,14 +990,12 @@ export async function checkTransactionAlerts(
 
     if (!acct || acct.isHidden || acct.isExcludedFromNetWorth) return;
 
-    // Query alert rules for all share group members (not just the data owner)
-    const groupUserIds = await getShareGroupUserIds(userId);
     const rules = await db
       .select()
       .from(customAlertRules)
       .where(
         and(
-          inArray(customAlertRules.userId, groupUserIds),
+          eq(customAlertRules.userId, userId),
           eq(customAlertRules.isEnabled, true),
           eq(customAlertRules.triggerType, 'transaction')
         )
@@ -1079,14 +1076,12 @@ export async function checkAccountBalanceAlerts(
 ) {
   try {
     const db = getDb();
-    // Query alert rules for all share group members (not just the data owner)
-    const groupUserIds = await getShareGroupUserIds(userId);
     const rules = await db
       .select()
       .from(customAlertRules)
       .where(
         and(
-          inArray(customAlertRules.userId, groupUserIds),
+          eq(customAlertRules.userId, userId),
           eq(customAlertRules.isEnabled, true),
           eq(customAlertRules.triggerType, 'account_balance')
         )
@@ -1264,14 +1259,12 @@ export async function checkSavingsGoalAlerts(
 ) {
   try {
     const db = getDb();
-    // Query alert rules for all share group members (not just the data owner)
-    const groupUserIds = await getShareGroupUserIds(userId);
     const rules = await db
       .select()
       .from(customAlertRules)
       .where(
         and(
-          inArray(customAlertRules.userId, groupUserIds),
+          eq(customAlertRules.userId, userId),
           eq(customAlertRules.isEnabled, true),
           eq(customAlertRules.triggerType, 'savings_goal')
         )
@@ -1372,14 +1365,12 @@ export async function checkSavingsGoalAlerts(
 export async function checkCashFlowAlerts(userId: string, dek: Uint8Array) {
   try {
     const db = getDb();
-    // Query alert rules for all share group members (not just the data owner)
-    const groupUserIds = await getShareGroupUserIds(userId);
     const rules = await db
       .select()
       .from(customAlertRules)
       .where(
         and(
-          inArray(customAlertRules.userId, groupUserIds),
+          eq(customAlertRules.userId, userId),
           eq(customAlertRules.isEnabled, true),
           eq(customAlertRules.triggerType, 'cash_flow')
         )
@@ -1831,23 +1822,21 @@ export async function checkStaleConnectionsAndNotify(userId: string, dek: Uint8A
     const { decryptRows } = await import('@/lib/crypto');
     const { getConnectionDisplayName } = await import('@/lib/services/scheduler-logger');
 
-    const dataUserId = await resolveDataUserId(userId);
     const userAccounts = await db
       .select()
       .from(accounts)
       .where(
         and(
-          eq(accounts.userId, dataUserId),
+          eq(accounts.userId, userId),
           eq(accounts.isHidden, false),
           eq(accounts.isExcludedFromNetWorth, false)
         )
       );
 
     const decrypted = await decryptRows('accounts', userAccounts, dek);
-    const statuses = await getAccountsSyncStatus(userId, dataUserId, dek, decrypted);
+    const statuses = await getAccountsSyncStatus(userId, dek, decrypted);
 
     // Fetch user connections to check timestamps and labels
-    const groupUserIds = await getShareGroupUserIds(userId);
     const sfConns = await db
       .select({
         id: simplifinConnections.id,
@@ -1858,7 +1847,7 @@ export async function checkStaleConnectionsAndNotify(userId: string, dek: Uint8A
         createdAt: simplifinConnections.createdAt,
       })
       .from(simplifinConnections)
-      .where(inArray(simplifinConnections.userId, groupUserIds));
+      .where(eq(simplifinConnections.userId, userId));
 
     const pConns = await db
       .select({
@@ -1871,7 +1860,7 @@ export async function checkStaleConnectionsAndNotify(userId: string, dek: Uint8A
         createdAt: plaidConnections.createdAt,
       })
       .from(plaidConnections)
-      .where(inArray(plaidConnections.userId, groupUserIds));
+      .where(eq(plaidConnections.userId, userId));
 
     const connsMap = new Map<
       string,

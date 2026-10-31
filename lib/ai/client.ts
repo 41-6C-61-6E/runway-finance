@@ -1,7 +1,6 @@
 import { getDb } from '@/lib/db';
 import { aiProviders } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { resolveDataUserId } from '@/lib/sharing';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { fetchSecure } from '@/lib/utils/ssrf';
@@ -56,12 +55,11 @@ export class AiClientError extends Error {
 }
 
 /**
- * Own provider → household provider → null.
+ * Resolves the active AI provider for a user.
  * Runs seedUserAiProviders first to enforce deployment-wide env providers.
  */
 export async function resolveAiProvider(userId: string, dek: Uint8Array): Promise<ResolvedProvider | null> {
   const db = getDb();
-  const dataUserId = await resolveDataUserId(userId);
 
   // Enforce deployment-wide provider (env vars win over saved settings)
   try {
@@ -80,16 +78,7 @@ export async function resolveAiProvider(userId: string, dek: Uint8Array): Promis
     .where(eq(aiProviders.userId, userId))
     .limit(10);
 
-  let activeProvider = pickProvider(ownProviderRows);
-
-  if (!activeProvider && dataUserId !== userId) {
-    const householdProviderRows = await db
-      .select()
-      .from(aiProviders)
-      .where(eq(aiProviders.userId, dataUserId))
-      .limit(10);
-    activeProvider = pickProvider(householdProviderRows);
-  }
+  const activeProvider = pickProvider(ownProviderRows);
 
   if (!activeProvider) {
     return null;

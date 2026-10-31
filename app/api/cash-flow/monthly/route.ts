@@ -10,13 +10,12 @@ export async function GET(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const months = parseInt(searchParams.get('months') || '12', 10);
 
   try {
-    const ctx = await buildFinanceContext({ userId, dataUserId, dek });
+    const ctx = await buildFinanceContext({ userId, dek });
     const data = await getMonthlyCashFlow(ctx, months);
 
     logger.info('GET /api/cash-flow/monthly', { months, count: data.length });

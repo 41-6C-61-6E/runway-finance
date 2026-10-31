@@ -12,20 +12,7 @@ const journalPath = path.join(migrationsFolder, 'meta', '_journal.json');
 async function runSelfHealingChecks(client) {
   console.log('[migrate] Running database self-healing checks...');
   try {
-    // 1. Check if primary_user_id column exists on user_encryption_keys
-    const colCheck = await client.query(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'user_encryption_keys' AND column_name = 'primary_user_id'
-    `);
-    if (colCheck.rows.length === 0) {
-      console.log('[migrate] [self-heal] Adding missing primary_user_id column to user_encryption_keys...');
-      await client.query(`
-        ALTER TABLE user_encryption_keys
-        ADD COLUMN IF NOT EXISTS primary_user_id TEXT
-      `);
-    }
-
-    // 2. Check missing columns in user_settings
+    // 1. Check missing columns in user_settings
     const columnsToCheck = [
       { name: 'use_market_data_for_snapshots', type: 'BOOLEAN NOT NULL DEFAULT FALSE' },
       { name: 'budget_alert_threshold', type: 'INTEGER NOT NULL DEFAULT 80' },
@@ -106,16 +93,6 @@ async function runSelfHealingChecks(client) {
       await client.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_discretionary BOOLEAN NOT NULL DEFAULT TRUE`);
     }
 
-    // 3d. Check if sensitive column exists on accounts
-    const accountSensitiveColCheck = await client.query(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'accounts' AND column_name = 'sensitive'
-    `);
-    if (accountSensitiveColCheck.rows.length === 0) {
-      console.log('[migrate] [self-heal] Adding missing sensitive column to accounts...');
-      await client.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS sensitive BOOLEAN NOT NULL DEFAULT FALSE`);
-    }
-
     // 3e. Check if current_balance and available_balance columns exist on accounts
     const accountBalanceColsCheck = await client.query(`
       SELECT column_name FROM information_schema.columns
@@ -162,49 +139,6 @@ async function runSelfHealingChecks(client) {
         UPDATE accounts
         SET currency = 'USD'
         WHERE currency IS NULL OR TRIM(currency) = ''
-      `);
-    }
-
-    // 4. Check if account_sharing_invitations table exists
-    const tableCheck1 = await client.query(`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_name = 'account_sharing_invitations'
-    `);
-    if (tableCheck1.rows.length === 0) {
-      console.log('[migrate] [self-heal] Creating missing account_sharing_invitations table...');
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS account_sharing_invitations (
-          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          inviter_user_id TEXT NOT NULL,
-          invitee_email   TEXT NOT NULL,
-          pin_hash        TEXT NOT NULL,
-          pin             TEXT,
-          status          TEXT NOT NULL DEFAULT 'pending',
-          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-      `);
-    }
-
-    // 5. Check if account_share_members table exists
-    const tableCheck2 = await client.query(`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_name = 'account_share_members'
-    `);
-    if (tableCheck2.rows.length === 0) {
-      console.log('[migrate] [self-heal] Creating missing account_share_members table...');
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS account_share_members (
-          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          primary_user_id TEXT NOT NULL,
-          member_user_id  TEXT NOT NULL,
-          invitation_id   UUID REFERENCES account_sharing_invitations(id) ON DELETE SET NULL,
-          status          TEXT NOT NULL DEFAULT 'active',
-          joined_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          removed_at      TIMESTAMPTZ,
-          removed_by      TEXT,
-          UNIQUE (primary_user_id, member_user_id)
-        )
       `);
     }
 
@@ -425,11 +359,6 @@ async function runSelfHealingChecks(client) {
         { tag: '0073_loving_sinister_six', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plans' AND column_name = 'primary_salary_year'` },
         { tag: '0074_add_allow_penalty_withdrawals', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'` },
         { tag: '0075_naive_secret_warriors', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'weekly_net_worth_alert_day'` },
-        { tag: '0083_sharing_invitation_attempts', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'account_sharing_invitations' AND column_name = 'attempts'` },
-        { tag: '0084_sharing_dek_versions', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'dek_versions'` },
-        { tag: '0085_sharing_roles_audit', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'share_audit_log'` },
-        { tag: '0086_sharing_join_tokens', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'account_sharing_invitations' AND column_name = 'join_token_hash'` },
-        { tag: '0087_accounts_sensitive', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'accounts' AND column_name = 'sensitive'` },
         { tag: '0088_rate_limits', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'rate_limits'` },
       ];
       for (const { tag, check } of migrationArtifacts) {

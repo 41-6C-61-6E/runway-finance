@@ -1,5 +1,4 @@
 import { getDb } from '@/lib/db';
-import { resolveDataUserId } from '@/lib/sharing';
 import { transactions, categories as categoriesTable, categoryRules, userSettings, aiProposals, accounts, aiProviders } from '@/lib/db/schema';
 import { eq, and, or, isNull, asc, desc, gt, inArray, sql } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
@@ -135,7 +134,6 @@ export function shouldProposeRule(
  */
 export async function pruneDuplicateProposals(userId: string): Promise<number> {
   const db = getDb();
-  const dataUserId = await resolveDataUserId(userId);
 
   try {
     // 1. Delete duplicate pending categorize proposals (keeping newest per transaction)
@@ -149,7 +147,7 @@ export async function pruneDuplicateProposals(userId: string): Promise<number> {
                    ORDER BY created_at DESC, id DESC
                  ) as rn
           FROM ${aiProposals}
-          WHERE user_id = ${dataUserId}
+          WHERE user_id = ${userId}
             AND status = 'pending'
             AND type = 'categorize'
             AND (payload->>'transactionId') IS NOT NULL
@@ -162,7 +160,7 @@ export async function pruneDuplicateProposals(userId: string): Promise<number> {
     const markCategorized = await db.execute(sql`
       UPDATE ${aiProposals}
       SET status = 'applied', updated_at = NOW()
-      WHERE user_id = ${dataUserId}
+      WHERE user_id = ${userId}
         AND status = 'pending'
         AND type = 'categorize'
         AND (payload->>'transactionId') IS NOT NULL
@@ -176,7 +174,7 @@ export async function pruneDuplicateProposals(userId: string): Promise<number> {
     // 2b. Delete orphaned pending categorize proposals where the transaction no longer exists
     const deleteOrphaned = await db.execute(sql`
       DELETE FROM ${aiProposals}
-      WHERE user_id = ${dataUserId}
+      WHERE user_id = ${userId}
         AND status = 'pending'
         AND type = 'categorize'
         AND (payload->>'transactionId') IS NOT NULL
@@ -197,7 +195,7 @@ export async function pruneDuplicateProposals(userId: string): Promise<number> {
                    ORDER BY created_at DESC, id DESC
                  ) as rn
           FROM ${aiProposals}
-          WHERE user_id = ${dataUserId}
+          WHERE user_id = ${userId}
             AND status = 'pending'
             AND type = 'create_category'
             AND (payload->>'name') IS NOT NULL
@@ -217,7 +215,7 @@ export async function pruneDuplicateProposals(userId: string): Promise<number> {
                    ORDER BY created_at DESC, id DESC
                  ) as rn
           FROM ${aiProposals}
-          WHERE user_id = ${dataUserId}
+          WHERE user_id = ${userId}
             AND status = 'pending'
             AND type = 'create_rule'
             AND (payload->>'conditionField') IS NOT NULL
@@ -234,7 +232,7 @@ export async function pruneDuplicateProposals(userId: string): Promise<number> {
       (Number(dedupRules.rowCount) || 0);
 
     if (totalPruned > 0) {
-      logger.info(`${LOG_TAG} Pruned duplicate/stale proposals`, { userId: dataUserId, totalPruned });
+      logger.info(`${LOG_TAG} Pruned duplicate/stale proposals`, { userId: userId, totalPruned });
     }
     return totalPruned;
   } catch (err) {
@@ -286,7 +284,6 @@ export async function analyzeUncategorized(
       onLog?.(`Info: ${msg}`);
       return { proposalsCreated: 0, autoApproved: 0, errors: [msg] };
     }
-    const dataUserId = await resolveDataUserId(userId);
     // Accept an explicit DEK so background runs kicked off from sync jobs
     // don't depend on request-scoped auth after the response completes.
     const dek = dekOverride ?? await getSessionDEK();
@@ -328,7 +325,7 @@ export async function analyzeUncategorized(
     const categoryRows = await db
       .select()
       .from(categoriesTable)
-      .where(eq(categoriesTable.userId, dataUserId));
+      .where(eq(categoriesTable.userId, userId));
 
     const decryptedCategories = await decryptRows('categories', categoryRows, dek);
     const categoryMap = new Map(decryptedCategories.map((c) => [c.id, c.name]));
@@ -347,7 +344,7 @@ export async function analyzeUncategorized(
       .from(categoryRules)
       .where(
         and(
-          eq(categoryRules.userId, dataUserId),
+          eq(categoryRules.userId, userId),
           eq(categoryRules.isActive, true)
         )
       );
@@ -363,7 +360,7 @@ export async function analyzeUncategorized(
 
     onLog?.('Counting uncategorized transactions...');
     const baseWhereConditions = [
-      eq(transactions.userId, dataUserId),
+      eq(transactions.userId, userId),
       isNull(transactions.categoryId),
       eq(transactions.deleted, false),
       or(
@@ -375,7 +372,7 @@ export async function analyzeUncategorized(
       ),
       sql`NOT EXISTS (
         SELECT 1 FROM ${aiProposals}
-        WHERE ${aiProposals.userId} = ${dataUserId}
+        WHERE ${aiProposals.userId} = ${userId}
           AND ${aiProposals.status} IN ('pending', 'rejected', 'approved')
           AND ${aiProposals.type} = 'categorize'
           AND (${aiProposals.payload}->>'transactionId') = (${transactions.id})::text
@@ -423,7 +420,7 @@ export async function analyzeUncategorized(
       .from(aiProposals)
       .where(
         and(
-          eq(aiProposals.userId, dataUserId),
+          eq(aiProposals.userId, userId),
           eq(aiProposals.status, 'rejected'),
         )
       )
@@ -571,7 +568,7 @@ export async function analyzeUncategorized(
             const [txCheck] = await db
               .select({ categoryId: transactions.categoryId, deleted: transactions.deleted })
               .from(transactions)
-              .where(and(eq(transactions.id, txId), eq(transactions.userId, dataUserId)))
+              .where(and(eq(transactions.id, txId), eq(transactions.userId, userId)))
               .limit(1);
 
             if (!txCheck || txCheck.categoryId || txCheck.deleted) {
@@ -584,7 +581,7 @@ export async function analyzeUncategorized(
               .from(aiProposals)
               .where(
                 and(
-                  eq(aiProposals.userId, dataUserId),
+                  eq(aiProposals.userId, userId),
                   eq(aiProposals.status, 'pending'),
                   eq(aiProposals.type, 'categorize'),
                   sql`(${aiProposals.payload}->>'transactionId') = ${txId}::text`
@@ -605,7 +602,7 @@ export async function analyzeUncategorized(
                 .where(eq(aiProposals.id, existing[0].id));
             } else {
               await db.insert(aiProposals).values({
-                userId: dataUserId,
+                userId: userId,
                 type: suggestion.type,
                 status,
                 confidence: confidenceStr,
@@ -633,7 +630,7 @@ export async function analyzeUncategorized(
               .from(aiProposals)
               .where(
                 and(
-                  eq(aiProposals.userId, dataUserId),
+                  eq(aiProposals.userId, userId),
                   eq(aiProposals.status, 'pending'),
                   eq(aiProposals.type, 'create_category'),
                   sql`LOWER(${aiProposals.payload}->>'name') = ${catName}`
@@ -646,7 +643,7 @@ export async function analyzeUncategorized(
             }
 
             await db.insert(aiProposals).values({
-              userId: dataUserId,
+              userId: userId,
               type: suggestion.type,
               status,
               confidence: confidenceStr,
@@ -675,7 +672,7 @@ export async function analyzeUncategorized(
               .from(aiProposals)
               .where(
                 and(
-                  eq(aiProposals.userId, dataUserId),
+                  eq(aiProposals.userId, userId),
                   eq(aiProposals.status, 'pending'),
                   eq(aiProposals.type, 'create_rule'),
                   sql`${aiProposals.payload}->>'conditionField' = ${condField}`,
@@ -690,7 +687,7 @@ export async function analyzeUncategorized(
             }
 
             await db.insert(aiProposals).values({
-              userId: dataUserId,
+              userId: userId,
               type: suggestion.type,
               status,
               confidence: confidenceStr,
@@ -797,13 +794,12 @@ export async function analyzeSingleTransaction(
   dek: Uint8Array,
 ): Promise<{ proposalId: string; type: string; message: string }> {
   const db = getDb();
-  const dataUserId = await resolveDataUserId(userId);
 
   const txnRows = await db
     .select({ transaction: transactions, account: accounts })
     .from(transactions)
     .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-    .where(and(eq(transactions.id, transactionId), eq(transactions.userId, dataUserId)))
+    .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)))
     .limit(1);
 
   if (!txnRows.length) {
@@ -836,7 +832,7 @@ export async function analyzeSingleTransaction(
   const categoryRows = await db
     .select()
     .from(categoriesTable)
-    .where(eq(categoriesTable.userId, dataUserId));
+    .where(eq(categoriesTable.userId, userId));
   const decryptedCategories = await decryptRows('categories', categoryRows, dek);
   const categoryMap = new Map(decryptedCategories.map((c) => [c.id, c.name]));
   const categories: CategoryInfo[] = decryptedCategories.map((c) => ({
@@ -851,7 +847,7 @@ export async function analyzeSingleTransaction(
   const ruleRows = await db
     .select()
     .from(categoryRules)
-    .where(and(eq(categoryRules.userId, dataUserId), eq(categoryRules.isActive, true)));
+    .where(and(eq(categoryRules.userId, userId), eq(categoryRules.isActive, true)));
   const decryptedRules = await decryptRows('category_rules', ruleRows, dek);
   const rules: RuleInfo[] = decryptedRules.map((r) => ({
     name: r.name,
@@ -913,7 +909,7 @@ export async function analyzeSingleTransaction(
     .delete(aiProposals)
     .where(
       and(
-        eq(aiProposals.userId, dataUserId),
+        eq(aiProposals.userId, userId),
         eq(aiProposals.type, 'categorize'),
         inArray(aiProposals.status, ['pending', 'rejected']),
         sql`(${aiProposals.payload}->>'transactionId') = ${transactionId}::text`
@@ -923,7 +919,7 @@ export async function analyzeSingleTransaction(
   const [created] = await db
     .insert(aiProposals)
     .values({
-      userId: dataUserId,
+      userId: userId,
       type: suggestion.type,
       status: 'pending',
       confidence: String(Math.round(suggestion.confidence * 100)),
@@ -1386,13 +1382,12 @@ function buildPayload(
 
 export async function applyApprovedProposals(userId: string, dek: Uint8Array): Promise<void> {
   const db = getDb();
-  const dataUserId = await resolveDataUserId(userId);
 
   const pending = await db
     .select()
     .from(aiProposals)
     .where(and(
-      eq(aiProposals.userId, dataUserId),
+      eq(aiProposals.userId, userId),
       eq(aiProposals.status, 'approved'),
     ))
     .orderBy(asc(aiProposals.createdAt));
@@ -1405,7 +1400,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
   const categoryRows = await db
     .select()
     .from(categoriesTable)
-    .where(eq(categoriesTable.userId, dataUserId));
+    .where(eq(categoriesTable.userId, userId));
   const decryptedCategories = await decryptRows('categories', categoryRows, dek);
 
   // Set of valid category IDs to check existence later
@@ -1437,7 +1432,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
       const [created] = await db
         .insert(categoriesTable)
         .values({
-          userId: dataUserId,
+          userId: userId,
           parentId: payload.parentId,
           name: encrypted,
           color: payload.color ?? '#6366f1',
@@ -1482,7 +1477,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
             .where(
               and(
                 eq(transactions.id, payload.transactionId),
-                eq(transactions.userId, dataUserId)
+                eq(transactions.userId, userId)
               )
             );
           logger.info(`${LOG_TAG} Categorized transaction ${payload.transactionId}`, { userId, categoryId });
@@ -1505,7 +1500,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
                           null;
         }
 
-        const duplicate = await findDuplicateRule(dataUserId, dek, {
+        const duplicate = await findDuplicateRule(userId, dek, {
           conditionField: payload.conditionField,
           conditionOperator: payload.conditionOperator,
           conditionValue: payload.conditionValue,
@@ -1529,7 +1524,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
         await db
           .insert(categoryRules)
           .values({
-            userId: dataUserId,
+            userId: userId,
             name: encryptedRule,
             priority: 999,
             isActive: true,
@@ -1567,7 +1562,7 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
       .set({ status: 'applied', updatedAt: new Date() })
       .where(
         and(
-          eq(aiProposals.userId, dataUserId),
+          eq(aiProposals.userId, userId),
           eq(aiProposals.status, 'pending'),
           eq(aiProposals.type, 'categorize'),
           sql`(${aiProposals.payload}->>'transactionId')::text = ANY(${categorizedTxIds}::text[])`
@@ -1576,5 +1571,5 @@ export async function applyApprovedProposals(userId: string, dek: Uint8Array): P
   }
 
   logger.info(`${LOG_TAG} All approved proposals applied and marked as applied`, { userId, count: pending.length });
-  invalidateUserSearchCache(dataUserId);
+  invalidateUserSearchCache(userId);
 }

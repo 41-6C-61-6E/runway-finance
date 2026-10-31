@@ -14,7 +14,6 @@ import {
   UploadCloud, 
   FileText, 
   ShieldAlert,
-  Users2,
   Bell,
   ChevronLeft,
   ChevronRight,
@@ -33,7 +32,6 @@ import CategoriesTab from '@/components/features/settings/CategoriesTab';
 import RulesTab from '@/components/features/settings/RulesTab';
 import TagsTab from '@/components/features/settings/TagsTab';
 import AnalyticsTab from '@/components/features/settings/AnalyticsTab';
-import SharingTab from '@/components/features/settings/SharingTab';
 import AdvancedTab from '@/components/features/settings/AdvancedTab';
 import NotificationsTab from '@/components/features/settings/NotificationsTab';
 import AiTab from '@/components/features/settings/AiTab';
@@ -53,7 +51,6 @@ const SETTINGS_TABS = [
   { id: 'ai' as const, label: 'AI', description: 'AI provider endpoints, model parameters, and keys', icon: Sparkles },
   { id: 'import' as const, label: 'Data', description: 'Import bank statements, export financial data, and manage full backups', icon: UploadCloud },
   { id: 'payroll' as const, label: 'Payroll', description: 'Paystub parsing templates and forecasts', icon: FileText },
-  { id: 'sharing' as const, label: 'Sharing', description: 'Invite others to share your financial data', icon: Users2 },
   { id: 'notifications' as const, label: 'Notifications', description: 'Configure push notifications and alert preferences', icon: Bell },
   { id: 'advanced' as const, label: 'Advanced', description: 'Backups, dev tools, and database settings', icon: ShieldAlert },
 ];
@@ -93,7 +90,6 @@ function SettingsPageBody() {
   const [connectionsLoading, setConnectionsLoading] = useState(true);
   const [accounts, setAccounts] = useState<SettingsAccount[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
-  const [sharingGroup, setSharingGroup] = useState<any>(null);
 
   const [selectedAccount, setSelectedAccount] = useState<SettingsAccount | null>(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
@@ -125,10 +121,6 @@ function SettingsPageBody() {
   useEffect(() => {
     fetchConnections();
     fetchAccounts();
-    fetch('/api/sharing', { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setSharingGroup(data?.group ?? null))
-      .catch(() => setSharingGroup(null));
   }, [fetchConnections, fetchAccounts]);
 
   const handleOpenAccountDrawer = useCallback((account: SettingsAccount) => {
@@ -305,7 +297,6 @@ function SettingsPageBody() {
                       connections={connections}
                       connectionsLoading={connectionsLoading}
                       currentUserId={currentUserId}
-                      sharingGroup={sharingGroup}
                       fetchAccounts={fetchAccounts}
                       fetchConnections={fetchConnections}
                       onOpenAccountDrawer={handleOpenAccountDrawer}
@@ -321,7 +312,6 @@ function SettingsPageBody() {
                       connections={connections}
                       connectionsLoading={connectionsLoading}
                       currentUserId={currentUserId}
-                      sharingGroup={sharingGroup}
                       fetchAccounts={fetchAccounts}
                       fetchConnections={fetchConnections}
                       onOpenAccountDrawer={handleOpenAccountDrawer}
@@ -339,12 +329,6 @@ function SettingsPageBody() {
             {activeTab === 'analytics' && (
               <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
                 <AnalyticsTab />
-              </div>
-            )}
-
-            {activeTab === 'sharing' && (
-              <div className="p-3 sm:p-5 bg-card border border-border rounded-xl min-h-[400px]">
-                <SharingTab />
               </div>
             )}
 

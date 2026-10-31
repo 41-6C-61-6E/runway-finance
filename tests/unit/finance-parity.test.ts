@@ -48,10 +48,7 @@ describe('Finance Services Parity', () => {
   const dek = new Uint8Array([1, 2, 3]);
   const mockCtx: FinanceContext = {
     userId: 'user-1',
-    dataUserId: 'user-1',
     dek,
-    role: 'primary',
-    hiddenAccountIds: new Set(),
     settings: {
       currency: 'USD',
       timezone: 'America/New_York',

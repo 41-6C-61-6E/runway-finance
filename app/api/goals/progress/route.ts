@@ -11,7 +11,7 @@ import { getGoalAllocation, computeGoalAllocations } from '@/lib/services/goal-a
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+  const userId = session?.user?.id;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   try {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       .from(financialGoals)
       .where(and(
         eq(financialGoals.id, goalId),
-        eq(financialGoals.userId, dataUserId)
+        eq(financialGoals.userId, userId)
       ))
       .limit(1);
 
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     if (goal[0].linkedAccountId) {
       // Recompute allocation for this goal
-      const allocation = await getGoalAllocation(goalId, dataUserId);
+      const allocation = await getGoalAllocation(goalId, userId);
       if (allocation) {
         newAllocatedAmount = allocation.allocatedAmount;
       }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const session = await auth();
-  const dataUserId = session?.user ? ((session.user as any).dataUserId ?? session.user.id) : undefined;
+  const userId = session?.user?.id;
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const dek = await getSessionDEK();
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
     .from(financialGoals)
     .where(and(
       eq(financialGoals.id, goalId),
-      eq(financialGoals.userId, dataUserId)
+      eq(financialGoals.userId, userId)
     ))
     .limit(1);
 

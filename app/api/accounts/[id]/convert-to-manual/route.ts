@@ -27,7 +27,6 @@ export async function POST(
   }
 
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { id } = await params;
 
   const [account] = await getDb()
@@ -124,11 +123,11 @@ export async function POST(
   const today = new Date().toISOString().split('T')[0];
   try {
     await Promise.all([
-      createAccountSnapshots(dataUserId, dek, today),
-      createNetWorthSnapshot(dataUserId, dek, today, { skipNotifications: true }),
-      updateMonthlyCashFlowSummaries(dataUserId, dek),
-      updateCategorySpendingSummaries(dataUserId, dek),
-      updateCategoryIncomeSummaries(dataUserId, dek),
+      createAccountSnapshots(userId, dek, today),
+      createNetWorthSnapshot(userId, dek, today, { skipNotifications: true }),
+      updateMonthlyCashFlowSummaries(userId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+      updateCategoryIncomeSummaries(userId, dek),
     ]);
   } catch (err) {
     logger.error('Error in background sync/recalc after convert to manual', {

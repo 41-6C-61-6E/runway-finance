@@ -99,7 +99,6 @@ const USER_TABLES: { table: any; dbName: string }[] = [
 
 import { apiError, apiUnauthorized, apiTooManyRequests, handleApiError } from '@/lib/api/response';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { requireMinRole } from '@/lib/utils/require-auth';
 
 export async function GET(request: Request) {
   try {
@@ -111,14 +110,6 @@ export async function GET(request: Request) {
     const userId = session.user.id;
     if (!(await checkRateLimit(`backup-export:${userId}`, 10, 60_000))) {
       return apiTooManyRequests('Too many export requests. Please wait a moment.');
-    }
-
-    // M-1: a full backup is a household-restore artifact and includes
-    // sensitive accounts. Plain members cannot produce it (admins/primary
-    // are unaffected); use the filtered CSV export for their needs.
-    const forbidden = await requireMinRole('admin', userId);
-    if (forbidden) {
-      return forbidden;
     }
 
     // M-6: the full backup is decrypted financial history. It is now
@@ -137,16 +128,13 @@ export async function GET(request: Request) {
       );
     }
 
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
     const db = getDb();
     const dek = await getSessionDEK();
 
     const data: Record<string, unknown[]> = {};
 
     for (const { table, dbName } of USER_TABLES) {
-      const isPersonalTable = dbName === 'ai_providers' || dbName === 'simplefin_connections' || dbName === 'plaid_connections';
-      const targetUserId = isPersonalTable ? userId : dataUserId;
-      const rows = await db.select().from(table).where(eq(table.userId, targetUserId));
+      const rows = await db.select().from(table).where(eq(table.userId, userId));
       const decrypted = await Promise.all(
         rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
       );
@@ -161,7 +149,7 @@ export async function GET(request: Request) {
       })
       .from(transactionTags)
       .innerJoin(tags, eq(transactionTags.tagId, tags.id))
-      .where(eq(tags.userId, dataUserId));
+      .where(eq(tags.userId, userId));
     data.transaction_tags = transactionTagsExport;
 
     const accountTagsExport = await db
@@ -171,7 +159,7 @@ export async function GET(request: Request) {
       })
       .from(accountTags)
       .innerJoin(tags, eq(accountTags.tagId, tags.id))
-      .where(eq(tags.userId, dataUserId));
+      .where(eq(tags.userId, userId));
     data.account_tags = accountTagsExport;
 
     const budgetTagsExport = await db
@@ -181,7 +169,7 @@ export async function GET(request: Request) {
       })
       .from(budgetTags)
       .innerJoin(tags, eq(budgetTags.tagId, tags.id))
-      .where(eq(tags.userId, dataUserId));
+      .where(eq(tags.userId, userId));
     data.budget_tags = budgetTagsExport;
 
     const goalTagsExport = await db
@@ -191,7 +179,7 @@ export async function GET(request: Request) {
       })
       .from(goalTags)
       .innerJoin(tags, eq(goalTags.tagId, tags.id))
-      .where(eq(tags.userId, dataUserId));
+      .where(eq(tags.userId, userId));
     data.goal_tags = goalTagsExport;
 
     const [settings] = await db

@@ -100,14 +100,14 @@ export async function buildSnapshotData(ctx: FinanceContext): Promise<SnapshotDa
         status: simplifinConnections.lastSyncStatus,
       })
       .from(simplifinConnections)
-      .where(eq(simplifinConnections.userId, ctx.dataUserId)),
+      .where(eq(simplifinConnections.userId, ctx.userId)),
     db
       .select({
         lastSyncAt: plaidConnections.lastSyncAt,
         status: plaidConnections.lastSyncStatus,
       })
       .from(plaidConnections)
-      .where(eq(plaidConnections.userId, ctx.dataUserId)),
+      .where(eq(plaidConnections.userId, ctx.userId)),
   ]);
 
   const allSyncTimes = [...sConns, ...pConns]
@@ -132,7 +132,7 @@ export async function buildSnapshotData(ctx: FinanceContext): Promise<SnapshotDa
     .from(transactions)
     .where(
       and(
-        eq(transactions.userId, ctx.dataUserId),
+        eq(transactions.userId, ctx.userId),
         eq(transactions.deleted, false),
         gte(transactions.date, ninetyDaysStr)
       )
@@ -265,7 +265,7 @@ export async function buildSnapshotData(ctx: FinanceContext): Promise<SnapshotDa
   // 5. Fixed obligations (recurring)
   let recurringData = { monthlyTotal: 0, count: 0 };
   try {
-    const recSummary = await getRecurringSummary(ctx.dataUserId, ctx.dek);
+    const recSummary = await getRecurringSummary(ctx.userId, ctx.dek);
     recurringData = {
       monthlyTotal: recSummary.monthlyExpenses,
       count: recSummary.expenseCount,
@@ -290,8 +290,8 @@ export async function buildSnapshotData(ctx: FinanceContext): Promise<SnapshotDa
 
   // 7. Goals & Budgets
   const [goalsList, budgetRows] = await Promise.all([
-    db.select().from(financialGoals).where(eq(financialGoals.userId, ctx.dataUserId)),
-    db.select({ id: budgets.id }).from(budgets).where(eq(budgets.userId, ctx.dataUserId)).limit(1),
+    db.select().from(financialGoals).where(eq(financialGoals.userId, ctx.userId)),
+    db.select({ id: budgets.id }).from(budgets).where(eq(budgets.userId, ctx.userId)).limit(1),
   ]);
 
   const decGoals = await decryptRows('financial_goals', goalsList, ctx.dek);
@@ -504,7 +504,7 @@ export async function getAdviceSnapshot(
   ctx: FinanceContext,
   options?: { forceRefresh?: boolean }
 ): Promise<string> {
-  const cacheKey = `user:${ctx.dataUserId}:advice:snapshot:${ctx.userId}`;
+  const cacheKey = `user:${ctx.userId}:advice:snapshot`;
 
   if (!options?.forceRefresh) {
     const cached = getCached<string>(cacheKey);

@@ -38,11 +38,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'not_found', message: 'Plaid connection not found' }, { status: 404 });
   }
 
-  const { resolveDataUserId } = await import('@/lib/sharing');
-  const requestingDataUserId = await resolveDataUserId(userId);
-  const connectionDataUserId = await resolveDataUserId(connection.userId);
-
-  if (connectionDataUserId !== requestingDataUserId) {
+  if (connection.userId !== userId) {
     return NextResponse.json({ error: 'forbidden', message: 'You do not own this connection' }, { status: 403 });
   }
 

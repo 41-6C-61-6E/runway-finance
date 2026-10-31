@@ -20,7 +20,6 @@ export async function GET(request: Request) {
 
   const dek = await getSessionDEK();
   const userId = session.user.id;
-  const dataUserId = (session.user as any).dataUserId ?? session.user.id;
   const { searchParams } = new URL(request.url);
   const now = new Date();
   const month = searchParams.get('month');
@@ -156,7 +155,7 @@ export async function GET(request: Request) {
         isDiscretionary: categories.isDiscretionary,
       })
       .from(categories)
-      .where(and(eq(categories.userId, dataUserId), inArray(categories.id, expenseParentIds)));
+      .where(and(eq(categories.userId, userId), inArray(categories.id, expenseParentIds)));
 
     const parentIds = targetCats.map((c) => c.parentId).filter(Boolean) as string[];
     const parentCats = parentIds.length > 0
@@ -167,7 +166,7 @@ export async function GET(request: Request) {
             isDiscretionary: categories.isDiscretionary,
           })
           .from(categories)
-          .where(and(eq(categories.userId, dataUserId), inArray(categories.id, parentIds)))
+          .where(and(eq(categories.userId, userId), inArray(categories.id, parentIds)))
       : [];
 
     const lookup = new Map<string, { isDiscretionary: boolean }>();
@@ -189,7 +188,7 @@ export async function GET(request: Request) {
 
     async function fetchTransactionsAggregated(start: string, end: string, accountIds: string[], isIncome?: boolean): Promise<any[]> {
     const conditions = [
-      eq(transactions.userId, dataUserId),
+      eq(transactions.userId, userId),
       gte(transactions.date, start),
       lte(transactions.date, end),
       eq(transactions.pending, false),
@@ -295,7 +294,7 @@ export async function GET(request: Request) {
         expenseParentId: categories.expenseParentId,
       })
       .from(categories)
-      .where(and(eq(categories.userId, dataUserId), inArray(categories.id, catIds)));
+      .where(and(eq(categories.userId, userId), inArray(categories.id, catIds)));
 
     const decryptedCats = await decryptRows('categories', cats, dek);
     const catInfo = new Map(decryptedCats.map((c: any) => [c.id, c]));
@@ -324,7 +323,7 @@ export async function GET(request: Request) {
     incomeCount: number;
   }> {
     const conditions = [
-      eq(transactions.userId, dataUserId),
+      eq(transactions.userId, userId),
       gte(transactions.date, start),
       lte(transactions.date, end),
       isNull(transactions.categoryId),
@@ -404,7 +403,7 @@ export async function GET(request: Request) {
         const endYm = endDate!.substring(0, 7);
 
         const spendingConditions = [
-          eq(categorySpendingSummary.userId, dataUserId),
+          eq(categorySpendingSummary.userId, userId),
           gte(categorySpendingSummary.yearMonth, startYm),
           lte(categorySpendingSummary.yearMonth, endYm),
           eq(categories.excludeFromReports, false),
@@ -416,7 +415,7 @@ export async function GET(request: Request) {
         ];
 
         const incomeConditions = [
-          eq(categoryIncomeSummary.userId, dataUserId),
+          eq(categoryIncomeSummary.userId, userId),
           gte(categoryIncomeSummary.yearMonth, startYm),
           lte(categoryIncomeSummary.yearMonth, endYm),
           eq(categories.excludeFromReports, false),
@@ -596,7 +595,7 @@ export async function GET(request: Request) {
       currentIncomeRows = income;
     } else {
       const spendingConditions = [
-        eq(categorySpendingSummary.userId, dataUserId),
+        eq(categorySpendingSummary.userId, userId),
         eq(categorySpendingSummary.yearMonth, resolvedMonth),
         eq(categories.excludeFromReports, false),
         // Also exclude children whose parent has excludeFromReports=true
@@ -606,7 +605,7 @@ export async function GET(request: Request) {
         ),
       ];
       const incomeConditions = [
-        eq(categoryIncomeSummary.userId, dataUserId),
+        eq(categoryIncomeSummary.userId, userId),
         eq(categoryIncomeSummary.yearMonth, resolvedMonth),
         eq(categories.excludeFromReports, false),
         // Also exclude children whose parent has excludeFromReports=true
@@ -689,7 +688,7 @@ export async function GET(request: Request) {
       const map = new Map<string, number>();
       const idCol = table.categoryId;
       const conditions = [
-        eq(table.userId, dataUserId),
+        eq(table.userId, userId),
         eq(table.yearMonth, previousMonth),
       ];
       if (accountIds.length > 0) {

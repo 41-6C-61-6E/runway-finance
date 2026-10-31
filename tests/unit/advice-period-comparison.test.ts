@@ -7,10 +7,7 @@ import * as categoriesModule from '@/lib/finance/categories';
 describe('Period Comparison Data Pack', () => {
   const dummyCtx: FinanceContext = {
     userId: 'u-1',
-    dataUserId: 'u-1',
     dek: new Uint8Array(32),
-    role: 'primary',
-    hiddenAccountIds: new Set(),
     settings: {} as any,
     now: new Date('2026-10-15T12:00:00Z'),
     getAccounts: vi.fn().mockResolvedValue([]),

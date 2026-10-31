@@ -19,10 +19,7 @@ async function hydratePlan(planRow: any, dek: Uint8Array, preloadedTaxRules?: an
   const loaded = await loadEnginePlan(
     {
       userId: planRow.userId,
-      dataUserId: planRow.userId,
       dek,
-      role: 'primary',
-      hiddenAccountIds: new Set(),
       settings: {} as any,
       now: new Date(),
       getAccounts: async () => [],
@@ -60,7 +57,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const dek = await getSessionDEK();
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+    const userId = session.user.id;
 
     // Engine simulations start at the current calendar year
     // (retirement-engine: currentYear), so rules must be for the same year.
@@ -68,7 +65,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch user plans and tax rules in parallel
     const [dbPlans, taxRules] = await Promise.all([
-      getDb().select().from(plans).where(eq(plans.userId, dataUserId)),
+      getDb().select().from(plans).where(eq(plans.userId, userId)),
       getSystemTaxRules(currentYear),
     ]);
 
@@ -93,7 +90,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const dek = await getSessionDEK();
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+    const userId = session.user.id;
     const body = await req.json();
 
     const {
@@ -129,17 +126,17 @@ export async function POST(req: NextRequest) {
     // Find default plan ID as source if not explicitly passed
     let effectiveSourcePlanId = sourcePlanId;
     if (!effectiveSourcePlanId) {
-      const defaultPlanRow = await getDb().select({ id: plans.id }).from(plans).where(and(eq(plans.userId, dataUserId), eq(plans.isDefault, true))).limit(1);
+      const defaultPlanRow = await getDb().select({ id: plans.id }).from(plans).where(and(eq(plans.userId, userId), eq(plans.isDefault, true))).limit(1);
       effectiveSourcePlanId = defaultPlanRow[0]?.id;
     }
 
     // If setting as default, clear default status on other plans
     if (isDefault) {
-      await getDb().update(plans).set({ isDefault: false }).where(eq(plans.userId, dataUserId));
+      await getDb().update(plans).set({ isDefault: false }).where(eq(plans.userId, userId));
     }
 
     const encryptedValues = await encryptRow('plans', {
-      userId: dataUserId,
+      userId,
       name: name || 'Default Plan',
       hasSpouse: Boolean(hasSpouse),
       primaryBirthYear: Number(primaryBirthYear) || 1985,
@@ -173,7 +170,7 @@ export async function POST(req: NextRequest) {
     const newPlanId = inserted[0].id;
     
     // Auto-populate accounts, income, expenses, and flows (cloning from source plan if available)
-    await populatePlanWithUserFinances(newPlanId, dataUserId, dek, effectiveSourcePlanId, accountInclusions);
+    await populatePlanWithUserFinances(newPlanId, userId, dek, effectiveSourcePlanId, accountInclusions);
 
     // Apply specific settings overrides if passed from the wizard
     if (body.settings && typeof body.settings === 'object') {
@@ -183,7 +180,7 @@ export async function POST(req: NextRequest) {
       if (settingsRow[0]) {
         const decSettings = await decryptRow('plan_settings', settingsRow[0], dek);
         const settingsUpdates = { ...decSettings, ...body.settings, updatedAt: new Date() };
-        const encSettings = await encryptRow('plan_settings', { ...settingsUpdates, userId: dataUserId, planId: newPlanId }, dek);
+        const encSettings = await encryptRow('plan_settings', { ...settingsUpdates, userId, planId: newPlanId }, dek);
         delete encSettings.userId;
         delete encSettings.planId;
         await getDb().update(planSettings).set(encSettings).where(eq(planSettings.planId, newPlanId));
@@ -202,7 +199,7 @@ export async function POST(req: NextRequest) {
           amount: String(body.livingExpenseAmount),
           adjustForInflation: body.livingExpenseAdjustForInflation !== false,
           updatedAt: new Date(),
-          userId: dataUserId,
+          userId,
           planId: newPlanId,
         }, dek);
         delete encEv.userId;
@@ -211,7 +208,7 @@ export async function POST(req: NextRequest) {
       } else {
         const encEv = await encryptRow('plan_events', {
           planId: newPlanId,
-          userId: dataUserId,
+          userId,
           name: 'Base Living Expenses',
           category: 'expense',
           type: 'living_expense',
@@ -234,7 +231,7 @@ export async function POST(req: NextRequest) {
           ...existingHealth,
           amount: String(body.healthcareExpenseAmount),
           updatedAt: new Date(),
-          userId: dataUserId,
+          userId,
           planId: newPlanId,
         }, dek);
         delete encEv.userId;
@@ -243,7 +240,7 @@ export async function POST(req: NextRequest) {
       } else if (Number(body.healthcareExpenseAmount) > 0) {
         const encEv = await encryptRow('plan_events', {
           planId: newPlanId,
-          userId: dataUserId,
+          userId,
           name: 'Healthcare & Medical Expenses',
           category: 'expense',
           type: 'healthcare',
@@ -267,7 +264,7 @@ export async function POST(req: NextRequest) {
           amount: String(body.pensionIncomeAmount),
           startTriggerValue: body.pensionStartAge ? String(body.pensionStartAge) : existingPension.startTriggerValue,
           updatedAt: new Date(),
-          userId: dataUserId,
+          userId,
           planId: newPlanId,
         }, dek);
         delete encEv.userId;
@@ -276,7 +273,7 @@ export async function POST(req: NextRequest) {
       } else if (Number(body.pensionIncomeAmount) > 0) {
         const encEv = await encryptRow('plan_events', {
           planId: newPlanId,
-          userId: dataUserId,
+          userId,
           name: 'Pension / Passive Income',
           category: 'income',
           type: 'pension',
@@ -303,7 +300,7 @@ export async function POST(req: NextRequest) {
           const encAcc = await encryptRow('plan_accounts', {
             ...decAcc,
             isIncluded: Boolean(incVal),
-            userId: dataUserId,
+            userId,
             planId: newPlanId,
           }, dek);
           delete encAcc.userId;
@@ -329,7 +326,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const dek = await getSessionDEK();
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+    const userId = session.user.id;
     const body = await req.json();
     const { planId, ...updates } = body;
 
@@ -339,7 +336,7 @@ export async function PUT(req: NextRequest) {
 
     // Verify plan ownership
     const existing = await getDb().select().from(plans)
-      .where(and(eq(plans.id, planId), eq(plans.userId, dataUserId)))
+      .where(and(eq(plans.id, planId), eq(plans.userId, userId)))
       .limit(1);
 
     if (!existing[0]) {
@@ -348,12 +345,12 @@ export async function PUT(req: NextRequest) {
 
     // Handle setting as default plan
     if (updates.isDefault === true) {
-      await getDb().update(plans).set({ isDefault: false }).where(eq(plans.userId, dataUserId));
+      await getDb().update(plans).set({ isDefault: false }).where(eq(plans.userId, userId));
     }
 
     // Reset default / plan finances
     if (updates.resetPlanFinances || updates.resetDefault) {
-      await populatePlanWithUserFinances(planId, dataUserId, dek);
+      await populatePlanWithUserFinances(planId, userId, dek);
     }
 
     // Build the update fields (only encrypt changed plan-level fields)
@@ -378,7 +375,7 @@ export async function PUT(req: NextRequest) {
 
     if (Object.keys(planUpdates).length > 0) {
       planUpdates.updatedAt = new Date();
-      const encrypted = await encryptRow('plans', { ...planUpdates, userId: dataUserId }, dek);
+      const encrypted = await encryptRow('plans', { ...planUpdates, userId }, dek);
       delete encrypted.userId;
       await getDb().update(plans).set(encrypted).where(eq(plans.id, planId));
     }
@@ -393,7 +390,7 @@ export async function PUT(req: NextRequest) {
           const encAcc = await encryptRow('plan_accounts', {
             ...decAcc,
             isIncluded: Boolean(incVal),
-            userId: dataUserId,
+            userId,
             planId,
           }, dek);
           delete encAcc.userId;
@@ -415,7 +412,7 @@ export async function PUT(req: NextRequest) {
         const encAcc = await encryptRow('plan_accounts', {
           ...decAcc,
           isIncluded: newIncluded,
-          userId: dataUserId,
+          userId,
           planId,
         }, dek);
         delete encAcc.userId;
@@ -432,14 +429,14 @@ export async function PUT(req: NextRequest) {
       if (settingsRow[0]) {
         const decSettings = await decryptRow('plan_settings', settingsRow[0], dek);
         const settingsUpdates = { ...decSettings, ...updates.settings, updatedAt: new Date() };
-        const encSettings = await encryptRow('plan_settings', { ...settingsUpdates, userId: dataUserId, planId }, dek);
+        const encSettings = await encryptRow('plan_settings', { ...settingsUpdates, userId, planId }, dek);
         delete encSettings.userId;
         delete encSettings.planId;
         await getDb().update(planSettings).set(encSettings).where(eq(planSettings.planId, planId));
       } else {
         const encSettings = await encryptRow('plan_settings', {
           planId,
-          userId: dataUserId,
+          userId,
           ...updates.settings,
         }, dek);
         await getDb().insert(planSettings).values(encSettings);
@@ -459,7 +456,7 @@ export async function PUT(req: NextRequest) {
             amount: String(updates.livingExpenseAmount),
             adjustForInflation: updates.livingExpenseAdjustForInflation !== false,
             updatedAt: new Date(),
-            userId: dataUserId,
+            userId,
             planId,
           }, dek);
           delete encEv.userId;
@@ -468,7 +465,7 @@ export async function PUT(req: NextRequest) {
         } else {
           const encEv = await encryptRow('plan_events', {
             planId,
-            userId: dataUserId,
+            userId,
             name: 'Base Living Expenses',
             category: 'expense',
             type: 'living_expense',
@@ -491,7 +488,7 @@ export async function PUT(req: NextRequest) {
             ...existingHealth,
             amount: String(updates.healthcareExpenseAmount),
             updatedAt: new Date(),
-            userId: dataUserId,
+            userId,
             planId,
           }, dek);
           delete encEv.userId;
@@ -500,7 +497,7 @@ export async function PUT(req: NextRequest) {
         } else if (Number(updates.healthcareExpenseAmount) > 0) {
           const encEv = await encryptRow('plan_events', {
             planId,
-            userId: dataUserId,
+            userId,
             name: 'Healthcare & Medical Expenses',
             category: 'expense',
             type: 'healthcare',
@@ -524,7 +521,7 @@ export async function PUT(req: NextRequest) {
             amount: String(updates.pensionIncomeAmount),
             startTriggerValue: updates.pensionStartAge ? String(updates.pensionStartAge) : existingPension.startTriggerValue,
             updatedAt: new Date(),
-            userId: dataUserId,
+            userId,
             planId,
           }, dek);
           delete encEv.userId;
@@ -533,7 +530,7 @@ export async function PUT(req: NextRequest) {
         } else if (Number(updates.pensionIncomeAmount) > 0) {
           const encEv = await encryptRow('plan_events', {
             planId,
-            userId: dataUserId,
+            userId,
             name: 'Pension / Passive Income',
             category: 'income',
             type: 'pension',
@@ -573,7 +570,7 @@ export async function PUT(req: NextRequest) {
           endTriggerType: ev.endTriggerType !== undefined ? ev.endTriggerType : decEv.endTriggerType,
           endTriggerValue: ev.endTriggerValue !== undefined ? String(ev.endTriggerValue) : decEv.endTriggerValue,
           updatedAt: new Date(),
-          userId: dataUserId,
+          userId,
           planId,
         };
         const encEv = await encryptRow('plan_events', updatedValues, dek);
@@ -601,7 +598,7 @@ export async function PUT(req: NextRequest) {
           ruleType: fl.ruleType !== undefined ? fl.ruleType : decFl.ruleType,
           ruleValue: fl.ruleValue !== undefined ? String(fl.ruleValue) : decFl.ruleValue,
           updatedAt: new Date(),
-          userId: dataUserId,
+          userId,
           planId,
         };
         const encFl = await encryptRow('plan_flows', updatedValues, dek);
@@ -630,7 +627,7 @@ export async function PUT(req: NextRequest) {
           isSurplusDestination: contrib.isSurplusDestination !== undefined ? contrib.isSurplusDestination : decAcc.isSurplusDestination,
           rothPercentage: contrib.rothPercentage !== undefined ? (contrib.rothPercentage != null ? Number(contrib.rothPercentage) : null) : decAcc.rothPercentage,
           updatedAt: new Date(),
-          userId: dataUserId,
+          userId,
           planId,
         };
 
@@ -644,7 +641,7 @@ export async function PUT(req: NextRequest) {
               const encOther = await encryptRow('plan_accounts', {
                 ...decOther,
                 isSurplusDestination: false,
-                userId: dataUserId,
+                userId,
                 planId,
               }, dek);
               delete encOther.userId;
@@ -666,7 +663,7 @@ export async function PUT(req: NextRequest) {
       const ev = updates.newEvent;
       const encEvent = await encryptRow('plan_events', {
         planId,
-        userId: dataUserId,
+        userId,
         name: ev.name,
         category: ev.category,
         type: ev.type,
@@ -688,7 +685,7 @@ export async function PUT(req: NextRequest) {
       const fl = updates.newFlow;
       const encFlow = await encryptRow('plan_flows', {
         planId,
-        userId: dataUserId,
+        userId,
         name: fl.name,
         type: fl.type || 'invest',
         rank: fl.rank || 1,
@@ -706,7 +703,7 @@ export async function PUT(req: NextRequest) {
       const liab = updates.newLiability;
       const encLiab = await encryptRow('plan_liabilities', {
         planId,
-        userId: dataUserId,
+        userId,
         name: liab.name || 'Debt / Mortgage',
         owner: liab.owner || 'primary',
         balance: String(liab.balance || 0),
@@ -735,7 +732,7 @@ export async function PUT(req: NextRequest) {
           monthlyPayment: liab.monthlyPayment !== undefined ? String(liab.monthlyPayment) : decLiab.monthlyPayment,
           yearsRemaining: liab.yearsRemaining !== undefined ? String(liab.yearsRemaining) : decLiab.yearsRemaining,
           updatedAt: new Date(),
-          userId: dataUserId,
+          userId,
           planId,
         };
         const encLiab = await encryptRow('plan_liabilities', updatedValues, dek);
@@ -780,7 +777,7 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const dek = await getSessionDEK();
-    const dataUserId = (session.user as any).dataUserId ?? session.user.id;
+    const userId = session.user.id;
     const { searchParams } = new URL(req.url);
     const planId = searchParams.get('planId');
 
@@ -790,7 +787,7 @@ export async function DELETE(req: NextRequest) {
 
     // Verify ownership then delete (cascade handles sub-entities)
     const existing = await getDb().select().from(plans)
-      .where(and(eq(plans.id, planId), eq(plans.userId, dataUserId)))
+      .where(and(eq(plans.id, planId), eq(plans.userId, userId)))
       .limit(1);
 
     if (!existing[0]) {
@@ -801,7 +798,7 @@ export async function DELETE(req: NextRequest) {
 
     // If the deleted plan was default, mark the first remaining plan as default
     if (existing[0].isDefault) {
-      const remainingPlans = await getDb().select().from(plans).where(eq(plans.userId, dataUserId)).limit(1);
+      const remainingPlans = await getDb().select().from(plans).where(eq(plans.userId, userId)).limit(1);
       if (remainingPlans.length > 0) {
         await getDb().update(plans).set({ isDefault: true }).where(eq(plans.id, remainingPlans[0].id));
       }
