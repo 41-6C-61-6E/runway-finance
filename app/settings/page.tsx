@@ -21,23 +21,23 @@ import {
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
-import AccountDetailDrawer from '@/components/features/accounts/AccountDetailDrawer';
+import AccountDetailDrawer from '@/components/features/accounts/account-detail-drawer';
 
 // Settings feature tabs
-import GeneralTab from '@/components/features/settings/GeneralTab';
-import AutomaticAccountsSection from '@/components/features/settings/AutomaticAccountsSection';
-import OrphanedAccountsSection, { type SettingsAccount, type SettingsConnection } from '@/components/features/settings/OrphanedAccountsSection';
-import ManualAccountsSection from '@/components/features/settings/ManualAccountsSection';
-import CategoriesTab from '@/components/features/settings/CategoriesTab';
-import RulesTab from '@/components/features/settings/RulesTab';
-import TagsTab from '@/components/features/settings/TagsTab';
-import AnalyticsTab from '@/components/features/settings/AnalyticsTab';
-import AdvancedTab from '@/components/features/settings/AdvancedTab';
-import NotificationsTab from '@/components/features/settings/NotificationsTab';
-import AiTab from '@/components/features/settings/AiTab';
-import ImportExportTab from '@/components/features/settings/ImportExportTab';
+import GeneralTab from '@/components/features/settings/general-tab';
+import AutomaticAccountsSection from '@/components/features/settings/automatic-accounts-section';
+import OrphanedAccountsSection, { type SettingsAccount, type SettingsConnection } from '@/components/features/settings/orphaned-accounts-section';
+import ManualAccountsSection from '@/components/features/settings/manual-accounts-section';
+import CategoriesTab from '@/components/features/settings/categories-tab';
+import RulesTab from '@/components/features/settings/rules-tab';
+import TagsTab from '@/components/features/settings/tags-tab';
+import AnalyticsTab from '@/components/features/settings/analytics-tab';
+import AdvancedTab from '@/components/features/settings/advanced-tab';
+import NotificationsTab from '@/components/features/settings/notifications-tab';
+import AiTab from '@/components/features/settings/ai-tab';
+import ImportExportTab from '@/components/features/settings/import-export-tab';
 import { AppTabs } from '@/components/ui/app-tabs';
-import PayrollTab from '@/components/features/settings/PayrollTab';
+import PayrollTab from '@/components/features/settings/payroll-tab';
 
 
 

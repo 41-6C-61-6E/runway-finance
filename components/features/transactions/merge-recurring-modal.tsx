@@ -16,7 +16,7 @@ import { Merge, Sparkles, Check, Search, ArrowRight } from 'lucide-react';
 import { Spinner } from '@/components/ui/loading-spinner';
 import { formatCurrency } from '@/lib/utils/format';
 import { toast } from 'sonner';
-import type { RecurringItem } from './RecurringCard';
+import type { RecurringItem } from './recurring-card';
 import { cn } from '@/lib/utils';
 
 interface MergeRecurringModalProps {

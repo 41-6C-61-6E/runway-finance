@@ -5,7 +5,7 @@ import { Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { SectionHeading } from '@/components/ui/section-heading';
 import ModeToggle from '@/components/mode-toggle';
-import AccentPicker from '@/components/features/settings/AccentPicker';
+import AccentPicker from '@/components/features/settings/accent-picker';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { useChartColorScheme } from '@/lib/hooks/use-chart-colors';

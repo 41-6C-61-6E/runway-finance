@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { Copy, Check, ExternalLink, Trash2, AlertTriangle } from 'lucide-react';
 import { Spinner } from '@/components/ui/loading-spinner';
-import JsonViewer from './JsonViewer';
+import JsonViewer from './json-viewer';
 import { IconButton } from '@/components/ui/icon-button';
 import {
   AlertDialog,

@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { Bot, Trash2, ShieldAlert, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useAdvice } from './AdviceProvider';
-import { AdviceMessageList } from './AdviceMessageList';
-import { AdviceComposer } from './AdviceComposer';
-import { AdviceConsentDialog } from './AdviceConsentDialog';
+import { useAdvice } from './advice-provider';
+import { AdviceMessageList } from './advice-message-list';
+import { AdviceComposer } from './advice-composer';
+import { AdviceConsentDialog } from './advice-consent-dialog';
 
 export function AdviceSheet() {
   const {

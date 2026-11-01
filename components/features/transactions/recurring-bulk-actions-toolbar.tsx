@@ -15,8 +15,8 @@ import { Spinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import { toast } from 'sonner';
-import type { RecurringItem } from './RecurringCard';
-import { MergeRecurringModal } from './MergeRecurringModal';
+import type { RecurringItem } from './recurring-card';
+import { MergeRecurringModal } from './merge-recurring-modal';
 
 interface RecurringBulkActionsToolbarProps {
   selectedIds: string[];

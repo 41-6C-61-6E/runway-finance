@@ -1,9 +1,13 @@
 {
-  "buildNumber": "26.11.1793568877599",
-  "buildTime": "2026-11-01T21:34:37.599Z",
-  "hash": "8590382",
-  "fullHash": "859038278e8b128f3ff827ff1e65916a985084fc",
+  "buildNumber": "26.11.1793572039980",
+  "buildTime": "2026-11-01T22:27:19.980Z",
+  "hash": "19ed5f5",
+  "fullHash": "19ed5f57442c8e9434f3d16f499ee02146ba8936",
   "commits": [
+    "docs(tracker): record Wave 3 completion (CC-04, CC-10, CC-11)",
+    "refactor(cc-11): normalize font tokens, palette variables, z-indices, and inline styles",
+    "refactor(cc-10): standardize chart frames, tooltips, and consolidate sankey visualization",
+    "refactor(cc-04): standardize dialogs, sheets, popovers, loaders, and table sorting",
     "docs(tracker): mark wave 2 workstreams complete",
     "refactor(cc-03, cc-09): unify query keys, domain queries, retire fetch-cache, compose app providers, and fix logout storage purge",
     "refactor(cc-02): standardize api route wrappers, error handling, consolidate goals endpoints, and retire orphan routes",
@@ -199,21 +203,49 @@
     "feat: implement time-based budget pacing and improved health status projections for monthly, quarterly, and yearly periods",
     "feat: implement net value calculation to correctly handle income versus expense logic in budget actuals",
     "refactor: improve budget status health logic and update transaction tooltip interaction behavior",
-    "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component",
-    "feat: implement collapsible sidebar UI for desktop dashboards and update side panel styling",
-    "ui: redesign Everything Else breakout pill for improved compactness and text truncation in budget table",
-    "refactor: simplify budget actuals calculation by implementing ancestor-based transaction attribution",
-    "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses"
+    "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component"
   ],
   "history": [
+    {
+      "hash": "19ed5f5",
+      "fullHash": "19ed5f57442c8e9434f3d16f499ee02146ba8936",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T22:20:45Z",
+      "message": "docs(tracker): record Wave 3 completion (CC-04, CC-10, CC-11)",
+      "type": "docs",
+      "buildNumber": "26.11.1793572039980"
+    },
+    {
+      "hash": "caae7d0",
+      "fullHash": "caae7d0d3b8be7bd396a909715408538ee7b0c51",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T22:19:24Z",
+      "message": "refactor(cc-11): normalize font tokens, palette variables, z-indices, and inline styles",
+      "type": "refactor"
+    },
+    {
+      "hash": "a6a5e94",
+      "fullHash": "a6a5e94d09ab394c4856d8e8b7dc72d3ee912dc7",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T22:04:31Z",
+      "message": "refactor(cc-10): standardize chart frames, tooltips, and consolidate sankey visualization",
+      "type": "refactor"
+    },
+    {
+      "hash": "42ddf93",
+      "fullHash": "42ddf93d39cd105e145a9a6a31bbe31a59307c82",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T21:38:48Z",
+      "message": "refactor(cc-04): standardize dialogs, sheets, popovers, loaders, and table sorting",
+      "type": "refactor"
+    },
     {
       "hash": "8590382",
       "fullHash": "859038278e8b128f3ff827ff1e65916a985084fc",
       "author": "41-6C-61-6E",
       "date": "2026-11-01T21:08:17Z",
       "message": "docs(tracker): mark wave 2 workstreams complete",
-      "type": "docs",
-      "buildNumber": "26.11.1793568877599"
+      "type": "docs"
     },
     {
       "hash": "7220426",
@@ -1774,38 +1806,6 @@
       "date": "2026-08-10T15:17:16-07:00",
       "message": "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component",
       "type": "feat"
-    },
-    {
-      "hash": "75002bc",
-      "fullHash": "75002bce390960d8297a67531f01b0a94a02f878",
-      "author": "Alan Racek",
-      "date": "2026-08-10T15:03:26-07:00",
-      "message": "feat: implement collapsible sidebar UI for desktop dashboards and update side panel styling",
-      "type": "feat"
-    },
-    {
-      "hash": "0c61fbc",
-      "fullHash": "0c61fbc3970ebfb488b1398767b2652ba73b09b9",
-      "author": "Alan Racek",
-      "date": "2026-08-10T14:50:58-07:00",
-      "message": "ui: redesign Everything Else breakout pill for improved compactness and text truncation in budget table",
-      "type": "ui"
-    },
-    {
-      "hash": "ee31c14",
-      "fullHash": "ee31c147dc1967d49741cca240cd3a6dc061abf7",
-      "author": "Alan Racek",
-      "date": "2026-08-10T14:43:30-07:00",
-      "message": "refactor: simplify budget actuals calculation by implementing ancestor-based transaction attribution",
-      "type": "refactor"
-    },
-    {
-      "hash": "a9764c8",
-      "fullHash": "a9764c818f02e92aa0bed282ca5e54f446539279",
-      "author": "Alan Racek",
-      "date": "2026-08-10T14:14:53-07:00",
-      "message": "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses",
-      "type": "refactor"
     }
   ]
 }

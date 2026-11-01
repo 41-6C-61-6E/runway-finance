@@ -6,7 +6,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
-import { AccountTransactions } from '@/components/features/accounts/AccountTransactions';
+import { AccountTransactions } from '@/components/features/accounts/account-transactions';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import type { Account } from './account-types';
 

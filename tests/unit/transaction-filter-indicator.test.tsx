@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import FilterBar from '@/components/features/transactions/FilterBar';
+import FilterBar from '@/components/features/transactions/filter-bar';
 
 beforeAll(() => {
   global.ResizeObserver = class ResizeObserver {

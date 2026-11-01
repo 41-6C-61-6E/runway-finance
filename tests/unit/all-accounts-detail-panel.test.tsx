@@ -75,7 +75,7 @@ vi.mock('@/components/features/charts/date-window-nav', () => ({
   DateWindowNav: () => null,
 }));
 
-import AllAccountsDetailPanel from '@/components/features/accounts/AllAccountsDetailPanel';
+import AllAccountsDetailPanel from '@/components/features/accounts/all-accounts-detail-panel';
 import type { Account } from '@/components/features/accounts/account-types';
 
 const testAccounts: Account[] = [
@@ -140,7 +140,7 @@ const mockHistory = [
   },
 ];
 
-describe('AllAccountsDetailPanel', () => {
+describe('all-accounts-detail-panel', () => {
   it('renders header, account count, and calls onClose', async () => {
     const user = userEvent.setup();
     const handleClose = vi.fn();

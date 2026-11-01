@@ -27,7 +27,7 @@ import { getBadgeClasses } from '@/lib/utils/account-badge';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { useRouter } from 'next/navigation';
-import type { SettingsAccount, SettingsConnection } from './OrphanedAccountsSection';
+import type { SettingsAccount, SettingsConnection } from './orphaned-accounts-section';
 import { Select } from '@/components/ui/select';
 
 const SYNC_INTERVALS: Record<string, number> = {

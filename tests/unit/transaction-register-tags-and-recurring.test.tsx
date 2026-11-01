@@ -3,7 +3,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import TransactionTable from '@/components/features/transactions/TransactionTable';
+import TransactionTable from '@/components/features/transactions/transaction-table';
 
 const mockUseUserSettings = vi.fn();
 vi.mock('@/components/user-settings-provider', () => ({

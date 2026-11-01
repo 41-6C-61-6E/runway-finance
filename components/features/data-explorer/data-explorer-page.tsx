@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { useSearchParams, useRouter } from 'next/navigation';
-import TableSelector from './TableSelector';
-import DataToolbar from './DataToolbar';
-import DataTable from './DataTable';
-import DataCleanup from './DataCleanup';
+import TableSelector from './table-selector';
+import DataToolbar from './data-toolbar';
+import DataTable from './data-table';
+import DataCleanup from './data-cleanup';
 import PageContent from '@/components/page-content';
 import { PageHeader } from '@/components/page-header';
 import { Database } from 'lucide-react';

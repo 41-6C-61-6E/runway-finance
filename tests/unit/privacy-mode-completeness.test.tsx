@@ -2,7 +2,7 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import DataTable, { CellRenderer } from '@/components/features/data-explorer/DataTable';
+import DataTable, { CellRenderer } from '@/components/features/data-explorer/data-table';
 
 // Mock next/navigation
 vi.mock('next/navigation', () => ({

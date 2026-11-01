@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import ReactErrorBoundary from './ReactErrorBoundary';
+import ReactErrorBoundary from './react-error-boundary';
 
 interface ClientError {
   id: string;

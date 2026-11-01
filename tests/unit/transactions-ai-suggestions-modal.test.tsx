@@ -37,7 +37,7 @@ vi.mock('@/lib/hooks/use-persistent-state', () => ({
   },
 }));
 
-vi.mock('@/components/features/transactions/TransactionTable', () => ({
+vi.mock('@/components/features/transactions/transaction-table', () => ({
   default: ({ pendingAiCount, aiSuggestionsDismissed, onOpenAiSuggestions }: any) => (
     <div data-testid="transaction-table">
       {pendingAiCount > 0 && !aiSuggestionsDismissed && (
@@ -53,19 +53,19 @@ vi.mock('@/components/features/transactions/TransactionTable', () => ({
   ),
 }));
 
-vi.mock('@/components/features/transactions/FilterBar', () => ({
+vi.mock('@/components/features/transactions/filter-bar', () => ({
   default: () => <div data-testid="filter-bar" />,
 }));
 
-vi.mock('@/components/features/transactions/BulkActionsToolbar', () => ({
+vi.mock('@/components/features/transactions/bulk-actions-toolbar', () => ({
   default: () => null,
 }));
 
-vi.mock('@/components/features/transactions/TransactionDetailDrawer', () => ({
+vi.mock('@/components/features/transactions/transaction-detail-drawer', () => ({
   default: () => null,
 }));
 
-vi.mock('@/components/features/ai/AiSuggestionsModal', () => ({
+vi.mock('@/components/features/ai/ai-suggestions-modal', () => ({
   default: ({ open, onOpenChange }: any) =>
     open ? (
       <div data-testid="ai-suggestions-modal">

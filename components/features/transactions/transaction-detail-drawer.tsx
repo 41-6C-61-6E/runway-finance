@@ -6,8 +6,8 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Search, Sparkles, Plus, Repeat, Check } from 'lucide-react';
 import { toast } from 'sonner';
-import AiCategorizeButton from '@/components/features/transactions/AiCategorizeButton';
-import { MarkAsRecurringModal } from './MarkAsRecurringModal';
+import AiCategorizeButton from '@/components/features/transactions/ai-categorize-button';
+import { MarkAsRecurringModal } from './mark-as-recurring-modal';
 import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 

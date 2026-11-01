@@ -23,10 +23,10 @@ import { useUserSettings } from '@/components/user-settings-provider';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
 import { getPreciseDateRange } from '@/lib/utils/date-window';
-import { AccountTransactions } from '@/components/features/accounts/AccountTransactions';
-import AccountDetailPanel from '@/components/features/accounts/AccountDetailPanel';
-import GroupDetailPanel from '@/components/features/accounts/GroupDetailPanel';
-import AllAccountsDetailPanel from '@/components/features/accounts/AllAccountsDetailPanel';
+import { AccountTransactions } from '@/components/features/accounts/account-transactions';
+import AccountDetailPanel from '@/components/features/accounts/account-detail-panel';
+import GroupDetailPanel from '@/components/features/accounts/group-detail-panel';
+import AllAccountsDetailPanel from '@/components/features/accounts/all-accounts-detail-panel';
 import {
   type Account,
   type TagItem,

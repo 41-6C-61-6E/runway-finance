@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import DataExplorerPage from '@/components/features/data-explorer/DataExplorerPage';
+import DataExplorerPage from '@/components/features/data-explorer/data-explorer-page';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function DataPage() {

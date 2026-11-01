@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, X, Plus, Filter, RotateCcw, Settings2, EyeOff, Eye } from 'lucide-react';
-import DataExport from './DataExport';
+import DataExport from './data-export';
 import { IconButton } from '@/components/ui/icon-button';
 import { Select } from '@/components/ui/select';
 

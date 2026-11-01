@@ -27,7 +27,7 @@ import {
   Trash2,
   Eye,
 } from 'lucide-react';
-import CustomAlertRuleForm from './CustomAlertRuleForm';
+import CustomAlertRuleForm from './custom-alert-rule-form';
 import { formatBalance } from '@/lib/utils/format';
 import { ModalBackdrop } from '@/components/ui/modal-overlay';
 import { Spinner } from '@/components/ui/loading-spinner';

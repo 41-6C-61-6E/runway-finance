@@ -22,7 +22,7 @@ import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { cn } from '@/lib/utils';
 import type { UpcomingBill } from '@/lib/services/recurring-detection';
 import type { DailyCashFlowDay } from '@/lib/finance/daily-cash-flow';
-import { formatFrequencyLabel } from '@/components/features/transactions/RecurringCard';
+import { formatFrequencyLabel } from '@/components/features/transactions/recurring-card';
 import {
   buildCalendarCells,
   HEAT_CLASSES,

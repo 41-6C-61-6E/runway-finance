@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import AccountDetailPanel from '@/components/features/accounts/AccountDetailPanel';
+import AccountDetailPanel from '@/components/features/accounts/account-detail-panel';
 import type { Account } from '@/components/features/accounts/account-types';
 
 beforeAll(() => {

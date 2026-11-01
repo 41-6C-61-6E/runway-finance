@@ -56,7 +56,7 @@ import {
 import { LoadingSpinner, Spinner } from "@/components/ui/loading-spinner";
 import { SortableHeader } from "@/components/ui/sortable-header";
 import { ClickOutsideBackdrop } from "@/components/ui/modal-overlay";
-import AiCategorizeButton from "@/components/features/transactions/AiCategorizeButton";
+import AiCategorizeButton from "@/components/features/transactions/ai-categorize-button";
 import { ListRow } from "@/components/ui/list-row";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { IconButton } from "@/components/ui/icon-button";

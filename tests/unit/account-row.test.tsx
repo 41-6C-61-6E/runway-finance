@@ -2,7 +2,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import AccountRow, { type Account } from '@/components/features/accounts/AccountRow';
+import AccountRow, { type Account } from '@/components/features/accounts/account-row';
 import { isLiabilityAccount } from '@/lib/utils/account-scope';
 
 const mockPush = vi.fn();

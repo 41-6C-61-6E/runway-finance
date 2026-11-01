@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { Bell, BellOff, AlertTriangle, Play, Trash2 } from 'lucide-react';
 import type { AlertCondition, AlertConditionField, ConditionOperator, ConditionTreeNode } from '@/lib/db/schema/notifications';
-import CustomAlertRuleList from './CustomAlertRuleList';
+import CustomAlertRuleList from './custom-alert-rule-list';
 import { Select } from '@/components/ui/select';
 
 function urlBase64ToUint8Array(base64String: string) {

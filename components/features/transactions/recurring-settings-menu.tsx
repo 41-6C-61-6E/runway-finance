@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { SlidersHorizontal, RefreshCw, EyeOff, Trash2 } from 'lucide-react';
 import { FeatureSettingsMenu } from '@/components/ui/feature-settings-menu';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
-import { RecurringExclusionsDialog } from './RecurringExclusionsDialog';
+import { RecurringExclusionsDialog } from './recurring-exclusions-dialog';
 import { toast } from 'sonner';
 
 interface RecurringSettingsMenuProps {

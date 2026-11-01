@@ -20,11 +20,11 @@ import { AppTabs } from '@/components/ui/app-tabs';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { cn } from '@/lib/utils';
 import type { UpcomingBill } from '@/lib/services/recurring-detection';
-import type { RecurringItem } from '@/components/features/transactions/RecurringCard';
-import { formatFrequencyLabel } from '@/components/features/transactions/RecurringCard';
+import type { RecurringItem } from '@/components/features/transactions/recurring-card';
+import { formatFrequencyLabel } from '@/components/features/transactions/recurring-card';
 import { BillCalendarGrid } from '@/components/cash-flow/bill-calendar-grid';
-import RecurringDetailDrawer from '@/components/features/transactions/RecurringDetailDrawer';
-import TransactionDetailDrawer from '@/components/features/transactions/TransactionDetailDrawer';
+import RecurringDetailDrawer from '@/components/features/transactions/recurring-detail-drawer';
+import TransactionDetailDrawer from '@/components/features/transactions/transaction-detail-drawer';
 import { formatCurrency } from '@/lib/utils/format';
 import { useDailyCashFlow } from '@/lib/hooks/use-daily-cash-flow';
 import {

@@ -4,10 +4,10 @@ import React, { useRef, useEffect, useState } from 'react';
 import { AlertCircle, RotateCcw, User, Bot } from 'lucide-react';
 import { Spinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
-import { AdviceMarkdown } from './AdviceMarkdown';
-import { AdviceSources } from './AdviceSources';
-import { AdviceSuggestions } from './AdviceSuggestions';
-import type { AdviceMessage, AdvicePhase } from './useAdviceStream';
+import { AdviceMarkdown } from './advice-markdown';
+import { AdviceSources } from './advice-sources';
+import { AdviceSuggestions } from './advice-suggestions';
+import type { AdviceMessage, AdvicePhase } from './use-advice-stream';
 import type { PageContext } from '@/lib/advice/router';
 
 export interface AdviceMessageListProps {

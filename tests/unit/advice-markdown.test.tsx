@@ -2,13 +2,13 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { AdviceMarkdown } from '@/components/features/advice/AdviceMarkdown';
+import { AdviceMarkdown } from '@/components/features/advice/advice-markdown';
 
 vi.mock('@/components/privacy-mode-provider', () => ({
   usePrivacyMode: () => ({ privacyMode: false }),
 }));
 
-describe('AdviceMarkdown', () => {
+describe('advice-markdown', () => {
   it('renders headings as h3 or h4 and never h1 or h2', () => {
     const markdown = '# Main Heading\n## Sub Heading\n### Section Heading';
     const { container } = render(<AdviceMarkdown content={markdown} />);

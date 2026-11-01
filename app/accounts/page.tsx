@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import type { Account, TagItem } from '@/components/features/accounts/account-types';
-import AccountHierarchyTree from '@/components/features/accounts/AccountHierarchyTree';
+import AccountHierarchyTree from '@/components/features/accounts/account-hierarchy-tree';
 
 function AccountsContent() {
   const { data: session } = useSession();

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUserSettings } from '@/components/user-settings-provider';
-import ImportTab from './ImportTab';
+import ImportTab from './import-tab';
 import { Select } from '@/components/ui/select';
 import { formatFileSize } from '@/lib/utils/format';
 

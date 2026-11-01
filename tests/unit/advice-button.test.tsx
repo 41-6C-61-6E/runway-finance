@@ -2,10 +2,10 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AdviceButton } from '@/components/features/advice/AdviceButton';
-import * as AdviceProviderModule from '@/components/features/advice/AdviceProvider';
+import { AdviceButton } from '@/components/features/advice/advice-button';
+import * as AdviceProviderModule from '@/components/features/advice/advice-provider';
 
-vi.mock('@/components/features/advice/AdviceProvider', () => ({
+vi.mock('@/components/features/advice/advice-provider', () => ({
   useAdvice: vi.fn(),
   useAsk: vi.fn(),
 }));

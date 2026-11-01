@@ -9,7 +9,7 @@ import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/ho
 import { useReduceTransparency } from '@/lib/hooks/use-reduce-transparency'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { AdviceButton } from '@/components/features/advice/AdviceButton'
+import { AdviceButton } from '@/components/features/advice/advice-button'
 
 export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from '@/components/sidebar-context'
 

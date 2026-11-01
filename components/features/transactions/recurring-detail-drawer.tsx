@@ -41,7 +41,7 @@ import {
   Landmark,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/loading-spinner';
-import type { RecurringItem } from './RecurringCard';
+import type { RecurringItem } from './recurring-card';
 import type { FrequencyType } from '@/lib/services/recurring-detection';
 import { toast } from 'sonner';
 import { Select } from '@/components/ui/select';

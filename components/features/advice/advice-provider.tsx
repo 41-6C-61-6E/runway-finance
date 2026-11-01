@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { useAdviceStream, type AdviceMessage, type AdvicePhase, type AskMessage, type AskPhase } from './useAdviceStream';
+import { useAdviceStream, type AdviceMessage, type AdvicePhase, type AskMessage, type AskPhase } from './use-advice-stream';
 import type { PageContext } from '@/lib/advice/router';
 import { ADVICE_CONFIG } from '@/lib/advice/config';
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Check, Repeat } from 'lucide-react';
-import { MarkAsRecurringModal } from './MarkAsRecurringModal';
+import { MarkAsRecurringModal } from './mark-as-recurring-modal';
 
 interface BulkActionsToolbarProps {
   selectedIds: string[];

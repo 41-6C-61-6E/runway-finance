@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import type { SourceItem } from './AdviceSources';
+import type { SourceItem } from './advice-sources';
 
 export interface AdviceMessage {
   id: string;

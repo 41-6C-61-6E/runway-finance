@@ -4,7 +4,7 @@ import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useAdvice } from './AdviceProvider';
+import { useAdvice } from './advice-provider';
 
 export interface AdviceButtonProps {
   className?: string;

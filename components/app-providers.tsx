@@ -7,7 +7,7 @@ import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
 import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
 import { AccountSubheadingsProvider } from '@/components/account-subheadings-provider';
 import { MobileSubNavProvider } from '@/components/mobile-subnav-context';
-import { AdviceProvider } from '@/components/features/advice/AdviceProvider';
+import { AdviceProvider } from '@/components/features/advice/advice-provider';
 
 /**
  * Composed provider tree for authenticated layouts in canonical dependency order.

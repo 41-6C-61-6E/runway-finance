@@ -77,7 +77,7 @@ vi.mock('@/components/features/charts/date-window-nav', () => ({
   DateWindowNav: () => null,
 }));
 
-import GroupDetailPanel from '@/components/features/accounts/GroupDetailPanel';
+import GroupDetailPanel from '@/components/features/accounts/group-detail-panel';
 import type { Account } from '@/components/features/accounts/account-types';
 
 // Build daily history rows from startDate through 2026-09-03.

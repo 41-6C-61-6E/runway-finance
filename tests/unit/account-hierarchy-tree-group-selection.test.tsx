@@ -43,12 +43,12 @@ vi.mock('@/components/user-settings-provider', () => ({
 }));
 
 // Child renderers: stub the heavy chart panel and the transaction feed that does a real fetch
-vi.mock('@/components/features/accounts/AccountTransactions', () => ({
+vi.mock('@/components/features/accounts/account-transactions', () => ({
   AccountTransactions: ({ accountId }: { accountId: string }) => (
     <div data-testid={`account-transactions-stub-${accountId}`} />
   ),
 }));
-vi.mock('@/components/features/accounts/AccountDetailPanel', () => ({
+vi.mock('@/components/features/accounts/account-detail-panel', () => ({
   default: ({ account }: { account: { name: string } | null }) => (
     <div
       data-testid="account-detail-panel-stub"
@@ -56,10 +56,10 @@ vi.mock('@/components/features/accounts/AccountDetailPanel', () => ({
     />
   ),
 }));
-vi.mock('@/components/features/accounts/GroupDetailPanel', () => ({
+vi.mock('@/components/features/accounts/group-detail-panel', () => ({
   default: () => <div data-testid="group-detail-panel-stub" />,
 }));
-vi.mock('@/components/features/accounts/AllAccountsDetailPanel', () => ({
+vi.mock('@/components/features/accounts/all-accounts-detail-panel', () => ({
   default: () => <div data-testid="all-accounts-detail-panel-stub" />,
 }));
 vi.mock('recharts', () => ({
@@ -76,7 +76,7 @@ vi.mock('recharts', () => ({
   YAxis: () => null,
 }));
 
-import AccountHierarchyTree from '@/components/features/accounts/AccountHierarchyTree';
+import AccountHierarchyTree from '@/components/features/accounts/account-hierarchy-tree';
 import type { Account } from '@/components/features/accounts/account-types';
 
 const accounts: Account[] = [

@@ -15,7 +15,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
 import type { CalendarCell } from './calendar-cells';
 import type { UpcomingBill } from '@/lib/services/recurring-detection';
-import { formatFrequencyLabel } from '@/components/features/transactions/RecurringCard';
+import { formatFrequencyLabel } from '@/components/features/transactions/recurring-card';
 import { useDayTransactions } from '@/lib/hooks/use-daily-cash-flow';
 import { CategorySplitBar } from './category-split-bar';
 

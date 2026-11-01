@@ -18,7 +18,7 @@ import {
   ChevronRight,
   GripVertical,
 } from 'lucide-react';
-import RowExpansion from './RowExpansion';
+import RowExpansion from './row-expansion';
 import { TableScroll } from '@/components/ui/table-scroll';
 import { PageLoading } from '@/components/ui/page-loading';
 import { Select } from '@/components/ui/select';

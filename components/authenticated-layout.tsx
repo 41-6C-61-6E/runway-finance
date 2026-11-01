@@ -10,8 +10,8 @@ import { AuthenticatedProviders } from '@/components/app-providers';
 import { MobileNav } from '@/components/mobile-nav';
 import { PullToRefresh } from '@/components/pull-to-refresh';
 import { ReactNode, useState, useEffect } from 'react';
-import { useAdvice } from '@/components/features/advice/AdviceProvider';
-import { AdviceSheet } from '@/components/features/advice/AdviceSheet';
+import { useAdvice } from '@/components/features/advice/advice-provider';
+import { AdviceSheet } from '@/components/features/advice/advice-sheet';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();

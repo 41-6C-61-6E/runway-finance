@@ -19,7 +19,7 @@ import {
   OTHER_KEY,
   pickTopSeries,
   buildAggregatedValues,
-} from '@/components/features/accounts/AccountHistoryChart';
+} from '@/components/features/accounts/account-history-chart';
 
 // Build `rows` where every key has a constant value per row. A key with a
 // constant `mag` has average |value| === mag, so top-N ranking is trivial to

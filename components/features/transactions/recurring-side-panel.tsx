@@ -15,7 +15,7 @@ import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { formatCurrency } from '@/lib/utils/format';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { cn } from '@/lib/utils';
-import type { RecurringItem } from './RecurringCard';
+import type { RecurringItem } from './recurring-card';
 
 interface SummaryData {
   monthlyExpenses: number;

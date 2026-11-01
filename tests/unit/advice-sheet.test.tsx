@@ -2,8 +2,8 @@
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AdviceSheet } from '@/components/features/advice/AdviceSheet';
-import { AdviceProvider, useAdvice } from '@/components/features/advice/AdviceProvider';
+import { AdviceSheet } from '@/components/features/advice/advice-sheet';
+import { AdviceProvider, useAdvice } from '@/components/features/advice/advice-provider';
 
 vi.mock('@/components/privacy-mode-provider', () => ({
   usePrivacyMode: () => ({ privacyMode: false }),
