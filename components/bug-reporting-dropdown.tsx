@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useIsMobile } from '@/lib/hooks/use-is-mobile';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Bug, 
@@ -74,6 +76,13 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
   const [editStatus, setEditStatus] = useState<string>('reported');
 
   const ref = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 1. Query Config
   const { data: config } = useQuery({
@@ -214,7 +223,23 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement | null;
+      if (
+        !target ||
+        !document.body.contains(target) ||
+        target.closest('[role="dialog"]') ||
+        target.closest('[role="alertdialog"]') ||
+        target.closest('[data-radix-portal]') ||
+        target.closest('[role="tooltip"]')
+      ) {
+        return;
+      }
+
+      if (
+        ref.current &&
+        !ref.current.contains(target) &&
+        (!dropdownRef.current || !dropdownRef.current.contains(target))
+      ) {
         setOpen(false);
       }
     }
@@ -366,29 +391,54 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
         <TooltipContent side="bottom" className="hidden md:block">Bugs & Feedback</TooltipContent>
       </Tooltip>
 
-      {open && (
-        <div className="fixed inset-x-2.5 top-16 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-1 sm:mx-0 w-auto sm:w-[420px] max-w-lg mx-auto p-4 bg-card border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right max-h-[calc(100dvh-5.5rem)] sm:max-h-[640px] flex flex-col overflow-hidden">
-          {/* Header Tab Buttons */}
-          <div className="flex p-0.5 rounded-lg bg-muted mb-4">
-            <button
-              type="button"
-              onClick={() => setTab('report')}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                tab === 'report' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Report Issue
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('track')}
-              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                tab === 'track' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Open Issues ({openIssues.length})
-            </button>
-          </div>
+      {open && (() => {
+        const dropdownElement = (
+          <div
+            ref={dropdownRef}
+            className={
+              isMobile
+                ? "fixed inset-x-3 sm:inset-x-6 z-50 max-w-lg mx-auto p-4 bg-card border border-border rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-100 ease-out max-h-[calc(100svh-6.5rem)] flex flex-col overflow-hidden"
+                : "absolute right-0 top-full mt-1 w-[420px] max-w-lg p-4 bg-card border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right max-h-[640px] flex flex-col overflow-hidden"
+            }
+            style={
+              isMobile
+                ? {
+                    top: 'calc(var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 14px)) + 46px)',
+                  }
+                : undefined
+            }
+          >
+            {/* Header Tab Buttons */}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex flex-1 p-0.5 rounded-lg bg-muted">
+                <button
+                  type="button"
+                  onClick={() => setTab('report')}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    tab === 'report' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Report Issue
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('track')}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    tab === 'track' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Open Issues ({openIssues.length})
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors sm:hidden"
+                aria-label="Close feedback panel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
           {/* Tab Content: Report Form */}
           {tab === 'report' ? (
@@ -735,8 +785,25 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
               )}
             </div>
           )}
-        </div>
-      )}
+          </div>
+        );
+
+        if (isMobile && mounted && typeof document !== 'undefined') {
+          return createPortal(
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden"
+                onClick={() => setOpen(false)}
+                aria-hidden="true"
+              />
+              {dropdownElement}
+            </>,
+            document.body
+          );
+        }
+
+        return dropdownElement;
+      })()}
     </div>
   );
 }

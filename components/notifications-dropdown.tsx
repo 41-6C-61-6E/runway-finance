@@ -1,6 +1,8 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useIsMobile } from '@/lib/hooks/use-is-mobile';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Bell, Check, ExternalLink, Inbox, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Landmark, Calendar, CreditCard, Target, TrendingUp } from 'lucide-react';
@@ -116,6 +118,13 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
   const [serverUnreadCount, setServerUnreadCount] = useState<number | null>(null);
   const [filter, setFilter] = useState<'all' | 'money' | 'sync' | 'milestones'>('all');
   const ref = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const prevUnreadCountRef = useRef(0);
 
   const unreadCount =
@@ -186,7 +195,11 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
         return;
       }
 
-      if (ref.current && !ref.current.contains(target)) {
+      if (
+        ref.current &&
+        !ref.current.contains(target) &&
+        (!dropdownRef.current || !dropdownRef.current.contains(target))
+      ) {
         setOpen(false);
       }
     }
@@ -391,8 +404,23 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
         <TooltipContent side="bottom" className="hidden md:block">Notifications</TooltipContent>
       </Tooltip>
 
-      {open && (
-        <div className="fixed inset-x-2.5 top-16 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:mx-0 w-auto sm:w-96 max-w-lg mx-auto bg-popover border border-border rounded-xl shadow-xl z-50 flex flex-col overflow-hidden max-h-[calc(100dvh-5.5rem)] sm:max-h-[520px] text-foreground">
+      {open && (() => {
+        const dropdownElement = (
+          <div
+            ref={dropdownRef}
+            className={
+              isMobile
+                ? "fixed inset-x-3 sm:inset-x-6 z-50 max-w-lg mx-auto bg-popover border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[calc(100svh-6.5rem)] text-foreground"
+                : "absolute right-0 top-full mt-2 w-96 max-w-lg bg-popover border border-border rounded-xl shadow-xl z-50 flex flex-col overflow-hidden max-h-[520px] text-foreground"
+            }
+            style={
+              isMobile
+                ? {
+                    top: 'calc(var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 14px)) + 46px)',
+                  }
+                : undefined
+            }
+          >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
             <span className="font-semibold text-sm">Notifications</span>
@@ -427,6 +455,14 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
                 aria-label="Notification settings"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus:outline-none sm:hidden"
+                aria-label="Close notifications panel"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -541,8 +577,25 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
               })
             )}
           </div>
-        </div>
-      )}
+          </div>
+        );
+
+        if (isMobile && mounted && typeof document !== 'undefined') {
+          return createPortal(
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden"
+                onClick={() => setOpen(false)}
+                aria-hidden="true"
+              />
+              {dropdownElement}
+            </>,
+            document.body
+          );
+        }
+
+        return dropdownElement;
+      })()}
     </div>
   );
 }

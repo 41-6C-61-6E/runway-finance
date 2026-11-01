@@ -70,9 +70,9 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       {/* Mobile-only fixed floating actions pill */}
       <div
         style={{
-          top: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 8px))',
+          top: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 14px))',
         } as React.CSSProperties}
-        className={`fixed right-4 z-40 md:hidden flex items-center gap-1.5 py-1 px-2.5 rounded-full ${glassBar} transition-all duration-300 ease-out ${isVisible ? 'translate-y-0 opacity-100 pointer-events-auto visible' : '-translate-y-16 opacity-0 pointer-events-none invisible'
+        className={`fixed right-4 z-40 md:hidden flex items-center gap-1 py-0.5 px-2 rounded-full ${glassBar} transition-all duration-300 ease-out ${isVisible ? 'translate-y-0 opacity-100 pointer-events-auto visible' : '-translate-y-16 opacity-0 pointer-events-none invisible'
           }`}
       >
         {privacyMode && (
@@ -95,7 +95,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       {/* Mobile-only scrolling title & children container */}
       <div
         style={{
-          paddingTop: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 8px))',
+          paddingTop: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 14px))',
         } as React.CSSProperties}
         className="flex flex-col gap-3 px-4 pb-1.5 md:hidden w-full"
       >

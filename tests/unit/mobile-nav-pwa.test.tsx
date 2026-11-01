@@ -92,7 +92,7 @@ describe('MobileNav PWA & Accessibility', () => {
     expect(nav).not.toBeNull();
     expect(nav?.className).toContain('fixed');
     expect(nav?.className).toContain('bottom-0');
-    expect(nav?.className).toContain('h-14');
+    expect(nav?.className).toContain('h-16');
     expect(nav?.getAttribute('style') ?? '').not.toContain('safe-area-inset-bottom');
   });
 });

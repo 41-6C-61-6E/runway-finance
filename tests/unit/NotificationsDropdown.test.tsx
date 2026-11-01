@@ -177,4 +177,31 @@ describe('NotificationsDropdown Component', () => {
       expect(screen.queryByText('Alert: Budget exceeded')).toBeNull();
     });
   });
+
+  it('renders portaled wide box on mobile viewports', async () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    render(<NotificationsDropdown />);
+
+    const bellButton = screen.getByRole('button', { name: /notifications/i });
+    fireEvent.click(bellButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Mark all read')).toBeDefined();
+    });
+
+    const panel = screen.getByText('Mark all read').closest('[class*="fixed"]');
+    expect(panel).not.toBeNull();
+    expect(panel?.className).toContain('inset-x-3');
+    expect(panel?.className).toContain('max-w-lg');
+  });
 });

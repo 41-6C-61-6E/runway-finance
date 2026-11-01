@@ -116,12 +116,12 @@ html.text-size-lg {
 }
 
 :root {
-  --mobile-header-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  --mobile-header-top: calc(env(safe-area-inset-top, 0px) + 14px);
 }
 
 @supports (-webkit-touch-callout: none) {
   :root {
-    --mobile-header-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    --mobile-header-top: calc(env(safe-area-inset-top, 0px) + 16px);
   }
 }
 

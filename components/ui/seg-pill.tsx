@@ -41,7 +41,7 @@ export const glassItemInactive =
 
 /** Base classes for square/round icon buttons that live inside a glass bar. */
 export const glassIconButton =
-  'relative inline-flex items-center justify-center p-2 min-w-10 min-h-10 rounded-full active:scale-95';
+  'relative inline-flex items-center justify-center p-1.5 md:p-2 min-w-9 md:min-w-10 min-h-9 md:min-h-10 rounded-full active:scale-95';
 
 export interface SegPillOption<T extends string = string> {
   id: T;

@@ -86,7 +86,7 @@ export function MobileViewSwitcher({
   const isSummaryActive = internalTab === 'summary';
 
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full flex-1 flex flex-col", className)}>
       {/* ── Desktop View (md and up): Choice of Grid or Stacked Layout ── */}
       <div className="hidden md:block space-y-6">
         {desktopHeader}
@@ -154,22 +154,12 @@ export function MobileViewSwitcher({
         )}
       </div>
 
-      {/* ── Mobile View (< md): First-class Underline Tabs & Swipe Navigation ── */}
-      <div className="md:hidden w-full">
+      {/* ── Mobile View (< md): Swipe Navigation with Pagination Dots ── */}
+      <div className="md:hidden w-full flex-1 flex flex-col">
         <MobileTabSwipeContainer
           tabs={mobileTabs}
           activeTabId={internalTab}
           onTabChange={handleMobileTabChange}
-          header={
-            <div className="mb-3 sm:mb-3.5">
-              <AppTabs
-                tabs={mobileTabs}
-                activeTab={internalTab}
-                onChange={handleMobileTabChange}
-                variant="underline"
-              />
-            </div>
-          }
         >
           <div className="space-y-5 sm:space-y-6">
             {isSummaryActive ? summary : main}
@@ -321,9 +311,9 @@ export function MobileTabSwipeContainer({
   };
 
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full flex-1 flex flex-col", className)}>
       {desktopHeader && <div className="hidden md:block mb-3 sm:mb-3.5">{desktopHeader}</div>}
-      {header && <div className="mb-3 sm:mb-3.5">{header}</div>}
+      {header && <div className="hidden md:block mb-3 sm:mb-3.5">{header}</div>}
 
       {/* Touch Swipe Container with clean fade transition and no rubber-band bounce */}
       <div
@@ -331,9 +321,9 @@ export function MobileTabSwipeContainer({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
-        className="w-full"
+        className="w-full flex-1 min-h-[calc(100svh-10rem)] md:min-h-0 flex flex-col"
       >
-        <div key={activeTabId} className="w-full animate-in fade-in-50 duration-150">
+        <div key={activeTabId} className="w-full flex-1 flex flex-col animate-in fade-in-50 duration-150">
           {children}
         </div>
       </div>

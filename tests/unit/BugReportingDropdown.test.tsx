@@ -259,4 +259,30 @@ describe('BugReportingDropdown status update', () => {
       );
     });
   });
+
+  it('renders portaled wide box on mobile viewports', async () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    renderDropdown();
+    const btn = await screen.findByRole('button', { name: /Submit Feedback/i });
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Report Issue')).toBeDefined();
+    });
+
+    const panel = screen.getByText('Report Issue').closest('[class*="fixed"]');
+    expect(panel).not.toBeNull();
+    expect(panel?.className).toContain('inset-x-3');
+    expect(panel?.className).toContain('max-w-lg');
+  });
 });
