@@ -1,17 +1,17 @@
 {
-  "clientFetch": 371,
+  "clientFetch": 365,
   "inlineQueryKey": 53,
   "routesAuth": 135,
   "nextResponseJson": 122,
   "fixedInset0": 20,
-  "rawLoader2": 65,
+  "rawLoader2": 64,
   "intlFormat": 25,
-  "anyInProd": 960,
-  "hexLiterals": 410,
-  "textPixel": 1162,
-  "styleAttr": 295,
+  "anyInProd": 949,
+  "hexLiterals": 379,
+  "textPixel": 1152,
+  "styleAttr": 286,
   "directLocalStorage": 37,
   "consoleInProd": 134,
   "processEnvDirect": 87,
-  "pascalCaseComponents": 59
+  "pascalCaseComponents": 58
 }

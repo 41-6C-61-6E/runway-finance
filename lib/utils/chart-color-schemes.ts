@@ -129,15 +129,3 @@ function muteOklchColor(color: string): string {
   const newC = Math.max(c * 0.5, 0.05);
   return `oklch(${newL.toFixed(3)} ${newC.toFixed(3)} ${h.toFixed(0)})`;
 }
-
-export function resetChartColorScheme() {
-  currentSchemeId = null;
-  if (typeof window === 'undefined') return;
-  const r = document.documentElement;
-  for (let i = 1; i <= 5; i++) {
-    r.style.removeProperty(`--chart-${i}`);
-  }
-  r.style.removeProperty('--constructive');
-  r.style.removeProperty('--chart-synthetic');
-  r.style.removeProperty('--destructive-synthetic');
-}

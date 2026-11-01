@@ -73,7 +73,7 @@ export function wrapToLines(measureEl: SVGTextElement, text: string, maxW: numbe
 /**
  * Measured sankey node label.
  *
- * The three sankey charts (`sankey-nodes.tsx`, `cash-flow-sankey.tsx`,
+ * The sankey charts (`cash-flow-sankey.tsx`,
  * `wealth-flow-sankey.tsx`) each hard-truncated node names at a *character
  * count* (22/8/24), which reads as "Payroll Tax (SS / Medi…" at 1440px with
  * hundreds of blank canvas pixels to the right. This component truncates

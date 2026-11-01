@@ -120,18 +120,6 @@ export function handleApiError(e: unknown, fallback = 'An unexpected error occur
   return apiInternalError(fallback);
 }
 
-export function guarded<TArgs extends any[]>(
-  fn: (...args: TArgs) => Promise<NextResponse | Response>
-): (...args: TArgs) => Promise<NextResponse | Response> {
-  return async (...args: TArgs) => {
-    try {
-      return await fn(...args);
-    } catch (err) {
-      return handleApiError(err);
-    }
-  };
-}
-
 export async function parseAndValidateBody<T>(
   req: Request,
   schema: ZodSchema<T>

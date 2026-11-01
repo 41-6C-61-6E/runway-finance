@@ -35,7 +35,8 @@ the shortest distinguishing word (`Cash vs Credit` → `Coverage`,
 | Page             | Tabs                                                    | Count |
 | ---------------- | ------------------------------------------------------- | :---: |
 | /transactions    | Transactions, Recurring, Calendar                       | 3     |
-| /accounts        | List, History                                           | 2     |
+| /accounts        | _(None — unified hierarchy tree & detail drawer)_       | 0     |
+| /goals           | _(None — goals list, progress & projections)_           | 0     |
 | /spending        | Breakdown, Coverage                                     | 2     |
 | /investments     | Overview, Holdings, Activity                            | 3     |
 | /plans           | Projection, Scenarios, Settings                         | 3     |

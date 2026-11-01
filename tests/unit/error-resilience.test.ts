@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   handleApiError,
-  guarded,
   apiSuccess,
   apiValidation,
   apiTooManyRequests,
@@ -72,30 +71,6 @@ describe('Error Resilience & Standardization Suite', () => {
       expect(json.message).toBe('An unexpected error occurred');
       expect(JSON.stringify(json)).not.toContain('FATAL');
       expect(JSON.stringify(json)).not.toContain('database secret');
-    });
-  });
-
-  describe('lib/api/response.ts - guarded wrapper', () => {
-    it('returns successful response without catching', async () => {
-      const handler = guarded(async () => {
-        return apiSuccess({ ok: true });
-      });
-
-      const response = await handler();
-      expect(response.status).toBe(200);
-      const json = await response.json();
-      expect(json.ok).toBe(true);
-    });
-
-    it('traps thrown errors and returns standardized NextResponse', async () => {
-      const handler = guarded(async () => {
-        throw new Error('Something broke inside handler');
-      });
-
-      const response = await handler();
-      expect(response.status).toBe(500);
-      const json = await response.json();
-      expect(json.error).toBe('internal_error');
     });
   });
 
