@@ -1,0 +1,53 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`API Route Characterization Snapshots > Authenticated Success Snapshots > characterizes /api/accounts empty response 1`] = `[]`;
+
+exports[`API Route Characterization Snapshots > Authenticated Success Snapshots > characterizes /api/bug-reporting/config response 1`] = `
+{
+  "enabled": false,
+}
+`;
+
+exports[`API Route Characterization Snapshots > Authenticated Success Snapshots > characterizes /api/categories empty response 1`] = `[]`;
+
+exports[`API Route Characterization Snapshots > Authenticated Success Snapshots > characterizes /api/tags empty response 1`] = `[]`;
+
+exports[`API Route Characterization Snapshots > GET /api/health and /api/version > characterizes /api/version response envelope 1`] = `
+[
+  "buildNumber",
+  "buildTime",
+  "hash",
+]
+`;
+
+exports[`API Route Characterization Snapshots > Unauthenticated Rejection Snapshots > characterizes 401 unauthenticated response shape for /api/accounts 1`] = `
+{
+  "error": "unauthenticated",
+  "message": "Authentication required",
+}
+`;
+
+exports[`API Route Characterization Snapshots > Unauthenticated Rejection Snapshots > characterizes 401 unauthenticated response shape for /api/categories 1`] = `
+{
+  "error": "unauthenticated",
+}
+`;
+
+exports[`API Route Characterization Snapshots > Unauthenticated Rejection Snapshots > characterizes 401 unauthenticated response shape for /api/notifications 1`] = `
+{
+  "error": "Unauthorized",
+  "message": "Authentication required",
+}
+`;
+
+exports[`API Route Characterization Snapshots > Unauthenticated Rejection Snapshots > characterizes 401 unauthenticated response shape for /api/tags 1`] = `
+{
+  "error": "unauthenticated",
+}
+`;
+
+exports[`API Route Characterization Snapshots > Unauthenticated Rejection Snapshots > characterizes 401 unauthenticated response shape for /api/user-settings 1`] = `
+{
+  "error": "Unauthorized",
+}
+`;

@@ -1,0 +1,275 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Date Utilities Characterization Matrix > characterizes formatSafeUTCDate outputs 1`] = `
+[
+  {
+    "input": "2026-01-01",
+    "output": "Jan 26",
+  },
+  {
+    "input": "2026-02-28",
+    "output": "Feb 26",
+  },
+  {
+    "input": "2024-02-29",
+    "output": "Feb 24",
+  },
+  {
+    "input": "2026-12-31",
+    "output": "Dec 26",
+  },
+  {
+    "input": "2026-06-15T12:00:00Z",
+    "output": "Jun 26",
+  },
+  {
+    "input": "2026-07",
+    "output": "Jul 26",
+  },
+  {
+    "input": "",
+    "output": "",
+  },
+  {
+    "input": "invalid-date",
+    "output": "Invalid Date",
+  },
+]
+`;
+
+exports[`Date Utilities Characterization Matrix > characterizes shiftDaysUTC shifts across month and leap boundaries 1`] = `
+[
+  {
+    "input": "2026-01-01",
+    "shifts": [
+      {
+        "days": -31,
+        "result": "2025-12-01",
+      },
+      {
+        "days": -1,
+        "result": "2025-12-31",
+      },
+      {
+        "days": 0,
+        "result": "2026-01-01",
+      },
+      {
+        "days": 1,
+        "result": "2026-01-02",
+      },
+      {
+        "days": 31,
+        "result": "2026-02-01",
+      },
+      {
+        "days": 365,
+        "result": "2027-01-01",
+      },
+    ],
+  },
+  {
+    "input": "2026-02-28",
+    "shifts": [
+      {
+        "days": -31,
+        "result": "2026-01-28",
+      },
+      {
+        "days": -1,
+        "result": "2026-02-27",
+      },
+      {
+        "days": 0,
+        "result": "2026-02-28",
+      },
+      {
+        "days": 1,
+        "result": "2026-03-01",
+      },
+      {
+        "days": 31,
+        "result": "2026-03-31",
+      },
+      {
+        "days": 365,
+        "result": "2027-02-28",
+      },
+    ],
+  },
+  {
+    "input": "2024-02-29",
+    "shifts": [
+      {
+        "days": -31,
+        "result": "2024-01-29",
+      },
+      {
+        "days": -1,
+        "result": "2024-02-28",
+      },
+      {
+        "days": 0,
+        "result": "2024-02-29",
+      },
+      {
+        "days": 1,
+        "result": "2024-03-01",
+      },
+      {
+        "days": 31,
+        "result": "2024-03-31",
+      },
+      {
+        "days": 365,
+        "result": "2025-02-28",
+      },
+    ],
+  },
+  {
+    "input": "2026-12-31",
+    "shifts": [
+      {
+        "days": -31,
+        "result": "2026-11-30",
+      },
+      {
+        "days": -1,
+        "result": "2026-12-30",
+      },
+      {
+        "days": 0,
+        "result": "2026-12-31",
+      },
+      {
+        "days": 1,
+        "result": "2027-01-01",
+      },
+      {
+        "days": 31,
+        "result": "2027-01-31",
+      },
+      {
+        "days": 365,
+        "result": "2027-12-31",
+      },
+    ],
+  },
+  {
+    "input": "2026-06-15T12:00:00Z",
+    "shifts": [
+      {
+        "days": -31,
+        "result": "2026-05-15",
+      },
+      {
+        "days": -1,
+        "result": "2026-06-14",
+      },
+      {
+        "days": 0,
+        "result": "2026-06-15",
+      },
+      {
+        "days": 1,
+        "result": "2026-06-16",
+      },
+      {
+        "days": 31,
+        "result": "2026-07-16",
+      },
+      {
+        "days": 365,
+        "result": "2027-06-15",
+      },
+    ],
+  },
+  {
+    "input": "2026-07",
+    "shifts": [
+      {
+        "days": -31,
+        "result": "",
+      },
+      {
+        "days": -1,
+        "result": "",
+      },
+      {
+        "days": 0,
+        "result": "",
+      },
+      {
+        "days": 1,
+        "result": "",
+      },
+      {
+        "days": 31,
+        "result": "",
+      },
+      {
+        "days": 365,
+        "result": "",
+      },
+    ],
+  },
+  {
+    "input": "",
+    "shifts": [
+      {
+        "days": -31,
+        "result": "",
+      },
+      {
+        "days": -1,
+        "result": "",
+      },
+      {
+        "days": 0,
+        "result": "",
+      },
+      {
+        "days": 1,
+        "result": "",
+      },
+      {
+        "days": 31,
+        "result": "",
+      },
+      {
+        "days": 365,
+        "result": "",
+      },
+    ],
+  },
+  {
+    "input": "invalid-date",
+    "shifts": [
+      {
+        "days": -31,
+        "result": "",
+      },
+      {
+        "days": -1,
+        "result": "",
+      },
+      {
+        "days": 0,
+        "result": "",
+      },
+      {
+        "days": 1,
+        "result": "",
+      },
+      {
+        "days": 31,
+        "result": "",
+      },
+      {
+        "days": 365,
+        "result": "",
+      },
+    ],
+  },
+]
+`;

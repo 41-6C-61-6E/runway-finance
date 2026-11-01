@@ -1,0 +1,424 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Account Scope Utilities Characterization Matrix > characterizes getSignedNetWorthBalance across balance and account types 1`] = `
+[
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "checking",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "checking",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "checking",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "savings",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "savings",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "savings",
+  },
+  {
+    "balance": 1000,
+    "signed": -1000,
+    "type": "credit",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "credit",
+  },
+  {
+    "balance": 0,
+    "signed": -0,
+    "type": "credit",
+  },
+  {
+    "balance": 1000,
+    "signed": -1000,
+    "type": "loan",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "loan",
+  },
+  {
+    "balance": 0,
+    "signed": -0,
+    "type": "loan",
+  },
+  {
+    "balance": 1000,
+    "signed": -1000,
+    "type": "mortgage",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "mortgage",
+  },
+  {
+    "balance": 0,
+    "signed": -0,
+    "type": "mortgage",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "investment",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "investment",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "investment",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "brokerage",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "brokerage",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "brokerage",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "401k",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "401k",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "401k",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "rothira",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "rothira",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "rothira",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "traditionalira",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "traditionalira",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "traditionalira",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "realestate",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "realestate",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "realestate",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "vehicle",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "vehicle",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "vehicle",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "crypto",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "crypto",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "crypto",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "other",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "other",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "other",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "unknown_custom_type",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "unknown_custom_type",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "unknown_custom_type",
+  },
+  {
+    "balance": 1000,
+    "signed": 1000,
+    "type": "",
+  },
+  {
+    "balance": -1000,
+    "signed": -1000,
+    "type": "",
+  },
+  {
+    "balance": 0,
+    "signed": 0,
+    "type": "",
+  },
+]
+`;
+
+exports[`Account Scope Utilities Characterization Matrix > characterizes getTaxWrapper classification 1`] = `
+[
+  {
+    "account": {
+      "name": "Company 401(k)",
+      "type": "401k",
+    },
+    "wrapper": "Tax-Deferred",
+  },
+  {
+    "account": {
+      "name": "Roth IRA",
+      "type": "rothira",
+    },
+    "wrapper": "Tax-Free",
+  },
+  {
+    "account": {
+      "name": "Taxable Brokerage",
+      "type": "brokerage",
+    },
+    "wrapper": "Taxable",
+  },
+  {
+    "account": {
+      "name": "Main Checking",
+      "type": "checking",
+    },
+    "wrapper": "Taxable",
+  },
+  {
+    "account": {
+      "name": "Health Savings",
+      "type": "hsa",
+    },
+    "wrapper": "Tax-Free",
+  },
+]
+`;
+
+exports[`Account Scope Utilities Characterization Matrix > characterizes isAssetAccount across account types 1`] = `
+[
+  {
+    "isAsset": true,
+    "type": "checking",
+  },
+  {
+    "isAsset": true,
+    "type": "savings",
+  },
+  {
+    "isAsset": false,
+    "type": "credit",
+  },
+  {
+    "isAsset": false,
+    "type": "loan",
+  },
+  {
+    "isAsset": false,
+    "type": "mortgage",
+  },
+  {
+    "isAsset": true,
+    "type": "investment",
+  },
+  {
+    "isAsset": true,
+    "type": "brokerage",
+  },
+  {
+    "isAsset": true,
+    "type": "401k",
+  },
+  {
+    "isAsset": true,
+    "type": "rothira",
+  },
+  {
+    "isAsset": true,
+    "type": "traditionalira",
+  },
+  {
+    "isAsset": true,
+    "type": "realestate",
+  },
+  {
+    "isAsset": true,
+    "type": "vehicle",
+  },
+  {
+    "isAsset": true,
+    "type": "crypto",
+  },
+  {
+    "isAsset": true,
+    "type": "other",
+  },
+  {
+    "isAsset": false,
+    "type": "unknown_custom_type",
+  },
+  {
+    "isAsset": false,
+    "type": "",
+  },
+]
+`;
+
+exports[`Account Scope Utilities Characterization Matrix > characterizes isLiabilityAccount across account types 1`] = `
+[
+  {
+    "isLiability": false,
+    "type": "checking",
+  },
+  {
+    "isLiability": false,
+    "type": "savings",
+  },
+  {
+    "isLiability": true,
+    "type": "credit",
+  },
+  {
+    "isLiability": true,
+    "type": "loan",
+  },
+  {
+    "isLiability": true,
+    "type": "mortgage",
+  },
+  {
+    "isLiability": false,
+    "type": "investment",
+  },
+  {
+    "isLiability": false,
+    "type": "brokerage",
+  },
+  {
+    "isLiability": false,
+    "type": "401k",
+  },
+  {
+    "isLiability": false,
+    "type": "rothira",
+  },
+  {
+    "isLiability": false,
+    "type": "traditionalira",
+  },
+  {
+    "isLiability": false,
+    "type": "realestate",
+  },
+  {
+    "isLiability": false,
+    "type": "vehicle",
+  },
+  {
+    "isLiability": false,
+    "type": "crypto",
+  },
+  {
+    "isLiability": false,
+    "type": "other",
+  },
+  {
+    "isLiability": false,
+    "type": "unknown_custom_type",
+  },
+  {
+    "isLiability": false,
+    "type": "",
+  },
+]
+`;

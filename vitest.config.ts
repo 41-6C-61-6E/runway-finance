@@ -19,7 +19,7 @@ export default defineConfig({
       VAPID_SUBJECT: 'mailto:admin@example.com',
       TZ: 'America/New_York',
     },
-    include: ['tests/unit/**/*.test.{ts,tsx}'],
+    include: ['tests/unit/**/*.test.{ts,tsx}', 'tests/characterization/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

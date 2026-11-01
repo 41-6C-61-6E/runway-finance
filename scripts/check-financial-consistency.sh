@@ -15,20 +15,31 @@ echo "🔍 Checking financial type consistency..."
 #   const ASSET_TYPES = ['checking', 'savings', ...]
 #   const LIABILITY_TYPES = ['credit', ...]
 
-# Find files with hardcoded asset type arrays
-ASSET_PATTERN="['\"]checking['\"].*['\"]savings['\"].*['\"]investment['\"].*['\"]brokerage['\"].*['\"]retirement['\"]"
-LIABILITY_PATTERN="['\"]credit['\"].*['\"]loan['\"].*['\"]mortgage['\"]"
+# Find files with hardcoded asset type arrays (supporting single-line and multi-line array declarations)
+ASSET_PATTERN='\[[^\]]*?[\x27"]checking[\x27"][^\]]*?[\x27"]savings[\x27"][^\]]*?[\x27"]investment[\x27"][^\]]*?[\x27"]brokerage[\x27"][^\]]*?[\x27"]retirement[\x27"][^\]]*?\]'
+LIABILITY_PATTERN='\[[^\]]*?[\x27"]credit[\x27"][^\]]*?[\x27"]loan[\x27"][^\]]*?[\x27"]mortgage[\x27"][^\]]*?\]'
+
+matches_pattern() {
+  local pattern="$1"
+  local file="$2"
+  perl -0777 -ne "exit(0) if /$pattern/s; exit(1)" "$file" 2>/dev/null
+}
 
 while IFS= read -r file; do
+  # Skip the source of truth definition itself and tests
+  case "$file" in
+    */lib/utils/account-scope.ts|*/tests/*|*/scripts/*) continue ;;
+  esac
+
   # Check if the file has a hardcoded asset/liability list
-  if grep -qE "$ASSET_PATTERN" "$file" 2>/dev/null; then
+  if matches_pattern "$ASSET_PATTERN" "$file"; then
     # Make sure it's importing from account-scope
     if ! grep -qE "from.*account-scope" "$file" 2>/dev/null; then
       echo "❌ $file has hardcoded asset type list without importing from account-scope"
       HAS_ERROR=1
     fi
   fi
-  if grep -qE "$LIABILITY_PATTERN" "$file" 2>/dev/null; then
+  if matches_pattern "$LIABILITY_PATTERN" "$file"; then
     if ! grep -qE "from.*account-scope" "$file" 2>/dev/null; then
       echo "❌ $file has hardcoded liability type list without importing from account-scope"
       HAS_ERROR=1
