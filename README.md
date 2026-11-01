@@ -450,10 +450,9 @@ All API routes require authentication via NextAuth session.
 | `GET` | `/api/connections` | List all connections |
 | `DELETE` | `/api/connections/:id` | Delete a connection (requires `X-Confirm-Delete: true` header) |
 | `POST` | `/api/connections/:id/sync` | Trigger manual sync |
-| `GET` | `/api/connections/:id/sync-logs` | View sync history |
+| `POST` | `/api/connections/sync` | Sync all active bank connections |
 | `POST` | `/api/plaid/create-link-token` | Generate a link token for Plaid Link client initialization |
 | `POST` | `/api/plaid/exchange-public-token`| Exchange Plaid public token for secure access token |
-| `POST` | `/api/plaid/sync` | Sync Plaid connection transactions and balances |
 
 ### Accounts
 

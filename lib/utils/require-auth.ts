@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { getDb } from '@/lib/db';
 import { simplifinConnections, plaidConnections } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { apiNotFound, apiForbidden } from '@/lib/api/response';
+import { apiNotFound, apiForbidden, handleApiError } from '@/lib/api/response';
 
 export function requireDeleteConfirmation(request: Request): void {
   if (request.headers.get('X-Confirm-Delete') !== 'true') {
@@ -81,11 +81,7 @@ export function withAuth(
       }
       return await handler(req, { session, userId });
     } catch (error) {
-      logger.error('API route error in withAuth', { error: error instanceof Error ? error.message : String(error) });
-      return NextResponse.json(
-        { error: 'internal_error', message: 'Internal server error' },
-        { status: 500 }
-      );
+      return handleApiError(error);
     }
   };
 }

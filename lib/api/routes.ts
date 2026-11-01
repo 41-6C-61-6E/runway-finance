@@ -75,7 +75,7 @@ export const API_ROUTES = {
 
   cashFlow: {
     summary: '/api/cash-flow/summary',
-    monthly: '/api/cash-flow/monthly',
+    monthly: '/api/cash-flow/summary',
     daily: '/api/cash-flow/daily',
     categories: '/api/cash-flow/categories',
     savingsRate: '/api/cash-flow/savings-rate',
@@ -91,11 +91,11 @@ export const API_ROUTES = {
 
   goals: {
     list: '/api/goals',
-    financialGoals: '/api/financial-goals',
+    financialGoals: '/api/goals',
     allocation: '/api/goals/allocation',
     bulkReorder: '/api/goals/bulk-reorder',
     history: '/api/goals/history',
-    progress: '/api/goals/progress',
+    progress: '/api/goals/allocation',
     projections: '/api/goals/projections',
   },
 
@@ -127,7 +127,7 @@ export const API_ROUTES = {
     list: '/api/paystubs',
     detail: (id: string) => `/api/paystubs/${id}`,
     autoGenerate: '/api/paystubs/auto-generate',
-    depositReport: '/api/paystubs/deposit-report',
+    depositReport: '/api/paystubs',
     import: '/api/paystubs/import',
     mappings: '/api/paystubs/mappings',
     mappingDetail: (id: string) => `/api/paystubs/mappings/${id}`,
@@ -144,15 +144,15 @@ export const API_ROUTES = {
     accounts: (id: string) => `/api/connections/${id}/accounts`,
     resetCursor: (id: string) => `/api/connections/${id}/reset-cursor`,
     sync: (id: string) => `/api/connections/${id}/sync`,
-    syncLogs: (id: string) => `/api/connections/${id}/sync-logs`,
+    syncLogs: (id: string) => `/api/connections/${id}/accounts`,
     syncAll: '/api/connections/sync',
-    simplefinLogs: (id: string) => `/api/connections/simplefin/${id}/logs`,
+    simplefinLogs: (id: string) => `/api/connections/${id}/accounts`,
   },
 
   plaid: {
     createLinkToken: '/api/plaid/create-link-token',
     exchangePublicToken: '/api/plaid/exchange-public-token',
-    sync: '/api/plaid/sync',
+    sync: '/api/connections/sync',
     validate: '/api/plaid/validate',
   },
 
@@ -162,21 +162,21 @@ export const API_ROUTES = {
     analyze: '/api/ai/analyze',
     analyzeTransaction: '/api/ai/analyze-transaction',
     cancel: '/api/ai/cancel',
-    testConnection: '/api/ai/test-connection',
+    testConnection: '/api/ai/provider/test',
     provider: '/api/ai/provider',
     providerTest: '/api/ai/provider/test',
-    providers: '/api/ai/providers',
+    providers: '/api/ai/provider',
     providerDetail: (id: string) => `/api/ai/providers/${id}`,
-    providerDetailTest: (id: string) => `/api/ai/providers/${id}/test`,
-    providerTestActive: '/api/ai/providers/test-active',
+    providerDetailTest: (_id: string) => '/api/ai/provider/test',
+    providerTestActive: '/api/ai/provider/test',
     advice: '/api/ai/advice',
     adviceContextPreview: '/api/ai/advice/context-preview',
     adviceStatus: '/api/ai/advice/status',
     proposals: '/api/ai/proposals',
     proposalApprove: (id: string) => `/api/ai/proposals/${id}/approve`,
     proposalReject: (id: string) => `/api/ai/proposals/${id}/reject`,
-    proposalsBatch: '/api/ai/proposals/batch',
-    proposalsClear: '/api/ai/proposals/clear',
+    proposalsBatch: '/api/ai/proposals',
+    proposalsClear: '/api/ai/proposals',
   },
 
   backup: {
