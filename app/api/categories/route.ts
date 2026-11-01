@@ -9,22 +9,11 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, encryptRow } from '@/lib/crypto';
 import { ensureCompoundCategories, ensureEmployerContributions, mergeDuplicateCategories } from '@/lib/db/seed-categories';
 
+import { CreateCategorySchema } from '@/lib/validations/category';
+
 function normalizeCategoryName(name: string) {
   return name.trim().toLowerCase();
 }
-
-const CreateCategorySchema = z.object({
-  name: z.string().min(1).max(100),
-  parentId: z.string().uuid().nullable().optional(),
-  color: z.string().max(7).default('#6366f1'),
-  isIncome: z.boolean().default(false),
-  excludeFromReports: z.boolean().default(false),
-  hideFromTransactions: z.boolean().default(false),
-  displayOrder: z.number().int().default(0),
-  categoryType: z.enum(['standard', 'compound', 'transfer']).default('standard'),
-  expenseParentId: z.string().uuid().nullable().optional(),
-  isDiscretionary: z.boolean().default(true),
-});
 
 export async function GET() {
   const session = await auth();

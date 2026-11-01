@@ -1,25 +1,9 @@
 import type { TimeRange } from '@/components/charts/chart-filters';
+import type { Account } from '@/lib/types/account';
+export type { Account };
 
 export type ChartType = 'line' | 'bar';
 export type GroupingMode = 'account' | 'type' | 'group';
-
-export interface Account {
-  id: string;
-  name: string;
-  type: string;
-  balance: number;
-  currentBalance?: number | null;
-  availableBalance?: number | null;
-  currency: string;
-  institution: string | null;
-  isHidden: boolean;
-  isExcludedFromNetWorth: boolean;
-  connectionId?: string | null;
-  plaidConnectionId?: string | null;
-  tags?: { id: string; name: string; color: string }[];
-  metadata?: Record<string, any> | string | null;
-  syncStatus?: { status: 'ok' | 'warning' | 'error'; reason?: string; lastSyncAt?: string } | null;
-}
 
 export type TagItem = {
   id: string;
@@ -83,54 +67,11 @@ export const DEFAULT_PRESETS: ChartPreset[] = [
   },
 ];
 
-export const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string; icon: string }> = {
-  checking:   { group: 'Banking',       subGroup: 'Cash & Checking',  icon: '🏦' },
-  savings:    { group: 'Banking',       subGroup: 'Savings',          icon: '🏦' },
-  other:      { group: 'Banking',       subGroup: 'Cash & Checking',  icon: '🏦' },
-  credit:     { group: 'Credit',        subGroup: 'Credit Cards',     icon: '💳' },
-  investment: { group: 'Investments',   subGroup: 'Taxable Brokerage', icon: '📈' },
-  brokerage:  { group: 'Investments',   subGroup: 'Taxable Brokerage', icon: '📈' },
-  retirement: { group: 'Investments',   subGroup: 'Retirement',       icon: '📈' },
-  otherinvestment: { group: 'Investments', subGroup: 'Other Investments', icon: '📈' },
-  rothira:        { group: 'Investments',   subGroup: 'Roth IRA',         icon: '📈' },
-  traditionalira: { group: 'Investments',   subGroup: 'Traditional IRA',  icon: '📈' },
-  '401k':         { group: 'Investments',   subGroup: '401(k)',           icon: '📈' },
-  '403b':         { group: 'Investments',   subGroup: '403(b)',           icon: '📈' },
-  sepira:         { group: 'Investments',   subGroup: 'SEP IRA',          icon: '📈' },
-  simpleira:      { group: 'Investments',   subGroup: 'Simple IRA',       icon: '📈' },
-  '529':          { group: 'Investments',   subGroup: '529 Account',      icon: '📈' },
-  stock_option:   { group: 'Investments',   subGroup: 'Stock Options & Equity', icon: '🚀' },
-  otherAsset: { group: 'Assets',        subGroup: 'Other Assets',     icon: '💼' },
-  vehicle:    { group: 'Assets',        subGroup: 'Vehicles',         icon: '🚗' },
-  crypto:     { group: 'Assets',        subGroup: 'Crypto Currency',  icon: '₿' },
-  metals:     { group: 'Assets',        subGroup: 'Metals',           icon: '🏅' },
-  hsa:        { group: 'Investments',   subGroup: 'HSA Account',      icon: '🏥' },
-  hsachecking: { group: 'Banking',      subGroup: 'HSA Account',      icon: '🏥' },
-  health:     { group: 'Investments',   subGroup: 'HSA Account',      icon: '🏥' },
-  loan:       { group: 'Loans',         subGroup: 'Loans',            icon: '📋' },
-  mortgage:   { group: 'Loans',         subGroup: 'Mortgages',        icon: '📋' },
-  studentloan: { group: 'Loans',        subGroup: 'Student Loans',    icon: '📋' },
-  autoloan:    { group: 'Loans',        subGroup: 'Auto Loans',       icon: '📋' },
-  otherloan:   { group: 'Loans',        subGroup: 'Other Loans',      icon: '📋' },
-  realestate: { group: 'Real Estate',   subGroup: 'Real Estate',      icon: '🏠' },
-  primaryhome: { group: 'Real Estate',  subGroup: 'Primary Home',     icon: '🏠' },
-  secondaryhome: { group: 'Real Estate', subGroup: 'Secondary Home',   icon: '🏠' },
-  rentalproperty: { group: 'Real Estate', subGroup: 'Rental Property', icon: '🏠' },
-  commercial:   { group: 'Real Estate', subGroup: 'Commercial',        icon: '🏢' },
-  land:         { group: 'Real Estate', subGroup: 'Land',              icon: '🌳' },
-  otherrealestate: { group: 'Real Estate', subGroup: 'Other Real Estate', icon: '🏠' },
-  'single-family': { group: 'Real Estate', subGroup: 'Single Family Home', icon: '🏠' },
-  condo:           { group: 'Real Estate', subGroup: 'Condo',              icon: '🏢' },
-  townhouse:       { group: 'Real Estate', subGroup: 'Townhouse',          icon: '🏠' },
-  'multi-family':  { group: 'Real Estate', subGroup: 'Multi-Family',       icon: '🏢' },
-  otherLiability: { group: 'Liabilities', subGroup: 'Liabilities',    icon: '⚠️' },
-};
-
-export const GROUP_ORDER = ['Banking', 'Credit', 'Savings', 'Investments', 'Real Estate', 'Loans', 'Liabilities'];
-
-export function getHierarchy(accountType: string) {
-  return TYPE_HIERARCHY[accountType.toLowerCase()] ?? { group: 'Other', subGroup: 'Other', icon: '📁' };
-}
+/**
+ * @deprecated CC-06: Consolidated into `@/lib/constants/account-types`.
+ * Import directly from `@/lib/constants/account-types` instead.
+ */
+export { TYPE_HIERARCHY, GROUP_ORDER, getHierarchy } from '@/lib/constants/account-types';
 
 export const getSeriesColor = (key: string, mode: GroupingMode, index: number, isAsset: boolean) => {
   const cycle = Math.floor(index / 5);

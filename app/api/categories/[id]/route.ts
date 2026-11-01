@@ -10,22 +10,11 @@ import { decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
 import { mergeDuplicateCategories } from '@/lib/db/seed-categories';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 
+import { UpdateCategorySchema } from '@/lib/validations/category';
+
 function normalizeCategoryName(name: string) {
   return name.trim().toLowerCase();
 }
-
-const UpdateCategorySchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  parentId: z.string().uuid().nullable().optional(),
-  color: z.string().max(7).optional(),
-  isIncome: z.boolean().optional(),
-  excludeFromReports: z.boolean().optional(),
-  hideFromTransactions: z.boolean().optional(),
-  displayOrder: z.number().int().optional(),
-  categoryType: z.enum(['standard', 'compound', 'transfer']).optional(),
-  expenseParentId: z.string().uuid().nullable().optional(),
-  isDiscretionary: z.boolean().optional(),
-});
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

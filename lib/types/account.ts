@@ -14,6 +14,24 @@ export interface AccountBase {
   metadata?: Record<string, any> | string | null;
 }
 
+export interface Account {
+  id: string;
+  name: string;
+  type: string;
+  balance: number;
+  currentBalance?: number | null;
+  availableBalance?: number | null;
+  currency: string;
+  institution: string | null;
+  isHidden: boolean;
+  isExcludedFromNetWorth: boolean;
+  connectionId?: string | null;
+  plaidConnectionId?: string | null;
+  tags?: { id: string; name: string; color: string }[];
+  metadata?: Record<string, any> | string | null;
+  syncStatus?: { status: 'ok' | 'warning' | 'error'; reason?: string; lastSyncAt?: string } | null;
+}
+
 export interface SettingsAccount extends AccountBase {
   isExcludedFromCashFlow?: boolean | null;
   isManual?: boolean;

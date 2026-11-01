@@ -20,6 +20,23 @@ export interface TransactionBase {
   updatedAt?: string | Date;
 }
 
+export interface Transaction extends TransactionBase {
+  categoryColor?: string | null;
+  accountType?: string | null;
+  postedDate?: string | null;
+  reviewed?: boolean | null;
+  categorizedByAi?: boolean;
+  accountTags?: Array<{ id: string; name: string; color: string }>;
+  splits?: Array<{
+    id: string;
+    amount: string;
+    description?: string | null;
+    categoryId: string | null;
+    categoryName?: string | null;
+    categoryColor?: string | null;
+  }>;
+}
+
 export interface TransactionPreset {
   id: string;
   name: string;
