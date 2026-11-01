@@ -2,71 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Play, Plus, Search, Sparkles, ChevronUp, ChevronDown, Pencil, Trash2, X } from 'lucide-react';
-import { Select } from '@/components/ui/select';
 import { ActionButton } from '@/components/ui/action-button';
-
-type Condition = {
-  id: string; // temp id for UI
-  field: string;
-  operator: string;
-  value: string;
-  caseSensitive: boolean;
-};
-
-type Rule = {
-  id: string;
-  name: string;
-  priority: number;
-  isActive: boolean;
-  isSystem: boolean;
-  createdByAi: boolean;
-  conditionField: string;
-  conditionOperator: string;
-  conditionValue: string;
-  conditionCaseSensitive: boolean;
-  conditions?: Condition[];
-  setCategoryId: string | null;
-  setPayee: string | null;
-  setReviewed: boolean | null;
-  setTagId: string | null;
-  categoryName: string | null;
-  categoryColor: string | null;
-  overrideExisting: boolean;
-};
-
-type Category = {
-  id: string;
-  name: string;
-  color: string;
-  parentId: string | null;
-  isIncome: boolean;
-};
-
-type TagItem = {
-  id: string;
-  name: string;
-  color: string;
-};
-
-const FIELD_OPTIONS = [
-  { value: 'description', label: 'Description' },
-  { value: 'payee', label: 'Payee' },
-  { value: 'amount', label: 'Amount' },
-  { value: 'memo', label: 'Memo' },
-];
-
-const OPERATOR_OPTIONS = [
-  { value: 'contains', label: 'Contains' },
-  { value: 'equals', label: 'Equals' },
-  { value: 'starts_with', label: 'Starts With' },
-  { value: 'ends_with', label: 'Ends With' },
-  { value: 'regex', label: 'Regex' },
-];
+import type { Condition, Rule, Category, TagItem } from './rules/types';
+import { FIELD_OPTIONS, OPERATOR_OPTIONS } from './rules/types';
+import { RuleEditorSheet } from './rules/rule-editor-sheet';
+import { RuleBulkEditDialog } from './rules/rule-bulk-edit-dialog';
 
 const OPERATOR_LABELS: Record<string, string> = {
   contains: 'contains',
@@ -85,14 +28,6 @@ export default function RulesTab() {
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [deleting, setDeleting] = useState<Rule | null>(null);
 
-  const [formName, setFormName] = useState('');
-  const [formConditions, setFormConditions] = useState<Condition[]>([]);
-  const [formCategoryId, setFormCategoryId] = useState<string | null>(null);
-  const [formTagId, setFormTagId] = useState<string | null>(null);
-  const [formSetPayee, setFormSetPayee] = useState('');
-  const [formSetReviewed, setFormSetReviewed] = useState<boolean | null>(null);
-  const [formOverrideExisting, setFormOverrideExisting] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [runningRuleId, setRunningRuleId] = useState<string | null>(null);
   const [runningAll, setRunningAll] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -107,42 +42,12 @@ export default function RulesTab() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkEditingOpen, setBulkEditingOpen] = useState(false);
   const [bulkDeletingIds, setBulkDeletingIds] = useState<string[] | null>(null);
-  
-  const [bulkUpdateFields, setBulkUpdateFields] = useState({
-    isActive: false,
-    setCategoryId: false,
-    setTagId: false,
-    setPayee: false,
-    setReviewed: false,
-    overrideExisting: false,
-  });
-
-  const [bulkFormIsActive, setBulkFormIsActive] = useState(true);
-  const [bulkFormCategoryId, setBulkFormCategoryId] = useState<string | null>(null);
-  const [bulkFormTagId, setBulkFormTagId] = useState<string | null>(null);
-  const [bulkFormSetPayee, setBulkFormSetPayee] = useState('');
-  const [bulkFormSetReviewed, setBulkFormSetReviewed] = useState<boolean | null>(null);
-  const [bulkFormOverrideExisting, setBulkFormOverrideExisting] = useState(false);
 
   useEffect(() => {
     setSelectedRuleIds([]);
   }, [activeSubTab, searchQuery]);
 
   const openBulkEditDialog = () => {
-    setBulkUpdateFields({
-      isActive: false,
-      setCategoryId: false,
-      setTagId: false,
-      setPayee: false,
-      setReviewed: false,
-      overrideExisting: false,
-    });
-    setBulkFormIsActive(true);
-    setBulkFormCategoryId(null);
-    setBulkFormTagId(null);
-    setBulkFormSetPayee('');
-    setBulkFormSetReviewed(null);
-    setBulkFormOverrideExisting(false);
     setBulkEditingOpen(true);
   };
 
@@ -216,45 +121,6 @@ export default function RulesTab() {
       showFeedback('error', 'Failed to delete selected rules.');
     } finally {
       setBulkLoading(false);
-    }
-  };
-
-  const handleBulkUpdate = async () => {
-    const updates: any = {};
-    if (bulkUpdateFields.isActive) updates.isActive = bulkFormIsActive;
-    if (bulkUpdateFields.setCategoryId) updates.setCategoryId = bulkFormCategoryId;
-    if (bulkUpdateFields.setTagId) updates.setTagId = bulkFormTagId;
-    if (bulkUpdateFields.setPayee) updates.setPayee = bulkFormSetPayee.trim() || null;
-    if (bulkUpdateFields.setReviewed) updates.setReviewed = bulkFormSetReviewed;
-    if (bulkUpdateFields.overrideExisting) updates.overrideExisting = bulkFormOverrideExisting;
-
-    if (Object.keys(updates).length === 0) {
-      showFeedback('error', 'Please select at least one field to update.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const res = await fetch('/api/category-rules/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ids: selectedRuleIds,
-          action: 'update',
-          updates
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to bulk update rules');
-      showFeedback('success', `Successfully updated ${selectedRuleIds.length} rules.`);
-      setBulkEditingOpen(false);
-      setSelectedRuleIds([]);
-      await fetchRules();
-    } catch (error) {
-      console.error('Error bulk updating rules:', error);
-      showFeedback('error', 'Failed to bulk update rules.');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -420,105 +286,17 @@ export default function RulesTab() {
 
   const openAdd = () => {
     setEditingRule(null);
-    setFormName('');
-    setFormConditions([
-      {
-        id: Math.random().toString(),
-        field: 'description',
-        operator: 'contains',
-        value: '',
-        caseSensitive: false,
-      }
-    ]);
-    setFormCategoryId(null);
-    setFormTagId(null);
-    setFormSetPayee('');
-    setFormSetReviewed(null);
-    setFormOverrideExisting(false);
     setDrawerOpen(true);
   };
 
   const openEdit = (rule: Rule) => {
     setEditingRule(rule);
-    setFormName(rule.name);
-    // Use multi-condition format if available, fallback to single condition
-    const conditions = rule.conditions && rule.conditions.length > 0 
-      ? rule.conditions.map((c) => ({ ...c, id: c.id || Math.random().toString() }))
-      : [{
-          id: Math.random().toString(),
-          field: rule.conditionField,
-          operator: rule.conditionOperator,
-          value: rule.conditionValue,
-          caseSensitive: rule.conditionCaseSensitive,
-        }];
-    setFormConditions(conditions);
-    setFormCategoryId(rule.setCategoryId);
-    setFormTagId(rule.setTagId ?? null);
-    setFormSetPayee(rule.setPayee ?? '');
-    setFormSetReviewed(rule.setReviewed);
-    setFormOverrideExisting(!!rule.overrideExisting);
     setDrawerOpen(true);
   };
 
   const handleClose = () => {
     setDrawerOpen(false);
     setEditingRule(null);
-  };
-
-  const handleSave = async () => {
-    if (!formName.trim() || formConditions.length === 0 || formConditions.some(c => !c.value.trim())) return;
-    setSaving(true);
-    try {
-      // Use first condition for backward compatibility with older rules
-      const firstCondition = formConditions[0];
-      const body: any = {
-        name: formName.trim(),
-        conditionField: firstCondition.field,
-        conditionOperator: firstCondition.operator,
-        conditionValue: firstCondition.value.trim(),
-        conditionCaseSensitive: firstCondition.caseSensitive,
-        // Include multi-condition format if there are multiple conditions
-        ...(formConditions.length > 1 && {
-          conditions: formConditions.map(c => ({
-            field: c.field,
-            operator: c.operator,
-            value: c.value.trim(),
-            caseSensitive: c.caseSensitive,
-          }))
-        }),
-        setCategoryId: formCategoryId || null,
-        setTagId: formTagId || null,
-        setPayee: formSetPayee.trim() || null,
-        setReviewed: formSetReviewed ?? null,
-        overrideExisting: formOverrideExisting,
-        priority: editingRule ? editingRule.priority : rules.length,
-      };
-
-      if (editingRule) {
-        await fetch(`/api/category-rules/${editingRule.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body),
-        });
-      } else {
-        await fetch('/api/category-rules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body),
-        });
-      }
-
-      setDrawerOpen(false);
-      setEditingRule(null);
-      await fetchRules();
-    } catch (error) {
-      console.error('Error saving rule:', error);
-      showFeedback('error', 'Failed to save rule.');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleDelete = async () => {
@@ -960,209 +738,16 @@ export default function RulesTab() {
       </div>
 
       {/* Add/Edit Drawer */}
-      <Sheet open={drawerOpen} onOpenChange={(open) => !open && handleClose()}>
-        <SheetContent side="right" className="bg-card border-l border-border p-6 overflow-y-auto">
-          <SheetHeader className="mb-6">
-            <SheetTitle>
-              {editingRule ? 'Edit Rule' : 'Add Rule'}
-            </SheetTitle>
-          </SheetHeader>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Rule Name</label>
-              <input
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                placeholder="e.g., Amazon Purchases"
-              />
-            </div>
-
-            <div className="border-t border-border pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-foreground">Conditions (all must match)</h4>
-                <button
-                  onClick={() => {
-                    setFormConditions([...formConditions, {
-                      id: Math.random().toString(),
-                      field: 'description',
-                      operator: 'contains',
-                      value: '',
-                      caseSensitive: false,
-                    }]);
-                  }}
-                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Condition
-                </button>
-              </div>
-              
-              <div className="space-y-3">
-                {formConditions.map((condition, idx) => (
-                  <div key={condition.id} className="p-3 bg-muted/30 border border-border rounded-lg">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Field</label>
-                        <Select
-                          value={condition.field}
-                          onChange={(e) => {
-                            const updated = [...formConditions];
-                            updated[idx] = { ...updated[idx], field: e.target.value };
-                            setFormConditions(updated);
-                          }}
-                        >
-                          {FIELD_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Operator</label>
-                        <Select
-                          value={condition.operator}
-                          onChange={(e) => {
-                            const updated = [...formConditions];
-                            updated[idx] = { ...updated[idx], operator: e.target.value };
-                            setFormConditions(updated);
-                          }}
-                        >
-                          {OPERATOR_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="mb-3">
-                      <label className="block text-xs text-muted-foreground mb-1">Value</label>
-                      <input
-                        value={condition.value}
-                        onChange={(e) => {
-                          const updated = [...formConditions];
-                          updated[idx] = { ...updated[idx], value: e.target.value };
-                          setFormConditions(updated);
-                        }}
-                        className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                        placeholder="e.g., AMAZON"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={condition.caseSensitive}
-                          onChange={(e) => {
-                            const updated = [...formConditions];
-                            updated[idx] = { ...updated[idx], caseSensitive: e.target.checked };
-                            setFormConditions(updated);
-                          }}
-                          className="rounded border-border text-primary focus:ring-ring"
-                          id={`case-${condition.id}`}
-                        />
-                        <label htmlFor={`case-${condition.id}`} className="text-xs text-foreground/80 cursor-pointer">Case Sensitive</label>
-                      </div>
-                      {formConditions.length > 1 && (
-                        <button
-                          onClick={() => {
-                            setFormConditions(formConditions.filter((_, i) => i !== idx));
-                          }}
-                          className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                          title="Remove condition"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t border-border pt-4">
-              <h4 className="text-sm font-medium text-foreground mb-3">Action</h4>
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1">Set Category</label>
-                <Select
-                  value={formCategoryId || ''}
-                  onChange={(e) => setFormCategoryId(e.target.value || null)}
-                >
-                  <option value="">Don't change category</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.parentId ? '  ' : ''}{cat.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="mt-3">
-                <label className="block text-xs text-muted-foreground mb-1">Set Payee (optional)</label>
-                <input
-                  value={formSetPayee}
-                  onChange={(e) => setFormSetPayee(e.target.value)}
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="Override payee name"
-                />
-              </div>
-
-              <div className="mt-3">
-                <label className="block text-xs text-muted-foreground mb-1">Set Tag (optional)</label>
-                <Select
-                  value={formTagId || ''}
-                  onChange={(e) => setFormTagId(e.target.value || null)}
-                >
-                  <option value="">Don&apos;t set a tag</option>
-                  {tags.map((tag) => (
-                    <option key={tag.id} value={tag.id}>{tag.name}</option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs text-foreground/80">Mark as Reviewed</span>
-                <Switch
-                  checked={formSetReviewed === true}
-                  onCheckedChange={(checked) => setFormSetReviewed(checked ? true : null)}
-                />
-              </div>
-
-              <div className="mt-4 border-t border-border pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-foreground/80 font-medium">Override Existing Category</span>
-                  <Switch
-                    checked={formOverrideExisting}
-                    onCheckedChange={(checked) => setFormOverrideExisting(checked)}
-                  />
-                </div>
-                {formOverrideExisting && (
-                  <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 font-normal">
-                    ⚠️ Warning: Enabling this option will cause this rule to overwrite existing category assignments on matching transactions.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 mt-8">
-            <button
-              onClick={() => { setDrawerOpen(false); setEditingRule(null); }}
-              className="flex-1 px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || !formName.trim() || formConditions.length === 0 || formConditions.some(c => !c.value.trim())}
-              className="flex-1 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-            >
-              {saving ? 'Saving...' : editingRule ? 'Update' : 'Create'}
-            </button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <RuleEditorSheet
+        open={drawerOpen}
+        onClose={handleClose}
+        editingRule={editingRule}
+        categories={categories}
+        tags={tags}
+        rulesCount={rules.length}
+        onSaveSuccess={fetchRules}
+        showFeedback={showFeedback}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
@@ -1230,199 +815,18 @@ export default function RulesTab() {
       </AlertDialog>
 
       {/* Bulk Edit Dialog */}
-      <Dialog open={bulkEditingOpen} onOpenChange={setBulkEditingOpen}>
-        <DialogContent className="max-w-md bg-card border-border">
-          <DialogHeader>
-            <DialogTitle>Bulk Edit Rules</DialogTitle>
-            <DialogDescription>
-              Select the fields you want to update for the {selectedRuleIds.length} selected rules.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 my-2">
-            {/* Active Status */}
-            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={bulkUpdateFields.isActive}
-                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, isActive: e.target.checked })}
-                  id="bulk-update-active"
-                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
-                />
-                <label htmlFor="bulk-update-active" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
-                  Update Active Status
-                </label>
-              </div>
-              {bulkUpdateFields.isActive && (
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
-                  <span className="text-xs text-muted-foreground">Status</span>
-                  <Switch
-                    checked={bulkFormIsActive}
-                    onCheckedChange={setBulkFormIsActive}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Set Category */}
-            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={bulkUpdateFields.setCategoryId}
-                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, setCategoryId: e.target.checked })}
-                  id="bulk-update-category"
-                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
-                />
-                <label htmlFor="bulk-update-category" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
-                  Update Category Action
-                </label>
-              </div>
-              {bulkUpdateFields.setCategoryId && (
-                <div className="mt-2 pt-2 border-t border-border/40">
-                  <label className="block text-[11px] text-muted-foreground mb-1">Category</label>
-                  <Select
-                    value={bulkFormCategoryId || ''}
-                    onChange={(e) => setBulkFormCategoryId(e.target.value || null)}
-                  >
-                    <option value="">Don&apos;t set category (Clear category)</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.parentId ? '  ' : ''}{cat.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              )}
-            </div>
-
-            {/* Set Tag */}
-            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={bulkUpdateFields.setTagId}
-                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, setTagId: e.target.checked })}
-                  id="bulk-update-tag"
-                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
-                />
-                <label htmlFor="bulk-update-tag" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
-                  Update Tag Action
-                </label>
-              </div>
-              {bulkUpdateFields.setTagId && (
-                <div className="mt-2 pt-2 border-t border-border/40">
-                  <label className="block text-[11px] text-muted-foreground mb-1">Tag</label>
-                  <Select
-                    value={bulkFormTagId || ''}
-                    onChange={(e) => setBulkFormTagId(e.target.value || null)}
-                  >
-                    <option value="">Don&apos;t set a tag (Clear tag)</option>
-                    {tags.map((tag) => (
-                      <option key={tag.id} value={tag.id}>{tag.name}</option>
-                    ))}
-                  </Select>
-                </div>
-              )}
-            </div>
-
-            {/* Set Payee */}
-            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={bulkUpdateFields.setPayee}
-                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, setPayee: e.target.checked })}
-                  id="bulk-update-payee"
-                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
-                />
-                <label htmlFor="bulk-update-payee" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
-                  Update Payee Overwrite Action
-                </label>
-              </div>
-              {bulkUpdateFields.setPayee && (
-                <div className="mt-2 pt-2 border-t border-border/40">
-                  <label className="block text-[11px] text-muted-foreground mb-1">Payee Name</label>
-                  <input
-                    value={bulkFormSetPayee}
-                    onChange={(e) => setBulkFormSetPayee(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="Clear payee or set new payee"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Set Reviewed */}
-            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={bulkUpdateFields.setReviewed}
-                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, setReviewed: e.target.checked })}
-                  id="bulk-update-reviewed"
-                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
-                />
-                <label htmlFor="bulk-update-reviewed" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
-                  Update Reviewed Action
-                </label>
-              </div>
-              {bulkUpdateFields.setReviewed && (
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
-                  <span className="text-xs text-muted-foreground">Mark as Reviewed</span>
-                  <Switch
-                    checked={bulkFormSetReviewed === true}
-                    onCheckedChange={(checked) => setBulkFormSetReviewed(checked ? true : null)}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Override Existing */}
-            <div className="flex flex-col gap-1.5 p-3 bg-muted/20 border border-border rounded-lg">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={bulkUpdateFields.overrideExisting}
-                  onChange={(e) => setBulkUpdateFields({ ...bulkUpdateFields, overrideExisting: e.target.checked })}
-                  id="bulk-update-override"
-                  className="rounded border-border text-primary focus:ring-ring cursor-pointer h-4 w-4"
-                />
-                <label htmlFor="bulk-update-override" className="text-xs font-semibold text-foreground/80 cursor-pointer select-none">
-                  Update Override Existing Option
-                </label>
-              </div>
-              {bulkUpdateFields.overrideExisting && (
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
-                  <span className="text-xs text-muted-foreground">Override Existing Category</span>
-                  <Switch
-                    checked={bulkFormOverrideExisting}
-                    onCheckedChange={setBulkFormOverrideExisting}
-                  />
-                </div>
-              )}
-            </div>
-
-          </div>
-
-          <DialogFooter className="gap-2 mt-4">
-            <button
-              onClick={() => setBulkEditingOpen(false)}
-              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleBulkUpdate}
-              disabled={saving || !Object.values(bulkUpdateFields).some(Boolean)}
-              className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-            >
-              {saving ? 'Updating...' : 'Apply Changes'}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RuleBulkEditDialog
+        open={bulkEditingOpen}
+        onClose={() => setBulkEditingOpen(false)}
+        selectedRuleIds={selectedRuleIds}
+        categories={categories}
+        tags={tags}
+        onUpdateSuccess={async () => {
+          setSelectedRuleIds([]);
+          await fetchRules();
+        }}
+        showFeedback={showFeedback}
+      />
     </div>
   );
 }

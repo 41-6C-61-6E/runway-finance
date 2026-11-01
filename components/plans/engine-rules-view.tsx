@@ -27,10 +27,12 @@ import {
 } from 'lucide-react';
 import {
   DEFAULT_2026_RULES,
-  IRS_UNIFORM_LIFETIME_TABLE,
-  HISTORICAL_RETURNS_DATA,
 } from '@/lib/constants/retirement-defaults';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { ScenarioExplorer } from './engine-rules/scenario-explorer';
+import { RmdTablePreview } from './engine-rules/rmd-table-preview';
+import { HistoricalMarketData } from './engine-rules/historical-market-data';
+import { EnginePipelineDiagram } from './engine-rules/pipeline-diagram';
 
 interface EngineRulesViewProps {
   rules: any;
@@ -55,22 +57,8 @@ export function EngineRulesView({
 }: EngineRulesViewProps) {
   const isMfj = filingStatus === 'married_joint';
 
-  // State for active scenario in interactive scenario explorer
-  const [activeScenario, setActiveScenario] = useState<
-    'accumulation' | 'early_retirement' | 'roth_ladder' | 'medicare_irmaa' | 'rmd_phase'
-  >('early_retirement');
-
   // Active accordion section for deep-dive rules
   const [expandedRuleTopic, setExpandedRuleTopic] = useState<string | null>('penalties');
-
-  // Toggle for IRS Uniform Lifetime Table III
-  const [showRmdTable, setShowRmdTable] = useState(false);
-
-  // Toggle for Historical Market Data
-  const [showHistoricalData, setShowHistoricalData] = useState(false);
-
-  // Toggle scenario math breakdown detail
-  const [showMathDetails, setShowMathDetails] = useState(true);
 
   if (loadingRules) {
     return (
@@ -82,45 +70,6 @@ export function EngineRulesView({
       </div>
     );
   }
-
-  // Scenarios metadata for interactive explorer
-  const scenarios = [
-    {
-      id: 'accumulation' as const,
-      title: '1. Pre-Retirement Accumulation',
-      ageSpan: 'Age 20 – 55',
-      badgeColor: 'bg-constructive/10 text-constructive border-constructive/30',
-      description: 'Active earned income phase where savings are routed through pre-tax & post-tax investment waterfalls.',
-    },
-    {
-      id: 'early_retirement' as const,
-      title: '2. Early Retirement & Penalty Guard',
-      ageSpan: 'Age 45 – 59.5',
-      badgeColor: 'bg-status-warning/10 text-status-warning border-status-warning/30',
-      description: 'Living off portfolio drawdowns before age 59.5 with strict 10% & 20% early withdrawal penalty checks & Rule of 55 exceptions.',
-    },
-    {
-      id: 'roth_ladder' as const,
-      title: '3. Roth Conversion Ladder',
-      ageSpan: 'Age 55 – 65',
-      badgeColor: 'bg-chart-5/10 text-chart-5 border-chart-5/30',
-      description: 'Optimized pre-tax to Roth conversions filling lower tax brackets before RMDs begin, with optional IRMAA cliff avoidance.',
-    },
-    {
-      id: 'medicare_irmaa' as const,
-      title: '4. Medicare & ACA Healthcare Transition',
-      ageSpan: 'Age 60 – 65+',
-      badgeColor: 'bg-chart-1/10 text-chart-1 border-chart-1/30',
-      description: 'ACA subsidies bridge early retirement up to age 65; Medicare IRMAA Part B & D surcharges trigger based on MAGI from 2 years prior.',
-    },
-    {
-      id: 'rmd_phase' as const,
-      title: '5. Mandatory RMD & Estate Phase',
-      ageSpan: 'Age 73 – 100+',
-      badgeColor: 'bg-chart-2/10 text-chart-2 border-chart-2/30',
-      description: 'SECURE Act 2.0 mandatory distributions using IRS Table III divisors, plus Social Security taxation (up to 85%) and 10-year inherited IRA rules.',
-    },
-  ];
 
   return (
     <div className="@container space-y-6 animate-in fade-in duration-300">
@@ -173,333 +122,10 @@ export function EngineRulesView({
       )}
 
       {/* ── SECTION 1: INTERACTIVE SCENARIO RULES EXPLORER ───────────────────── */}
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-4">
-          <div>
-            <h4 className="text-base font-bold text-foreground flex items-center gap-2">
-              <Play className="w-4 h-4 text-primary fill-primary/20" />
-              Interactive Scenario Rules Explorer
-            </h4>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Select a financial life stage to inspect rules, tax evaluations, and drawdown execution.
-            </p>
-          </div>
-          <span className="text-[11px] font-semibold text-muted-foreground bg-muted/40 px-3 py-1 rounded-lg border border-border">
-            Filing Status: <strong className="text-foreground">{isMfj ? 'Married Filing Jointly (MFJ)' : 'Single'}</strong>
-          </span>
-        </div>
-
-        {/* Scenario Tabs (Container-Responsive Grid) */}
-        <div className="grid grid-cols-1 @sm:grid-cols-2 @md:grid-cols-3 @lg:grid-cols-5 gap-2.5">
-          {scenarios.map((sc) => {
-            const isSelected = activeScenario === sc.id;
-            return (
-              <button
-                key={sc.id}
-                onClick={() => setActiveScenario(sc.id)}
-                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
-                  isSelected
-                    ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary'
-                    : 'bg-muted/20 border-border hover:bg-muted/40'
-                }`}
-              >
-                <div className="space-y-1">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border inline-block ${sc.badgeColor}`}>
-                    {sc.ageSpan}
-                  </span>
-                  <p className="text-xs font-bold text-foreground leading-tight">{sc.title}</p>
-                </div>
-                <p className="text-[11px] text-muted-foreground line-clamp-2">{sc.description}</p>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Scenario Deep Dive Card */}
-        <div className="bg-muted/20 border border-border rounded-xl p-5 space-y-5">
-          {activeScenario === 'accumulation' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
-                <h5 className="font-bold text-sm text-foreground">Scenario 1: Pre-Retirement Accumulation Phase</h5>
-              </div>
-              <p className="text-muted-foreground leading-relaxed">
-                During the working phase, earned salary income pays payroll FICA tax (6.2% Social Security up to cap + 1.45% Medicare). Pre-tax contributions (401k/HSA) reduce taxable income dollar-for-dollar. Net surplus cash flow is routed through the savings waterfall.
-              </p>
-
-              <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-foreground block">1. Tax Deduction Priority</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Pre-tax 401(k) (max ${rules?.contributionLimits?.k401 || 23000}) & HSA (max ${rules?.contributionLimits?.hsaSingle || 4150}) deduct directly from Gross Salary before Ordinary Income Tax.
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-foreground block">2. FICA Payroll Tax</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    7.65% fixed payroll deduction applies to gross wages (Social Security portion capped at IRS wage limit, Medicare uncapped).
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-foreground block">3. Defined Plan Contributions</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Only defined per-account contributions (% or fixed $) and employer matches fund accounts. Unallocated cash is not swept.
-                  </p>
-                </div>
-              </div>
-
-              {showMathDetails && (
-                <div className="bg-card border border-border rounded-lg p-3.5 space-y-2 text-[11px] font-mono">
-                  <div className="flex items-center justify-between text-muted-foreground border-b border-border pb-1 font-sans font-bold">
-                    <span>Example Math Walkthrough (Single Filer, $150,000 Salary)</span>
-                    <span className="text-emerald-500 font-mono">Accumulation Year</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-muted-foreground">
-                    <div>Gross Salary: <span className="text-foreground font-bold">$150,000</span></div>
-                    <div>Pre-Tax 401(k) Contribution: <span className="text-emerald-500 font-bold">-${rules?.contributionLimits?.k401 || 23000}</span></div>
-                    <div>HSA Pre-Tax Contribution: <span className="text-emerald-500 font-bold">-${rules?.contributionLimits?.hsaSingle || 4150}</span></div>
-                    <div>FICA Payroll Tax (7.65%): <span className="text-amber-500 font-bold">-$11,475</span></div>
-                    <div>Standard Deduction: <span className="text-foreground font-bold">-${rules?.standardDeduction || 15000}</span></div>
-                    <div>Taxable Ordinary Income: <span className="text-foreground font-bold">$107,850</span></div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeScenario === 'early_retirement' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-amber-500" />
-                <h5 className="font-bold text-sm text-foreground">Scenario 2: Early Retirement & Early Withdrawal Penalty Guard</h5>
-              </div>
-              <p className="text-muted-foreground leading-relaxed">
-                When retiring before age 59.5 (or age 65 for HSA non-medical usage), accessing tax-deferred accounts triggers IRS penalties unless specific statutory exceptions are met. The engine monitors withdrawal sequence and tags early penalty warnings.
-              </p>
-
-              <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-amber-600 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    10% IRA / 401(k) Penalty
-                  </span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Traditional IRA & 401(k) withdrawals before age 59.5 incur a 10% IRS penalty on top of ordinary income tax.
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-emerald-600 flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Rule of 55 Exception
-                  </span>
-                  <p className="text-muted-foreground text-[11px]">
-                    If leaving an employer in or after the year turning age 55, 401(k) withdrawals from that plan are 100% penalty-free.
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-red-500 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    20% HSA Penalty (Age &lt; 65)
-                  </span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Non-medical HSA withdrawals before age 65 incur a 20% penalty. After age 65, HSA acts like a Traditional IRA (ordinary tax only).
-                  </p>
-                </div>
-              </div>
-
-              {showMathDetails && (
-                <div className="bg-card border border-border rounded-lg p-3.5 space-y-2 text-[11px] font-mono">
-                  <div className="flex items-center justify-between text-muted-foreground border-b border-border pb-1 font-sans font-bold">
-                    <span>Engine Drawdown Hierarchy to Avoid Early Penalties</span>
-                    <span className="text-amber-500 font-mono">Penalty-Aware Order</span>
-                  </div>
-                  <p className="text-muted-foreground font-sans text-[11px]">
-                    The engine drains <strong className="text-foreground">Cash</strong> first, followed by <strong className="text-foreground">Taxable Brokerage Basis</strong>, then <strong className="text-foreground">Roth Contributions</strong>, avoiding early traditional withdrawals until age 59.5 (or Rule of 55).
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeScenario === 'roth_ladder' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-purple-500" />
-                <h5 className="font-bold text-sm text-foreground">Scenario 3: Roth Conversion Ladder & Tax Bracket Filling</h5>
-              </div>
-              <p className="text-muted-foreground leading-relaxed">
-                In early retirement years before Social Security & RMDs begin, ordinary income is low. The engine can systematically convert Traditional IRA funds into Roth IRAs, locking in today’s lower tax brackets (e.g., 10% or 12%) to eliminate future RMD tax torpedoes.
-              </p>
-
-              <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-foreground block">1. Target Bracket Filling</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Engine computes headroom up to the top of the selected target bracket (e.g. top of 12% at ${isMfj ? '96,950' : '48,475'}) and converts up to that threshold.
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-purple-600 block">2. 5-Year Conversion Rule</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Each Roth conversion principal amount must age 5 tax years before penalty-free withdrawal prior to age 59.5.
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-blue-600 block">3. IRMAA Guardrail</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    When `avoidIrmaaCliffs` is enabled, conversion headroom is automatically capped $1,000 below Medicare IRMAA Tier 1 limits starting at age 63.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeScenario === 'medicare_irmaa' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center gap-2">
-                <HeartHandshake className="w-4 h-4 text-blue-500" />
-                <h5 className="font-bold text-sm text-foreground">Scenario 4: ACA Subsidies & Medicare IRMAA Surcharges</h5>
-              </div>
-              <p className="text-muted-foreground leading-relaxed">
-                Between retirement and age 65, early retirees qualify for ACA Health Premium Tax Credits based on MAGI relative to Federal Poverty Line (FPL). At age 65, Medicare begins, and MAGI from 2 years prior (age 63+) determines Part B & D IRMAA monthly surcharges.
-              </p>
-
-              <div className="grid grid-cols-1 @md:grid-cols-2 gap-3 pt-1">
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-blue-600 block">ACA Premium Assistance (&lt; Age 65)</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Subsidy caps health premium cost to a percentage of MAGI (0% at 100-150% FPL, scaling up to 8.5% of MAGI at 400%+ FPL). Benchmark cost = ${(isMfj ? 16800 : 8400).toLocaleString()}/yr adjusted for inflation.
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-indigo-600 block">Medicare IRMAA 2-Year Lag (&ge; Age 65)</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    MAGI at Age 63 determines Medicare Part B & D surcharges at Age 65. If MAGI exceeds ${isMfj ? '206,000' : '103,000'}, Part B premium rises from $174.70/mo up to $594.00/mo per person.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeScenario === 'rmd_phase' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-indigo-500" />
-                <h5 className="font-bold text-sm text-foreground">Scenario 5: SECURE Act 2.0 RMDs & Estate Distribution Rules</h5>
-              </div>
-              <p className="text-muted-foreground leading-relaxed">
-                Under SECURE Act 2.0, mandatory RMDs start at age 73 (born 1951–1959) and step up by one year per birth cohort for later years (e.g. 1960→75, 1963→78). The engine calculates required minimum distributions using IRS Uniform Lifetime Table III. Additionally, Social Security taxation rules apply up to 85% of benefits.
-              </p>
-
-              <div className="grid grid-cols-1 @md:grid-cols-3 gap-3 pt-1">
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-foreground block">1. IRS Divisor Calculation</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Annual RMD = Prior Dec 31 Traditional Balance &divide; IRS Divisor (e.g. Age 73 divisor = 26.5 &rarr; 3.77% forced withdrawal).
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-indigo-600 block">2. Social Security Taxability</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Provisional Income = AGI + Tax-Exempt Interest + 50% Social Security. Over ${isMfj ? '44,000' : '34,000'}, up to 85% of SS is taxable.
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-3 space-y-1">
-                  <span className="font-bold text-purple-600 block">3. 10-Year Inherited IRA Rule</span>
-                  <p className="text-muted-foreground text-[11px]">
-                    Non-spouse heirs must fully drain inherited traditional IRAs within 10 years, taxed at their individual marginal income rate.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <ScenarioExplorer rules={rules} isMfj={isMfj} />
 
       {/* ── SECTION 2: ANNUAL ENGINE EXECUTION PIPELINE DIAGRAM ──────────────── */}
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-5">
-        <div className="border-b border-border pb-3">
-          <h4 className="text-base font-bold text-foreground flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-500" />
-            Annual Engine Execution Pipeline (9-Phase Projection Loop)
-          </h4>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Sequential calculation pipeline executed on each year of the simulation:
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 @sm:grid-cols-2 @md:grid-cols-3 gap-3 text-xs">
-          {[
-            {
-              step: 'Phase 1',
-              title: 'Gross Income & FICA',
-              desc: 'Sum salary, passive income, pension, & SS. Compute 7.65% payroll taxes.',
-              color: 'bg-muted/20 border-border hover:border-blue-500/40',
-            },
-            {
-              step: 'Phase 2',
-              title: 'Pre-Tax Savings Waterfall',
-              desc: 'Route employer match, HSA, & 401(k) pre-tax contributions before income tax.',
-              color: 'bg-muted/20 border-border hover:border-emerald-500/40',
-            },
-            {
-              step: 'Phase 3',
-              title: 'Tax Base & Provisional SS',
-              desc: 'Subtract standard deduction; compute SS provisional income (50%/85% tiers).',
-              color: 'bg-muted/20 border-border hover:border-purple-500/40',
-            },
-            {
-              step: 'Phase 4',
-              title: 'SECURE Act RMD Draw & Offset',
-              desc: 'Enforce mandatory RMDs at age 73+; proceeds cover retirement living expenses first.',
-              color: 'bg-muted/20 border-border hover:border-indigo-500/40',
-            },
-            {
-              step: 'Phase 5',
-              title: 'Deficit Drawdown / RMD Sweep',
-              desc: 'Draw remaining deficit via strategy, or sweep excess RMDs above expenses to specified account.',
-              color: 'bg-muted/20 border-border hover:border-amber-500/40',
-            },
-            {
-              step: 'Phase 6',
-              title: 'Roth Conversion Ladder',
-              desc: 'Convert pre-tax to Roth up to target tax bracket, capping at IRMAA cliff if enabled.',
-              color: 'bg-muted/20 border-border hover:border-pink-500/40',
-            },
-            {
-              step: 'Phase 7',
-              title: 'Tax Stack & 3.8% NIIT',
-              desc: 'Reconcile Ordinary Tax, CapGains, State Tax, NIIT surcharge, & early penalties.',
-              color: 'bg-muted/20 border-border hover:border-rose-500/40',
-            },
-            {
-              step: 'Phase 8',
-              title: 'IRMAA Lag & ACA Subsidy',
-              desc: 'Compute MAGI; queue Year Y+2 Medicare surcharge and calculate ACA subsidy.',
-              color: 'bg-muted/20 border-border hover:border-cyan-500/40',
-            },
-            {
-              step: 'Phase 9',
-              title: 'Asset Growth & Yield',
-              desc: 'Accrue stock/bond asset growth & dividend yield, update balances & cost basis for Year Y+1.',
-              color: 'bg-muted/20 border-border hover:border-teal-500/40',
-            },
-          ].map((item, idx) => (
-            <div key={idx} className={`p-3.5 rounded-xl border transition-all ${item.color} space-y-1`}>
-              <div className="flex items-center justify-between">
-                <SectionHeading label>
-                  {item.step}
-                </SectionHeading>
-                <span className="text-[10px] font-bold text-foreground bg-background px-1.5 py-0.5 rounded border">
-                  Step {idx + 1}
-                </span>
-              </div>
-              <h5 className="font-bold text-foreground text-xs">{item.title}</h5>
-              <p className="text-[11px] text-muted-foreground leading-snug">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <EnginePipelineDiagram />
 
       {/* ── SECTION 3: RULE LOGIC DEEP DIVES (DEEP EXPLANATION CARDS) ───────── */}
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
@@ -1230,33 +856,7 @@ export function EngineRulesView({
           </div>
 
           {/* Collapsible IRS Uniform Lifetime Table Preview */}
-          <div className="pt-2">
-            <button
-              onClick={() => setShowRmdTable(!showRmdTable)}
-              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Info className="w-3.5 h-3.5" />
-              {showRmdTable ? 'Hide IRS Uniform Lifetime RMD Table III' : 'View IRS Uniform Lifetime RMD Table III Divisors'}
-            </button>
-
-            {showRmdTable && (
-              <div className="mt-3 p-3 bg-muted/20 border border-border rounded-xl space-y-2 animate-in fade-in">
-                <p className="text-[11px] text-muted-foreground">
-                  IRS Publication 590-B Uniform Lifetime Table III divisors used by the engine to compute mandatory annual distributions:
-                </p>
-                <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 text-[11px] font-mono">
-                  {Object.entries(IRS_UNIFORM_LIFETIME_TABLE)
-                    .slice(0, 24)
-                    .map(([age, divisor]) => (
-                      <div key={age} className="bg-background border border-border rounded p-1.5 text-center">
-                        <span className="text-muted-foreground text-[10px] block">Age {age}</span>
-                        <span className="font-bold text-foreground">{divisor}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <RmdTablePreview />
         </div>
 
         {/* 5. Gift & Estate Tax Exemptions */}
@@ -1319,58 +919,7 @@ export function EngineRulesView({
         </div>
 
         {/* 6. Historical Asset Returns & CPI Benchmarks */}
-        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div>
-              <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
-                Historical Market & CPI Inflation Benchmarks
-              </h4>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Empirical historical asset class returns and CPI inflation data (1928–2025) used for historical sequence-of-returns stress testing.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowHistoricalData(!showHistoricalData)}
-              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              {showHistoricalData ? 'Hide Data Table' : 'View Historical Table'}
-            </button>
-          </div>
-
-          {showHistoricalData && (
-            <div className="overflow-x-auto border border-border rounded-xl max-h-64 overflow-y-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/40 text-muted-foreground font-semibold border-b border-border sticky top-0 bg-card">
-                  <tr>
-                    <th className="p-2.5">Year</th>
-                    <th className="p-2.5">S&P 500 Price Growth</th>
-                    <th className="p-2.5">S&P 500 Dividend Yield</th>
-                    <th className="p-2.5">US Bond Growth</th>
-                    <th className="p-2.5">US Bond Yield</th>
-                    <th className="p-2.5">CPI Inflation</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border font-mono">
-                  {HISTORICAL_RETURNS_DATA.map((row) => (
-                    <tr key={row.year} className="hover:bg-muted/20">
-                      <td className="p-2 font-bold">{row.year}</td>
-                      <td className={`p-2 font-bold ${row.stocksGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {(row.stocksGrowth * 100).toFixed(2)}%
-                      </td>
-                      <td className="p-2 text-muted-foreground">{(row.stocksYield * 100).toFixed(2)}%</td>
-                      <td className={`p-2 font-bold ${row.bondsGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {(row.bondsGrowth * 100).toFixed(2)}%
-                      </td>
-                      <td className="p-2 text-muted-foreground">{(row.bondsYield * 100).toFixed(2)}%</td>
-                      <td className="p-2 text-amber-500 font-bold">{(row.inflationRate * 100).toFixed(2)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <HistoricalMarketData />
       </div>
     </div>
   );
