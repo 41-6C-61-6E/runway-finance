@@ -146,7 +146,7 @@ export default function AccountHierarchyTree({
   useEffect(() => {
     if (!effectiveAccountId) {
       hasAutoScrolledRef.current = false;
-      return;
+      return undefined;
     }
 
     setExpandedAccounts((prev) => (prev[effectiveAccountId] ? prev : { [effectiveAccountId]: true }));
@@ -175,6 +175,7 @@ export default function AccountHierarchyTree({
         setSelectedGroup('All Accounts');
       }
     }
+    return undefined;
   }, [effectiveAccountId, filteredAllAccounts, accountsLoading, setExpandedAccounts, setExpandedGroups, setExpandedSubgroups, setSelectedAccountId, setSelectedGroup]);
 
   const hierarchyAvailableGroups = useMemo(() => {
@@ -504,7 +505,7 @@ export default function AccountHierarchyTree({
   // so the detail the user opened stays visible on mobile.
   useEffect(() => {
     const accountId = pendingMobileAccountScrollRef.current;
-    if (!accountId || effectiveAccountId !== accountId || selectedGroup) return;
+    if (!accountId || effectiveAccountId !== accountId || selectedGroup) return undefined;
 
     pendingMobileAccountScrollRef.current = null;
     const frame = requestAnimationFrame(() => {

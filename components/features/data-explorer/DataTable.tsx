@@ -161,7 +161,7 @@ export default function DataTable({
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     const ro = new ResizeObserver(() => calculateSizes());
     ro.observe(el);
     return () => ro.disconnect();

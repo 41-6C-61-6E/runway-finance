@@ -10,31 +10,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { ListRow } from '@/components/ui/list-row';
 import { IconButton } from '@/components/ui/icon-button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-
-interface Goal {
-  id: string;
-  name: string;
-  description: string | null;
-  type: string;
-  targetAmount: string;
-  currentAmount: string;
-  initialAmount?: string;
-  allocatedAmount?: number;
-  isUnderfunded?: boolean;
-  accountBalance?: number | null;
-  accountName?: string | null;
-  remainingOnAccount?: number | null;
-  sortOrder?: number;
-  targetDate: string | null;
-  category: { id: string; name: string; color: string } | string | null;
-  tags?: Array<{ id: string; name: string; color: string }>;
-  status: string;
-  linkedAccountId: string | null;
-  percentage: string;
-  reserve: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Goal } from '@/lib/types/goal';
+export type { Goal };
 
 interface GoalProjection {
   projectedFundDate: string | null;

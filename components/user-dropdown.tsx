@@ -46,7 +46,7 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);

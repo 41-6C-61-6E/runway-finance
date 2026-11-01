@@ -37,7 +37,7 @@ export function TableScroll({
   React.useLayoutEffect(() => {
     update();
     const el = scrollerRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();

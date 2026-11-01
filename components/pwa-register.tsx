@@ -43,7 +43,7 @@ export function PWARegister() {
       !("serviceWorker" in navigator) ||
       process.env.NODE_ENV !== "production"
     ) {
-      return;
+      return undefined;
     }
 
     let cancelled = false;

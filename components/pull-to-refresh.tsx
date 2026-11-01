@@ -33,7 +33,7 @@ export function PullToRefresh({ children }: PullToRefreshProps) {
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) return undefined;
 
     const handleTouchStart = (e: TouchEvent) => {
       // Only handle single-finger touch

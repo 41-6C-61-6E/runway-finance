@@ -147,7 +147,7 @@ function useLastFired(ruleId: string, isEnabled: boolean) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!isEnabled) return;
+    if (!isEnabled) return undefined;
     setLoading(true);
     fetch(`/api/notifications/custom-alerts/${ruleId}/last-fired`)
       .then((r) => r.ok ? r.json() : null)

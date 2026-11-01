@@ -20,7 +20,7 @@ export function OverflowAware({ children, className }: OverflowAwareProps) {
     const measureContainer = measureRef.current;
     if (!container || !measureContainer || items.length === 0) {
       setVisibleCount(0);
-      return;
+      return undefined;
     }
 
     const measure = () => {

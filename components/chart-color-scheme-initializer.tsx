@@ -9,7 +9,7 @@ export function ChartColorSchemeInitializer() {
   const { theme } = useTheme();
 
   useEffect(() => {
-    if (!theme) return;
+    if (!theme) return undefined;
 
     const updateThemeColor = () => {
       const metas = document.querySelectorAll('meta[name="theme-color"]');

@@ -275,7 +275,7 @@ function GrantLogoBadge({
   const dimClass = size === 'md' ? 'w-10 h-10 rounded-xl text-sm' : 'w-8 h-8 rounded-lg text-xs';
 
   useEffect(() => {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined') return undefined;
     const observer = new MutationObserver(() => {
       setThemeRevision((v) => v + 1);
     });
@@ -287,7 +287,7 @@ function GrantLogoBadge({
   }, []);
 
   useEffect(() => {
-    if (!resolvedSrc || typeof window === 'undefined') return;
+    if (!resolvedSrc || typeof window === 'undefined') return undefined;
 
     let cancelled = false;
     const docAttr = document.documentElement.getAttribute('data-theme') || theme || resolvedTheme || 'dark';

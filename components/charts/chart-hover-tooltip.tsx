@@ -37,7 +37,7 @@ export function ChartHoverTooltip({ content, children }: ChartHoverTooltipProps)
 
   // Dismiss on any scroll
   useEffect(() => {
-    if (!pos) return;
+    if (!pos) return undefined;
     const handleScroll = () => {
       setPos(null);
     };

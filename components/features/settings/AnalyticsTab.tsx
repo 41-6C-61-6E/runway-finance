@@ -102,6 +102,7 @@ export default function AnalyticsTab() {
       }, 2000);
       return () => clearInterval(timer);
     }
+    return undefined;
   }, [recalcStatus?.status, fetchRecalcStatus]);
 
   const handleTriggerRecalc = async (type = 'netWorth') => {

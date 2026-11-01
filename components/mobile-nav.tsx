@@ -382,7 +382,7 @@ export function MobileNav() {
 
   // Global window pointer/touch move and up handlers when dragging an item
   useEffect(() => {
-    if (!draggedItem) return;
+    if (!draggedItem) return undefined;
 
     const handleMove = (clientX: number, clientY: number) => {
       setDragCurrentPos({ x: clientX, y: clientY });

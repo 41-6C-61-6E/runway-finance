@@ -121,7 +121,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   // with ?categoryId=<id>, scroll the matching row into view and flash it.
   const [flashCategoryId, setFlashCategoryId] = useState<string | null>(null);
   useEffect(() => {
-    if (!targetCategoryId) return;
+    if (!targetCategoryId) return undefined;
     // Wait for the budgets query to render rows.
     let tries = 0;
     const timer = setInterval(() => {
@@ -171,7 +171,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
     };
     updateWidth();
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const width = entry.contentRect.width || (entry.target as HTMLElement).clientWidth;

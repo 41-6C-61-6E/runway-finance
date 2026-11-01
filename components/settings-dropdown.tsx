@@ -41,7 +41,7 @@ export default function SettingsDropdown({ onOpenChange }: SettingsDropdownProps
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);

@@ -221,7 +221,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
 
   // Handle outside click & escape key
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as HTMLElement | null;
       if (
@@ -265,7 +265,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
 
   // Reset delete confirmation timer
   useEffect(() => {
-    if (!deleteConfirmId) return;
+    if (!deleteConfirmId) return undefined;
     const timer = setTimeout(() => {
       setDeleteConfirmId(null);
     }, 4000);

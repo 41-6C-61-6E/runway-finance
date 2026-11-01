@@ -180,7 +180,7 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
 
   // Close dropdown on click outside or escape key
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as HTMLElement;
       if (!target) return;

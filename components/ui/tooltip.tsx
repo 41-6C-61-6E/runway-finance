@@ -64,7 +64,7 @@ function Tooltip({
 
   // App-wide mobile touch listener to dismiss open tooltips when tapping anywhere or scrolling
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
 
     const handleGlobalScroll = () => {
       setOpen(false);

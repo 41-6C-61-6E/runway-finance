@@ -617,6 +617,7 @@ export default function AccountHistoryChart({
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
     }
+    return undefined;
   }, []);
 
   const maxPoints = useMemo(() => {

@@ -3,10 +3,10 @@ export interface GoalBase {
   name: string;
   description?: string | null;
   type: string;
-  targetAmount: string | number;
-  currentAmount: string | number;
+  targetAmount: string;
+  currentAmount: string;
   targetDate?: string | null;
-  initialAmount?: string | number;
+  initialAmount?: string;
   allocatedAmount?: number;
   isUnderfunded?: boolean;
   accountBalance?: number | null;
@@ -17,11 +17,16 @@ export interface GoalBase {
   tags?: Array<{ id: string; name: string; color: string }>;
   status?: string;
   linkedAccountId?: string | null;
+  percentage?: string;
+  reserve?: string;
 }
 
 export interface Goal extends GoalBase {
+  status: string;
+  linkedAccountId: string | null;
+  percentage: string;
+  reserve: string;
   userId?: string;
   createdAt?: string | Date;
   updatedAt?: string | Date;
 }
-

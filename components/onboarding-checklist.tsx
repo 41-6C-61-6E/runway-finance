@@ -36,7 +36,7 @@ export function OnboardingChecklist() {
   useEffect(() => {
     if (dismissed) {
       setLoading(false);
-      return;
+      return undefined;
     }
 
     let cancelled = false;

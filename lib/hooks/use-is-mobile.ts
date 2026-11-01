@@ -11,7 +11,7 @@ export function useIsMobile(breakpoint = MOBILE_BREAKPOINT): boolean {
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return undefined;
 
     const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
     const onChange = () => {

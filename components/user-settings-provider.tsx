@@ -74,7 +74,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
   // Cross-tab sync: when another tab changes a setting, refresh this tab's cache.
   // BroadcastChannel only delivers to OTHER contexts, so we never echo our own writes.
   useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return;
+    if (typeof BroadcastChannel === 'undefined') return undefined;
     const channel = new BroadcastChannel('runway-settings');
     channelRef.current = channel;
     channel.onmessage = () => {

@@ -238,7 +238,7 @@ export default function PayrollTab() {
   const [suggestionMsg, setSuggestionMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (paystubsLoading || paystubs.length === 0 || suggestionDismissed) return;
+    if (paystubsLoading || paystubs.length === 0 || suggestionDismissed) return undefined;
     let cancelled = false;
     (async () => {
       // Paystubs are fetched newest-first; use the latest imported one

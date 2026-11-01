@@ -213,7 +213,7 @@ export default function AiTab() {
     if (!endpoint.trim() || !endpoint.startsWith('http')) {
       setFetchedModels([]);
       setModelsFetchError(null);
-      return;
+      return undefined;
     }
 
     const timer = setTimeout(async () => {

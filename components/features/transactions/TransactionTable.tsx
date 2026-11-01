@@ -616,7 +616,7 @@ export default function TransactionTable({
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     const ro = new ResizeObserver(() => calculateSizes());
     ro.observe(el);
     return () => ro.disconnect();
@@ -931,7 +931,7 @@ export default function TransactionTable({
 
   useEffect(() => {
     const currentSentinel = sentinelRef.current;
-    if (!currentSentinel || typeof IntersectionObserver === 'undefined') return;
+    if (!currentSentinel || typeof IntersectionObserver === 'undefined') return undefined;
 
     const observer = new IntersectionObserver(
       (entries) => {

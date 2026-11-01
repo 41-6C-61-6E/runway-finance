@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, Search, Sparkles } from 'lucide-react';
 import { Select } from '@/components/ui/select';
+import type { Goal } from '@/lib/types/goal';
 
 interface GoalFormData {
   name: string;
@@ -41,22 +42,7 @@ interface GoalFormDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  editGoal?: {
-    id: string;
-    name: string;
-    description: string | null;
-    type: string;
-    targetAmount: string;
-    currentAmount: string;
-    targetDate: string | null;
-    category: any;
-    status: string;
-    linkedAccountId: string | null;
-    percentage: string;
-    reserve: string;
-    sortOrder: number;
-    tags?: Array<{ id: string; name: string; color: string }>;
-  };
+  editGoal?: Goal | null;
 }
 
 interface Account {

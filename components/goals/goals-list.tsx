@@ -13,25 +13,8 @@ import { toast } from 'sonner';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { ActionButton } from '@/components/ui/action-button';
 import { Plus } from 'lucide-react';
-
-interface Goal {
-  id: string;
-  name: string;
-  description: string | null;
-  type: string;
-  targetAmount: string;
-  currentAmount: string;
-  targetDate: string | null;
-  category: { id: string; name: string; color: string } | null;
-  tags?: Array<{ id: string; name: string; color: string }>;
-  status: string;
-  linkedAccountId: string | null;
-  percentage: string;
-  reserve: string;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Goal } from '@/lib/types/goal';
+export type { Goal };
 
 type FilterStatus = 'all' | 'active' | 'completed' | 'paused' | 'pending';
 
@@ -115,7 +98,7 @@ export function GoalsList({ targetGoalId }: { targetGoalId?: string | null } = {
   // Notification deep-linking: when a goal notification lands us here with
   // ?goalId=<id>, make sure it's visible (force "all" filter) and flash it.
   useEffect(() => {
-    if (!targetGoalId) return;
+    if (!targetGoalId) return undefined;
     setFilter('all');
     let tries = 0;
     const timer = setInterval(() => {

@@ -55,7 +55,7 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
   // with nearest-neighbor interpolation to create blocky pixel blocks.
   // Trivial change to trigger workflow run.
   useEffect(() => {
-    if (loading) return;
+    if (loading) return undefined;
 
     function cleanupPixelation() {
       // Remove canvas overlays from HTML elements
@@ -76,7 +76,7 @@ export function PrivacyModeProvider({ children }: { children: React.ReactNode })
 
     if (!privacyMode) {
       cleanupPixelation();
-      return;
+      return undefined;
     }
 
     const PIXEL_SIZE = 8;

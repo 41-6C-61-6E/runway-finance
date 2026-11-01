@@ -18,6 +18,10 @@
       "auth": ["./lib/auth"]
     },
     "strict": false,
+    "noFallthroughCasesInSwitch": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    "noImplicitReturns": true,
     "plugins": [
       {
         "name": "next"

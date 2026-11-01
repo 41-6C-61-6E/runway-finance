@@ -78,7 +78,7 @@ function CategoryPillSelector({
   const [creatingCategoryLoading, setCreatingCategoryLoading] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) return undefined;
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
@@ -654,7 +654,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     fetchProposals();
     fetch('/api/categories', { credentials: 'include' })
       .then((r) => r.json())
@@ -673,7 +673,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             const timeoutMsg = `Analysis timed out after 10 minutes. Please try running the analysis again.`;
             setSavedStatus({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt });
             localStorage.setItem(STATUS_KEY, JSON.stringify({ status: 'error', message: timeoutMsg, startedAt: parsed.startedAt }));
-            return;
+            return undefined;
           }
         }
 
@@ -741,7 +741,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   }, [open, fetchProposals]);
 
   useEffect(() => {
-    if (!analyzing || !savedStatus?.startedAt) return;
+    if (!analyzing || !savedStatus?.startedAt) return undefined;
     const checkTimeout = setInterval(() => {
       const elapsed = Date.now() - (savedStatus.startedAt || 0);
       if (elapsed > ANALYSIS_TIMEOUT_MS) {
@@ -758,7 +758,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   useEffect(() => {
     if (!analyzing || !startTime) {
       setElapsedSeconds(0);
-      return;
+      return undefined;
     }
     const timer = setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
@@ -767,7 +767,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
   }, [analyzing, startTime]);
 
   useEffect(() => {
-    if (!analyzing || !open) return;
+    if (!analyzing || !open) return undefined;
     const interval = setInterval(() => {
       fetch(`/api/ai/proposals?status=pending&_t=${Date.now()}`, { credentials: 'include', cache: 'no-store' })
         .then((r) => r.json())
@@ -815,7 +815,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
         setAnalysisLogs([]);
         setCurrentStep('Initializing...');
       }
-      return;
+      return undefined;
     }
     const interval = setInterval(async () => {
       try {

@@ -156,7 +156,7 @@ const SankeyLabel = React.forwardRef<SVGGElement, SankeyLabelProps>(function San
     let on = true;
     if (typeof document === 'undefined' || !('fonts' in document)) {
       setFontsReady(true);
-      return;
+      return undefined;
     }
     document.fonts.ready.then(() => {
       if (on) setFontsReady(true);

@@ -43,11 +43,11 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
   }, []);
 
   useIsomorphicLayoutEffect(() => {
-    if (isMobile) return;
+    if (isMobile) return undefined;
     const el = ref.current;
     const container = containerRef?.current;
     setPosition(null);
-    if (!el || !container || !isCustomPositioned || Number.isNaN(x) || Number.isNaN(y)) return;
+    if (!el || !container || !isCustomPositioned || Number.isNaN(x) || Number.isNaN(y)) return undefined;
 
     const margin = 12;
     const scrollParent = getHorizontalScrollParent(container);

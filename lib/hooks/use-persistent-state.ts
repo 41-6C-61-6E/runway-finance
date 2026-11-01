@@ -139,7 +139,7 @@ export function usePersistentState<T>(
   // localStorage changes, so we pick up writes made by another tab here.
   // Setting state does not write back to localStorage, so this cannot loop.
   useEffect(() => {
-    if (!key || typeof window === 'undefined') return;
+    if (!key || typeof window === 'undefined') return undefined;
     const onStorage = (e: StorageEvent) => {
       if (e.key !== key || e.newValue === null) return;
       try {

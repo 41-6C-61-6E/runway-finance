@@ -1038,6 +1038,7 @@ export default function ManualAccountsSection() {
           </div>
         );
     }
+    return null;
   };
 
   if (loading) {

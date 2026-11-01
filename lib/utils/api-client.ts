@@ -17,7 +17,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T = any>(
+export async function apiFetch<T = unknown>(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<T> {
@@ -36,7 +36,7 @@ export async function apiFetch<T = any>(
 
   if (!response.ok) {
     let errMsg = `Request failed with status ${response.status}`;
-    let errorDetails: any = null;
+    let errorDetails: unknown = null;
     try {
       const data = await response.json();
       errorDetails = data;

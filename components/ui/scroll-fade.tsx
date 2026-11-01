@@ -45,7 +45,7 @@ export function useScrollFades<T extends HTMLElement = HTMLDivElement>() {
   React.useLayoutEffect(() => {
     update();
     const el = fadeRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     const ro = new ResizeObserver(update);
     ro.observe(el);
     ro.observe(document.documentElement);

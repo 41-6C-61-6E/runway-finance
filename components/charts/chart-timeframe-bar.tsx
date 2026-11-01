@@ -54,7 +54,7 @@ export function ChartTimeframeBar({ value, onChange, presets, windowNav, classNa
 
   // Close overflow on outside click
   useEffect(() => {
-    if (!overflowOpen) return;
+    if (!overflowOpen) return undefined;
     const handler = (e: MouseEvent) => {
       if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
         setOverflowOpen(false);
@@ -107,7 +107,7 @@ export function ChartTimeframeBar({ value, onChange, presets, windowNav, classNa
 
   useEffect(() => {
     const bar = barRef.current;
-    if (!bar) return;
+    if (!bar) return undefined;
     const ro = new ResizeObserver(() => computeVisible());
     ro.observe(bar);
     // also observe nav width changes

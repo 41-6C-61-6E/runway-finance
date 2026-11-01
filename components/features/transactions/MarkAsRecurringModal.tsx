@@ -245,7 +245,7 @@ export function MarkAsRecurringModal({
     if (!open || !effectivePattern || effectivePattern.length < 2) {
       setPreviewData(null);
       setExistingRule(null);
-      return;
+      return undefined;
     }
 
     const timer = setTimeout(async () => {

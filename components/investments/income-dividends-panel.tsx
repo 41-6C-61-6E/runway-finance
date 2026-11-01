@@ -110,7 +110,7 @@ export function IncomeDividendsPanel({ value, onValueChange, onFocusActivity }: 
   const [selectedMonth, setSelectedMonth] = useState<MonthlyFlowDatum | null>(null);
   // CF-5 (a11y/UX parity): close the detail modal on Escape.
   useEffect(() => {
-    if (!selectedMonth) return;
+    if (!selectedMonth) return undefined;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSelectedMonth(null);
     };
