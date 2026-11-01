@@ -37,8 +37,15 @@ interface CachedSyncHealth {
 const syncHealthCache = new Map<string, CachedSyncHealth>();
 
 export function invalidateSyncHealthCache(userId?: string): void {
-  if (userId) syncHealthCache.delete(userId);
-  else syncHealthCache.clear();
+  if (userId) {
+    for (const key of syncHealthCache.keys()) {
+      if (key === userId || key.startsWith(`${userId}:`)) {
+        syncHealthCache.delete(key);
+      }
+    }
+  } else {
+    syncHealthCache.clear();
+  }
 }
 
 export async function getAccountsSyncStatus(

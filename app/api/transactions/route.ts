@@ -42,6 +42,7 @@ import {
   updateMonthlyCashFlowSummaries,
 } from "@/lib/services/sync";
 import { getSearchMatchingTransactionIds, invalidateUserSearchCache } from "@/lib/services/search-cache";
+import { invalidateUserServerCache } from "@/lib/server-cache";
 
 const UNCATEGORIZED_CATEGORY_IDS = new Set([
   "uncategorized",
@@ -372,13 +373,22 @@ export async function GET(request: Request) {
       eq(accounts.type, 'paystub')
     ),
     eq(transactions.deleted, false),
-    isNull(transactions.parentId),
   ];
 
-  if (filters.ignored !== undefined) {
-    whereConditions.push(eq(transactions.ignored, filters.ignored));
-  } else if (filters.totalAmountOnly) {
-    whereConditions.push(eq(transactions.ignored, false));
+  if (filters.totalAmountOnly) {
+    if (filters.ignored !== undefined) {
+      whereConditions.push(eq(transactions.ignored, filters.ignored));
+      whereConditions.push(isNull(transactions.parentId));
+    } else {
+      // Include non-ignored transactions; allows active child splits (which have parentId != null and ignored = false)
+      // to be included in ledger total amounts in place of their ignored parent.
+      whereConditions.push(eq(transactions.ignored, false));
+    }
+  } else {
+    whereConditions.push(isNull(transactions.parentId));
+    if (filters.ignored !== undefined) {
+      whereConditions.push(eq(transactions.ignored, filters.ignored));
+    }
   }
 
   if (filters.search) {
@@ -1457,6 +1467,7 @@ export async function PATCH(request: Request) {
   }
 
   invalidateUserSearchCache(userId);
+  invalidateUserServerCache(userId);
   triggerUserSummariesRebuild(userId, dek);
 
   logger.info("Transactions patched", { updatedCount: updated.length });
@@ -1545,6 +1556,7 @@ export async function POST(request: Request) {
   }
 
   invalidateUserSearchCache(userId);
+  invalidateUserServerCache(userId);
   triggerUserSummariesRebuild(userId, dek);
 
   return NextResponse.json(created, { status: 201 });
@@ -1797,7 +1809,22 @@ export async function DELETE(request: Request) {
       .returning();
   }
 
+  const deletedIds = updated.map((u) => u.id);
+  if (deletedIds.length > 0) {
+    // Soft delete child split transactions whose parent was just soft deleted (WS-06-F12)
+    await getDb()
+      .update(transactions)
+      .set({ deleted: true, updatedAt: new Date() })
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          inArray(transactions.parentId, deletedIds)
+        )
+      );
+  }
+
   invalidateUserSearchCache(userId);
+  invalidateUserServerCache(userId);
   triggerUserSummariesRebuild(userId, dek);
 
   logger.info("Transactions deleted", { deletedCount: updated.length });

@@ -18,11 +18,28 @@ import {
   categoryIncomeSummary,
 
   simplifinConnections,
+  plaidConnections,
   aiProviders,
   tags,
   importLog,
+  holdings,
+  holdingSnapshots,
+  equityGrants,
+  goalAllocationHistory,
   paystubs,
+  paystubLineItems,
+  paystubFieldMappings,
+  paystubAutoGenerateSettings,
+  plans,
+  planAccounts,
+  planEvents,
+  planFlows,
+  planSettings,
+  planLiabilities,
+  retirementRules,
   recurringTransactions,
+  customAlertRules,
+  userNotifications,
   transactionTags,
 } from '@/lib/db/schema';
 import { toCsv } from '@/lib/utils/export-formatter';
@@ -40,6 +57,7 @@ const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: transactionTags, dbName: 'transaction_tags', label: 'transaction_tags' },
   { table: budgets, dbName: 'budgets', label: 'budgets' },
   { table: financialGoals, dbName: 'financial_goals', label: 'financial_goals' },
+  { table: goalAllocationHistory, dbName: 'goal_allocation_history', label: 'goal_allocation_history' },
   { table: netWorthSnapshots, dbName: 'net_worth_snapshots', label: 'net_worth_snapshots' },
   { table: accountSnapshots, dbName: 'account_snapshots', label: 'account_snapshots' },
   { table: monthlyCashFlow, dbName: 'monthly_cash_flow', label: 'monthly_cash_flow' },
@@ -47,7 +65,25 @@ const CSV_TABLES: { table: any; dbName: string; label: string }[] = [
   { table: categoryIncomeSummary, dbName: 'category_income_summary', label: 'category_income_summary' },
 
   { table: simplifinConnections, dbName: 'simplefin_connections', label: 'simplefin_connections' },
+  { table: plaidConnections, dbName: 'plaid_connections', label: 'plaid_connections' },
   { table: aiProviders, dbName: 'ai_providers', label: 'ai_providers' },
+  { table: holdings, dbName: 'holdings', label: 'holdings' },
+  { table: holdingSnapshots, dbName: 'holding_snapshots', label: 'holding_snapshots' },
+  { table: equityGrants, dbName: 'equity_grants', label: 'equity_grants' },
+  { table: paystubs, dbName: 'paystubs', label: 'paystubs' },
+  { table: paystubLineItems, dbName: 'paystub_line_items', label: 'paystub_line_items' },
+  { table: paystubFieldMappings, dbName: 'paystub_field_mappings', label: 'paystub_field_mappings' },
+  { table: paystubAutoGenerateSettings, dbName: 'paystub_auto_generate_settings', label: 'paystub_auto_generate_settings' },
+  { table: plans, dbName: 'plans', label: 'plans' },
+  { table: planAccounts, dbName: 'plan_accounts', label: 'plan_accounts' },
+  { table: planEvents, dbName: 'plan_events', label: 'plan_events' },
+  { table: planFlows, dbName: 'plan_flows', label: 'plan_flows' },
+  { table: planSettings, dbName: 'plan_settings', label: 'plan_settings' },
+  { table: planLiabilities, dbName: 'plan_liabilities', label: 'plan_liabilities' },
+  { table: retirementRules, dbName: 'retirement_rules', label: 'retirement_rules' },
+  { table: customAlertRules, dbName: 'custom_alert_rules', label: 'custom_alert_rules' },
+  { table: userNotifications, dbName: 'user_notifications', label: 'user_notifications' },
+  { table: importLog, dbName: 'import_log', label: 'import_log' },
 ];
 
 export async function GET(request: Request) {
@@ -155,7 +191,19 @@ export async function GET(request: Request) {
     });
 
     for (const { table, dbName, label } of CSV_TABLES) {
-      const rows = await db.select().from(table).where(eq(table.userId, userId));
+      let rows: any[];
+      if (dbName === 'transaction_tags') {
+        rows = await db
+          .select({
+            transactionId: transactionTags.transactionId,
+            tagId: transactionTags.tagId,
+          })
+          .from(transactionTags)
+          .innerJoin(tags, eq(transactionTags.tagId, tags.id))
+          .where(eq(tags.userId, userId));
+      } else {
+        rows = await db.select().from(table).where(eq(table.userId, userId));
+      }
       const decrypted = await Promise.all(
         rows.map((row) => decryptRow(dbName, row as Record<string, unknown>, dek)),
       );

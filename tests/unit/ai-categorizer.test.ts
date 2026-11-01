@@ -109,4 +109,22 @@ describe('shouldProposeRule (frequency gate)', () => {
   it('rejects if rule fields are missing', () => {
     expect(shouldProposeRule({ conditionField: '', conditionOperator: '', conditionValue: '' }, batchTxns)).toBe(false);
   });
+
+  it('differentiates user abort from batch timeout so no timeout error is added', async () => {
+    const abortController = new AbortController();
+    abortController.abort();
+
+    // Call analyzeUncategorized with an already aborted controller
+    const { analyzeUncategorized } = await import('@/lib/services/ai-categorizer');
+    const logs: string[] = [];
+    const result = await analyzeUncategorized(
+      'user_test_cancel',
+      undefined,
+      (msg) => logs.push(msg),
+      abortController
+    );
+
+    // Errors should not contain "timed out"
+    expect(result.errors.some((e) => e.includes('timed out'))).toBe(false);
+  });
 });

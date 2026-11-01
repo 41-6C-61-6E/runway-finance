@@ -1239,8 +1239,16 @@ export async function DELETE(request: Request) {
 
       await db
         .update(budgets)
-        .set({ effectiveFrom: periodKey, effectiveTo: null })
-        .where(eq(budgets.userId, userId));
+        .set({ effectiveFrom: periodKey })
+        .where(
+          and(
+            eq(budgets.userId, userId),
+            or(
+              lt(budgets.effectiveFrom, periodKey),
+              isNull(budgets.effectiveFrom)
+            )
+          )
+        );
 
       return NextResponse.json({ success: true, message: 'Budget history removed' });
     }

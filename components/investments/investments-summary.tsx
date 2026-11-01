@@ -251,11 +251,11 @@ export function InvestmentsSummary({
     {
       label: 'Cost Basis',
       value: totalCostBasis != null ? formatCurrency(totalCostBasis) : '—',
-      subValue: totalCostBasis != null && totalCostBasis > 0 && totalBalance > 0
-        ? `${formatPlainPercent((totalBalance / totalCostBasis - 1) * 100)} growth`
+      subValue: totalUnrealizedReturnPct != null
+        ? `${formatPlainPercent(totalUnrealizedReturnPct)} growth`
         : 'No basis data',
       icon: DollarSign,
-      isPositive: totalCostBasis != null ? totalBalance >= totalCostBasis : null,
+      isPositive: totalUnrealizedGainLoss != null ? totalUnrealizedGainLoss >= 0 : null,
     },
     {
       label: 'Est. Annual Income',

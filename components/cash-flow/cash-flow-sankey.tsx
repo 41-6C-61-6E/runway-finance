@@ -113,7 +113,7 @@ function buildCategoryLookup(allCategoryInfo: CategoryInfo[]): Map<string, Categ
   return new Map(allCategoryInfo.map((c) => [c.id, c]));
 }
 
-function buildSankeyData(
+export function buildSankeyData(
   categories: CategoryData[],
   totalIncome: number,
   totalExpenses: number,
@@ -290,13 +290,25 @@ function buildSankeyData(
     links.push({ source: fallbackId, target: hubId, value: totalIncome });
   }
 
+  // When expenses exceed income, add a balancing source node to maintain mass conservation (sum(in) == sum(out))
+  if (totalExpenses > totalIncome) {
+    const deficit = totalExpenses - totalIncome;
+    const deficitId = '__deficit__';
+    nodes.push({
+      id: deficitId,
+      label: 'Savings Drawdown',
+      color: '#f59e0b',
+      value: deficit,
+      percentage: totalExpenses > 0 ? (deficit / totalExpenses) * 100 : 0,
+    });
+    links.push({ source: deficitId, target: hubId, value: deficit });
+  }
+
   if (incomeCategories.length > 0 || expenseCategories.length > 0 || totalIncome > 0 || totalExpenses > 0) {
-    const isSurplus = totalIncome >= totalExpenses;
-    const label = isSurplus ? 'Cash Surplus' : 'Cash Deficit';
     const netChange = totalIncome - totalExpenses;
     nodes.push({
       id: hubId,
-      label,
+      label: 'Available Funds',
       color: '#0ea5e9',
       value: Math.max(totalIncome, totalExpenses),
       percentage: 100,
@@ -413,7 +425,7 @@ function buildSankeyData(
     const savingsId = '__savings__';
     nodes.push({
       id: savingsId,
-      label: 'Cash Surplus',
+      label: 'Net Savings',
       color: '#10b981',
       value: surplus,
       percentage: totalIncome > 0 ? (surplus / totalIncome) * 100 : 0,
@@ -451,13 +463,13 @@ const SankeyCustomNode = ({
   if (typeof x !== 'number' || Number.isNaN(x) || typeof y !== 'number' || Number.isNaN(y)) {
     return null;
   }
-  const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
+  const isLeftSide = !payload.targetLinks || payload.targetLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
   const rawLabel = payload.label ?? payload.name ?? '';
   const isMobileSize = isMobile;
   let label = rawLabel;
-  const labelMaxW = computeLabelGutter(x, width, isRightSide, columnLeftXs, chartWidth ?? 0);
+  const labelMaxW = computeLabelGutter(x, width, isLeftSide, columnLeftXs, chartWidth ?? 0);
 
   const valueLabel = payload.isHub
     ? formatCurrency(payload.netChange)
@@ -602,10 +614,10 @@ const SankeyCustomNode = ({
       ) : (
         <SankeyLabel
           text={label}
-          x={isRightSide ? x - 8 : x + width + 8}
+          x={isLeftSide ? x - 8 : x + width + 8}
           y={shiftedY + height / 2}
           maxW={labelMaxW}
-          anchor={isRightSide ? 'end' : 'start'}
+          anchor={isLeftSide ? 'end' : 'start'}
           value={valueLabel || undefined}
           opacity={isDimmed ? 0.3 : 1}
         />
@@ -812,7 +824,7 @@ export function CashFlowSankey() {
   };
 
   const handleNodeClick = useCallback((nodeId: string) => {
-    if (nodeId === '__available_funds__' || nodeId === '__savings__') return;
+    if (nodeId === '__available_funds__' || nodeId === '__savings__' || nodeId === '__deficit__') return;
     const categoryId = getNodeCategoryId(nodeId);
     if (categoryId) navigateToTransactions(categoryId);
   }, [sankeyData, dateRange]);

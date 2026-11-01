@@ -24,14 +24,18 @@ vi.mock('@/lib/hooks/use-card-collapsed', () => ({
 }));
 
 let mockPeriodKey = '2026-08';
-vi.mock('@/components/budgets/budget-period-selector', () => ({
-  useBudgetPeriod: () => ({
-    periodType: 'monthly',
-    periodKey: mockPeriodKey,
-    setPeriodType: vi.fn(),
-    setPeriodKey: vi.fn(),
-  }),
-}));
+vi.mock('@/components/budgets/budget-period-selector', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/budgets/budget-period-selector')>();
+  return {
+    ...actual,
+    useBudgetPeriod: () => ({
+      periodType: 'monthly',
+      periodKey: mockPeriodKey,
+      setPeriodType: vi.fn(),
+      setPeriodKey: vi.fn(),
+    }),
+  };
+});
 
 let mockBudgets: any[] = [
   {

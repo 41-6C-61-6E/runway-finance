@@ -38,36 +38,45 @@ export async function POST() {
   const ruleResults = await applyRulesToTransactions(decryptedTxns, userId, dek);
 
   if (ruleResults.size > 0) {
-    for (const [txId, action] of ruleResults) {
-      if (action.shouldUpdateCategory) {
-        const updateData: Record<string, unknown> = { updatedAt: new Date() };
-        if (action.categoryId) updateData.categoryId = action.categoryId;
-        if (action.payee) {
-          updateData.payee = await encryptField(action.payee, dek);
-        }
-        if (action.reviewed !== null) updateData.reviewed = action.reviewed;
-        if (Object.keys(updateData).length > 1) {
-          await getDb()
-            .update(transactions)
-            .set(updateData)
-            .where(eq(transactions.id, txId));
+    const payeeEncCache = new Map<string, string>();
+    if (dek) {
+      for (const [, action] of ruleResults) {
+        if (action.payee && !payeeEncCache.has(action.payee)) {
+          payeeEncCache.set(action.payee, await encryptField(action.payee, dek));
         }
       }
+    }
 
-      if (action.shouldUpdateTags) {
-        if (action.overrideExisting) {
-          await getDb()
-            .delete(transactionTags)
-            .where(eq(transactionTags.transactionId, txId));
+    await getDb().transaction(async (tx) => {
+      for (const [txId, action] of ruleResults) {
+        if (action.shouldUpdateCategory) {
+          const updateData: Record<string, unknown> = { updatedAt: new Date() };
+          if (action.categoryId) updateData.categoryId = action.categoryId;
+          if (action.payee && payeeEncCache.has(action.payee)) {
+            updateData.payee = payeeEncCache.get(action.payee);
+          }
+          if (action.reviewed !== null) updateData.reviewed = action.reviewed;
+          if (Object.keys(updateData).length > 1) {
+            await tx
+              .update(transactions)
+              .set(updateData)
+              .where(eq(transactions.id, txId));
+          }
         }
-        if (action.setTagId) {
-          await getDb()
+
+        if (action.shouldUpdateTags && action.setTagId) {
+          if (action.overrideExisting) {
+            await tx
+              .delete(transactionTags)
+              .where(eq(transactionTags.transactionId, txId));
+          }
+          await tx
             .insert(transactionTags)
             .values({ transactionId: txId, tagId: action.setTagId })
             .onConflictDoNothing();
         }
       }
-    }
+    });
   }
 
   logger.info('POST /api/category-rules/apply-all', { userId, updated: ruleResults.size, total: allTxns.length });

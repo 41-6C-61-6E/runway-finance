@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 const DEFAULTS: {
   global: boolean;
@@ -17,27 +18,42 @@ const DEFAULTS: {
 };
 
 export function useSyntheticData() {
-  const [settings, setSettings] = useState<typeof DEFAULTS>(DEFAULTS);
-  const [loading, setLoading] = useState(true);
+  const userSettingsCtx = useUserSettings();
 
+  const [localSettings, setLocalSettings] = useState<typeof DEFAULTS>(DEFAULTS);
+  const [localLoading, setLocalLoading] = useState(!userSettingsCtx);
+
+  // If outside provider, fetch manually
   useEffect(() => {
+    if (userSettingsCtx) return;
     fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        const s = data.showSyntheticData;
+        const s = data?.showSyntheticData;
         if (s && typeof s === 'object') {
-          setSettings({ ...DEFAULTS, ...s });
+          setLocalSettings({ ...DEFAULTS, ...s });
         }
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setLocalLoading(false));
+  }, [userSettingsCtx]);
+
+  const settings = useMemo(() => {
+    if (userSettingsCtx) {
+      const s = userSettingsCtx.settings?.showSyntheticData;
+      if (s && typeof s === 'object') {
+        return { ...DEFAULTS, ...s };
+      }
+      return DEFAULTS;
+    }
+    return localSettings;
+  }, [userSettingsCtx, userSettingsCtx?.settings?.showSyntheticData, localSettings]);
+
+  const loading = userSettingsCtx ? userSettingsCtx.loading : localLoading;
 
   const isEnabled = useCallback(
     (module: keyof typeof DEFAULTS) => {
       if (loading) return true;
-      // When global flag is not present, default to true for backward compatibility
-      // But when it's explicitly false, respect the individual module toggle
       if (settings.global !== undefined && !settings.global) return false;
       return settings[module] !== false;
     },
@@ -48,7 +64,13 @@ export function useSyntheticData() {
     async (next: Partial<typeof DEFAULTS>) => {
       const prev = settings;
       const merged = { ...prev, ...next };
-      setSettings(merged);
+
+      if (userSettingsCtx) {
+        await userSettingsCtx.updateSetting('showSyntheticData', merged);
+        return;
+      }
+
+      setLocalSettings(merged);
       try {
         const res = await fetch('/api/user-settings', {
           method: 'PATCH',
@@ -58,10 +80,10 @@ export function useSyntheticData() {
         });
         if (!res.ok) throw new Error('Failed to save');
       } catch {
-        setSettings(prev);
+        setLocalSettings(prev);
       }
     },
-    [settings]
+    [settings, userSettingsCtx]
   );
 
   return { settings, loading, isEnabled, updateSettings };

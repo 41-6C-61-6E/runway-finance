@@ -379,21 +379,27 @@ export async function POST(request: Request) {
         continue;
       }
 
+      // Pad with zero for months in the lookback window that had no spending
+      const lookbackMonthCount = Math.max(1, Math.round(divisorMonths));
+      const zeroMonthsCount = Math.max(0, lookbackMonthCount - monthlySumList.length);
+      const paddedMonthlySums = [...monthlySumList, ...Array(zeroMonthsCount).fill(0)];
+
       // Outlier exclusion at monthly totals level
-      if (excludeOutliers && monthlySumList.length >= 3) {
-        const mean = monthlySumList.reduce((s, m) => s + m, 0) / monthlySumList.length;
-        const variance = monthlySumList.reduce((s, m) => s + Math.pow(m - mean, 2), 0) / monthlySumList.length;
+      let activeMonthlySums = paddedMonthlySums;
+      if (excludeOutliers && activeMonthlySums.length >= 3) {
+        const mean = activeMonthlySums.reduce((s, m) => s + m, 0) / activeMonthlySums.length;
+        const variance = activeMonthlySums.reduce((s, m) => s + Math.pow(m - mean, 2), 0) / activeMonthlySums.length;
         const stdDev = Math.sqrt(variance);
-        const filtered = monthlySumList.filter((m) => Math.abs(m - mean) <= 2.0 * stdDev);
+        const filtered = activeMonthlySums.filter((m) => Math.abs(m - mean) <= 2.0 * stdDev);
         if (filtered.length > 0) {
-          monthlySumList = filtered;
+          activeMonthlySums = filtered;
         }
       }
 
       const totalSpent = monthlySumList.reduce((s, a) => s + a, 0);
       const monthlyAverage = totalSpent / divisorMonths;
 
-      const sortedMonthly = [...monthlySumList].sort((a, b) => a - b);
+      const sortedMonthly = [...activeMonthlySums].sort((a, b) => a - b);
       let monthlyMedian = 0;
       if (sortedMonthly.length > 0) {
         const mid = Math.floor(sortedMonthly.length / 2);

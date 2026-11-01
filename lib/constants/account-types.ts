@@ -1,3 +1,6 @@
+import { LIABILITY_ACCOUNT_TYPES, REAL_ESTATE_SUBTYPES } from '@/lib/utils/account-scope';
+export { REAL_ESTATE_SUBTYPES };
+
 export const TYPE_HIERARCHY: Record<string, { group: string; subGroup: string }> = {
   checking:   { group: 'Banking',       subGroup: 'Cash & Checking' },
   savings:    { group: 'Banking',       subGroup: 'Savings' },
@@ -123,7 +126,7 @@ export function getTypesByGroup(): { group: string; types: { value: string; labe
 export const ACCOUNT_GROUP_MAP: Record<string, string[]> = {
   BANKING: ['checking', 'savings', 'cash', 'other', 'hsachecking'],
   INVESTMENTS: ['investment', 'brokerage', 'retirement', 'otherinvestment', 'otherInvestment', 'rothira', 'traditionalira', '401k', '403b', 'sepira', 'simpleira', '529', 'hsa', 'health', 'stock_option'],
-  CREDIT: ['credit', 'loan', 'mortgage', 'studentloan', 'autoloan', 'otherloan', 'otherLiability'],
+  CREDIT: [...LIABILITY_ACCOUNT_TYPES],
   ASSETS: ['vehicle', 'crypto', 'metals', 'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate', 'single-family', 'condo', 'townhouse', 'multi-family', 'otherAsset', 'otherasset'],
 };
 
@@ -141,20 +144,6 @@ export function getAccountGroupKey(type?: string | null): 'BANKING' | 'INVESTMEN
   if (ACCOUNT_GROUP_MAP.ASSETS.map(x => x.toLowerCase()).includes(t)) return 'ASSETS';
   return 'BANKING';
 }
-
-export const REAL_ESTATE_SUBTYPES = [
-  'realestate',
-  'primaryhome',
-  'secondaryhome',
-  'rentalproperty',
-  'commercial',
-  'land',
-  'otherrealestate',
-  'single-family',
-  'condo',
-  'townhouse',
-  'multi-family',
-] as const;
 
 export function isRealEstateType(type?: string | null): boolean {
   if (!type) return false;

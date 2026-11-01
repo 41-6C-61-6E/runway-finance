@@ -4,6 +4,7 @@ import {
   TRANSACTION_AFFECTED_PREFIXES,
   queryKeys,
 } from '@/lib/query-keys';
+import { invalidateFetchCache } from '@/lib/fetch-cache';
 
 /**
  * Centralized, intent-named cache invalidation helpers.
@@ -25,6 +26,7 @@ export function invalidateAfterAccountChange(queryClient: QueryClient): void {
   for (const prefix of ACCOUNT_AFFECTED_PREFIXES) {
     queryClient.invalidateQueries({ queryKey: prefix });
   }
+  invalidateFetchCache('/api/accounts');
 }
 
 /**
@@ -36,6 +38,7 @@ export function invalidateAfterTransactionChange(queryClient: QueryClient): void
   for (const prefix of TRANSACTION_AFFECTED_PREFIXES) {
     queryClient.invalidateQueries({ queryKey: prefix });
   }
+  invalidateFetchCache('/api/transactions');
 }
 
 /**

@@ -272,6 +272,8 @@ describe('Paystubs Helpers', () => {
       expect(normalized[0].beforeTaxDeductions).toEqual([
         { description: '401k Pre-Tax', amount: 400, ytdAmount: 1600 },
       ]);
+      // WS-03-F09: Net pay must properly subtract post-tax deductions (4000 - 800 - 700 - 300 = 2200)
+      expect(normalized[0].netCurrent).toBe('2200');
     });
   });
 
@@ -438,6 +440,27 @@ describe('Paystubs Helpers', () => {
         deductionsYtd: 1000,
       };
       expect(computeTiesOut(brokenStub2, [stub1])).toBe(false);
+    });
+
+    it('WS-03-F09: ties out accurately when post-tax deductions (e.g. Roth 401k) are present', () => {
+      // Gross 5000, Taxes 1200, Pre-Tax Deductions 500, Post-Tax Deductions 300
+      // Net Pay = 5000 - 1200 - 500 - 300 = 3000
+      const stubWithPostTax = {
+        checkDate: '2026-02-15',
+        gross: 5000,
+        taxes: 1200,
+        deductions: 500,
+        afterTaxDeductions: 300,
+        net: 3000,
+      };
+      expect(computeTiesOut(stubWithPostTax, [])).toBe(true);
+
+      // If net was incorrectly computed without post-tax deductions (3300), it must not tie out
+      const brokenStubWithPostTax = {
+        ...stubWithPostTax,
+        net: 3300,
+      };
+      expect(computeTiesOut(brokenStubWithPostTax, [])).toBe(false);
     });
   });
 });

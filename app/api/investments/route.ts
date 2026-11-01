@@ -130,7 +130,7 @@ export async function GET(request: Request) {
     }
 
     // Compute portfolio-level unrealized gains
-    const totalUnrealizedGainLoss = totalValueForCostBasis > 0 ? (totalValueForCostBasis - totalCostBasis) : null;
+    const totalUnrealizedGainLoss = totalCostBasis > 0 ? (totalValueForCostBasis - totalCostBasis) : null;
     const totalUnrealizedReturnPct = (totalCostBasis > 0 && totalUnrealizedGainLoss != null) 
       ? (totalUnrealizedGainLoss / totalCostBasis) * 100 
       : null;

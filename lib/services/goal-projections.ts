@@ -239,6 +239,9 @@ export async function computeGoalProjections(
     }
 
     // Deduct prefunded goal targets so downstream active goals don't double-dip cash already claimed by funded goals
+    const prefundedEvents = goalDefs
+      .filter(g => g.initialAllocation >= g.targetAmount && g.targetAmount > 0)
+      .map(g => g.goalName);
     const prefundedTotal = goalDefs
       .filter(g => g.initialAllocation >= g.targetAmount && g.targetAmount > 0)
       .reduce((sum, g) => sum + g.targetAmount, 0);
@@ -250,15 +253,15 @@ export async function computeGoalProjections(
     const initialAllocations = Object.fromEntries(goalSavings);
     const initialAllocatedTotal = Array.from(goalSavings.values()).reduce((s, v) => s + v, 0);
 
-    // Month 0: current state snapshot
+    // Month 0: current state snapshot with prefunded goals acknowledged
     points.push({
       month: 0,
       date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
       accountBalance: currentBalance,
       totalAllocated: Math.round(initialAllocatedTotal * 100) / 100,
       goalAllocations: initialAllocations,
-      goalFunding: [],
-      availableAfterFunding: currentBalance,
+      goalFunding: prefundedEvents,
+      availableAfterFunding: Math.max(0, currentBalance - prefundedTotal),
     });
 
     // Remaining months: sequential allocation model matching static engine
@@ -280,14 +283,17 @@ export async function computeGoalProjections(
       const sortedActive = [...activeGoals].sort((a, b) => a.sortOrder - b.sortOrder || a.goalId.localeCompare(b.goalId));
 
       for (const g of sortedActive) {
-        const desiredAllocation = availableBalance * (g.percentage / 100);
-        const computed = Math.round(Math.min(desiredAllocation, remaining, g.targetAmount) * 100) / 100;
-        
         const prev = goalSavings.get(g.goalId) || 0;
-        const allocated = Math.round(Math.min(Math.max(prev, computed), remaining) * 100) / 100;
+        const needed = Math.max(0, g.targetAmount - prev);
+        const desiredAllocation = availableBalance * (g.percentage / 100);
+        const maxTake = Math.min(remaining, needed);
+        // Additional allocation cannot exceed remaining capacity or needed amount
+        const allocDelta = Math.max(0, desiredAllocation - prev);
+        const additionalAlloc = Math.round(Math.min(maxTake, allocDelta > 0 ? allocDelta : maxTake) * 100) / 100;
+        const allocated = Math.round((prev + additionalAlloc) * 100) / 100;
 
         goalSavings.set(g.goalId, allocated);
-        remaining = Math.max(0, remaining - allocated);
+        remaining = Math.max(0, remaining - additionalAlloc);
 
         // Check if funded
         if (allocated >= g.targetAmount) {

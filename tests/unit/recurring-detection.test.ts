@@ -11,6 +11,7 @@ import {
   mergeRecurringTransactions,
   mergeRecurringExclusions,
   previewMatchingTransactions,
+  getUpcomingBills,
 } from '@/lib/services/recurring-detection';
 import { detectRecurringTransactions } from '@/lib/services/recurring-detection';
 import type { FrequencyType } from '@/lib/utils/recurring';
@@ -212,6 +213,20 @@ describe('Recurring Detection Engine', () => {
       const { frequency } = classifyFrequency([3, 45, 12, 110, 4]);
       expect(frequency).toBeNull();
     });
+
+    it('[WS-04-F02] classifies semi-monthly transactions posted on 1st and 15th across consecutive months', () => {
+      const dates = [
+        '2026-01-01', '2026-01-15',
+        '2026-02-01', '2026-02-15',
+        '2026-03-01', '2026-03-15',
+        '2026-04-01', '2026-04-15',
+      ];
+      const intervals = [14, 17, 14, 14, 14, 14, 17];
+      const { frequency, regularity } = classifyFrequency(intervals, dates);
+      expect(frequency).toBe('semi_monthly');
+      expect(regularity).toBe(1);
+      expect(getMonthlyMultiplier('semi_monthly')).toBe(2);
+    });
   });
 
   describe('calculateNextExpectedDate & addFrequencyPeriod', () => {
@@ -229,6 +244,20 @@ describe('Recurring Detection Engine', () => {
 
       const nextDateBeforeDue = calculateNextExpectedDate('2026-01-15', 'monthly', '2026-08-10');
       expect(nextDateBeforeDue).toBe('2026-08-15');
+    });
+
+    it('[WS-04-F07] steps semi-monthly schedule preserving end-of-month cadence on the 15th', () => {
+      const step1 = addFrequencyPeriod('2026-03-01', 'semi_monthly', 31);
+      expect(step1).toBe('2026-03-15');
+
+      const step2 = addFrequencyPeriod(step1, 'semi_monthly', 31);
+      expect(step2).toBe('2026-03-31');
+
+      const step3 = addFrequencyPeriod(step2, 'semi_monthly', 31);
+      expect(step3).toBe('2026-04-15');
+
+      const step4 = addFrequencyPeriod(step3, 'semi_monthly', 31);
+      expect(step4).toBe('2026-04-30');
     });
   });
 
@@ -689,6 +718,59 @@ describe('Recurring Detection Engine', () => {
       expect(res.totalAmount).toBe(47.97);
       expect(res.suggestedFrequency).toBe('monthly');
       expect(res.latestDate).toBe('2026-08-01');
+    });
+  });
+
+  describe('getUpcomingBills', () => {
+    it('[WS-04-F03] suppresses upcoming bill on August 15 when matching transaction posted on August 13', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+
+      mockRecurringRows = [
+        {
+          id: 'rec-util-1',
+          userId: 'user-1',
+          merchantName: 'Electric Utility',
+          displayName: 'Electric Utility',
+          flowType: 'expense',
+          amount: '120.00',
+          averageAmount: '120.00',
+          lastAmount: '120.00',
+          frequency: 'monthly',
+          status: 'active',
+          isDismissed: false,
+          isPaused: false,
+          matchPattern: 'electric utility',
+          nextExpectedDate: '2026-08-15',
+          lastDate: '2026-07-15',
+          confidence: 90,
+          accountId: 'acc-1',
+        },
+      ];
+
+      const paidTx = await encryptRow('transactions', {
+        id: 'tx-paid-1',
+        userId: 'user-1',
+        accountId: 'acc-1',
+        date: '2026-08-13',
+        amount: '-120.00',
+        description: 'Electric Utility Autopay',
+        deleted: false,
+        ignored: false,
+      }, testDek);
+
+      mockDetectState.transactions = [paidTx];
+
+      const result = await getUpcomingBills('user-1', testDek, 30);
+
+      // The August 15 bill should be suppressed / advanced to next cycle (Sept 15)
+      const aug15Bill = result.bills.find((b) => b.expectedDate === '2026-08-15');
+      expect(aug15Bill).toBeUndefined();
+
+      // Should be counted as paid this month
+      expect(result.stats.paidThisMonth).toBe(1);
+
+      vi.useRealTimers();
     });
   });
 });

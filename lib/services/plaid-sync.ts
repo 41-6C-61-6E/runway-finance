@@ -744,9 +744,12 @@ export async function syncPlaidConnection(
         })
         .from(transactions)
         .where(
-          inArray(
-            transactions.externalId,
-            rawTxData.map((t) => t.externalId)
+          and(
+            eq(transactions.userId, userId),
+            inArray(
+              transactions.externalId,
+              rawTxData.map((t) => t.externalId)
+            )
           )
         );
 
@@ -785,7 +788,7 @@ export async function syncPlaidConnection(
               await getDb()
                 .update(transactions)
                 .set(updateData)
-                .where(eq(transactions.id, txId));
+                .where(and(eq(transactions.id, txId), eq(transactions.userId, userId)));
             }
           }
 

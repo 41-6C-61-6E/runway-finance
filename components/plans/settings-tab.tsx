@@ -22,6 +22,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
+import { CURRENT_TAX_YEAR } from '@/lib/constants/tax';
 import {
   calculateSocialSecurityPIA,
   calculateAdjustedSsBenefit,
@@ -249,7 +250,8 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
   };
 
   const handleResetRules = async () => {
-    if (!confirm('Are you sure you want to reset all engine rules and tax parameters to 2026 IRS defaults?')) {
+    const yearDisplay = rules?.taxYear || CURRENT_TAX_YEAR;
+    if (!confirm(`Are you sure you want to reset all engine rules and tax parameters to ${yearDisplay} IRS defaults?`)) {
       return;
     }
     setSavingRules(true);
@@ -262,7 +264,7 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
       if (res.ok) {
         const saved = await res.json();
         setRules(saved);
-        setRulesSuccessMsg('Reset to 2026 IRS default rules successfully!');
+        setRulesSuccessMsg(`Reset to ${saved?.taxYear || yearDisplay} IRS default rules successfully!`);
         setTimeout(() => setRulesSuccessMsg(''), 4000);
         if (onUpdatePlan) {
           onUpdatePlan({});

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { fetchSecure } from '@/lib/utils/ssrf';
 
 /**
  * Proxies company logos / favicons from a domain (e.g. "stokespace.com") or direct image URL
@@ -58,16 +59,15 @@ export async function GET(request: Request) {
 
   for (const url of candidateUrls) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(url, {
-        signal: controller.signal,
+      const res = await fetchSecure(url, {
+        requireHttps: true,
+        maxRedirects: 2,
+        timeoutMs: 5000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; RunwayFinance/1.0)',
           Accept: 'image/*,*/*;q=0.8',
         },
       });
-      clearTimeout(timeout);
 
       if (!res.ok) continue;
       const contentType = res.headers.get('content-type') || 'image/png';

@@ -379,7 +379,7 @@ export default function DataTable({
           </TableScroll>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-t border-border">
             <div className="flex items-center gap-3">
               <span className="text-xs text-muted-foreground">
                 {offset + 1}–{Math.min(offset + limit, total)} of {total}
@@ -396,7 +396,7 @@ export default function DataTable({
               </Select>
             </div>
             {totalPages > 1 && (
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   onClick={() => onPageChange(0)}
                   disabled={currentPage === 0}
@@ -439,16 +439,16 @@ export default function DataTable({
   );
 }
 
-function CellRenderer({
+export function CellRenderer({
   value,
   type,
   field,
-  isExpanded,
+  isExpanded = false,
 }: {
   value: unknown;
   type: string;
   field: string;
-  isExpanded: boolean;
+  isExpanded?: boolean;
 }) {
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground/50 italic">—</span>;
@@ -500,7 +500,7 @@ function CellRenderer({
 
   if (type === 'number') {
     return (
-      <span className="text-foreground text-[13px] tabular-nums">
+      <span className="text-foreground text-[13px] tabular-nums blur-number">
         {new Intl.NumberFormat('en-US', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 4,

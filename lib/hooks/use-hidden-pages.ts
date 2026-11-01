@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 export const HIDDEN_PAGE_KEYS = [
   'netWorth',
@@ -23,18 +24,30 @@ export type HiddenPageKey = (typeof HIDDEN_PAGE_KEYS)[number];
 const defaultHiddenPages: Partial<Record<HiddenPageKey, boolean>> = {};
 
 export function useHiddenPages() {
-  const [hiddenPages, setHiddenPages] = useState<Partial<Record<HiddenPageKey, boolean>>>(defaultHiddenPages);
-  const [loading, setLoading] = useState(true);
+  const userSettingsCtx = useUserSettings();
+
+  const [localHiddenPages, setLocalHiddenPages] = useState<Partial<Record<HiddenPageKey, boolean>>>(defaultHiddenPages);
+  const [localLoading, setLocalLoading] = useState(!userSettingsCtx);
 
   useEffect(() => {
+    if (userSettingsCtx) return;
     fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        setHiddenPages(data.hiddenPages ?? {});
+        setLocalHiddenPages(data?.hiddenPages ?? {});
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setLocalLoading(false));
+  }, [userSettingsCtx]);
+
+  const hiddenPages = useMemo<Partial<Record<HiddenPageKey, boolean>>>(() => {
+    if (userSettingsCtx) {
+      return (userSettingsCtx.settings?.hiddenPages as Partial<Record<HiddenPageKey, boolean>>) ?? defaultHiddenPages;
+    }
+    return localHiddenPages;
+  }, [userSettingsCtx, userSettingsCtx?.settings?.hiddenPages, localHiddenPages]);
+
+  const loading = userSettingsCtx ? userSettingsCtx.loading : localLoading;
 
   const isHidden = useCallback(
     (pageKey: HiddenPageKey) => {
@@ -48,7 +61,13 @@ export function useHiddenPages() {
     async (pageKey: HiddenPageKey, hidden: boolean) => {
       const prev = hiddenPages;
       const next = { ...prev, [pageKey]: hidden };
-      setHiddenPages(next);
+
+      if (userSettingsCtx) {
+        await userSettingsCtx.updateSetting('hiddenPages', next);
+        return;
+      }
+
+      setLocalHiddenPages(next);
       try {
         await fetch('/api/user-settings', {
           method: 'PATCH',
@@ -58,7 +77,7 @@ export function useHiddenPages() {
         });
       } catch {}
     },
-    [hiddenPages]
+    [hiddenPages, userSettingsCtx]
   );
 
   return { hiddenPages, loading, isHidden, updateHidden };

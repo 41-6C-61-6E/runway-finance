@@ -175,4 +175,10 @@ describe('Trace Engine (trace-engine.ts)', () => {
     expect(gainStep?.operation).toBe('50000 − 35000');
     expect(gainStep?.output).toBe(15000);
   });
+
+  it('formatTraceResult formats years without percentage sign', () => {
+    expect(formatTraceResult(5.1, 'years')).toBe('5.1 yrs');
+    expect(formatTraceResult(12, 'years')).toBe('12 yrs');
+    expect(formatTraceResult(Infinity, 'years')).toBe('∞');
+  });
 });

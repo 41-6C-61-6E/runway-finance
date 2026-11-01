@@ -1,7 +1,7 @@
 // ─── Tax & Financial Planning Constants ─────────────────────────────────────
 // Note: For statutory tax calculations, use `DEFAULT_2026_RULES` or `getSystemTaxRules(taxYear)`.
 
-export const CURRENT_TAX_YEAR = 2026;
+export const CURRENT_TAX_YEAR = new Date().getFullYear();
 export const DEFAULT_STANDARD_DEDUCTION = 15750;
 export const DEFAULT_STANDARD_DEDUCTION_MFJ = 31500;
 export const DEFAULT_STANDARD_DEDUCTION_HOH = 23625;

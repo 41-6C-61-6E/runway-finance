@@ -20,8 +20,12 @@ RUN corepack enable pnpm && corepack prepare pnpm@10.23.0 --activate && pnpm i -
 FROM deps AS builder
 ARG BUILD_NUMBER
 ARG BUILD_TIME
+ARG NEXT_PUBLIC_BUILD_NUMBER
+ARG NEXT_PUBLIC_BUILD_TIME
 ENV BUILD_NUMBER=$BUILD_NUMBER
 ENV BUILD_TIME=$BUILD_TIME
+ENV NEXT_PUBLIC_BUILD_NUMBER=${NEXT_PUBLIC_BUILD_NUMBER:-$BUILD_NUMBER}
+ENV NEXT_PUBLIC_BUILD_TIME=${NEXT_PUBLIC_BUILD_TIME:-$BUILD_TIME}
 # Build-time placeholder so Next.js page-data collection doesn't fail on the
 # production secret check in lib/auth.config.ts. The real secret is provided
 # at runtime via the container environment.
@@ -34,6 +38,15 @@ RUN DISABLE_WORKER_THREADS=true pnpm build
 # Production image, copy all the files and run next
 FROM base AS runner
 WORKDIR /app
+
+ARG BUILD_NUMBER
+ARG BUILD_TIME
+ARG NEXT_PUBLIC_BUILD_NUMBER
+ARG NEXT_PUBLIC_BUILD_TIME
+ENV BUILD_NUMBER=$BUILD_NUMBER
+ENV BUILD_TIME=$BUILD_TIME
+ENV NEXT_PUBLIC_BUILD_NUMBER=${NEXT_PUBLIC_BUILD_NUMBER:-$BUILD_NUMBER}
+ENV NEXT_PUBLIC_BUILD_TIME=${NEXT_PUBLIC_BUILD_TIME:-$BUILD_TIME}
 
 ENV NODE_ENV=production
 ENV UV_THREADPOOL_SIZE=16
@@ -70,7 +83,7 @@ USER nextjs
 EXPOSE 3000
 
 # Healthcheck for Docker
-#HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD wget -q --spider http://localhost:3000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD wget -q --spider http://127.0.0.1:3000/api/health || exit 1
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"

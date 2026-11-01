@@ -4,6 +4,7 @@ import { syncScheduler } from '@/lib/services/sync-scheduler';
 import { manualAccountScheduler } from '@/lib/services/manual-account-scheduler';
 import { paystubAutoGenerateScheduler } from '@/lib/services/paystub-auto-generate-scheduler';
 import { weeklyNetWorthScheduler } from '@/lib/services/weekly-networth-scheduler';
+import { stalenessScheduler } from '@/lib/services/staleness-scheduler';
 
 export async function GET() {
   const session = await auth();
@@ -39,6 +40,13 @@ export async function GET() {
       lastInitAt: weeklyNetWorthScheduler.lastInitAt,
       lastTickAt: weeklyNetWorthScheduler.lastTickAt,
       lastError: weeklyNetWorthScheduler.lastError,
+    },
+    stalenessScheduler: {
+      isRunning: stalenessScheduler.isRunning,
+      armedCount: stalenessScheduler.armedCount,
+      lastInitAt: stalenessScheduler.lastInitAt,
+      lastTickAt: stalenessScheduler.lastTickAt,
+      lastError: stalenessScheduler.lastError,
     },
   };
 

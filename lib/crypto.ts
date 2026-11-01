@@ -53,6 +53,20 @@ export function getServerKey(): Uint8Array {
 
 const encryptKeyCache = new Map<string, CryptoKey>();
 const decryptKeyCache = new Map<string, CryptoKey>();
+const MAX_KEY_CACHE_SIZE = 500;
+
+function setKeyInCache(cache: Map<string, CryptoKey>, keyHex: string, cryptoKey: CryptoKey) {
+  if (cache.size >= MAX_KEY_CACHE_SIZE) {
+    const firstKey = cache.keys().next().value;
+    if (firstKey) cache.delete(firstKey);
+  }
+  cache.set(keyHex, cryptoKey);
+}
+
+export function clearCryptoKeyCaches(): void {
+  encryptKeyCache.clear();
+  decryptKeyCache.clear();
+}
 
 export async function encrypt(plaintext: string, key: Uint8Array): Promise<EncryptedPayload> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -66,7 +80,7 @@ export async function encrypt(plaintext: string, key: Uint8Array): Promise<Encry
       false,
       ['encrypt'],
     );
-    encryptKeyCache.set(keyHex, cryptoKey);
+    setKeyInCache(encryptKeyCache, keyHex, cryptoKey);
   }
   const encrypted = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
@@ -91,7 +105,7 @@ async function importDecryptKey(key: Uint8Array): Promise<CryptoKey> {
       false,
       ['decrypt'],
     );
-    decryptKeyCache.set(keyHex, cryptoKey);
+    setKeyInCache(decryptKeyCache, keyHex, cryptoKey);
   }
   return cryptoKey;
 }
@@ -289,15 +303,15 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   category_rules: ['name', 'conditionValue', 'setPayee', 'conditions'],
   tags: ['name', 'description'],
   budgets: ['amount', 'notes'],
-  financial_goals: ['name', 'description', 'targetAmount', 'currentAmount', 'percentage', 'reserve'],
+  financial_goals: ['name', 'description', 'targetAmount', 'currentAmount', 'percentage', 'reserve', 'initialAmount', 'allocatedAmount'],
   goal_allocation_history: ['accountBalance', 'allocatedAmount', 'desiredAmount', 'remainingOnAccount'],
-  net_worth_snapshots: ['totalAssets', 'totalLiabilities', 'netWorth'],
+  net_worth_snapshots: ['totalAssets', 'totalLiabilities', 'netWorth', 'breakdown'],
   monthly_cash_flow: ['totalIncome', 'totalExpenses', 'netCashFlow', 'transactionCount'],
   category_spending_summary: ['amount', 'transactionCount'],
   category_income_summary: ['amount', 'transactionCount'],
   account_snapshots: ['balance'],
-  holdings: ['name', 'quantity', 'price', 'costBasis', 'value', 'tickerOverride', 'publicEquivalent'],
-  holding_snapshots: ['name', 'quantity', 'price', 'value', 'costBasis'],
+  holdings: ['name', 'ticker', 'quantity', 'price', 'costBasis', 'value', 'tickerOverride', 'publicEquivalent'],
+  holding_snapshots: ['name', 'ticker', 'quantity', 'price', 'value', 'costBasis'],
   import_log: ['fileContent'],
 
   ai_providers: ['apiKeyEncrypted'],
@@ -305,11 +319,11 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   plaid_connections: ['accessTokenEncrypted', 'accessTokenIv', 'accessTokenTag'],
   sync_logs: ['accountsSynced', 'transactionsFetched', 'transactionsNew', 'durationMs', 'details'],
   user_settings: ['apiKeys'],
-  paystubs: ['grossPay', 'netPay', 'employerName', 'notes'],
-  paystub_line_items: ['name', 'amount'],
-  paystub_field_mappings: ['sourceField', 'targetField'],
-  paystub_auto_generate_settings: ['employerName', 'frequency'],
-  plans: ['name', 'description', 'customWithdrawalOrder'],
+  paystubs: ['employerName', 'employeeName', 'adviceNumber', 'grossCurrent', 'taxesCurrent', 'deductionsCurrent', 'netCurrent', 'grossYtd', 'taxesYtd', 'deductionsYtd', 'sourceJson'],
+  paystub_line_items: ['description', 'amount', 'ytdAmount', 'hours', 'rate', 'ytdHours'],
+  paystub_field_mappings: ['name', 'employerName'],
+  paystub_auto_generate_settings: ['frequency'],
+  plans: ['name', 'description', 'customWithdrawalOrder', 'primarySalary', 'spouseSalary', 'primarySsMonthlyAmount', 'spouseSsMonthlyAmount', 'primarySalaryOverrides', 'spouseSalaryOverrides', 'spouseName'],
   plan_accounts: ['name', 'balance', 'costBasis', 'expectedGrowthRate', 'dividendYield', 'qualifiedDividendRatio'],
   plan_liabilities: ['name', 'balance', 'interestRate', 'monthlyPayment', 'yearsRemaining'],
   plan_events: ['name', 'amount', 'growthRate', 'growthCap', 'startTriggerValue', 'endTriggerValue', 'inflationPerRecurrence'],

@@ -23,11 +23,13 @@ export interface HistoricalYearReturn {
 
 /**
  * Returns the SECURE 2.0 RMD starting age for a primary-birth year:
+ * - <= 1950 → Age 72 (SECURE 1.0)
  * - 1951–1959 → Age 73
  * - 1960+ → Age 75 (SECURE 2.0 §107 / IRC §401(a)(9)(C)(v))
  */
 export function getRmdStartAge(birthYear: number | null | undefined, fallback = 73): number {
   if (!birthYear) return fallback;
+  if (birthYear <= 1950) return 72;
   if (birthYear <= 1959) return 73;
   return 75; // 1960+ born individuals
 }
@@ -154,6 +156,7 @@ export const DEFAULT_2026_RULES = {
     inheritedIraYears: 10,
   },
   rmdUniformLifetimeTable: {
+    70: 29.1, 71: 28.2, 72: 27.4,
     73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2,
     81: 19.3, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2, 87: 14.4, 88: 13.7,
     89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8, 93: 10.1, 94: 9.5,  95: 8.9,  96: 8.4,
@@ -165,6 +168,9 @@ export const DEFAULT_2026_RULES = {
 
 // ── IRS Uniform Lifetime Table III (RMD Divisors) ────────────────────────────
 export const IRS_UNIFORM_LIFETIME_TABLE: Record<number, number> = {
+  70: 29.1,
+  71: 28.2,
+  72: 27.4,
   73: 26.5,
   74: 25.5,
   75: 24.6,

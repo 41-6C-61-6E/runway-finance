@@ -44,6 +44,12 @@ export async function handleChangePassword(formData: FormData): Promise<{ succes
     return { success: false, error: 'Not authenticated' }
   }
 
+  const { checkRateLimit } = await import('@/lib/rate-limit')
+  const allowed = await checkRateLimit(`change-password:${session.user.id}`, 5, 60_000)
+  if (!allowed) {
+    return { success: false, error: 'Too many password attempts. Please wait a minute.' }
+  }
+
   const result = await updatePassword(session.user.id, currentPassword, newPassword)
   return result
 }

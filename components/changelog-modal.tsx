@@ -84,11 +84,7 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
         setData(json);
       })
       .catch(() => {
-        // Fallback to version-info.json directly
-        fetch('/version-info.json')
-          .then((res) => res.json())
-          .then((json) => setData(json))
-          .catch(() => {});
+        // Handled: changelog retrieval failed or unauthenticated
       })
       .finally(() => setLoading(false));
   }, [isOpen]);
@@ -362,7 +358,7 @@ export function ChangelogModal({ open: externalOpen, onOpenChange }: ChangelogMo
         {/* Modal Footer */}
         <div className="p-3 sm:p-4 border-t border-border/60 bg-muted/30 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-muted-foreground">
-            Personal Finance Dashboard • Version History
+            Runway Finance Dashboard • Version History
           </span>
           <div className="flex items-center gap-2">
             {hasUpdate && (

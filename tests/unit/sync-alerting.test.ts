@@ -16,7 +16,12 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/crypto', () => ({
-  decryptField: vi.fn(async (val) => val),
+  decryptField: vi.fn(async (val) => {
+    if (typeof val === 'string' && val.startsWith('aes256gcm:')) {
+      return 'Chase Bank';
+    }
+    return val;
+  }),
   encryptField: vi.fn(async (val) => val),
   decryptRows: vi.fn(async (_table, rows) => rows),
 }));
@@ -387,6 +392,47 @@ describe('Sync Problem Alerting Suite', () => {
       expect(mockInsertCalls['user_notifications'][0].title).toContain('Chase');
       expect(mockInsertCalls['user_notifications'][0].urlPath).toBe('/settings?tab=advanced&connection=conn_1');
       expect(mockInsertCalls['user_notifications'][0].type).toBe('sync_error');
+    });
+
+    it('decrypts encrypted account institution and never leaks raw ciphertext into title', async () => {
+      const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+      mockSelectResponses = {
+        user_settings: [{ notifySyncErrors: true, locale: 'en-US', currency: 'USD' }],
+        accounts: [
+          {
+            id: 'acc_1',
+            name: 'Checking',
+            connectionId: 'conn_1',
+            type: 'checking',
+            isHidden: false,
+            isExcludedFromNetWorth: false,
+            institution: 'aes256gcm:dGVzdGl2:dGVzdGNpcGhlcg==:dGFn',
+            metadata: '{}',
+          },
+        ],
+        simplefin_connections: [
+          {
+            id: 'conn_1',
+            label: null,
+            syncFrequency: 'daily',
+            lastSyncAt: fourDaysAgo,
+            lastSyncStatus: 'error',
+            lastSyncError: 'Invalid credentials',
+            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          },
+        ],
+        plaid_connections: [],
+        account_snapshots: [],
+        sent_notifications: [],
+      };
+
+      await checkStaleConnectionsAndNotify(userId, dummyDek);
+
+      expect(mockInsertCalls['user_notifications']).toBeDefined();
+      expect(mockInsertCalls['user_notifications'].length).toBe(1);
+      const title = mockInsertCalls['user_notifications'][0].title;
+      expect(title).toContain('Chase Bank');
+      expect(title).not.toContain('aes256gcm:');
     });
 
     it('throttles notifications so subsequent checks within 7 days do not re-send alerts', async () => {

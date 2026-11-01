@@ -47,11 +47,11 @@ const SankeyCustomNode = ({
   if (typeof x !== 'number' || Number.isNaN(x) || typeof y !== 'number' || Number.isNaN(y)) {
     return null;
   }
-  const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
+  const isLeftSide = !payload.targetLinks || payload.targetLinks.length === 0;
   const isDimmed = hoveredNode !== null && hoveredNode !== payload.id;
 
   const label = payload.label ?? payload.name ?? '';
-  const labelMaxW = computeLabelGutter(x, width, isRightSide, columnLeftXs, chartWidth ?? 0);
+  const labelMaxW = computeLabelGutter(x, width, isLeftSide, columnLeftXs, chartWidth ?? 0);
 
   const nodeType = payload.type as string | undefined;
   const isIncrease = nodeType === 'increase';
@@ -167,10 +167,10 @@ const SankeyCustomNode = ({
       {!isHub && (
         <SankeyLabel
           text={label}
-          x={isRightSide ? x - 8 : x + width + 8}
+          x={isLeftSide ? x - 8 : x + width + 8}
           y={y + height / 2}
           maxW={labelMaxW}
-          anchor={isRightSide ? 'end' : 'start'}
+          anchor={isLeftSide ? 'end' : 'start'}
           value={valueLabel || undefined}
           opacity={isDimmed ? 0.3 : 1}
         />

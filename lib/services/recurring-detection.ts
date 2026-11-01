@@ -88,15 +88,70 @@ function calculateMeanAndStdDev(arr: number[]): { mean: number; stdDev: number; 
 }
 
 /**
- * Classifies recurrence frequency based on inter-transaction day intervals.
+ * Classifies recurrence frequency based on inter-transaction day intervals and optional dates.
  */
-export function classifyFrequency(intervals: number[]): {
+export function classifyFrequency(
+  intervals: number[],
+  dates?: (string | Date)[]
+): {
   frequency: FrequencyType | null;
   regularity: number;
 } {
   if (intervals.length === 0) return { frequency: null, regularity: 0 };
 
   const median = calculateMedian(intervals);
+
+  // Check for semi_monthly when median interval is in the 11-17 day range
+  if (median >= 11 && median <= 17) {
+    let isSemiMonthly = false;
+
+    if (dates && dates.length >= 3) {
+      const parsedDays = dates.map((d) => {
+        const dt = new Date(typeof d === 'string' ? d.split('T')[0] + 'T00:00:00Z' : d);
+        return {
+          day: dt.getUTCDate(),
+          daysInMonth: new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate(),
+        };
+      });
+
+      const dayValues = parsedDays.map((p) => p.day);
+      const minDay = Math.min(...dayValues);
+      const maxDay = Math.max(...dayValues);
+
+      // In semi-monthly, the two clusters are ~13 to 17 days apart (e.g. 1 & 15, or 15 & 30/31)
+      if (maxDay - minDay >= 12 && maxDay - minDay <= 18) {
+        const group1 = parsedDays.filter((p) => Math.abs(p.day - minDay) <= 3);
+        const group2 = parsedDays.filter((p) => Math.abs(p.day - maxDay) <= 3);
+
+        if (group1.length > 0 && group2.length > 0 && group1.length + group2.length === parsedDays.length) {
+          isSemiMonthly = true;
+        }
+      } else {
+        // Also check for 15th and end-of-month across variable month lengths (28, 30, 31)
+        const group1 = parsedDays.filter((p) => Math.abs(p.day - 15) <= 3);
+        const group2 = parsedDays.filter((p) => (p.daysInMonth - p.day) <= 3);
+        if (group1.length > 0 && group2.length > 0 && group1.length + group2.length === parsedDays.length) {
+          isSemiMonthly = true;
+        }
+      }
+    } else if (intervals.length >= 3) {
+      // If dates not provided, detect semi-monthly alternation (e.g. 14, 16/17, 14, 16/17)
+      const minI = Math.min(...intervals);
+      const maxI = Math.max(...intervals);
+      const alternates = intervals.every((val, idx) => idx === 0 || (idx % 2 === 1 ? val >= 15 : val <= 15));
+      if (alternates && maxI - minI >= 2 && maxI - minI <= 4) {
+        isSemiMonthly = true;
+      }
+    }
+
+    if (isSemiMonthly) {
+      const matching = intervals.filter((i) => i >= 11 && i <= 17).length;
+      const regularity = matching / intervals.length;
+      if (regularity >= 0.5) {
+        return { frequency: 'semi_monthly', regularity };
+      }
+    }
+  }
 
   // Band definitions with tolerances
   const bands: { freq: FrequencyType; min: number; max: number; target: number }[] = [
@@ -434,7 +489,7 @@ export async function detectRecurringTransactions(
 
     if (intervals.length === 0) continue;
 
-    const { frequency, regularity } = classifyFrequency(intervals);
+    const { frequency, regularity } = classifyFrequency(intervals, dedupedTxs.map((t) => t.date));
     if (!frequency) continue;
 
     // Minimum occurrences threshold:
@@ -1054,7 +1109,8 @@ export async function previewMatchingTransactions(
       if (diff > 0) intervals.push(diff);
     }
     if (intervals.length > 0) {
-      const classified = classifyFrequency(intervals);
+      const dates = sortedAsc.map((t) => t.date as string);
+      const classified = classifyFrequency(intervals, dates);
       suggestedFrequency = classified.frequency;
     }
   }
@@ -1140,6 +1196,27 @@ export async function getUpcomingBills(
   horizonDate.setUTCDate(horizonDate.getUTCDate() + daysAhead);
   const horizonStr = horizonDate.toISOString().split('T')[0];
 
+  const currentMonth = todayStr.slice(0, 7);
+  const lookbackDate = new Date(todayDate);
+  lookbackDate.setUTCDate(lookbackDate.getUTCDate() - 35);
+  const lookbackStr = lookbackDate.toISOString().split('T')[0];
+
+  const db = getDb();
+  const recentTxns = await db
+    .select()
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.deleted, false),
+        eq(transactions.ignored, false),
+        gte(transactions.date, lookbackStr)
+      )
+    );
+
+  const decryptedRecentTxns = await decryptRows('transactions', recentTxns, dek);
+  const consumedTxIds = new Set<string>();
+
   const upcomingBills: UpcomingBill[] = [];
 
   // Project occurrences within window for each active recurring item
@@ -1165,10 +1242,44 @@ export async function getUpcomingBills(
     const origAnchorDate = new Date((item.lastDate || item.nextExpectedDate) + 'T00:00:00Z');
     const initialAnchorDay = isNaN(origAnchorDate.getTime()) ? undefined : origAnchorDate.getUTCDate();
 
+    const pat = (item.matchPattern || item.merchantName || '').toLowerCase();
+    const itemFlow = (item.flowType as 'income' | 'expense') || 'expense';
+
+    const isOccurrencePaid = (targetDate: string): boolean => {
+      const match = decryptedRecentTxns.find((tx) => {
+        if (consumedTxIds.has(tx.id)) return false;
+        if (item.accountId && tx.accountId && String(tx.accountId) !== String(item.accountId)) return false;
+        const txAmt = parseFloat(tx.amount || '0');
+        const txFlow: 'income' | 'expense' = txAmt > 0 ? 'income' : 'expense';
+        if (txFlow !== itemFlow) return false;
+        if (!pat) return false;
+        const desc = tx.payee || tx.description || '';
+        if (!patternMatches(desc, pat) && normalizeMerchantName(desc).toLowerCase() !== pat) return false;
+
+        const txDateStr = tx.date ? (typeof tx.date === 'string' ? tx.date.split('T')[0] : new Date(tx.date).toISOString().split('T')[0]) : '';
+        if (!txDateStr) return false;
+        const diffDays = Math.abs(
+          Math.round((new Date(txDateStr + 'T00:00:00Z').getTime() - new Date(targetDate + 'T00:00:00Z').getTime()) / (1000 * 60 * 60 * 24))
+        );
+        return diffDays <= 5;
+      });
+      if (match) {
+        consumedTxIds.add(match.id);
+        return true;
+      }
+      return false;
+    };
+
     let projDate = item.nextExpectedDate;
     let safety = 0;
 
-    // If nextExpectedDate is in the past, add as overdue
+    // While nextExpectedDate was already satisfied by a posted transaction, advance it
+    while (isOccurrencePaid(projDate) && safety < maxIterations) {
+      projDate = calculateNextExpectedDate(projDate, item.frequency, todayStr, initialAnchorDay);
+      safety++;
+    }
+
+    // If nextExpectedDate is in the past and unpaid, add as overdue
     if (projDate < todayStr) {
       const t1 = todayDate.getTime();
       const t2 = new Date(projDate + 'T00:00:00Z').getTime();
@@ -1197,9 +1308,15 @@ export async function getUpcomingBills(
 
     // Advance and collect occurrences up to horizon
     while (projDate <= horizonStr && safety < maxIterations) {
-      // Guard against degenerate frequency math (e.g. a weekly step that fails
-      // to advance): re-emitting the same date would create duplicate bill
-      // entries (same `${id}-${date}` key) that break React reconciliation.
+      // If occurrence was already satisfied, advance past it
+      if (isOccurrencePaid(projDate)) {
+        const nextProjDate = addFrequencyPeriod(projDate, item.frequency, initialAnchorDay);
+        if (nextProjDate <= projDate) break;
+        projDate = nextProjDate;
+        safety++;
+        continue;
+      }
+
       const nextProjDate = addFrequencyPeriod(projDate, item.frequency, initialAnchorDay);
       if (nextProjDate <= projDate) break;
 
@@ -1237,8 +1354,6 @@ export async function getUpcomingBills(
   oneWeekAhead.setUTCDate(oneWeekAhead.getUTCDate() + 7);
   const oneWeekAheadStr = oneWeekAhead.toISOString().split('T')[0];
 
-  const currentMonth = todayStr.slice(0, 7);
-
   let dueThisWeek = 0;
   let dueThisMonth = 0;
   let totalUpcoming = 0;
@@ -1270,30 +1385,16 @@ export async function getUpcomingBills(
   // Calculate paid this month by checking transactions matching active recurring items this month
   let paidThisMonthCount = 0;
   if (!countOnly) {
-    const db = getDb();
     const startOfMonthStr = `${currentMonth}-01`;
-    const monthTxns = await db
-      .select()
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.deleted, false),
-          eq(transactions.ignored, false),
-          gte(transactions.date, startOfMonthStr)
-        )
-      );
-
-    const decryptedMonthTxns = await decryptRows('transactions', monthTxns, dek);
-
     const statFlow = flowType === 'income' ? 'income' : 'expense';
 
-    // Count each recurring item at most once
     for (const item of list) {
       const pat = (item.matchPattern || item.merchantName || '').toLowerCase();
       if (!pat) continue;
       if (item.flowType !== statFlow) continue;
-      const matched = decryptedMonthTxns.some((tx) => {
+      const matched = decryptedRecentTxns.some((tx) => {
+        const txDateStr = tx.date ? (typeof tx.date === 'string' ? tx.date.split('T')[0] : new Date(tx.date).toISOString().split('T')[0]) : '';
+        if (txDateStr < startOfMonthStr) return false;
         if (item.accountId && tx.accountId && String(tx.accountId) !== String(item.accountId)) return false;
         const desc = tx.payee || tx.description || '';
         return patternMatches(desc, pat) || normalizeMerchantName(desc).toLowerCase() === pat;

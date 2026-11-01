@@ -1,6 +1,6 @@
 import pg from 'pg';
 const { Pool } = pg;
-const connectionString = process.env.DATABASE_URL || `postgresql://${process.env.POSTGRES_USER || 'postgres'}:${process.env.POSTGRES_PASSWORD || ''}@localhost:5432/${process.env.POSTGRES_DB || 'runway_finance'}`;
+const connectionString = process.env.DATABASE_URL || `postgresql://${process.env.POSTGRES_USER || 'postgres'}:${process.env.POSTGRES_PASSWORD || ''}@localhost:5432/${process.env.POSTGRES_DB || 'personal_finance'}`;
 const pool = new Pool({ connectionString });
 try {
   const r = await pool.query(`

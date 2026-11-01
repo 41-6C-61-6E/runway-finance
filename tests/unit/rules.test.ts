@@ -474,6 +474,128 @@ describe('Rules Engine', () => {
         shouldUpdateCategory: true,
       });
     });
+
+    it('[WS-04-F08] does not prematurely halt evaluation when earlier matching rule cannot update', async () => {
+      // Rule 1 matches "Uber", but has overrideExisting: false and no tag
+      const rule1 = {
+        id: 'rule_1',
+        userId: 'user_1',
+        name: 'Uber Soft',
+        priority: 1,
+        isActive: true,
+        conditionField: 'description',
+        conditionOperator: 'contains',
+        conditionValue: 'Uber',
+        conditionCaseSensitive: false,
+        setCategoryId: 'cat_travel_default',
+        setPayee: null,
+        setReviewed: null,
+        setTagId: null,
+        overrideExisting: false,
+      };
+
+      // Rule 2 matches "Uber", has overrideExisting: true for tags
+      const rule2 = {
+        id: 'rule_2',
+        userId: 'user_1',
+        name: 'Uber Business Tag',
+        priority: 2,
+        isActive: true,
+        conditionField: 'description',
+        conditionOperator: 'contains',
+        conditionValue: 'Uber',
+        conditionCaseSensitive: false,
+        setCategoryId: null,
+        setPayee: null,
+        setReviewed: null,
+        setTagId: 'tag_business',
+        overrideExisting: true,
+      };
+
+      mockRulesResponse = [
+        await encryptRow('category_rules', rule1, testDek),
+        await encryptRow('category_rules', rule2, testDek),
+      ];
+
+      const txns = [
+        {
+          id: 'tx_uber',
+          description: 'Uber Ride 1234',
+          payee: null,
+          memo: null,
+          amount: '-25.00',
+          categoryId: 'cat_existing', // Already categorized
+        },
+      ];
+
+      const results = await applyRulesToTransactions(txns, 'user_1', testDek);
+      expect(results.has('tx_uber')).toBe(true);
+      const res = results.get('tx_uber');
+      expect(res?.setTagId).toBe('tag_business');
+      expect(res?.shouldUpdateTags).toBe(true);
+      expect(res?.shouldUpdateCategory).toBe(false);
+    });
+
+    it('[WS-04-F08] composes orthogonal category and tag rules across matching rules', async () => {
+      const rule1 = {
+        id: 'rule_1',
+        userId: 'user_1',
+        name: 'Set Category',
+        priority: 1,
+        isActive: true,
+        conditionField: 'description',
+        conditionOperator: 'contains',
+        conditionValue: 'Flight',
+        conditionCaseSensitive: false,
+        setCategoryId: 'cat_flights',
+        setPayee: 'Airline',
+        setReviewed: null,
+        setTagId: null,
+        overrideExisting: true,
+      };
+
+      const rule2 = {
+        id: 'rule_2',
+        userId: 'user_1',
+        name: 'Set Tag',
+        priority: 2,
+        isActive: true,
+        conditionField: 'description',
+        conditionOperator: 'contains',
+        conditionValue: 'Flight',
+        conditionCaseSensitive: false,
+        setCategoryId: null,
+        setPayee: null,
+        setReviewed: null,
+        setTagId: 'tag_travel_tag',
+        overrideExisting: true,
+      };
+
+      mockRulesResponse = [
+        await encryptRow('category_rules', rule1, testDek),
+        await encryptRow('category_rules', rule2, testDek),
+      ];
+
+      const txns = [
+        {
+          id: 'tx_flight',
+          description: 'Flight to JFK',
+          payee: null,
+          memo: null,
+          amount: '-350.00',
+          categoryId: null,
+        },
+      ];
+
+      const results = await applyRulesToTransactions(txns, 'user_1', testDek);
+      expect(results.has('tx_flight')).toBe(true);
+      const res = results.get('tx_flight');
+      expect(res?.categoryId).toBe('cat_flights');
+      expect(res?.payee).toBe('Airline');
+      expect(res?.setTagId).toBe('tag_travel_tag');
+      expect(res?.shouldUpdateCategory).toBe(true);
+      expect(res?.shouldUpdateTags).toBe(true);
+    });
   });
 });
 

@@ -68,11 +68,14 @@ export function PropertyCards() {
     queryFn: async () => {
       const [reRes, mortRes] = await Promise.all([
         fetch('/api/real-estate', { credentials: 'include' }),
-        fetch('/api/accounts?type=mortgage', { credentials: 'include' }),
+        fetch('/api/accounts', { credentials: 'include' }),
       ]);
       if (!reRes.ok) throw new Error('Failed to fetch real estate data');
       const reData = await reRes.json();
-      const mortgageData = mortRes.ok ? await mortRes.json() : [];
+      const allAccounts = mortRes.ok ? await mortRes.json() : [];
+      const mortgageData = Array.isArray(allAccounts)
+        ? allAccounts.filter((a: any) => a.type === 'mortgage' || a.type === 'heloc' || a.type === 'loan')
+        : [];
       return {
         data: reData as RealEstateData,
         mortgageAccounts: mortgageData,

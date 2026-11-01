@@ -9,6 +9,12 @@ const LOG_TAG = '[finance-sync]';
 let watchdogTimer: ReturnType<typeof setInterval> | null = null;
 
 export async function registerNodeInstrumentation(): Promise<void> {
+  const globalNodeInit = globalThis as unknown as { __runwayNodeInstrumentationInitialized?: boolean };
+  if (globalNodeInit.__runwayNodeInstrumentationInitialized) {
+    return;
+  }
+  globalNodeInit.__runwayNodeInstrumentationInitialized = true;
+
   // 1. Install top-level process safety nets before any async initialization
   if (typeof process !== 'undefined' && typeof process.on === 'function') {
     // Prevent unhandled promise rejections from killing the Node 20+ process

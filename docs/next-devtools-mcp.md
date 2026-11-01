@@ -10,23 +10,19 @@ This document explains how to enable and use the `next-devtools-mcp` bridge (Mod
 
 **Quick start**
 
-- **Install dependencies (if needed):**
+- **Install dependencies (strictly use pnpm per AGENTS.md):**
 
 ```bash
 pnpm install
-# or
-npm install
 ```
 
-- **Start the Next.js dev server:**
+- **Start the Next.js dev server (binds to port 3001):**
 
 ```bash
-npm run dev
-# or
 pnpm dev
 ```
 
-When your dev server is running, `next-devtools-mcp` will discover the built-in MCP endpoint at `http://localhost:3000/_next/mcp` (or the port your server uses) and provide agent tooling (runtime errors, logs, metadata, etc.).
+When your dev server is running, `next-devtools-mcp` will discover the built-in MCP endpoint at `http://localhost:3001/_next/mcp` and provide agent tooling (runtime errors, logs, metadata, etc.).
 
 **What the `.mcp.json` does**
 

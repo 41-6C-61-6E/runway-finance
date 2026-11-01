@@ -296,7 +296,7 @@ export function BudgetItemTransactionsIcon({
                     </div>
                     <div
                       className={cn(
-                        "font-mono text-xs font-semibold shrink-0",
+                        "font-mono text-xs font-semibold shrink-0 blur-number",
                         isIncomeTx ? "text-constructive" : "text-foreground"
                       )}
                     >

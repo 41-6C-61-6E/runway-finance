@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, decryptRows } from '@/lib/crypto';
 import { toCashFlowAmount } from '@/lib/utils/account-scope';
+import { classifyCashFlowAmount } from '@/lib/finance/cash-flow-classify';
 
 function normalizeToMonthly(amount: number, periodType: string): number {
   if (periodType === 'quarterly') return amount / 3;
@@ -161,36 +162,24 @@ export async function GET(request: Request) {
       if (excluded) continue;
 
       const amount = toCashFlowAmount(rawAmount, accountTypeById.get(String(accId)));
+      const classification = classifyCashFlowAmount(amount, category);
+      if (classification.isTransfer) continue;
 
-      if (category?.categoryType === 'transfer') continue;
-      if (category?.categoryType === 'compound') {
-        const absAmt = Math.abs(rawAmount);
+      if (classification.income !== 0) {
         if (!incomeByAccount.has(accId)) incomeByAccount.set(accId, []);
-        incomeByAccount.get(accId)!.push(absAmt);
+        incomeByAccount.get(accId)!.push(classification.income);
+      }
+
+      if (classification.expenses !== 0) {
         if (!expenseByAccount.has(accId)) expenseByAccount.set(accId, []);
-        expenseByAccount.get(accId)!.push(absAmt);
+        expenseByAccount.get(accId)!.push(classification.expenses);
 
         if (txn.categoryId) {
           if (!expenseByAccountAndCategory.has(accId)) expenseByAccountAndCategory.set(accId, new Map());
           if (!expenseByAccountAndCategory.get(accId)!.has(txn.categoryId)) {
             expenseByAccountAndCategory.get(accId)!.set(txn.categoryId, []);
           }
-          expenseByAccountAndCategory.get(accId)!.get(txn.categoryId)!.push(absAmt);
-        }
-      } else if (amount > 0) {
-        if (!incomeByAccount.has(accId)) incomeByAccount.set(accId, []);
-        incomeByAccount.get(accId)!.push(amount);
-      } else {
-        const absAmt = Math.abs(rawAmount);
-        if (!expenseByAccount.has(accId)) expenseByAccount.set(accId, []);
-        expenseByAccount.get(accId)!.push(absAmt);
-
-        if (txn.categoryId) {
-          if (!expenseByAccountAndCategory.has(accId)) expenseByAccountAndCategory.set(accId, new Map());
-          if (!expenseByAccountAndCategory.get(accId)!.has(txn.categoryId)) {
-            expenseByAccountAndCategory.get(accId)!.set(txn.categoryId, []);
-          }
-          expenseByAccountAndCategory.get(accId)!.get(txn.categoryId)!.push(absAmt);
+          expenseByAccountAndCategory.get(accId)!.get(txn.categoryId)!.push(classification.expenses);
         }
       }
     }

@@ -19,8 +19,11 @@ import {
   categorySpendingSummary,
   userNotifications,
   aiProposals,
+  equityGrants,
+  customAlertRules,
 } from '../lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import assert from 'node:assert';
 
 async function main() {
   const db = getDb();
@@ -43,6 +46,8 @@ async function main() {
     spendSummary,
     notifs,
     proposals,
+    grants,
+    alertRules,
   ] = await Promise.all([
     db.select().from(accounts).where(eq(accounts.userId, userId)),
     db.select().from(holdings).where(eq(holdings.userId, userId)),
@@ -59,6 +64,8 @@ async function main() {
     db.select().from(categorySpendingSummary).where(eq(categorySpendingSummary.userId, userId)),
     db.select().from(userNotifications).where(eq(userNotifications.userId, userId)),
     db.select().from(aiProposals).where(eq(aiProposals.userId, userId)),
+    db.select().from(equityGrants).where(eq(equityGrants.userId, userId)),
+    db.select().from(customAlertRules).where(eq(customAlertRules.userId, userId)),
   ]);
 
   const pAccounts = firePlans.length > 0 ? await db.select().from(planAccounts).where(eq(planAccounts.planId, firePlans[0].id)) : [];
@@ -85,10 +92,27 @@ async function main() {
   console.log(`Category Spending Summary records: ${spendSummary.length}`);
   console.log(`Notifications: ${notifs.length}`);
   console.log(`AI Proposals: ${proposals.length}`);
+  console.log(`Equity Grants: ${grants.length}`);
+  console.log(`Custom Alert Rules: ${alertRules.length}`);
+
+  // Invariant assertions: Ensure synthetic dataset is non-empty
+  assert.ok(accs.length > 0, 'Expected non-zero accounts seeded');
+  assert.ok(txs.length > 0, 'Expected non-zero transactions seeded');
+  assert.ok(nwSnaps.length > 0, 'Expected non-zero net worth snapshots seeded');
+  assert.ok(bdgs.length > 0, 'Expected non-zero budgets seeded');
+  assert.ok(goals.length > 0, 'Expected non-zero financial goals seeded');
 
   console.log('\n--- LATEST NET WORTH ---');
   if (decNw.length > 0) {
-    console.log(`Date: ${decNw[0].snapshotDate}, Net Worth: $${Number(decNw[0].netWorth).toLocaleString()}, Assets: $${Number(decNw[0].totalAssets).toLocaleString()}, Liabilities: $${Number(decNw[0].totalLiabilities).toLocaleString()}`);
+    const latest = decNw[0];
+    const assets = Number(latest.totalAssets);
+    const liabilities = Number(latest.totalLiabilities);
+    const nw = Number(latest.netWorth);
+    console.log(`Date: ${latest.snapshotDate}, Net Worth: $${nw.toLocaleString()}, Assets: $${assets.toLocaleString()}, Liabilities: $${liabilities.toLocaleString()}`);
+
+    // Core balance sheet invariant: Net Worth === Assets - Liabilities
+    const diff = Math.abs((assets - liabilities) - nw);
+    assert.ok(diff < 0.05, `Balance sheet invariant violated: Assets ($${assets}) - Liabilities ($${liabilities}) !== Net Worth ($${nw}), diff = ${diff}`);
   }
 
   console.log('\n--- ACCOUNTS BREAKDOWN ---');

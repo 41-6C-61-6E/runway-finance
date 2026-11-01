@@ -147,8 +147,17 @@ export function PropertyEquityProgressBar({
       </div>
 
       {isUnderwater && (
-        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px] text-amber-700 dark:text-amber-300">
-          Property value is below recorded purchase price. Equity buckets are scaled to current equity.
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[10px] text-amber-700 dark:text-amber-300 flex items-center justify-between gap-2">
+          <span>
+            {mortgageOwed > totalValue
+              ? 'Property is underwater: mortgage debt exceeds current market value.'
+              : 'Property value is below recorded purchase price. Equity buckets are scaled to current equity.'}
+          </span>
+          {mortgageOwed > totalValue && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-destructive/15 text-destructive shrink-0">
+              Negative Equity
+            </span>
+          )}
         </div>
       )}
 
@@ -168,7 +177,7 @@ export function PropertyEquityProgressBar({
           return (
             <div
               key={seg.id}
-              style={{ width: `${seg.pct}%` }}
+              style={{ width: `${Math.min(100, Math.max(0, seg.pct))}%` }}
               className={cn(
                 'h-full',
                 seg.colorClass,

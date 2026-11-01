@@ -29,6 +29,7 @@ export interface User {
   username: string;
   password_hash: string;
   email?: string;
+  token_version?: number;
 }
 
 export async function getUsers(): Promise<Omit<User, 'password_hash'>[]> {
@@ -87,7 +88,7 @@ export async function findUser(username: string): Promise<User | undefined> {
   const client = await pool.connect();
   try {
     const { rows } = await client.query(
-      'SELECT username, password_hash, email FROM users WHERE username = $1',
+      'SELECT username, password_hash, email, token_version FROM users WHERE username = $1',
       [username]
     );
     return rows[0] || undefined;
@@ -130,7 +131,7 @@ export async function updatePassword(username: string, currentPassword: string, 
       await client.query('BEGIN');
 
       await client.query(
-        'UPDATE users SET password_hash = $1 WHERE username = $2',
+        'UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE username = $2',
         [password_hash, username]
       );
 

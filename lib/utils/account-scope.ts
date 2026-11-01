@@ -36,7 +36,20 @@ export const ASSET_ACCOUNT_TYPES = [
   'stock_option',
 ];
 
-import { REAL_ESTATE_SUBTYPES } from '@/lib/constants/account-types';
+export const REAL_ESTATE_SUBTYPES = [
+  'realestate',
+  'primaryhome',
+  'secondaryhome',
+  'rentalproperty',
+  'commercial',
+  'land',
+  'otherrealestate',
+  'single-family',
+  'condo',
+  'townhouse',
+  'multi-family',
+] as const;
+
 import { convertCurrency } from '@/lib/constants/currency-rates';
 import { roundToCents } from '@/lib/utils/format';
 
@@ -282,7 +295,7 @@ export interface NetWorthTotals {
  * - accounts inactive for the given date (e.g. paid-off/refinanced
  *   mortgages) are NOT included
  * - balances are converted from the account currency to `baseCurrency`
- * - liability balances are always counted as absolute value
+ * - liabilities reduce net worth algebraically (overpayment/credit balances increase net worth)
  *
  * Used by the live net worth calculation, the dashboard Overview, and the
  * debt breakdown so every surface reports the same figures.
@@ -390,3 +403,64 @@ export function isCashFlowRelevantAccount(account: {
 }): boolean {
   return isReportableAccount(account) || account.type === 'paystub';
 }
+
+export type TaxWrapper = 'Tax-Free' | 'Tax-Deferred' | 'Taxable' | 'Other';
+
+export const TAX_WRAPPER_MAP: Record<string, TaxWrapper> = {
+  rothira: 'Tax-Free',
+  roth: 'Tax-Free',
+  roth_ira: 'Tax-Free',
+  hsa: 'Tax-Free',
+  hsachecking: 'Tax-Free',
+  health: 'Tax-Free',
+  '401k': 'Tax-Deferred',
+  '403b': 'Tax-Deferred',
+  '457b': 'Tax-Deferred',
+  traditionalira: 'Tax-Deferred',
+  traditional_ira: 'Tax-Deferred',
+  sepira: 'Tax-Deferred',
+  sep_ira: 'Tax-Deferred',
+  simpleira: 'Tax-Deferred',
+  simple_ira: 'Tax-Deferred',
+  pension: 'Tax-Deferred',
+  retirement: 'Tax-Deferred',
+  ira: 'Tax-Deferred',
+  investment: 'Taxable',
+  brokerage: 'Taxable',
+  stock_option: 'Taxable',
+  individual: 'Taxable',
+  joint: 'Taxable',
+  '529': 'Other',
+  otherasset: 'Other',
+  otherAsset: 'Other',
+  otherinvestment: 'Other',
+  otherInvestment: 'Other',
+};
+
+export function getTaxWrapper(account: { type?: string | null; name?: string | null; metadata?: any }): TaxWrapper {
+  const t = (account.type || '').toLowerCase();
+  const n = (account.name || '').toLowerCase();
+
+  // If metadata specifies isRoth or 100% Roth
+  if (account.metadata) {
+    try {
+      const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+      if (meta?.isRoth === true || (typeof meta?.rothPercentage === 'number' && meta.rothPercentage >= 100)) {
+        return 'Tax-Free';
+      }
+    } catch {}
+  }
+
+  // Name check for Roth
+  if (n.includes('roth')) {
+    return 'Tax-Free';
+  }
+
+  // Name check for 401k/IRA if type is generic retirement
+  if (n.includes('401k') || n.includes('401(k)') || n.includes('traditional') || n.includes('sep') || n.includes('simple')) {
+    return 'Tax-Deferred';
+  }
+
+  return TAX_WRAPPER_MAP[t] ?? (t.includes('roth') ? 'Tax-Free' : 'Taxable');
+}
+

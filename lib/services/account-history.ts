@@ -1008,10 +1008,8 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
 
   const latestByAccount = new Map<string, number>();
 
-  // Clear existing net worth snapshots
-  await db.delete(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId));
-
-  // Iterate dates and calculate net worth
+  // Iterate dates and calculate net worth values
+  const allNwValues: any[] = [];
   for (const dateStr of sortedDates) {
     // Update latest balances for the day
     for (const snap of snapsByDate.get(dateStr)!) {
@@ -1046,22 +1044,47 @@ export async function recalculateNetWorthSnapshots(userId: string, dek?: Uint8Ar
       dateStr
     );
 
-    const nwValues = {
+    allNwValues.push({
       userId,
       snapshotDate: dateStr,
       totalAssets: formatToCents(totalAssets),
       totalLiabilities: formatToCents(totalLiabilities),
       netWorth: formatToCents(netWorth),
-      breakdown,
-    };
-
-    const encryptedNw = dek ? await encryptRow('net_worth_snapshots', nwValues, dek) : nwValues;
-
-    await db.insert(netWorthSnapshots).values(encryptedNw).onConflictDoUpdate({
-      target: [netWorthSnapshots.userId, netWorthSnapshots.snapshotDate],
-      set: encryptedNw,
+      breakdown: breakdown as any,
     });
   }
+
+  // Batch encrypt snapshot rows in chunks of 100
+  const encryptedNwRows: any[] = [];
+  const chunkSize = 100;
+  for (let i = 0; i < allNwValues.length; i += chunkSize) {
+    const chunk = allNwValues.slice(i, i + chunkSize);
+    const encryptedChunk = dek
+      ? await Promise.all(chunk.map((row) => encryptRow('net_worth_snapshots', row, dek)))
+      : chunk;
+    encryptedNwRows.push(...encryptedChunk);
+  }
+
+  // Atomically delete and batch-insert snapshots in a single database transaction
+  const runTransaction = typeof db.transaction === 'function'
+    ? (cb: (tx: any) => Promise<void>) => db.transaction(cb)
+    : (cb: (tx: any) => Promise<void>) => cb(db);
+
+  await runTransaction(async (tx) => {
+    await tx.delete(netWorthSnapshots).where(eq(netWorthSnapshots.userId, userId));
+    for (let i = 0; i < encryptedNwRows.length; i += chunkSize) {
+      const batch = encryptedNwRows.slice(i, i + chunkSize);
+      await tx.insert(netWorthSnapshots).values(batch).onConflictDoUpdate({
+        target: [netWorthSnapshots.userId, netWorthSnapshots.snapshotDate],
+        set: {
+          totalAssets: sql`excluded.total_assets`,
+          totalLiabilities: sql`excluded.total_liabilities`,
+          netWorth: sql`excluded.net_worth`,
+          breakdown: sql`excluded.breakdown`,
+        },
+      });
+    }
+  });
 }
 
 function toDateString(d: any): string {

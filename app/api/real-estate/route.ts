@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     const mortgageAccounts = decryptedAccounts.filter((a: any) => {
       const isImported = a.externalId?.startsWith('imported-');
       if (isImported && !isImportRealEstateEnabled) return false;
-      return a.type === 'mortgage';
+      return a.type === 'mortgage' || a.type === 'heloc' || a.type === 'loan';
     });
     const mortgageMap = new Map(mortgageAccounts.map((m: any) => [m.id, m]));
 

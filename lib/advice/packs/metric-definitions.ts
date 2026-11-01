@@ -63,6 +63,30 @@ const DEFINITIONS: Record<string, { title: string; formula: string; rules: strin
     rules:
       'Aggregates holdings and balances across all taxable brokerage and retirement accounts.',
   },
+  realEstate: {
+    title: 'Real Estate Equity & LTV',
+    formula: 'Property Equity = Estimated Property Value - Outstanding Mortgage Balance; LTV = (Outstanding Mortgage / Estimated Property Value) * 100',
+    rules:
+      'Home values are determined via automated valuation models (AVM, e.g. RentCast/FHFA) or user-specified manual values. Mortgage liabilities are tracked as debt.',
+  },
+  debtToAsset: {
+    title: 'Debt-to-Asset Leverage Ratio',
+    formula: 'Debt-to-Asset Ratio = (Total Liabilities / Total Assets) * 100',
+    rules:
+      'Measures overall financial leverage. Ratios below 30% represent conservative debt loads, while ratios exceeding 60% indicate higher borrowing risk.',
+  },
+  payrollNetPay: {
+    title: 'Payroll Net Pay Identity',
+    formula: 'Net Pay = Gross Pay - Pre-Tax Deductions - Taxes - Post-Tax Deductions',
+    rules:
+      'Pre-tax deductions (401k employee, HSA employee, Section 125 health) reduce federal/state taxable income. Post-tax deductions (Roth 401k employee) do not reduce taxable wages.',
+  },
+  equityVesting: {
+    title: 'Equity Grant Valuation',
+    formula: 'Unvested Value = Unvested Shares * Current FMV; Vested Spread = Vested Shares * max(0, Current FMV - Strike Price)',
+    rules:
+      'Vesting schedules support monthly/quarterly/annual cadences with optional cliffs. ISO/NSO options value reflects the in-the-money spread; RSUs reflect the full FMV.',
+  },
 };
 
 export const metricDefinitionsPack: AskPack<MetricDefinitionsParams> = {

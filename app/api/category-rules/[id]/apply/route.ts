@@ -62,7 +62,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (evaluateCondition(decryptedRule, tx)) {
       const hasTags = txsWithTags.has(tx.id);
       const shouldUpdateCategory = !tx.categoryId || decryptedRule.overrideExisting;
-      const shouldUpdateTags = !hasTags || decryptedRule.overrideExisting;
+      const shouldUpdateTags = Boolean(decryptedRule.setTagId) && (!hasTags || decryptedRule.overrideExisting);
 
       if (shouldUpdateCategory || shouldUpdateTags) {
         matchedIds.push(tx.id);
@@ -76,37 +76,38 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   if (matchedIds.length > 0) {
-    for (const update of matchedUpdates) {
-      const txId = update.txId;
+    const encryptedPayee = decryptedRule.setPayee && dek ? await encryptField(decryptedRule.setPayee, dek) : undefined;
+    await getDb().transaction(async (tx) => {
+      for (const update of matchedUpdates) {
+        const txId = update.txId;
 
-      if (update.shouldUpdateCategory) {
-        const updateData: Record<string, unknown> = { updatedAt: new Date() };
-        if (decryptedRule.setCategoryId) updateData.categoryId = decryptedRule.setCategoryId;
-        if (decryptedRule.setPayee) {
-          updateData.payee = await encryptField(decryptedRule.setPayee, dek);
+        if (update.shouldUpdateCategory) {
+          const updateData: Record<string, unknown> = { updatedAt: new Date() };
+          if (decryptedRule.setCategoryId) updateData.categoryId = decryptedRule.setCategoryId;
+          if (encryptedPayee) {
+            updateData.payee = encryptedPayee;
+          }
+          if (decryptedRule.setReviewed !== null) updateData.reviewed = decryptedRule.setReviewed;
+
+          await tx
+            .update(transactions)
+            .set(updateData)
+            .where(eq(transactions.id, txId));
         }
-        if (decryptedRule.setReviewed !== null) updateData.reviewed = decryptedRule.setReviewed;
 
-        await getDb()
-          .update(transactions)
-          .set(updateData)
-          .where(eq(transactions.id, txId));
-      }
-
-      if (update.shouldUpdateTags) {
-        if (decryptedRule.overrideExisting) {
-          await getDb()
-            .delete(transactionTags)
-            .where(eq(transactionTags.transactionId, txId));
-        }
-        if (decryptedRule.setTagId) {
-          await getDb()
+        if (update.shouldUpdateTags && decryptedRule.setTagId) {
+          if (decryptedRule.overrideExisting) {
+            await tx
+              .delete(transactionTags)
+              .where(eq(transactionTags.transactionId, txId));
+          }
+          await tx
             .insert(transactionTags)
             .values({ transactionId: txId, tagId: decryptedRule.setTagId })
             .onConflictDoNothing();
         }
       }
-    }
+    });
   }
 
   logger.info('POST /api/category-rules/[id]/apply', { userId, ruleId: id, matched: matchedIds.length, total: allTxns.length });

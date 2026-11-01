@@ -59,6 +59,8 @@ export function OfflineBanner() {
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={`w-full text-xs font-semibold py-1.5 px-4 flex items-center justify-center gap-2 transition-all duration-300 z-50 ${
         isOffline
           ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-b border-amber-500/20'

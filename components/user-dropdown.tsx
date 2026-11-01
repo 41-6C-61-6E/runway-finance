@@ -190,6 +190,8 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
             onClick={() => setOpen(!open)}
             className={`${glassIconButton} ${open ? glassItemActive : glassItemInactive}`}
             aria-label="User menu"
+            aria-haspopup="true"
+            aria-expanded={open}
           >
             <span className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary hover:bg-primary/30 transition-colors">
               {initial}
@@ -315,7 +317,11 @@ export default function UserDropdown({ onOpenChange }: UserDropdownProps = {}) {
 
           <button
             type="button"
-            onClick={() => { setOpen(false); void clearAllClientCaches(); signOut({ redirectTo: '/signin' }); }}
+            onClick={async () => {
+              setOpen(false);
+              await clearAllClientCaches();
+              await signOut({ redirectTo: '/signin' });
+            }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
           >
             <LogOut className="w-4 h-4 text-muted-foreground" />

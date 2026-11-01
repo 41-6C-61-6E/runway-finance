@@ -142,4 +142,37 @@ describe('mortgage-amortization', () => {
     expect(janSnap).toBeDefined();
     expect(janSnap?.balance).toBe(300000);
   });
+
+  it('WS-03-F08: generates correct amortization history for 0% interest loan without stalling', () => {
+    // $120,000 original balance, 0% interest rate, 120 months term, monthlyPayment: 0
+    // Expected payment: $120,000 / 120 = $1,000 / month
+    const zeroInterestParams = {
+      originalBalance: 120000,
+      annualRate: 0,
+      termMonths: 120,
+      monthlyPayment: 0,
+      startDate: '2025-01-01',
+    };
+
+    // Active loan, 6 months later (2025-07-01). Expected balance: 120000 - 6 * 1000 = 114000
+    const history = generateMortgagePaydownHistory(
+      zeroInterestParams,
+      114000,
+      '2025-07-01',
+      'active'
+    );
+
+    // Jan, Feb, Mar, Apr, May, Jun, Jul = 7 snapshots
+    expect(history).toHaveLength(7);
+    expect(history[0].date).toBe('2025-01-01');
+    expect(history[0].balance).toBe(120000);
+
+    // Month 1 (Feb 1): exactly $1,000 paid down
+    expect(history[1].date).toBe('2025-02-01');
+    expect(history[1].balance).toBeCloseTo(119000, 0);
+
+    // Final date (Jul 1): exactly currentBalance (114000)
+    expect(history[6].date).toBe('2025-07-01');
+    expect(history[6].balance).toBe(114000);
+  });
 });

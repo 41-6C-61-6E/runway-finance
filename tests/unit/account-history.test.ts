@@ -47,7 +47,11 @@ class MockDbQueryBuilder {
   }
 
   values(data: any) {
-    mockInsertValues.push(data);
+    if (Array.isArray(data)) {
+      mockInsertValues.push(...data);
+    } else {
+      mockInsertValues.push(data);
+    }
     return this;
   }
 

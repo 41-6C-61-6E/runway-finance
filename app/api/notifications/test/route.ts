@@ -12,7 +12,8 @@ export async function POST() {
       session.user.id,
       'Test Notification',
       'It works! This is a test notification from Personal Finance.',
-      '/settings?tab=notifications'
+      '/settings?tab=notifications',
+      'test'
     );
 
     if (!result.sent) {

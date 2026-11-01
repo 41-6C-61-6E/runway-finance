@@ -210,6 +210,32 @@ function trimOneDecimal(n: number): string {
 }
 
 /**
+ * Format raw byte size into human-readable string (KB, MB, GB).
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${trimOneDecimal(kb)} KB`;
+  const mb = kb / 1024;
+  return `${trimOneDecimal(mb)} MB`;
+}
+
+/**
+ * Format ratio multiplier (e.g. 1.4x).
+ */
+export function formatMultiplier(ratio: number): string {
+  return `${trimOneDecimal(ratio)}x`;
+}
+
+/**
+ * Format duration in years (e.g. 5.1 yrs).
+ */
+export function formatDurationYears(years: number): string {
+  if (years === Infinity) return '∞';
+  return `${trimOneDecimal(years)} yrs`;
+}
+
+/**
  * R-7 number-formatting role table — the single source of truth for "how many
  * decimals does this kind of number get?" (resolves P2-5 / mobile C-4).
  *

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { runMonteCarloSimulation } from '@/lib/services/monte-carlo';
-import { EnginePlan } from '@/lib/services/retirement-engine';
+import { EnginePlan, runRetirementSimulation } from '@/lib/services/retirement-engine';
 import { DEFAULT_2026_RULES } from '@/lib/constants/retirement-defaults';
 
 describe('Monte Carlo Simulation Engine', () => {
@@ -144,5 +144,146 @@ describe('Monte Carlo Simulation Engine', () => {
     expect(res1.medianLegacy).toBe(res2.medianLegacy);
     expect(res1.successRate).toBe(res2.successRate);
     expect(res1.averageLegacy).toBe(res2.averageLegacy);
+  });
+
+  it('[WS-02-F01] calculates total return in historical sequence without subtracting dividend yield', () => {
+    // 1928 S&P 500: stocksGrowth = 0.3788, stocksYield = 0.0405. Total Return = 41.93%.
+    const singleYearPlan: EnginePlan = {
+      ...mockPlan,
+      primaryBirthYear: 1966, // age 60 in 2026
+      lifeExpectancyAge: 61,  // 1-year simulation
+      retirementAge: 60,
+      primarySalary: 0,
+      events: [],
+      flows: [],
+      accounts: [
+        {
+          id: 'acc_roth',
+          name: 'Roth IRA',
+          type: 'roth_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 7.0,
+          dividendYield: 0.0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+        },
+      ],
+      settings: {
+        ...mockPlan.settings!,
+        fixedInflationRate: 0.0,
+      },
+    };
+
+    const res = runMonteCarloSimulation(singleYearPlan, {
+      numberOfTrials: 1,
+      model: 'historical_sequence',
+      startYear: 1928,
+      equityAllocation: 100, // 100% stocks
+      adjustForInflation: false,
+    });
+
+    // Starting with $100k, at 41.93% total return (37.88% price + 4.05% dividend), ending balance should be $141,930
+    const endingBalance = res.medianLegacy;
+    expect(endingBalance).toBeCloseTo(141930, -1);
+  });
+
+  it('[WS-02-F17] applies actual historical inflation rates during historical sequence simulation', () => {
+    // 1973-1975 stagflation period
+    const stagflationPlan: EnginePlan = {
+      ...mockPlan,
+      primaryBirthYear: 1966, // age 60 in 2026
+      lifeExpectancyAge: 63,  // 3-year simulation
+      retirementAge: 60,
+      primarySalary: 0,
+      events: [
+        {
+          id: 'ev_living',
+          name: 'Living Expenses',
+          category: 'expense',
+          type: 'living_expense',
+          owner: 'primary',
+          amount: 50000,
+          frequency: 'yearly',
+          growthRate: 0.0,
+          adjustForInflation: true,
+          startTriggerType: 'now',
+          endTriggerType: 'end_of_plan',
+        },
+      ],
+      flows: [],
+      accounts: [
+        {
+          id: 'acc_cash',
+          name: 'Cash',
+          type: 'cash',
+          owner: 'primary',
+          balance: 500000,
+          costBasis: 500000,
+          expectedGrowthRate: 0.0,
+          dividendYield: 0.0,
+          reinvestDividends: false,
+          qualifiedDividendRatio: 1.0,
+        },
+      ],
+    };
+
+    const res = runMonteCarloSimulation(stagflationPlan, {
+      numberOfTrials: 1,
+      model: 'historical_sequence',
+      startYear: 1973,
+      equityAllocation: 100,
+      adjustForInflation: true,
+    });
+
+    expect(res.totalTrials).toBe(1);
+    expect(res.percentiles.years.length).toBe(3);
+  });
+
+  it('[WS-02-F18] matches deterministic growth rate with Monte Carlo constant mode', () => {
+    const parityPlan: EnginePlan = {
+      ...mockPlan,
+      primaryBirthYear: 1966,
+      lifeExpectancyAge: 61,
+      retirementAge: 60,
+      primarySalary: 0,
+      events: [],
+      flows: [],
+      accounts: [
+        {
+          id: 'acc_roth',
+          name: 'Roth IRA',
+          type: 'roth_ira',
+          owner: 'primary',
+          balance: 100000,
+          costBasis: 100000,
+          expectedGrowthRate: 7.0,
+          dividendYield: 2.0,
+          reinvestDividends: true,
+          qualifiedDividendRatio: 1.0,
+        },
+      ],
+      settings: {
+        ...mockPlan.settings!,
+        fixedInflationRate: 0.0,
+      },
+    };
+
+    // Deterministic simulation
+    const detOutput = runRetirementSimulation(parityPlan);
+
+    // Monte Carlo constant mode with 7% return + 2% dividend
+    const mcOutput = runMonteCarloSimulation(parityPlan, {
+      numberOfTrials: 1,
+      model: 'constant',
+      meanAnnualReturn: 0.07,
+      dividendYield: 0.02,
+      adjustForInflation: false,
+    });
+
+    // Both should grow $100k at 7% price growth + 2% dividend = 9% total return ($109,000)
+    expect(detOutput.endingNetWorth).toBeCloseTo(109000, 0);
+    expect(mcOutput.medianLegacy).toBeCloseTo(109000, 0);
   });
 });

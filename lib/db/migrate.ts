@@ -548,6 +548,88 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       CREATE INDEX IF NOT EXISTS "equity_grants_user_id_idx" ON "equity_grants" ("user_id");
       CREATE INDEX IF NOT EXISTS "equity_grants_account_id_idx" ON "equity_grants" ("account_id");
     `);
+
+    // 12. Ensure system_tax_rules table exists
+    const tableCheckTaxRules = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'system_tax_rules'
+    `);
+    if (tableCheckTaxRules.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Creating missing system_tax_rules table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS system_tax_rules (
+          id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tax_year                        INTEGER NOT NULL DEFAULT 2026,
+          country                         TEXT NOT NULL DEFAULT 'US',
+          standard_deduction_single       TEXT NOT NULL DEFAULT '15000',
+          standard_deduction_mfj          TEXT NOT NULL DEFAULT '30000',
+          standard_deduction_hoh          TEXT NOT NULL DEFAULT '22500',
+          standard_deduction_mfs          TEXT NOT NULL DEFAULT '15000',
+          standard_deduction              TEXT NOT NULL DEFAULT '15000',
+          additional_std_deduction_65_plus JSONB NOT NULL,
+          ordinary_tax_brackets           JSONB NOT NULL,
+          head_of_household_brackets      JSONB NOT NULL,
+          capital_gains_brackets          JSONB NOT NULL,
+          fica_rules                      JSONB NOT NULL,
+          social_security_rules           JSONB NOT NULL,
+          early_penalty_rules             JSONB NOT NULL,
+          niit_rules                      JSONB NOT NULL,
+          aca_rules                       JSONB NOT NULL,
+          niit_threshold                  TEXT NOT NULL DEFAULT '200000',
+          irmaa_thresholds                JSONB NOT NULL,
+          ss_taxation_thresholds          JSONB NOT NULL,
+          contribution_limits             JSONB NOT NULL,
+          gift_estate_exemptions          JSONB NOT NULL,
+          aca_subsidy_table               JSONB NOT NULL,
+          fpl_amount                      TEXT NOT NULL DEFAULT '15060',
+          secure_act_rules                JSONB NOT NULL,
+          rmd_uniform_lifetime_table      JSONB NOT NULL,
+          created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS system_tax_rules_tax_year_idx
+        ON system_tax_rules (tax_year)
+      `);
+    }
+
+    // 13. Ensure recurring_transactions table exists
+    const tableCheckRec = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'recurring_transactions'
+    `);
+    if (tableCheckRec.rows.length === 0) {
+      logger.info('[migrate] [self-heal] Creating missing recurring_transactions table...');
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS recurring_transactions (
+          id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id            TEXT NOT NULL,
+          merchant_name      TEXT NOT NULL,
+          match_pattern      TEXT NOT NULL,
+          category_id        UUID REFERENCES categories(id) ON DELETE SET NULL,
+          account_id         UUID REFERENCES accounts(id) ON DELETE CASCADE,
+          frequency          TEXT NOT NULL,
+          average_amount     TEXT NOT NULL,
+          last_amount        TEXT NOT NULL,
+          last_date          DATE NOT NULL,
+          next_expected_date DATE,
+          flow_type          TEXT NOT NULL DEFAULT 'expense',
+          is_confirmed       BOOLEAN NOT NULL DEFAULT FALSE,
+          is_dismissed       BOOLEAN NOT NULL DEFAULT FALSE,
+          is_paused          BOOLEAN NOT NULL DEFAULT FALSE,
+          custom_name        TEXT,
+          notes              TEXT,
+          occurrence_count   INTEGER NOT NULL DEFAULT 0,
+          confidence         INTEGER NOT NULL DEFAULT 0,
+          created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS recurring_txn_user_idx ON recurring_transactions (user_id)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS recurring_txn_user_account_idx ON recurring_transactions (user_id, account_id)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS recurring_txn_next_date_idx ON recurring_transactions (user_id, next_expected_date)`);
+    }
   } catch (err) {
     logger.error('[migrate] Self-healing checks failed', { error: err instanceof Error ? err.message : String(err) });
     // Don't crash startup on self-healing check failure, but log it

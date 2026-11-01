@@ -7,17 +7,21 @@ export function killRunningDevServers() {
   const parentPid = process.ppid;
   let killed = 0;
 
-  for (const pidStr of fs.readdirSync('/proc')) {
-    if (!/^\d+$/.test(pidStr)) continue;
-    const pid = parseInt(pidStr, 10);
-    if (pid === currentPid || pid === parentPid) continue;
-
+  if (fs.existsSync('/proc')) {
     try {
-      const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8');
-      if (cmd.includes('next-server') || (cmd.includes('next') && cmd.includes('dev'))) {
+      for (const pidStr of fs.readdirSync('/proc')) {
+        if (!/^\d+$/.test(pidStr)) continue;
+        const pid = parseInt(pidStr, 10);
+        if (pid === currentPid || pid === parentPid) continue;
+
         try {
-          process.kill(pid, 'SIGTERM');
-          killed++;
+          const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+          if (cmd.includes('next-server') || (cmd.includes('next') && cmd.includes('dev'))) {
+            try {
+              process.kill(pid, 'SIGTERM');
+              killed++;
+            } catch {}
+          }
         } catch {}
       }
     } catch {}

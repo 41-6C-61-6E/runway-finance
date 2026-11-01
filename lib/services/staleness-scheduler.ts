@@ -3,6 +3,9 @@ import { userSettings } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { getServerDEK } from '@/lib/crypto-context';
 import { checkStaleConnectionsAndNotify, pruneSentNotifications } from '@/lib/services/notifications';
+import { pruneOldJobLogs } from '@/lib/services/scheduler-logger';
+import { pruneOldSyncLogs } from '@/lib/services/sync';
+import { pruneRateLimits } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
 import { BaseScheduler } from '@/lib/services/base-scheduler';
@@ -44,13 +47,14 @@ class StalenessScheduler extends BaseScheduler<string> {
     this.cancel('main');
 
     try {
-      // R3 maintenance: prune old sent_notifications rows each run (cheap,
-      // idempotent). Kept separate from the user loop so prune issues never
-      // affect staleness alerts and vice-versa.
+      // R3 maintenance: prune old operational rows each run (cheap, idempotent)
       try {
         await pruneSentNotifications(90);
+        await pruneOldJobLogs(30);
+        await pruneOldSyncLogs(90);
+        await pruneRateLimits();
       } catch (pruneErr) {
-        logger.debug(`${LOG_TAG} sent_notifications prune failed (non-fatal):`, pruneErr);
+        logger.debug(`${LOG_TAG} periodic retention prune failed (non-fatal):`, pruneErr);
       }
 
       const db = getDb();

@@ -4,7 +4,7 @@ import { getDb } from '@/lib/db';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRow } from '@/lib/crypto';
 import { eq, and } from 'drizzle-orm';
-import { plans, planAccounts, planEvents, planFlows, planSettings } from '@/lib/db/schema';
+import { plans, planAccounts, planEvents, planFlows, planLiabilities, planSettings } from '@/lib/db/schema';
 import { runRetirementSimulation, EnginePlan } from '@/lib/services/retirement-engine';
 import { formatFirePlanTxt, toCsv } from '@/lib/utils/export-formatter';
 
@@ -37,10 +37,11 @@ export async function GET(req: NextRequest) {
       planRowsRaw.map(async (pRow) => {
         const decPlan = await decryptRow('plans', pRow as Record<string, unknown>, dek);
 
-        const [rawAccounts, rawEvents, rawFlows, rawSettings] = await Promise.all([
+        const [rawAccounts, rawEvents, rawFlows, rawLiabilities, rawSettings] = await Promise.all([
           db.select().from(planAccounts).where(eq(planAccounts.planId, pRow.id)),
           db.select().from(planEvents).where(eq(planEvents.planId, pRow.id)),
           db.select().from(planFlows).where(eq(planFlows.planId, pRow.id)),
+          db.select().from(planLiabilities).where(eq(planLiabilities.planId, pRow.id)),
           db.select().from(planSettings).where(eq(planSettings.planId, pRow.id)).limit(1),
         ]);
 
@@ -52,6 +53,9 @@ export async function GET(req: NextRequest) {
         );
         const decFlows = await Promise.all(
           rawFlows.map((f) => decryptRow('plan_flows', f as Record<string, unknown>, dek))
+        );
+        const decLiabilities = await Promise.all(
+          rawLiabilities.map((l) => decryptRow('plan_liabilities', l as Record<string, unknown>, dek))
         );
         const decSettings = rawSettings[0]
           ? await decryptRow('plan_settings', rawSettings[0] as Record<string, unknown>, dek)
@@ -73,9 +77,9 @@ export async function GET(req: NextRequest) {
             spouseName: String(decPlan.spouseName || 'Spouse / Partner'),
             spouseRetirementAge: decPlan.spouseRetirementAge ? Number(decPlan.spouseRetirementAge) : 60,
             spouseLifeExpectancyAge: decPlan.spouseLifeExpectancyAge ? Number(decPlan.spouseLifeExpectancyAge) : 100,
-            primarySsMonthlyAmount: parseFloat(String(decPlan.primarySsMonthlyAmount || '2500')),
+            primarySsMonthlyAmount: decPlan.primarySsMonthlyAmount ? parseFloat(String(decPlan.primarySsMonthlyAmount)) : undefined,
             primarySsStartAge: decPlan.primarySsStartAge ? Number(decPlan.primarySsStartAge) : 67,
-            spouseSsMonthlyAmount: parseFloat(String(decPlan.spouseSsMonthlyAmount || '2000')),
+            spouseSsMonthlyAmount: decPlan.spouseSsMonthlyAmount ? parseFloat(String(decPlan.spouseSsMonthlyAmount)) : undefined,
             spouseSsStartAge: decPlan.spouseSsStartAge ? Number(decPlan.spouseSsStartAge) : 67,
             enableSpousalSsBenefit: decPlan.enableSpousalSsBenefit !== false,
             filingStatus: String(decPlan.filingStatus || 'single'),
@@ -111,7 +115,14 @@ export async function GET(req: NextRequest) {
               qualifiedDividendRatio: parseFloat(String(a.qualifiedDividendRatio || '1.0')),
               rothPercentage: typeof a.rothPercentage === 'number' ? a.rothPercentage : undefined,
             })),
-            liabilities: [],
+            liabilities: decLiabilities.map((l) => ({
+              id: String(l.id || ''),
+              name: String(l.name || ''),
+              balance: parseFloat(String(l.balance || '0')),
+              interestRate: parseFloat(String(l.interestRate || '0')),
+              monthlyPayment: parseFloat(String(l.monthlyPayment || '0')),
+              yearsRemaining: parseFloat(String(l.yearsRemaining || '0')),
+            })),
             events: decEvents.map((e) => ({
               id: String(e.id || ''),
               name: String(e.name || ''),
@@ -127,7 +138,15 @@ export async function GET(req: NextRequest) {
               endTriggerType: String(e.endTriggerType || 'end_of_plan'),
               endTriggerValue: e.endTriggerValue ? String(e.endTriggerValue) : undefined,
             })),
-            flows: [],
+            flows: decFlows.map((f) => ({
+              id: String(f.id || ''),
+              name: String(f.name || ''),
+              type: (f.type as any) || 'invest',
+              rank: Number(f.rank || f.priority || 1),
+              targetAccountId: String(f.targetAccountId || ''),
+              ruleType: (f.ruleType as any) || 'fixed_amount',
+              ruleValue: parseFloat(String(f.amount || f.ruleValue || '0')),
+            })),
             settings: {
               fixedInflationRate: parseFloat(String(decSettings?.fixedInflationRate || '3.0')),
               withholdingDeferred: parseFloat(String(decSettings?.withholdingDeferred || '20.0')),

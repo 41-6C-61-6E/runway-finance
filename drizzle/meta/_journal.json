@@ -743,6 +743,13 @@
       "when": 1793490000000,
       "tag": "0105_remove_account_sharing",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1793486882236,
+      "tag": "0106_awesome_shaman",
+      "breakpoints": true
     }
   ]
 }

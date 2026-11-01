@@ -9,6 +9,7 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { getDisplayTicker } from '@/lib/types/investments';
+import { TaxWrapper, getTaxWrapper } from '@/lib/utils/account-scope';
 
 interface Holding {
   accountId: string;
@@ -75,68 +76,11 @@ interface ChartItem {
   color: string;
 }
 
-export type TaxWrapper = 'Tax-Free' | 'Tax-Deferred' | 'Taxable' | 'Other';
-
-const TAX_WRAPPER_MAP: Record<string, TaxWrapper> = {
-  rothira: 'Tax-Free',
-  roth: 'Tax-Free',
-  roth_ira: 'Tax-Free',
-  hsa: 'Tax-Free',
-  health: 'Tax-Free',
-  '401k': 'Tax-Deferred',
-  '403b': 'Tax-Deferred',
-  '457b': 'Tax-Deferred',
-  traditionalira: 'Tax-Deferred',
-  traditional_ira: 'Tax-Deferred',
-  sepira: 'Tax-Deferred',
-  sep_ira: 'Tax-Deferred',
-  simpleira: 'Tax-Deferred',
-  simple_ira: 'Tax-Deferred',
-  pension: 'Tax-Deferred',
-  retirement: 'Tax-Deferred',
-  ira: 'Tax-Deferred',
-  investment: 'Taxable',
-  brokerage: 'Taxable',
-  stock_option: 'Taxable',
-  individual: 'Taxable',
-  joint: 'Taxable',
-  '529': 'Other',
-  otherasset: 'Other',
-  otherinvestment: 'Other',
-};
-
 const WRAPPER_COLORS: Record<TaxWrapper, string> = {
   'Tax-Free':     'var(--color-chart-1)',
   'Tax-Deferred': 'var(--color-chart-2)',
   'Taxable':      'var(--color-chart-4)',
   'Other':        'var(--color-muted-foreground)',
-};
-
-const getTaxWrapper = (type: string, name: string = '', metadata?: any): TaxWrapper => {
-  const t = (type || '').toLowerCase();
-  const n = (name || '').toLowerCase();
-
-  // If metadata specifies isRoth or 100% Roth
-  if (metadata) {
-    try {
-      const meta = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
-      if (meta?.isRoth === true || (typeof meta?.rothPercentage === 'number' && meta.rothPercentage >= 100)) {
-        return 'Tax-Free';
-      }
-    } catch {}
-  }
-
-  // Name check for Roth
-  if (n.includes('roth')) {
-    return 'Tax-Free';
-  }
-
-  // Name check for 401k/IRA if type is generic retirement
-  if (n.includes('401k') || n.includes('401(k)') || n.includes('traditional') || n.includes('sep') || n.includes('simple')) {
-    return 'Tax-Deferred';
-  }
-
-  return TAX_WRAPPER_MAP[t] ?? (t.includes('roth') ? 'Tax-Free' : 'Taxable');
 };
 
 export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationProps) {
@@ -202,13 +146,17 @@ export function HoldingsAllocation({ holdings, accounts }: HoldingsAllocationPro
 
           groupedValues['Tax-Free'] = (groupedValues['Tax-Free'] ?? 0) + rothVal;
 
-          const defaultWrapper = TAX_WRAPPER_MAP[type.toLowerCase()] ?? (type.toLowerCase().includes('roth') ? 'Tax-Free' : 'Tax-Deferred');
-          const nonRothWrapper = defaultWrapper === 'Tax-Free' ? 'Tax-Deferred' : defaultWrapper;
-          groupedValues[nonRothWrapper] = (groupedValues[nonRothWrapper] ?? 0) + nonRothVal;
+          const nonRothWrapper = getTaxWrapper({
+            type,
+            name: name.replace(/roth/gi, ''),
+            metadata: null,
+          });
+          const finalNonRothWrapper = nonRothWrapper === 'Tax-Free' ? 'Tax-Deferred' : nonRothWrapper;
+          groupedValues[finalNonRothWrapper] = (groupedValues[finalNonRothWrapper] ?? 0) + nonRothVal;
           continue;
         }
 
-        const wrapper = getTaxWrapper(type, name, acc?.metadata);
+        const wrapper = getTaxWrapper({ type, name, metadata: acc?.metadata });
         groupedValues[wrapper] = (groupedValues[wrapper] ?? 0) + h.value;
         continue;
       } else if (groupBy === 'assetClass') {

@@ -15,7 +15,7 @@ export { useSidebar, MIN_WIDTH, MAX_WIDTH, DEFAULT_WIDTH, COLLAPSED_WIDTH } from
 
 const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; pageKey: string }[] = [
   { href: '/', label: 'Net Worth', icon: ChartSpline, pageKey: 'netWorth' },
-  { href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'settings' },
+  { href: '/accounts', label: 'Accounts', icon: Landmark, pageKey: 'accounts' },
   { href: '/transactions', label: 'Transactions', icon: Receipt, pageKey: 'transactions' },
   { href: '/flows', label: 'Flows', icon: ArrowLeftRight, pageKey: 'flows' },
   { href: '/spending', label: 'Spending', icon: CreditCard, pageKey: 'spending' },

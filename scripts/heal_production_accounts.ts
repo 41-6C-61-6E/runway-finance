@@ -1,12 +1,16 @@
 import { getDb } from '../lib/db';
 import { plaidConnections, simplifinConnections, accounts } from '../lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { decryptRows, encryptField } from '../lib/crypto';
-import { getServerDEK } from '../lib/crypto-context';
 
 async function main() {
+  const isDryRun = process.argv.includes('--dry-run');
   const db = getDb();
-  console.log('Starting general production account healing process...\n');
+  console.log('Starting general production account healing process...');
+  if (isDryRun) {
+    console.log('[DRY-RUN MODE] No database modifications will be performed.\n');
+  } else {
+    console.log('');
+  }
 
   // Load all accounts and connections
   const allAccounts = await db.select().from(accounts);
@@ -41,10 +45,12 @@ async function main() {
         if (disabled.includes(acc.externalId)) {
           console.log(`[Re-enable] Active account ${acc.id} found in disabledAccounts list of Plaid connection ${conn.id} (${conn.institutionName}). Re-enabling...`);
           const updatedDisabled = disabled.filter(id => id !== acc.externalId);
-          await db
-            .update(plaidConnections)
-            .set({ disabledAccounts: updatedDisabled })
-            .where(eq(plaidConnections.id, conn.id));
+          if (!isDryRun) {
+            await db
+              .update(plaidConnections)
+              .set({ disabledAccounts: updatedDisabled })
+              .where(eq(plaidConnections.id, conn.id));
+          }
           conn.disabledAccounts = updatedDisabled; // update in-memory map
           accountsReenabled++;
         }
@@ -59,10 +65,12 @@ async function main() {
         if (disabled.includes(acc.externalId)) {
           console.log(`[Re-enable] Active account ${acc.id} found in disabledAccounts list of SimpleFIN connection ${conn.id}. Re-enabling...`);
           const updatedDisabled = disabled.filter(id => id !== acc.externalId);
-          await db
-            .update(simplifinConnections)
-            .set({ disabledAccounts: updatedDisabled })
-            .where(eq(simplifinConnections.id, conn.id));
+          if (!isDryRun) {
+            await db
+              .update(simplifinConnections)
+              .set({ disabledAccounts: updatedDisabled })
+              .where(eq(simplifinConnections.id, conn.id));
+          }
           conn.disabledAccounts = updatedDisabled; // update in-memory map
           accountsReenabled++;
         }
@@ -94,21 +102,23 @@ async function main() {
       console.log(`[Auto-Repair] Matching mismatched account ${mismatchedAcc.id} with Plaid account ${correctPlaidId}. Upgrading external ID...`);
 
       // Update account's externalId to the correct Plaid ID
-      await db
-        .update(accounts)
-        .set({
-          externalId: correctPlaidId,
-          updatedAt: new Date(),
-        })
-        .where(eq(accounts.id, mismatchedAcc.id));
+      if (!isDryRun) {
+        await db
+          .update(accounts)
+          .set({
+            externalId: correctPlaidId,
+            updatedAt: new Date(),
+          })
+          .where(eq(accounts.id, mismatchedAcc.id));
 
-      // Remove it from the disabled list
-      const updatedDisabled = disabled.filter(id => id !== correctPlaidId);
-      await db
-        .update(plaidConnections)
-        .set({ disabledAccounts: updatedDisabled })
-        .where(eq(plaidConnections.id, conn.id));
-      conn.disabledAccounts = updatedDisabled; // update in-memory map
+        // Remove it from the disabled list
+        const updatedDisabled = disabled.filter(id => id !== correctPlaidId);
+        await db
+          .update(plaidConnections)
+          .set({ disabledAccounts: updatedDisabled })
+          .where(eq(plaidConnections.id, conn.id));
+        conn.disabledAccounts = updatedDisabled; // update in-memory map
+      }
 
       accountsMismatchedFixed++;
       console.log(`[Auto-Repair] Successfully matched and re-enabled account ${mismatchedAcc.id}.`);

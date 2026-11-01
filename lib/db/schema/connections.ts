@@ -50,8 +50,8 @@ export const plaidConnections = pgTable('plaid_connections', {
 export const syncLogs = pgTable('sync_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),
-  connectionId: uuid('connection_id').references(() => simplifinConnections.id),
-  plaidConnectionId: uuid('plaid_connection_id').references(() => plaidConnections.id),
+  connectionId: uuid('connection_id').references(() => simplifinConnections.id, { onDelete: 'cascade' }),
+  plaidConnectionId: uuid('plaid_connection_id').references(() => plaidConnections.id, { onDelete: 'cascade' }),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   status: text('status').notNull(),

@@ -1,4 +1,4 @@
-import { eq, and, inArray, gte, lte } from 'drizzle-orm';
+import { eq, ne, and, inArray, gte, lte } from 'drizzle-orm';
 /**
  * GET /api/paystubs/deposit-report  —  S-2 read-only deposit reconciliation.
  *
@@ -86,12 +86,13 @@ export async function GET() {
             gte(transactions.date, padDate(windowStart, -5)),
             lte(transactions.date, padDate(today, 5)),
             eq(transactions.deleted, false),
+            ne(transactions.source, 'paystub'),
           )
         );
     }
     // Filter in JS: amount is encrypted (string) and may not be comparable in SQL.
     const deposits = (dek ? await decryptRows('transactions', candidateTxns, dek) : candidateTxns)
-      .filter(t => incomeAccounts.includes(t.accountId))
+      .filter(t => incomeAccounts.includes(t.accountId) && t.source !== 'paystub')
       .map(t => ({ ...t, amount: Number(t.amount) }))
       .filter(t => Number.isFinite(t.amount) && t.amount > 0)
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -107,6 +108,8 @@ export async function GET() {
       bestDeposit: { date: string; amount: number; deltaPct: number } | null;
     }> = [];
 
+    const usedTransactionIds = new Set<string>();
+
     for (const stub of stubs) {
       const net = Number(stub.netCurrent) || 0;
       const from = padDate(stub.checkDate, -DATE_WINDOW_DAYS);
@@ -115,6 +118,7 @@ export async function GET() {
       // closest in date to the check date.
       let best: { txn: (typeof deposits)[number]; delta: number } | null = null;
       for (const txn of deposits) {
+        if (usedTransactionIds.has(txn.id)) continue;
         if (txn.date < from || txn.date > to) continue;
         const delta = Math.abs(txn.amount - net);
         if (
@@ -138,6 +142,8 @@ export async function GET() {
         });
         continue;
       }
+
+      usedTransactionIds.add(best.txn.id);
 
       const deltaPct = net !== 0 ? (best.delta / Math.abs(net)) * 100 : 100;
       results.push({

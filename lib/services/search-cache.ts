@@ -174,32 +174,48 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
 
       const transactionsMap = new Map<string, CachedTransaction>();
 
-      // Decrypt search fields for each transaction in parallel batch
-      await Promise.all(
-        result.map(async (row) => {
-          const description = row.description ? await decryptField(row.description, dek) : '';
-          const payee = row.payee ? await decryptField(row.payee, dek) : '';
-          const notes = row.notes ? await decryptField(row.notes, dek) : '';
-          const categoryName = row.categoryName ? await decryptField(row.categoryName, dek) : '';
-          const accountName = row.accountName ? await decryptField(row.accountName, dek) : '';
-          const amount = row.amount ? await decryptField(row.amount, dek) : '0';
+      // Pre-decrypt unique category names and account names
+      const categoryNameMap = new Map<string, string>();
+      const accountNameMap = new Map<string, string>();
+      for (const row of result) {
+        if (row.categoryName && !categoryNameMap.has(row.categoryName)) {
+          categoryNameMap.set(row.categoryName, await decryptField(row.categoryName, dek));
+        }
+        if (row.accountName && !accountNameMap.has(row.accountName)) {
+          accountNameMap.set(row.accountName, await decryptField(row.accountName, dek));
+        }
+      }
 
-          transactionsMap.set(row.id, {
-            description: String(description).toLowerCase(),
-            payee: String(payee).toLowerCase(),
-            notes: String(notes).toLowerCase(),
-            categoryName: String(categoryName).toLowerCase(),
-            accountName: String(accountName).toLowerCase(),
-            amount: String(amount),
-            categoryId: row.categoryId,
-            accountId: row.accountId,
-            date: row.date,
-            ignored: row.ignored ?? false,
-            source: row.source,
-            parentId: row.parentId,
-          });
-        })
-      );
+      // Decrypt search fields for transactions in bounded chunks of 100
+      const chunkSize = 100;
+      for (let i = 0; i < result.length; i += chunkSize) {
+        const chunk = result.slice(i, i + chunkSize);
+        await Promise.all(
+          chunk.map(async (row) => {
+            const description = row.description ? await decryptField(row.description, dek) : '';
+            const payee = row.payee ? await decryptField(row.payee, dek) : '';
+            const notes = row.notes ? await decryptField(row.notes, dek) : '';
+            const categoryName = row.categoryName ? (categoryNameMap.get(row.categoryName) ?? '') : '';
+            const accountName = row.accountName ? (accountNameMap.get(row.accountName) ?? '') : '';
+            const amount = row.amount ? await decryptField(row.amount, dek) : '0';
+
+            transactionsMap.set(row.id, {
+              description: String(description).toLowerCase(),
+              payee: String(payee).toLowerCase(),
+              notes: String(notes).toLowerCase(),
+              categoryName: String(categoryName).toLowerCase(),
+              accountName: String(accountName).toLowerCase(),
+              amount: String(amount),
+              categoryId: row.categoryId,
+              accountId: row.accountId,
+              date: row.date,
+              ignored: row.ignored ?? false,
+              source: row.source,
+              parentId: row.parentId,
+            });
+          })
+        );
+      }
 
       entry.transactions = transactionsMap;
       entry.status = 'ready';

@@ -121,7 +121,10 @@ export function useThemeColors() {
       for (const mutation of mutations) {
         if (
           mutation.type === 'attributes' &&
-          (mutation.attributeName === 'class' || mutation.attributeName === 'data-theme')
+          (mutation.attributeName === 'class' ||
+            mutation.attributeName === 'data-theme' ||
+            mutation.attributeName === 'data-chart-scheme' ||
+            mutation.attributeName === 'style')
         ) {
           updateColors();
           break;

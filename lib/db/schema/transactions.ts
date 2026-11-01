@@ -70,6 +70,7 @@ export const transactions = pgTable(
     index('transactions_user_account_idx').on(t.userId, t.accountId),
     index('transactions_user_category_idx').on(t.userId, t.categoryId),
     index('transactions_user_deleted_idx').on(t.userId, t.deleted),
+    index('transactions_user_del_date_idx').on(t.userId, t.deleted, t.date),
   ]
 );
 

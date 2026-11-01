@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 const DEFAULTS: {
   global: boolean;
@@ -17,21 +18,37 @@ const DEFAULTS: {
 };
 
 export function useImportedData() {
-  const [settings, setSettings] = useState<typeof DEFAULTS>(DEFAULTS);
-  const [loading, setLoading] = useState(true);
+  const userSettingsCtx = useUserSettings();
+
+  const [localSettings, setLocalSettings] = useState<typeof DEFAULTS>(DEFAULTS);
+  const [localLoading, setLocalLoading] = useState(!userSettingsCtx);
 
   useEffect(() => {
+    if (userSettingsCtx) return;
     fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        const s = data.showImportedData;
+        const s = data?.showImportedData;
         if (s && typeof s === 'object') {
-          setSettings({ ...DEFAULTS, ...s });
+          setLocalSettings({ ...DEFAULTS, ...s });
         }
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setLocalLoading(false));
+  }, [userSettingsCtx]);
+
+  const settings = useMemo(() => {
+    if (userSettingsCtx) {
+      const s = userSettingsCtx.settings?.showImportedData;
+      if (s && typeof s === 'object') {
+        return { ...DEFAULTS, ...s };
+      }
+      return DEFAULTS;
+    }
+    return localSettings;
+  }, [userSettingsCtx, userSettingsCtx?.settings?.showImportedData, localSettings]);
+
+  const loading = userSettingsCtx ? userSettingsCtx.loading : localLoading;
 
   const isEnabled = useCallback(
     (module: keyof typeof DEFAULTS) => {
@@ -46,7 +63,13 @@ export function useImportedData() {
     async (next: Partial<typeof DEFAULTS>) => {
       const prev = settings;
       const merged = { ...prev, ...next };
-      setSettings(merged);
+
+      if (userSettingsCtx) {
+        await userSettingsCtx.updateSetting('showImportedData', merged);
+        return;
+      }
+
+      setLocalSettings(merged);
       try {
         const res = await fetch('/api/user-settings', {
           method: 'PATCH',
@@ -56,10 +79,10 @@ export function useImportedData() {
         });
         if (!res.ok) throw new Error('Failed to save');
       } catch {
-        setSettings(prev);
+        setLocalSettings(prev);
       }
     },
-    [settings]
+    [settings, userSettingsCtx]
   );
 
   return { settings, loading, isEnabled, updateSettings };

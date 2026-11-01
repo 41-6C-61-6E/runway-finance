@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PersistQueryClientProvider, type Persister, type PersistedClient } from '@tanstack/react-query-persist-client';
 import { get, set, del } from 'idb-keyval';
+import { clearFetchCache } from '@/lib/fetch-cache';
 import { useState, useMemo, type ReactNode } from 'react';
 
 const IDB_PERSIST_KEY = 'RUNWAY_FINANCE_QUERY_CACHE';
@@ -83,17 +84,28 @@ export async function clearQueryPersistence(idbKey: string = IDB_PERSIST_KEY) {
  */
 export async function clearAllClientCaches() {
   await clearQueryPersistence();
+  clearFetchCache();
   try {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      const cacheKeys = await caches.keys();
-      await Promise.all([
-        ...cacheKeys.map((k) => caches.delete(k)),
-        ...regs.map((r) => r.unregister()),
-      ]);
+    if (typeof window !== 'undefined') {
+      const keysToClear = Object.keys(localStorage).filter(
+        (k) => k.startsWith('finance-') || k.startsWith('pf_') || k.startsWith('cf-chart:') || k.startsWith('runway-')
+      );
+      for (const k of keysToClear) {
+        localStorage.removeItem(k);
+      }
+      sessionStorage.clear();
+
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        const cacheKeys = await caches.keys();
+        await Promise.all([
+          ...cacheKeys.map((k) => caches.delete(k)),
+          ...regs.map((r) => r.unregister()),
+        ]);
+      }
     }
   } catch (err) {
-    console.error('[QueryPersist] Error clearing service-worker caches:', err);
+    console.error('[QueryPersist] Error clearing client caches:', err);
   }
 }
 

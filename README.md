@@ -149,7 +149,7 @@ Manage your personal finance on the go with a fully optimized mobile responsive 
 - **Real Estate** — Property portfolio tracking with equity-over-time charts, allocation views, and integration with FRED/Redfin APIs for valuations.
 - **Investments** — Comprehensive investments tracker for stocks, mutual funds, and crypto holdings, with live stock quotes, cost basis calculations, unrealized gain/loss tracking, and tax breakdowns.
 - **Goals** — Track savings goals with progress percentages, reserve calculations, and goal allocation/projections.
-- **Plans** — Planning and projections engine (coming soon).
+- **Plans & FIRE Engine** — Comprehensive retirement and FIRE planning engine featuring Monte Carlo stochastic simulations, historical sequence-of-returns stress testing, IRS/state tax projections, ACA subsidy benchmarking, IRMAA surcharge tiers, and Roth conversion ladder optimization.
 
 ### 🔒 Security, Privacy & Sharing
 - **Authentication** — Single-user credentials via NextAuth v5 with bcrypt password hashing (optional Google OAuth).
@@ -269,10 +269,14 @@ All variables are defined in `.env.example`. For local development copy it to `.
 | `DATABASE_URL` | ✅ | — | PostgreSQL connection string |
 | `POSTGRES_PASSWORD` | ✅ | — | Password for the PostgreSQL `postgres` user (used by docker compose) |
 | `ENCRYPTION_KEY` | ✅ | — | 64-char hex key for AES-256-GCM encryption |
-| `ALLOW_REGISTRATION` | ✅ | `true` | Set to `false` after creating the first user |
-| `REGISTRATION_PIN` | ❌ | — | PIN required for new account creation |
+| `ALLOW_REGISTRATION` | ❌ | `false` | Registration is CLOSED BY DEFAULT. Set to `true` only to open standalone signups. |
+| `REGISTRATION_PIN` | ❌ | — | Optional PIN required for new account creation (>= 8 chars) |
 | `FRED_API_KEY` | ❌ | — | Federal Reserve Economic Data API key (optional — for historical home price estimation) |
+| `RENTCAST_API_KEY` | ❌ | — | RentCast API key (optional — for real estate property valuation) |
 | `BUG_REPORTING` | ❌ | `false` | Enable collaborative bug reporting dropdown |
+| `LOG_LEVEL` | ❌ | `info` | Active logging level (`debug`, `info`, `warn`, `error`) |
+| `ENABLE_HTTPS_UPGRADE` | ❌ | `false` | Force browser HTTPS upgrade header (enable only behind reverse proxy with TLS) |
+| `RATE_LIMIT_TRUST_PROXY`| ❌ | `false` | Trust X-Real-IP from reverse proxy for IP rate limiting |
 | `GOOGLE_CLIENT_ID` | ❌ | — | Google OAuth client ID (optional) |
 | `GOOGLE_CLIENT_SECRET` | ❌ | — | Google OAuth client secret (optional) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`| ❌ | — | VAPID public key (optional — for web push notifications) |
@@ -330,7 +334,7 @@ Build and deploy the full stack with Docker Compose:
 
 ```bash
 # Build the Docker image
-docker build -t alanracek/personal-finance:latest .
+docker build -t alanracek/personal-finance:2026.10.0 .
 
 # Start the full stack (PostgreSQL + app)
 docker compose up -d
@@ -350,7 +354,7 @@ docker run -p 3001:3000 personal-finance
 | Service | Image | Port | Purpose |
 |---|---|---|---|
 | `finance-db` | `postgres:16-alpine` | `5432` | PostgreSQL database (persistent volume) |
-| `finance-app` | `alanracek/personal-finance:latest` | `3001` | Next.js application |
+| `finance-app` | `alanracek/personal-finance:2026.10.0` | `3001` | Next.js application |
 
 ---
 
@@ -384,29 +388,36 @@ The database schema is defined across files in `lib/db/schema/` using Drizzle OR
 
 | Table | Purpose |
 |---|---|
-| `user`, `session`, `account`, `verification` | NextAuth core tables |
-| `user_settings` | User preferences (currency, locale, theme, privacy mode, chart visibility, etc.) |
+| `users` | Primary user accounts (username, password hash, token version) |
+| `user_encryption_keys` | Envelope-encrypted user Data Encryption Keys (DEKs) wrapped by master key |
+| `user`, `session`, `account`, `verification` | NextAuth core session & auth tables |
+| `user_settings` | User preferences (currency, theme, privacy mode, chart visibility, alerts, AI settings) |
 | `simplefin_connections` | SimpleFIN Bridge connections (encrypted access URLs) |
 | `plaid_connections` | Plaid account sync connections |
-| `sync_logs` | SimpleFIN/Plaid sync operation history |
-| `accounts` | Financial accounts (checking, savings, investment, credit, loan, etc.) |
-| `holdings`, `holding_snapshots` | Stock, mutual fund, and crypto holdings and balance history |
-| `transactions` | Transaction records with categories, tags, and bank metadata |
-| `categories` | Transaction categories with color and icon support |
-| `tags` | Custom tags for budgets, goals, and transactions |
-| `category_rules` | Auto-categorization rules |
+| `sync_logs` | SimpleFIN/Plaid sync operation history and diagnostic records |
+| `accounts` | Financial accounts (checking, savings, investment, credit, loan, mortgage, vehicle) |
+| `holdings`, `holding_snapshots` | Stock, mutual fund, and crypto holdings and valuation history |
+| `equity_grants` | Private and public company equity grants (ISO, NSO, RSU, Common) and vesting schedules |
+| `transactions` | Transaction records with categories, tags, splits, and provider metadata |
+| `recurring_transactions` | Detected and confirmed recurring bills, subscriptions, and scheduled income |
+| `categories` | Transaction categories with color, icon, and hierarchical parent support |
+| `tags`, `transaction_tags`, `account_tags`, `budget_tags`, `goal_tags` | Custom tags and entity junction mappings |
+| `category_rules` | Auto-categorization engine rules and merchant matching patterns |
 | `net_worth_snapshots` | Daily aggregated net worth history |
 | `account_snapshots` | Per-account balance history over time |
 | `monthly_cash_flow` | Pre-aggregated monthly income/expense summaries |
 | `category_spending_summary` | Monthly spending by category |
 | `category_income_summary` | Monthly income by category |
-| `budgets` | Category-based budgets |
-| `financial_goals` | Savings goals with targets and progress |
-| `goal_allocation_history` | Account balance allocation snapshots towards financial goals |
-| `paystubs`, `paystub_line_items`, `paystub_field_mappings` | Payroll paystub entries, line items, and template parsers |
-| `custom_alert_rules`, `sent_notifications`, `push_subscriptions` | Web push subscriptions and custom conditional alerting engine triggers |
-| `ai_proposals` | AI-generated categorization/insight suggestions |
-| `ai_providers` | AI/LLM endpoint configurations |
+| `budgets` | Category-based budgets and period spending ceilings |
+| `financial_goals`, `goal_allocation_history` | Savings goals with targets, reserves, and account funding allocations |
+| `plans`, `plan_accounts`, `plan_liabilities`, `plan_events`, `plan_flows`, `plan_settings` | FIRE & retirement planning scenario engine, timeline events, and simulation settings |
+| `retirement_rules`, `system_tax_rules` | Statutory IRS tax brackets, standard deductions, and annual retirement limits |
+| `paystubs`, `paystub_line_items`, `paystub_field_mappings`, `paystub_auto_generate_settings` | Payroll paystub tracking, deduction mapping, and generation rules |
+| `custom_alert_rules`, `sent_notifications`, `user_notifications`, `push_subscriptions` | Web push subscriptions, custom alert criteria, and notification inbox |
+| `ai_proposals`, `ai_providers` | AI-generated transaction categorization proposals and LLM endpoint configurations |
+| `rate_limits` | Atomic distributed rate-limiting buckets |
+| `issues` | Bug reports and feedback tracking |
+| `scheduler_job_logs` | Background scheduler execution audit log |
 
 ### Managing Migrations
 

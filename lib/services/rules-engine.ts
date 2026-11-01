@@ -136,25 +136,36 @@ export async function applyRulesToTransactions(
   const txsWithTags = new Set(existingTags.map((t) => t.transactionId));
 
   for (const tx of txns) {
+    let catApplied = false;
+    let tagApplied = false;
+    const hasTags = txsWithTags.has(tx.id);
+
     for (const rule of decryptedRules) {
       const match = evaluateCondition(rule, tx);
       if (match) {
-        const hasTags = txsWithTags.has(tx.id);
-        const shouldUpdateCategory = !tx.categoryId || rule.overrideExisting;
-        const shouldUpdateTags = rule.setTagId ? (!hasTags || rule.overrideExisting) : false;
+        const ruleWantsCat = Boolean(rule.setCategoryId || rule.setPayee || rule.setReviewed !== null);
+        const shouldUpdateCategory = !catApplied && ruleWantsCat && (!tx.categoryId || rule.overrideExisting);
+        const shouldUpdateTags = !tagApplied && Boolean(rule.setTagId) && (!hasTags || rule.overrideExisting);
 
         if (shouldUpdateCategory || shouldUpdateTags) {
+          const current = results.get(tx.id);
           results.set(tx.id, {
-            categoryId: shouldUpdateCategory ? rule.setCategoryId : tx.categoryId,
-            payee: shouldUpdateCategory ? (rule.setPayee ?? null) : tx.payee,
-            reviewed: shouldUpdateCategory ? (rule.setReviewed ?? null) : null,
-            setTagId: rule.setTagId ?? null,
-            overrideExisting: !!rule.overrideExisting,
-            shouldUpdateTags,
-            shouldUpdateCategory,
+            categoryId: shouldUpdateCategory ? rule.setCategoryId : (current?.categoryId ?? tx.categoryId),
+            payee: shouldUpdateCategory ? (rule.setPayee ?? null) : (current?.payee ?? tx.payee),
+            reviewed: shouldUpdateCategory ? (rule.setReviewed ?? null) : (current?.reviewed ?? null),
+            setTagId: shouldUpdateTags ? (rule.setTagId ?? null) : (current?.setTagId ?? null),
+            overrideExisting: Boolean(current?.overrideExisting || rule.overrideExisting),
+            shouldUpdateTags: Boolean(current?.shouldUpdateTags || shouldUpdateTags),
+            shouldUpdateCategory: Boolean(current?.shouldUpdateCategory || shouldUpdateCategory),
           } as any);
+
+          if (shouldUpdateCategory) catApplied = true;
+          if (shouldUpdateTags) tagApplied = true;
+
+          if (catApplied && tagApplied) {
+            break;
+          }
         }
-        break;
       }
     }
   }

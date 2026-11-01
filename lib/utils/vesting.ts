@@ -136,7 +136,7 @@ export interface GrantValuationMetrics {
  */
 export function addMonthsDateStr(dateStr: string, monthsToAdd: number): string {
   const parts = dateStr.split('-').map(Number);
-  const year = parts[0] || 2026;
+  const year = parts[0] || new Date().getUTCFullYear();
   const monthIdx = (parts[1] || 1) - 1;
   const day = parts[2] || 1;
 
@@ -476,14 +476,16 @@ export function computeGrantMetrics(
       ? Math.round(heldExercisedShares * fmvSharePrice * 100) / 100
       : Math.round(heldExercisedShares * strikePrice * 100) / 100;
 
-  // Tax / AMT calculations for exercising currently unexercised vested shares
+  // Tax / AMT calculations for exercising currently unexercised vested shares.
+  // Under IRC §83(b), an 83(b) election cannot legally apply to unexercised options.
+  // Exercising unexercised options always triggers AMT preference (ISO) or ordinary income (NSO).
   const isoAmtBargainElement =
-    grant.grantType === 'iso' && !grant.filed83b
+    grant.grantType === 'iso'
       ? Math.round(unexercisedVestedShares * fmvSpreadPerShare * 100) / 100
       : 0;
 
   const nsoOrdinaryIncomeSpread =
-    grant.grantType === 'nso' && !grant.filed83b
+    grant.grantType === 'nso'
       ? Math.round(unexercisedVestedShares * fmvSpreadPerShare * 100) / 100
       : 0;
 

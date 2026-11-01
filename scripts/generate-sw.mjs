@@ -60,7 +60,7 @@ try {
 
   let fileHistory = [];
   try {
-    const existingInfoPath = path.join(__dirname, '../public/version-info.json');
+    const existingInfoPath = path.join(__dirname, '../lib/generated/version-info.json');
     if (fs.existsSync(existingInfoPath)) {
       const existingInfo = JSON.parse(fs.readFileSync(existingInfoPath, 'utf8'));
       if (existingInfo && Array.isArray(existingInfo.history)) {
@@ -114,12 +114,25 @@ try {
     history,
   };
 
+  const outDir = path.join(__dirname, '../lib/generated');
+  if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir, { recursive: true });
+  }
+
   fs.writeFileSync(
-    path.join(__dirname, '../public/version-info.json'),
+    path.join(outDir, 'version-info.json'),
     JSON.stringify(versionInfo, null, 2),
     'utf8'
   );
-  console.log('Successfully generated version-info.json');
+
+  // Clean up legacy public/version-info.json to prevent unauthenticated PII leakage
+  const legacyPath = path.join(__dirname, '../public/version-info.json');
+  if (fs.existsSync(legacyPath)) {
+    try {
+      fs.unlinkSync(legacyPath);
+    } catch {}
+  }
+  console.log('Successfully generated lib/generated/version-info.json');
 } catch (err) {
   console.error('Error generating sw.js:', err);
   process.exit(1);

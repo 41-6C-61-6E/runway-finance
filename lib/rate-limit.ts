@@ -102,6 +102,25 @@ export async function checkGlobalRateLimit(bucket: string, maxRequests: number, 
   return checkRateLimit(`rl:global:${bucket}`, maxRequests, windowMs);
 }
 
+/**
+ * Prunes rate limits whose window is older than the retention threshold (default 1 day).
+ */
+export async function pruneRateLimits(retentionMs = 24 * 60 * 60 * 1000): Promise<number> {
+  const pool = getPool();
+  if (!pool || typeof pool.query !== 'function') return 0;
+  try {
+    const cutoffSecs = retentionMs / 1000;
+    const res = await pool.query(
+      `DELETE FROM "rate_limits" WHERE "window_start" < NOW() - make_interval(secs => $1)`,
+      [cutoffSecs]
+    );
+    return res.rowCount || 0;
+  } catch (err) {
+    logger.debug('[rate-limit] Failed to prune rate_limits table:', err);
+    return 0;
+  }
+}
+
 // Single atomic upsert: increments within the window, resets otherwise.
 // RETURNING gives the post-update count, so concurrent requests are safe.
 const RATE_LIMIT_UPSERT_SQL = `

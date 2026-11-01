@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { transactions, transactionTags } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { transactions, transactionTags, tags } from '@/lib/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 import { SplitTransactionSchema } from '@/lib/validations/transaction';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, encryptRow } from '@/lib/crypto';
 import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+import { invalidateUserServerCache } from '@/lib/server-cache';
 
 export async function POST(
   request: Request,
@@ -149,6 +150,17 @@ export async function POST(
         .set({ ignored: true, reviewed: true, updatedAt: new Date() })
         .where(eq(transactions.id, id));
 
+      // Pre-validate that all requested tag IDs belong to the authenticated user
+      const allRequestedTagIds = Array.from(new Set(splits.flatMap((s: any) => s.tagIds || []).filter(Boolean)));
+      let validTagIds = new Set<string>();
+      if (allRequestedTagIds.length > 0) {
+        const userTags = await tx
+          .select({ id: tags.id })
+          .from(tags)
+          .where(and(eq(tags.userId, userId), inArray(tags.id, allRequestedTagIds)));
+        validTagIds = new Set(userTags.map((t) => t.id));
+      }
+
       // 4. Create and encrypt child transactions
       for (let i = 0; i < splits.length; i++) {
         const split = splits[i];
@@ -195,9 +207,10 @@ export async function POST(
           .values(encryptedChild)
           .returning();
 
-        if (split.tagIds && split.tagIds.length > 0) {
+        const safeTagIds = (split.tagIds || []).filter((tagId: string) => validTagIds.has(tagId));
+        if (safeTagIds.length > 0) {
           await tx.insert(transactionTags).values(
-            split.tagIds.map((tagId) => ({
+            safeTagIds.map((tagId: string) => ({
               transactionId: insertedChild.id,
               tagId,
             }))
@@ -209,6 +222,7 @@ export async function POST(
     });
 
     invalidateUserSearchCache(userId);
+    invalidateUserServerCache(userId);
 
     // Rebuild summaries asynchronously
     Promise.all([

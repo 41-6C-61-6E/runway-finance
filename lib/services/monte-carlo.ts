@@ -10,6 +10,8 @@ export interface MonteCarloOptions {
   adjustForInflation: boolean; // true = Real Today's Dollars, false = Nominal
   fixedInflationRate?: number; // e.g. 3.0 for 3%
   randomFn?: () => number; // Optional deterministic RNG for testing
+  dividendYield?: number; // Optional custom dividend yield
+  startYear?: number; // Optional starting year for historical_sequence
 }
 
 export interface MonteCarloTrialResult {
@@ -66,15 +68,21 @@ export function runMonteCarloSimulation(
 
     // Generate yearly return sequence for this trial
     const yearlyMarketData: Array<{ growth: number; dividend: number }> = [];
+    const yearlyInflationData: number[] = [];
+    const foundStartIdx = options.startYear !== undefined
+      ? HISTORICAL_RETURNS_DATA.findIndex((h) => h.year === options.startYear)
+      : -1;
     const histSequenceStartIdx = model === 'historical_sequence'
-      ? Math.floor(rng() * HISTORICAL_RETURNS_DATA.length)
+      ? (foundStartIdx >= 0 ? foundStartIdx : Math.floor(rng() * HISTORICAL_RETURNS_DATA.length))
       : 0;
 
     for (let y = 0; y < totalYears; y++) {
       if (model === 'constant') {
-        const divYield = Math.min(0.015, Math.max(0, meanReturn));
-        const priceGrowth = meanReturn - divYield;
+        // WS-02-F18: In constant mode, price growth = meanReturn and divYield is added on top, aligning with deterministic engine
+        const divYield = options.dividendYield !== undefined ? options.dividendYield : 0.02;
+        const priceGrowth = meanReturn;
         yearlyMarketData.push({ growth: priceGrowth, dividend: divYield });
+        yearlyInflationData.push(inflationRate);
       } else if (model === 'normal_distribution') {
         const u1 = rng() || 0.0001;
         const u2 = rng() || 0.0001;
@@ -83,14 +91,17 @@ export function runMonteCarloSimulation(
         const boundedReturn = Math.max(-0.35, Math.min(0.45, randomReturn));
         
         // 1.5% dividend yield, price growth = boundedReturn - 1.5% (Total Return = boundedReturn)
-        const divYield = Math.min(0.015, Math.max(0, boundedReturn));
+        const divYield = Math.min(options.dividendYield ?? 0.015, Math.max(0, boundedReturn));
         const priceGrowth = boundedReturn - divYield;
         yearlyMarketData.push({ growth: priceGrowth, dividend: divYield });
+        yearlyInflationData.push(inflationRate);
       } else if (model === 'historical_sequence') {
         const histIndex = (histSequenceStartIdx + y) % HISTORICAL_RETURNS_DATA.length;
         const histData = HISTORICAL_RETURNS_DATA[histIndex];
 
-        const stockPriceGrowth = histData.stocksGrowth - histData.stocksYield;
+        // Stock Total Return = histData.stocksGrowth (price) + histData.stocksYield (dividend)
+        // WS-02-F01: stocksGrowth is already price appreciation, do not subtract stocksYield
+        const stockPriceGrowth = histData.stocksGrowth;
         const stockDivYield = histData.stocksYield;
 
         const bondPriceGrowth = histData.bondsGrowth;
@@ -100,13 +111,14 @@ export function runMonteCarloSimulation(
         const blendedDivYield = equityRatio * stockDivYield + bondRatio * bondYield;
 
         yearlyMarketData.push({ growth: blendedPriceGrowth, dividend: blendedDivYield });
+        yearlyInflationData.push(histData.inflationRate);
       } else {
         const randomIndex = Math.floor(rng() * HISTORICAL_RETURNS_DATA.length);
         const histData = HISTORICAL_RETURNS_DATA[randomIndex];
 
-        // Stock Total Return = histData.stocksGrowth (price + dividend)
-        // Bond Total Return = histData.bondsGrowth + histData.bondsYield
-        const stockPriceGrowth = histData.stocksGrowth - histData.stocksYield;
+        // Stock Total Return = histData.stocksGrowth (price) + histData.stocksYield (dividend)
+        // WS-02-F01: stocksGrowth is already price appreciation, do not subtract stocksYield
+        const stockPriceGrowth = histData.stocksGrowth;
         const stockDivYield = histData.stocksYield;
 
         const bondPriceGrowth = histData.bondsGrowth;
@@ -116,8 +128,16 @@ export function runMonteCarloSimulation(
         const blendedDivYield = equityRatio * stockDivYield + bondRatio * bondYield;
 
         yearlyMarketData.push({ growth: blendedPriceGrowth, dividend: blendedDivYield });
+        yearlyInflationData.push(histData.inflationRate);
       }
     }
+
+    // WS-02-F17: Pass historical inflation sequence to engine settings
+    trialPlan.settings = {
+      ...trialPlan.settings,
+      fixedInflationRate: trialPlan.settings?.fixedInflationRate ?? 3.0,
+      yearlyInflationRates: yearlyInflationData,
+    };
 
     const yearGrowthFn = (yearOffset: number, acc: EngineAccount) => {
       const isMarketAsset = acc.type === 'taxable' || acc.type === 'crypto' || acc.type.includes('ira') || acc.type.includes('401k') || acc.type === 'hsa';
@@ -133,9 +153,17 @@ export function runMonteCarloSimulation(
 
     const simRes = runRetirementSimulation(trialPlan, yearGrowthFn);
 
+    // Compute cumulative discount factors for inflation adjustment
+    const cumulativeDiscountFactors: number[] = [1.0];
+    let runningDiscount = 1.0;
+    for (let i = 0; i < totalYears; i++) {
+      runningDiscount *= (1 + (yearlyInflationData[i] ?? inflationRate));
+      cumulativeDiscountFactors.push(runningDiscount);
+    }
+
     const yearlyNetWorthProcessed = simRes.yearlyResults.map((y, idx) => {
       if (adjustForInflation) {
-        const discountFactor = Math.pow(1 + inflationRate, idx);
+        const discountFactor = cumulativeDiscountFactors[idx] ?? Math.pow(1 + inflationRate, idx);
         return y.netWorth / discountFactor;
       }
       return y.netWorth;

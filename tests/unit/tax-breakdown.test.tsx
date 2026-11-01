@@ -106,6 +106,45 @@ describe('TaxBreakdown Component', () => {
     expect(screen.getByText('$7,000')).toBeDefined();
   });
 
+  it('WS-03-F03: classifies roth_ira and retirement accounts named Roth IRA consistently as Tax-Free', () => {
+    const mockAccounts = [
+      {
+        id: 'acc_1',
+        name: 'Vanguard Roth IRA',
+        type: 'retirement',
+        balance: 50000,
+        institution: 'Vanguard',
+        metadata: null,
+      },
+      {
+        id: 'acc_2',
+        name: 'Fidelity Roth',
+        type: 'roth_ira',
+        balance: 25000,
+        institution: 'Fidelity',
+        metadata: null,
+      },
+      {
+        id: 'acc_3',
+        name: 'Traditional Rollover IRA',
+        type: 'traditional_ira',
+        balance: 100000,
+        institution: 'Schwab',
+        metadata: null,
+      },
+    ];
+
+    render(<TaxBreakdown accounts={mockAccounts} />);
+
+    // Tax-Free: 50,000 + 25,000 = 75,000
+    expect(screen.getByText('Tax-Free')).toBeDefined();
+    expect(screen.getByText('$75,000')).toBeDefined();
+
+    // Tax-Deferred: 100,000
+    expect(screen.getByText('Tax-Deferred')).toBeDefined();
+    expect(screen.getByText('$100,000')).toBeDefined();
+  });
+
   it('renders scorecard style conventions including portfolio balance hero metric and distribution', () => {
     const mockAccounts = [
       {

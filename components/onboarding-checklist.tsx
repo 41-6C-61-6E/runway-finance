@@ -21,13 +21,12 @@ const initialState: ChecklistState = {
 export function OnboardingChecklist() {
   const [state, setState] = useState<ChecklistState>(initialState);
   const [loading, setLoading] = useState(true);
-  const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
+  const [dismissed, setDismissed] = useState(() => {
     if (typeof window !== 'undefined') {
-      setDismissed(localStorage.getItem('onboarding-checklist-dismissed') === 'true');
+      return localStorage.getItem('onboarding-checklist-dismissed') === 'true';
     }
-  }, []);
+    return false;
+  });
 
   function dismiss() {
     localStorage.setItem('onboarding-checklist-dismissed', 'true');
@@ -35,9 +34,19 @@ export function OnboardingChecklist() {
   }
 
   useEffect(() => {
+    if (dismissed) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function load() {
+      if (typeof window !== 'undefined' && localStorage.getItem('onboarding-checklist-dismissed') === 'true') {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
       try {
         const [accountsRes, budgetsRes, goalsRes, plansRes, settingsRes] = await Promise.all([
           fetch('/api/accounts', { credentials: 'include' }),

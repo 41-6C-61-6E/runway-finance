@@ -116,11 +116,13 @@ export function buildSyncAlertMessage(
  * first (plaintext institution name), then SimpleFIN (account institution).
  * Returns null when unknown — the alert falls back to a generic title.
  */
-export async function getConnectionDisplayName(connectionId: string): Promise<string | null> {
+export async function getConnectionDisplayName(connectionId: string, dek?: Uint8Array): Promise<string | null> {
   try {
     const db = getDb();
     const { plaidConnections, simplifinConnections, accounts } = await import('@/lib/db/schema');
     const { and, or } = await import('drizzle-orm');
+    const { decryptField } = await import('@/lib/crypto');
+    const { getServerDEK } = await import('@/lib/crypto-context');
 
     const [plaid] = await db
       .select({ institutionName: plaidConnections.institutionName })
@@ -130,7 +132,7 @@ export async function getConnectionDisplayName(connectionId: string): Promise<st
     if (plaid?.institutionName) return plaid.institutionName;
 
     const [sf] = await db
-      .select({ userId: simplifinConnections.userId })
+      .select({ userId: simplifinConnections.userId, label: simplifinConnections.label })
       .from(simplifinConnections)
       .where(eq(simplifinConnections.id, connectionId))
       .limit(1);
@@ -147,9 +149,30 @@ export async function getConnectionDisplayName(connectionId: string): Promise<st
           )
         )
         .limit(3);
-      const institutions = Array.from(new Set(accountRows.map((a) => a.institution).filter(Boolean))) as string[];
+
+      const resolvedDek = dek || (sf.userId ? await getServerDEK(sf.userId).catch(() => null) : null);
+      const decryptedInstitutions: string[] = [];
+
+      for (const a of accountRows) {
+        if (!a.institution) continue;
+        if (a.institution.startsWith('aes256gcm:')) {
+          if (resolvedDek) {
+            try {
+              const decrypted = await decryptField(a.institution, resolvedDek);
+              if (decrypted && !decrypted.startsWith('aes256gcm:')) {
+                decryptedInstitutions.push(decrypted);
+              }
+            } catch {}
+          }
+        } else {
+          decryptedInstitutions.push(a.institution);
+        }
+      }
+
+      const institutions = Array.from(new Set(decryptedInstitutions.filter(Boolean)));
       if (institutions.length === 1) return institutions[0];
       if (institutions.length > 1) return `${institutions.length} institutions`;
+      if (sf.label) return sf.label;
     }
 
     return null;

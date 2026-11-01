@@ -10,6 +10,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptField, decryptRow, encryptRow, decryptRows } from '@/lib/crypto';
 import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries, triggerUserSummariesRebuild } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+import { invalidateUserServerCache } from '@/lib/server-cache';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -253,18 +254,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .returning();
     updated = res;
 
-    // Replace tags if provided
+    // Replace tags if provided (scoped to user's tags to prevent IDOR)
     if (tagIds !== undefined) {
       await tx.delete(transactionTags).where(eq(transactionTags.transactionId, id));
       if (tagIds.length > 0) {
-        await tx.insert(transactionTags).values(
-          tagIds.map((tagId) => ({ transactionId: id, tagId }))
-        );
+        const userTags = await tx
+          .select({ id: tags.id })
+          .from(tags)
+          .where(and(eq(tags.userId, userId), inArray(tags.id, tagIds)));
+        const validTagIds = new Set(userTags.map((t) => t.id));
+        const safeTagIds = tagIds.filter((t) => validTagIds.has(t));
+        if (safeTagIds.length > 0) {
+          await tx.insert(transactionTags).values(
+            safeTagIds.map((tagId) => ({ transactionId: id, tagId }))
+          );
+        }
       }
     }
   });
 
   invalidateUserSearchCache(userId);
+  invalidateUserServerCache(userId);
 
   // Rebuild summaries since categories/transactions changed (coalesced background task)
   if (dek) {
@@ -333,6 +343,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   });
 
   invalidateUserSearchCache(userId);
+  invalidateUserServerCache(userId);
 
   // Rebuild summaries since categories/transactions changed (coalesced background task)
   if (dek) {

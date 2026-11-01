@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, Fragment, useRef } fr
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterBudgetChange } from '@/lib/query-invalidation';
 import { useBudgetPeriod } from './budget-period-selector';
 import { BudgetFormDialog } from './budget-form-dialog';
 import { AutoBudgetDialog } from './auto-budget-dialog';
@@ -233,7 +234,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
       const res = await fetch('/api/budgets?action=reset', { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error('Failed to reset budgets');
       toast.success('All budgets reset successfully');
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      invalidateAfterBudgetChange(queryClient);
       setConfirmResetOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to reset budgets');
@@ -245,10 +246,10 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const handlePurgeHistory = async () => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/budgets?action=purge_history&periodKey=${periodKey}', { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(`/api/budgets?action=purge_history&periodKey=${encodeURIComponent(periodKey)}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error('Failed to remove budget history');
       toast.success('Budget history prior to current period removed');
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      invalidateAfterBudgetChange(queryClient);
       setConfirmPurgeHistoryOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to remove budget history');

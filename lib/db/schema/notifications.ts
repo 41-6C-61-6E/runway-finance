@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, jsonb, boolean, index } from 'drizzle-orm/pg-core';
 
 // ── Push Subscriptions ────────────────────────────────────────────────────────
 // Stores device-specific push subscriptions for users
@@ -96,15 +96,21 @@ export const customAlertRules = pgTable('custom_alert_rules', {
 
 // ── Persistent User Notifications Inbox ───────────────────────────────────────
 // Stores individual user notifications with status tracking
-export const userNotifications = pgTable('user_notifications', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').notNull(),
-  title: text('title').notNull(),
-  body: text('body').notNull(),
-  urlPath: text('url_path'),
-  type: text('type').notNull(), // 'budget_alert' | 'sync_error' | 'large_transaction' | 'generic'
-  isRead: boolean('is_read').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  readAt: timestamp('read_at', { withTimezone: true }),
-});
+export const userNotifications = pgTable(
+  'user_notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    urlPath: text('url_path'),
+    type: text('type').notNull(), // 'budget_alert' | 'sync_error' | 'large_transaction' | 'generic'
+    isRead: boolean('is_read').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp('read_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('idx_user_notifications_user_read').on(t.userId, t.isRead, t.createdAt),
+  ]
+);
 

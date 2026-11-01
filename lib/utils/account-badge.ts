@@ -1,4 +1,5 @@
 import { TYPE_HIERARCHY } from '@/lib/constants/account-types';
+import { isLiabilityAccount } from '@/lib/utils/account-scope';
 
 export function getBadgeClasses(type: string): string {
   const lowerType = type.toLowerCase();
@@ -8,7 +9,7 @@ export function getBadgeClasses(type: string): string {
   if (lowerType === 'checking' || lowerType === 'savings' || lowerType === 'cash') {
     return 'badge-pill badge-banking';
   }
-  if (lowerType === 'credit' || lowerType === 'loan' || lowerType === 'mortgage' || lowerType === 'liability') {
+  if (isLiabilityAccount(lowerType)) {
     return 'badge-pill badge-credit';
   }
   

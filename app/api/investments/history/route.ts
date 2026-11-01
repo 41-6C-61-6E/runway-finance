@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, accountSnapshots, userSettings, transactions } from '@/lib/db/schema';
+import { accounts, accountSnapshots, userSettings, transactions, categories } from '@/lib/db/schema';
 import { eq, and, gte, lte, lt, desc, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
@@ -9,6 +9,7 @@ import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows, decryptField } from '@/lib/crypto';
 import { filterReportableAccounts, isInvestmentAccount } from '@/lib/utils/account-scope';
 import { getDateRange, type TimeFrame, formatInTimezone } from '@/lib/utils/timeframe';
+import { filterAndClassifyCashFlow } from '@/lib/finance/investments-twr';
 
 const LOG_TAG = '[api-investments-history]';
 
@@ -125,9 +126,14 @@ export async function GET(request: Request) {
     // 5. Fetch transactions in range to compute daily net cash flows for TWR
     const inRangeTransactions = await getDb()
       .select({
+        id: transactions.id,
         date: transactions.date,
         amount: transactions.amount,
+        description: transactions.description,
+        payee: transactions.payee,
         accountId: transactions.accountId,
+        categoryId: transactions.categoryId,
+        externalId: transactions.externalId,
       })
       .from(transactions)
       .where(
@@ -140,17 +146,38 @@ export async function GET(request: Request) {
         )
       );
 
+    const decryptedTxns = await decryptRows('transactions', inRangeTransactions, dek);
+
+    // Load category names for classification
+    const userCategories = await getDb()
+      .select({ id: categories.id, name: categories.name })
+      .from(categories)
+      .where(eq(categories.userId, userId));
+    const decCategories = await decryptRows('categories', userCategories, dek);
+    const categoryNameById = new Map<string, string>();
+    for (const c of decCategories) {
+      categoryNameById.set(c.id, c.name);
+    }
+
     const dailyCashFlows = new Map<string, number>();
-    for (const tx of inRangeTransactions) {
+    for (const tx of decryptedTxns) {
       try {
-        const decryptedAmt = await decryptField(tx.amount, dek);
-        const amt = parseFloat(decryptedAmt);
+        const amt = parseFloat(String(tx.amount));
         if (!isNaN(amt)) {
-          const d = String(tx.date);
-          dailyCashFlows.set(d, (dailyCashFlows.get(d) || 0) + amt);
+          const flow = filterAndClassifyCashFlow({
+            externalId: tx.externalId,
+            description: tx.description,
+            payee: tx.payee,
+            categoryName: tx.categoryId ? categoryNameById.get(tx.categoryId) : undefined,
+            amount: amt,
+          });
+          if (flow !== null) {
+            const d = String(tx.date);
+            dailyCashFlows.set(d, (dailyCashFlows.get(d) || 0) + flow);
+          }
         }
       } catch {
-        // Skip individual decryption errors
+        // Skip individual calculation errors
       }
     }
 
@@ -253,7 +280,15 @@ export async function GET(request: Request) {
           // r_t = (Ending Value - Net Cash Flow) / Beginning Value - 1
           const r_t = (totalValue - netCashFlow) / prevTotalValue - 1;
           const factor = Math.max(0, 1 + r_t);
-          cumulativeTwrFactor *= factor;
+          if (cumulativeTwrFactor === 0 && totalValue > 0) {
+            cumulativeTwrFactor = factor > 0 ? factor : 1.0;
+          } else {
+            cumulativeTwrFactor *= factor;
+          }
+        } else if (prevTotalValue === 0 && totalValue > 0) {
+          if (cumulativeTwrFactor === 0) {
+            cumulativeTwrFactor = 1.0;
+          }
         }
         const currentTwrPct = (cumulativeTwrFactor - 1) * 100;
         prevTotalValue = totalValue;

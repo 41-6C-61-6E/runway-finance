@@ -21,6 +21,12 @@ import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   CircleDollarSign,
   TrendingUp,
   TrendingDown,
@@ -724,40 +730,24 @@ export function MonthDetailModal({
   const toggle = (key: string) => setExpanded((c) => (c === key ? null : key));
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Capital flow for ${formatMonthLong(month)}`}
-    >
-      <div
-        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 flex items-center justify-between p-5 border-b border-border bg-background/95 backdrop-blur">
+        <DialogHeader className="p-5 border-b border-border bg-background/95 backdrop-blur shrink-0">
           <div className="flex items-center gap-2">
             <CircleDollarSign className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-semibold text-foreground">
+            <DialogTitle className="text-base font-semibold text-foreground">
               Capital Flow — {formatMonthLong(month)}
               {monthDatum.lastSnapshotDate && (
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
                   · balance as of {formatSafeUTCDate(monthDatum.lastSnapshotDate, { month: 'short', day: 'numeric' })}
                 </span>
               )}
-            </h3>
+            </DialogTitle>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg p-1.5 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        </DialogHeader>
 
-        <div className="p-5 space-y-5 bg-background text-sm">
+        <div className="p-5 space-y-5 bg-background text-sm overflow-y-auto flex-1">
           {/* Hero: net change for the month */}
           <div className={`rounded-xl p-4 text-center space-y-1 border ${monthDatum.net >= 0 ? 'bg-chart-1/5 border-chart-1/20' : 'bg-destructive/5 border-destructive/20'}`}>
             <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Net change this month</div>
@@ -942,7 +932,7 @@ export function MonthDetailModal({
             <ExternalLink className="w-3.5 h-3.5" /> View every transaction in {formatMonthLong(month)}
           </a>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

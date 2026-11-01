@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     const dek = await getSessionDEK();
     const body = await req.json();
     const userId = session.user.id;
-    const { name, description, type, targetAmount, currentAmount, targetDate, categoryId, tagIds, status, linkedAccountId, percentage, reserve, sortOrder } = body;
+    const { name, description, type, targetAmount, currentAmount, initialAmount, targetDate, categoryId, tagIds, status, linkedAccountId, percentage, reserve, sortOrder } = body;
 
     if (!name || !type || !targetAmount) {
       return NextResponse.json({ error: 'name, type, and targetAmount are required' }, { status: 400 });
@@ -145,6 +145,7 @@ export async function POST(req: NextRequest) {
       type,
       targetAmount: formatToCents(parseFloat(String(targetAmount)) || 0),
       currentAmount: formatToCents(parseFloat(String(currentAmount || 0)) || 0),
+      initialAmount: formatToCents(parseFloat(String(initialAmount != null ? initialAmount : currentAmount || 0)) || 0),
       targetDate: targetDate || null,
       categoryId: categoryId || null,
       status: status || 'active',
@@ -210,6 +211,7 @@ export async function PATCH(req: NextRequest) {
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.targetAmount !== undefined) updateData.targetAmount = formatToCents(parseFloat(String(updates.targetAmount)) || 0);
     if (updates.currentAmount !== undefined) updateData.currentAmount = formatToCents(parseFloat(String(updates.currentAmount)) || 0);
+    if (updates.initialAmount !== undefined) updateData.initialAmount = formatToCents(parseFloat(String(updates.initialAmount)) || 0);
     if (updates.targetDate !== undefined) updateData.targetDate = updates.targetDate || null;
     if (updates.categoryId !== undefined) updateData.categoryId = updates.categoryId || null;
     if (updates.percentage !== undefined) updateData.percentage = String(updates.percentage);

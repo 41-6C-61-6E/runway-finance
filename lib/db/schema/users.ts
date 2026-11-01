@@ -14,6 +14,7 @@ export const users = pgTable('users', {
   username: text('username').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   email: text('email'),
+  tokenVersion: integer('token_version').notNull().default(1),
 });
 
 // ── User Encryption Keys ──────────────────────────────────────────────────────
@@ -30,7 +31,11 @@ export const userEncryptionKeys = pgTable('user_encryption_keys', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ── Next Auth Tables (existing) ──────────────────────────────────────────────
+// ── Next Auth Tables (Legacy / Unused) ─────────────────────────────────────────
+// Note: Runway Finance authenticates against the "users" table above using usernames.
+// All domain tables reference "users.username" via text columns. The legacy NextAuth
+// tables below (user, session, account, verification) are maintained solely for migration
+// compatibility and are never populated directly.
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),

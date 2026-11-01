@@ -141,7 +141,7 @@ self.addEventListener("push", (event) => {
     try {
       data = event.data.json();
     } catch {
-      data = { body: event.data.text() || "New notification from Personal Finance" };
+      data = { body: event.data.text() || "New notification from Runway Finance" };
     }
 
     const options = {
@@ -168,7 +168,7 @@ self.addEventListener("push", (event) => {
         .catch(() => {});
 
     event.waitUntil(
-      self.registration.showNotification(data.title || "Personal Finance", options)
+      self.registration.showNotification(data.title || "Runway Finance", options)
     );
   } catch (err) {
     console.error("Error displaying push notification:", err);

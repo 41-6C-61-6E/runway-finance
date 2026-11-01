@@ -164,4 +164,41 @@ describe('computeEquityBreakdown', () => {
     expect(r.principalPaid).toBeCloseTo(40_000, 2);
     expect(r.mortgageOwed).toBeCloseTo(400_000, 2);
   });
+
+  it('WS-03-F06: preserves real estate equity identity on cash-out refinance', () => {
+    // Purchase Price $pp = 500k, original loan 400k (down payment 100k)
+    // Paid down old loan to 300k (100k principal paid)
+    // Value appreciated to 600k (100k appreciation)
+    // Cash-out refi: old loan payoff 300k, new loan original 450k (extracts 150k cash), current balance 440k
+    // True equity = 600k - 440k = 160k
+    const r = computeEquityBreakdown(600_000, 500_000, 500_000, [
+      {
+        id: 'new_loan',
+        name: 'New Cash-out Loan',
+        balance: -440_000,
+        originalLoanAmount: 450_000,
+        metadata: { originalLoanAmount: 450_000, mortgageStatus: 'active', purchaseDate: '2025-01-01' },
+      },
+      {
+        id: 'old_loan',
+        name: 'Old Original Loan',
+        balance: 0,
+        originalLoanAmount: 400_000,
+        metadata: {
+          originalLoanAmount: 400_000,
+          mortgageStatus: 'refinanced',
+          purchaseDate: '2020-01-01',
+          refinanceDate: '2025-01-01',
+          payoffBalance: 300_000,
+          refinancedByLoanId: 'new_loan',
+        },
+      },
+    ]);
+
+    expect(r.mortgageOwed).toBeCloseTo(440_000, 2);
+    expect(r.totalEquity).toBeCloseTo(160_000, 2);
+    // Identity check: components must strictly sum to totalEquity within $0.01
+    const componentSum = r.downPayment + r.principalPaid + r.appreciation;
+    expect(componentSum).toBeCloseTo(r.totalEquity, 2);
+  });
 });

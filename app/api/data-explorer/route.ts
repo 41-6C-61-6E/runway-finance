@@ -69,7 +69,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     table: schema.accountSnapshots,
     label: 'Account Snapshots',
     group: 'Accounts',
-    defaultSort: 'snapshot_date',
+    defaultSort: 'snapshotDate',
     defaultSortOrder: 'desc',
     searchColumns: [],
     columnOverrides: {
@@ -81,7 +81,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     table: schema.netWorthSnapshots,
     label: 'Net Worth Snapshots',
     group: 'Accounts',
-    defaultSort: 'snapshot_date',
+    defaultSort: 'snapshotDate',
     defaultSortOrder: 'desc',
     searchColumns: [],
     columnOverrides: {
@@ -130,7 +130,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     table: schema.monthlyCashFlow,
     label: 'Monthly Cash Flow',
     group: 'Cash Flow',
-    defaultSort: 'year_month',
+    defaultSort: 'yearMonth',
     defaultSortOrder: 'desc',
     searchColumns: [],
     columnOverrides: {
@@ -144,7 +144,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     table: schema.categorySpendingSummary,
     label: 'Category Spending',
     group: 'Cash Flow',
-    defaultSort: 'year_month',
+    defaultSort: 'yearMonth',
     defaultSortOrder: 'desc',
     searchColumns: [],
     columnOverrides: {
@@ -156,7 +156,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     table: schema.categoryIncomeSummary,
     label: 'Category Income',
     group: 'Cash Flow',
-    defaultSort: 'year_month',
+    defaultSort: 'yearMonth',
     defaultSortOrder: 'desc',
     searchColumns: [],
     columnOverrides: {
@@ -168,7 +168,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     table: schema.budgets,
     label: 'Budgets',
     group: 'Budgets',
-    defaultSort: 'year_month',
+    defaultSort: 'yearMonth',
     defaultSortOrder: 'desc',
     searchColumns: ['notes'],
     columnOverrides: {
@@ -180,7 +180,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     table: schema.financialGoals,
     label: 'Goals',
     group: 'Budgets',
-    defaultSort: 'priority',
+    defaultSort: 'sortOrder',
     defaultSortOrder: 'desc',
     searchColumns: ['name', 'description'],
     columnOverrides: {
@@ -194,7 +194,7 @@ const TABLE_REGISTRY: Record<string, TableConfig> = {
     table: schema.syncLogs,
     label: 'Sync Logs',
     group: 'System',
-    defaultSort: 'started_at',
+    defaultSort: 'startedAt',
     defaultSortOrder: 'desc',
     searchColumns: ['error_message'],
     columnOverrides: {

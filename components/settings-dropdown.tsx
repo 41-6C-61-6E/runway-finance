@@ -76,6 +76,8 @@ export default function SettingsDropdown({ onOpenChange }: SettingsDropdownProps
             onClick={() => setOpen(!open)}
             className={`${glassIconButton} ${open ? glassItemActive : glassItemInactive}`}
             aria-label="Settings"
+            aria-haspopup="true"
+            aria-expanded={open}
           >
             <Settings className="w-5 h-5" />
           </button>

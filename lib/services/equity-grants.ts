@@ -388,7 +388,7 @@ export async function syncEquityAccountAndSnapshots(
     const effectiveUnitValue = m.vestedShares > 0
       ? Math.round((m.vestedIntrinsicValue / m.vestedShares) * 10000) / 10000
       : m.spreadPerShare;
-    const costBasisVal = m.exercisedCostBasis > 0 ? m.exercisedCostBasis : 0;
+    const costBasisVal = m.exercisedCostBasis > 0 ? String(m.exercisedCostBasis) : null;
 
     const rawHolding = {
       userId,
@@ -398,7 +398,7 @@ export async function syncEquityAccountAndSnapshots(
       name: holdingName,
       quantity: String(m.vestedShares),
       price: String(effectiveUnitValue),
-      costBasis: String(costBasisVal),
+      costBasis: costBasisVal,
       value: formatToCents(m.vestedIntrinsicValue),
       currency: 'USD',
     };
@@ -415,7 +415,7 @@ export async function syncEquityAccountAndSnapshots(
       quantity: String(m.vestedShares),
       price: String(effectiveUnitValue),
       value: formatToCents(m.vestedIntrinsicValue),
-      costBasis: String(costBasisVal),
+      costBasis: costBasisVal,
     };
     const encHoldingSnap = await encryptRow('holding_snapshots', rawHoldingSnap, dek);
     await db

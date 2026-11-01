@@ -356,7 +356,7 @@ export default function GroupDetailPanel({
                     dataKey="date"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
                     ticks={xAxisTicks as any}
                     tickFormatter={(d: string) =>
                       formatChartXAxisDate(d, hierarchyTimeframe, {
@@ -369,7 +369,7 @@ export default function GroupDetailPanel({
                     width={48}
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
                     domain={[0, maxStackedTotal]}
                     tickFormatter={(v: number) =>
                       formatChartYAxisCurrency(v, 0, maxStackedTotal)

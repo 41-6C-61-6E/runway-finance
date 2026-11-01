@@ -2,7 +2,14 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { GET as getList, POST as readAll, DELETE as clearAll } from '@/app/api/notifications/route';
 import { POST as markRead } from '@/app/api/notifications/[id]/read/route';
 import { DELETE as deleteOne } from '@/app/api/notifications/[id]/route';
+import { POST as postTestNotification } from '@/app/api/notifications/test/route';
 import { userNotifications } from '@/lib/db/schema';
+
+// Mock sendPushNotification
+const mockSendPushNotification = vi.fn().mockResolvedValue({ sent: true, count: 1 });
+vi.mock('@/lib/services/notifications', () => ({
+  sendPushNotification: (...args: any[]) => mockSendPushNotification(...args),
+}));
 
 // Mock auth
 const mockAuth = vi.fn();
@@ -158,6 +165,29 @@ describe('Notifications API Routes', () => {
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
+    });
+  });
+
+  describe('POST /api/notifications/test', () => {
+    it('should return 401 if unauthorized', async () => {
+      mockAuth.mockResolvedValue(null);
+      const res = await postTestNotification();
+      expect(res.status).toBe(401);
+    });
+
+    it('should send test push notification with type "test"', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      const res = await postTestNotification();
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(mockSendPushNotification).toHaveBeenCalledWith(
+        'user-1',
+        'Test Notification',
+        'It works! This is a test notification from Personal Finance.',
+        '/settings?tab=notifications',
+        'test'
+      );
     });
   });
 });

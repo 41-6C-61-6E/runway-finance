@@ -34,14 +34,14 @@ while IFS= read -r file; do
       HAS_ERROR=1
     fi
   fi
-done < <(find "$ROOT" -name '*.tsx' -o -name '*.ts' \
+done < <(find "$ROOT" \( -name '*.tsx' -o -name '*.ts' \) \
   ! -path '*/node_modules/*' \
   ! -path '*/dist/*' \
   ! -path '*/.next/*' \
   ! -path '*/drizzle/*')
 
 echo "✅ Checking for deprecated asset-calculations references..."
-if find "$ROOT" -name '*.ts' -o -name '*.tsx' \
+if find "$ROOT" \( -name '*.ts' -o -name '*.tsx' \) \
   ! -path '*/node_modules/*' \
   ! -path '*/dist/*' \
   ! -path '*/.next/*' | xargs grep -l 'asset-calculations' 2>/dev/null; then

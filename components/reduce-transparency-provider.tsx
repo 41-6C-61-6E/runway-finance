@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 type ReduceTransparencyContextType = {
   reduceTransparency: boolean;
@@ -11,40 +12,69 @@ type ReduceTransparencyContextType = {
 const ReduceTransparencyContext = createContext<ReduceTransparencyContextType | null>(null);
 
 export function ReduceTransparencyProvider({ children }: { children: ReactNode }) {
-  const [reduceTransparency, setReduceTransparency] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const userSettingsCtx = useUserSettings();
+
+  const [localReduceTransparency, setLocalReduceTransparency] = useState(false);
+  const [localLoading, setLocalLoading] = useState(!userSettingsCtx);
 
   const fetchSetting = useCallback(async () => {
     try {
       const res = await fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        setReduceTransparency(data.reduceTransparency === true);
+        setLocalReduceTransparency(data?.reduceTransparency === true);
       }
     } catch {
-      setReduceTransparency(false);
+      setLocalReduceTransparency(false);
     } finally {
-      setLoading(false);
+      setLocalLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    if (userSettingsCtx) return;
     fetchSetting();
-  }, [fetchSetting]);
+  }, [userSettingsCtx, fetchSetting]);
 
-  const updateReduceTransparency = useCallback(async (val: boolean) => {
-    setReduceTransparency(val);
-    try {
-      await fetch('/api/user-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ reduceTransparency: val }),
-      });
-    } catch {
-      setReduceTransparency(!val);
+  const reduceTransparency = useMemo(() => {
+    if (userSettingsCtx) {
+      return userSettingsCtx.settings?.reduceTransparency === true;
     }
-  }, []);
+    return localReduceTransparency;
+  }, [userSettingsCtx, userSettingsCtx?.settings?.reduceTransparency, localReduceTransparency]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (reduceTransparency) {
+      document.documentElement.classList.add('reduce-transparency-active');
+    } else {
+      document.documentElement.classList.remove('reduce-transparency-active');
+    }
+  }, [reduceTransparency]);
+
+  const loading = userSettingsCtx ? userSettingsCtx.loading : localLoading;
+
+  const updateReduceTransparency = useCallback(
+    async (val: boolean) => {
+      if (userSettingsCtx) {
+        await userSettingsCtx.updateSetting('reduceTransparency', val);
+        return;
+      }
+
+      setLocalReduceTransparency(val);
+      try {
+        await fetch('/api/user-settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ reduceTransparency: val }),
+        });
+      } catch {
+        setLocalReduceTransparency(!val);
+      }
+    },
+    [userSettingsCtx]
+  );
 
   const value = useMemo(
     () => ({ reduceTransparency, updateReduceTransparency, loading }),
@@ -59,9 +89,13 @@ export function ReduceTransparencyProvider({ children }: { children: ReactNode }
 }
 
 export function useReduceTransparency() {
-  const context = useContext(ReduceTransparencyContext);
-  if (!context) {
-    throw new Error('useReduceTransparency must be used within a ReduceTransparencyProvider');
+  const ctx = useContext(ReduceTransparencyContext);
+  if (!ctx) {
+    return {
+      reduceTransparency: false,
+      updateReduceTransparency: async () => {},
+      loading: false,
+    };
   }
-  return context;
+  return ctx;
 }

@@ -329,8 +329,14 @@ export function generateMortgagePaydownHistory(
   const snapshots: Array<{ date: string; balance: number }> = [];
 
   let effectivePayment = monthlyPayment;
-  if (effectivePayment <= 0 && monthlyRate > 0) {
-    effectivePayment = originalBalance * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1);
+  if (effectivePayment <= 0) {
+    effectivePayment =
+      monthlyRate > 0
+        ? (originalBalance * (monthlyRate * Math.pow(1 + monthlyRate, termMonths))) /
+          (Math.pow(1 + monthlyRate, termMonths) - 1)
+        : termMonths > 0
+          ? originalBalance / termMonths
+          : 0;
   }
 
   const start = new Date(startDate + 'T00:00:00Z');

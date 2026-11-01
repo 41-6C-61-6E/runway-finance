@@ -24,6 +24,12 @@ import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/cha
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import type { ChartType } from '@/components/charts/chart-type-selector';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { TIME_RANGE_PRESETS } from '@/components/charts/chart-filters';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
@@ -1013,29 +1019,17 @@ export function IncomeExpenseChart() {
 
       {/* ── Cash Flow Breakdown Popup Modal ── */}
       {selectedCashFlowPoint && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={handleCloseCashFlowModal}
-        >
-          <div
-            className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Dialog open={true} onOpenChange={(open) => !open && handleCloseCashFlowModal()}>
+          <DialogContent className="max-w-xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-border bg-muted/20">
+            <DialogHeader className="p-5 border-b border-border bg-muted/20 shrink-0">
               <div className="flex items-center gap-2">
                 <ArrowRightLeft className="w-4 h-4 text-primary" />
-                <h3 className="text-base font-semibold text-foreground">
+                <DialogTitle className="text-base font-semibold text-foreground">
                   Cash Flow Analysis — {formatChartXAxisDate(selectedCashFlowPoint.yearMonth + '-01', timeframe, { isMonthly: true })}
-                </h3>
+                </DialogTitle>
               </div>
-              <button
-                onClick={handleCloseCashFlowModal}
-                className="text-xs text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-1 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+            </DialogHeader>
 
             {/* Content */}
             <div className="p-5 space-y-5 bg-background text-sm">
@@ -1147,35 +1141,23 @@ export function IncomeExpenseChart() {
                 </span>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* ── Savings Rate Breakdown Popup Modal ── */}
       {selectedSavingsPoint && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={handleCloseSavingsModal}
-        >
-          <div
-            className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Dialog open={true} onOpenChange={(open) => !open && handleCloseSavingsModal()}>
+          <DialogContent className="max-w-xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-border bg-muted/20">
+            <DialogHeader className="p-5 border-b border-border bg-muted/20 shrink-0">
               <div className="flex items-center gap-2">
                 <PiggyBank className="w-4 h-4 text-primary" />
-                <h3 className="text-base font-semibold text-foreground">
+                <DialogTitle className="text-base font-semibold text-foreground">
                   Savings Rate Analysis — {formatChartXAxisDate(selectedSavingsPoint.yearMonth + '-01', timeframe, { isMonthly: true })}
-                </h3>
+                </DialogTitle>
               </div>
-              <button
-                onClick={handleCloseSavingsModal}
-                className="text-xs text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-1 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+            </DialogHeader>
 
             {/* Content */}
             <div className="p-5 space-y-5 bg-background text-sm">
@@ -1368,8 +1350,8 @@ export function IncomeExpenseChart() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
     </div>

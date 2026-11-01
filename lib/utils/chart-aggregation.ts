@@ -48,8 +48,8 @@ function getBucketKey(dateStr: string, level: AggregationLevel): string {
 function getBucketDate(bucketKey: string, level: AggregationLevel): string {
   switch (level) {
     case 'weekly': {
-      const d = new Date(bucketKey);
-      d.setDate(d.getDate() + 3);
+      const [y, m, day] = bucketKey.slice(0, 10).split('-').map(Number);
+      const d = new Date(Date.UTC(y, m - 1, day + 3));
       return d.toISOString().split('T')[0];
     }
     case 'monthly': return `${bucketKey}-15`;

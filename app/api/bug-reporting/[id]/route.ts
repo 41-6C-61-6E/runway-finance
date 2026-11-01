@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { issues } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { UpdateIssueSchema } from '@/lib/validations/issue';
 import { logger } from '@/lib/logger';
-import { apiNotFound, apiUnauthorized, apiValidation, handleApiError } from '@/lib/api/response';
+import { apiNotFound, apiUnauthorized, apiForbidden, apiValidation, handleApiError } from '@/lib/api/response';
 
 export async function PATCH(
   request: Request,
@@ -45,7 +45,21 @@ export async function PATCH(
     if (description !== undefined) updateData.description = description;
     if (type !== undefined) updateData.type = type;
 
-    // Server-wide bug reports: any authenticated user can triage or edit any report.
+    // Check existing issue and enforce author ownership for editing details
+    const [existing] = await getDb()
+      .select({ userId: issues.userId })
+      .from(issues)
+      .where(eq(issues.id, id))
+      .limit(1);
+
+    if (!existing) {
+      return apiNotFound('Issue not found');
+    }
+
+    if ((title !== undefined || description !== undefined || type !== undefined) && existing.userId !== session.user.id) {
+      return apiForbidden('Only the author can edit issue details');
+    }
+
     const [updated] = await getDb()
       .update(issues)
       .set(updateData)
@@ -89,7 +103,7 @@ export async function DELETE(
   try {
     const [deleted] = await getDb()
       .delete(issues)
-      .where(eq(issues.id, id))
+      .where(and(eq(issues.id, id), eq(issues.userId, session.user.id)))
       .returning();
 
     if (!deleted) {

@@ -318,12 +318,17 @@ export default function FinancialLogicPage() {
         const annualSavings = Math.max(0, (cashFlow.totalIncome ?? 0) - (cashFlow.totalExpenses ?? 0)) * 12;
         const expectedGrowthRate = 0.07;
         let yearsToFI = 0;
-        if (currentInvestableAssets < fireNumber) {
-          const needed = fireNumber - currentInvestableAssets;
+        if (currentInvestableAssets >= fireNumber) {
+          yearsToFI = 0;
+        } else {
           const denom = Math.log(1 + expectedGrowthRate);
-          yearsToFI = denom > 0 && annualSavings > 0
-            ? Math.log((needed * expectedGrowthRate) / annualSavings + 1) / denom
-            : (annualSavings > 0 ? needed / annualSavings : 99);
+          const num = Math.log(
+            (expectedGrowthRate * fireNumber + annualSavings) /
+            (expectedGrowthRate * currentInvestableAssets + annualSavings)
+          );
+          yearsToFI = denom > 0 && num > 0
+            ? num / denom
+            : (annualSavings > 0 ? (fireNumber - currentInvestableAssets) / annualSavings : 99);
         }
 
         setData({

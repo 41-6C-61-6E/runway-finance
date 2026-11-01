@@ -193,8 +193,10 @@ export async function GET(request: Request) {
       data.user_settings = [decryptedSettings];
     }
 
+    const appVersion = process.env.NEXT_PUBLIC_BUILD_NUMBER || process.env.BUILD_NUMBER || '2026.10.0';
     const backup = {
       version: 1,
+      appVersion,
       exportedAt: new Date().toISOString(),
       data,
     };

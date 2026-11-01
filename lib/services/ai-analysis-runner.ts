@@ -65,7 +65,10 @@ export function startAiAnalysis(
         existing.proposalsCreated = result.proposalsCreated;
         existing.autoApproved = result.autoApproved;
         existing.errors = result.errors;
-        if (result.proposalsCreated === 0 && result.errors.length > 0) {
+        if (abortController.signal.aborted) {
+          existing.status = 'completed';
+          existing.log.push('Analysis cancelled by user.');
+        } else if (result.proposalsCreated === 0 && result.errors.length > 0) {
           // Nothing to show the user — surface as a failed run instead of a
           // silent "completed with 0 suggestions".
           existing.status = 'error';

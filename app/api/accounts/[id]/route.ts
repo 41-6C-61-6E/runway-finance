@@ -13,6 +13,7 @@ import {
   updateCategorySpendingSummaries,
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
+import { invalidateUserServerCache } from '@/lib/server-cache';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -372,6 +373,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     import('@/lib/services/goal-allocation').then(({ updateGoalAllocations }) => {
       return updateGoalAllocations(userId);
     }).catch(() => {});
+
+    invalidateUserServerCache(userId);
   }
 
   return NextResponse.json(decryptedWithTags);
@@ -460,6 +463,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   // Invalidate search cache
   const { invalidateUserSearchCache } = await import('@/lib/services/search-cache');
   invalidateUserSearchCache(userId);
+  invalidateUserServerCache(userId);
 
 
   // Recalculate snapshots and summaries in the background

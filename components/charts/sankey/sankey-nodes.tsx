@@ -53,7 +53,7 @@ export function SankeyCustomNode({
     return null;
   }
 
-  const isRightSide = !payload.sourceLinks || payload.sourceLinks.length === 0;
+  const isLeftSide = !payload.targetLinks || payload.targetLinks.length === 0;
   const isDimmed =
     hoveredNode !== null &&
     hoveredNode !== undefined &&
@@ -62,7 +62,7 @@ export function SankeyCustomNode({
   // R-2: labels are full-size and get wrapped/ellipsized by SankeyLabel
   // against this node's measured gutter width, not a character clip.
   let label = String(payload.label ?? payload.name ?? '');
-  const labelMaxW = computeLabelGutter(x, width, isRightSide, columnLeftXs, chartWidth ?? 0);
+  const labelMaxW = computeLabelGutter(x, width, isLeftSide, columnLeftXs, chartWidth ?? 0);
 
   // Apply optional column offset for vertical centering
   let shiftedY = y;
@@ -230,11 +230,11 @@ export function SankeyCustomNode({
       {!isHub && (
         <>
           <text
-            x={isRightSide ? x - 8 : x + width + 8}
+            x={isLeftSide ? x - 8 : x + width + 8}
             y={shiftedY + height / 2 - (valueLabel ? 4 : 0)}
-            textAnchor={isRightSide ? 'end' : 'start'}
+            textAnchor={isLeftSide ? 'end' : 'start'}
             dominantBaseline="central"
-            fontSize={isMobile ? 8 : 10}
+            fontSize={10}
             fontWeight={600}
             fill="currentColor"
             className="fill-foreground select-none"
@@ -244,11 +244,11 @@ export function SankeyCustomNode({
           </text>
           {valueLabel && (
             <text
-              x={isRightSide ? x - 8 : x + width + 8}
+              x={isLeftSide ? x - 8 : x + width + 8}
               y={shiftedY + height / 2 + 5}
-              textAnchor={isRightSide ? 'end' : 'start'}
+              textAnchor={isLeftSide ? 'end' : 'start'}
               dominantBaseline="central"
-              fontSize={isMobile ? 7 : 9}
+              fontSize={10}
               fill="currentColor"
               className="fill-muted-foreground select-none blur-number"
               style={{ opacity: isDimmed ? 0.3 : 0.75 }}

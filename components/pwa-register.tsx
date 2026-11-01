@@ -82,7 +82,7 @@ export function PWARegister() {
 
           let data: any;
           try {
-            const res = await fetch(`/version-info.json?t=${Date.now()}`);
+            const res = await fetch(`/api/version?t=${Date.now()}`);
             if (!res.ok) throw new Error("Failed to fetch version info");
             data = await res.json();
           } catch {
@@ -154,7 +154,7 @@ export function PWARegister() {
             }
           };
 
-          toast.info("A new version of Personal Finance is available!", {
+          toast.info("A new version of Runway Finance is available!", {
             id: UPDATE_TOAST_ID,
             description: (
               <div className="flex flex-col gap-1.5 mt-1">

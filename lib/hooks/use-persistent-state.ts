@@ -51,7 +51,7 @@ export function usePersistentState<T>(
   const context = useUserSettings();
   const [state, setState] = useState<T>(defaultValue);
   const [isLoaded, setIsLoaded] = useState(false);
-  const loadedFromDb = useRef(false);
+  const loadedKeyRef = useRef<string | null>(null);
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
@@ -81,9 +81,9 @@ export function usePersistentState<T>(
     // Wait until the settings context has finished loading
     if (!context || context.loading) return;
 
-    // Only initialize from DB/localStorage once per mount
-    if (loadedFromDb.current) return;
-    loadedFromDb.current = true;
+    // Only initialize from DB/localStorage once per key
+    if (loadedKeyRef.current === key) return;
+    loadedKeyRef.current = key;
 
     const dbValue = context.settings.chartSelections?.[key];
 

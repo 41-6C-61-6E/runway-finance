@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { accounts, transactions, accountSnapshots, simplifinConnections, plaidConnections } from '@/lib/db/schema';
+import {
+  accounts,
+  transactions,
+  accountSnapshots,
+  simplifinConnections,
+  plaidConnections,
+  holdings,
+  holdingSnapshots,
+  recurringTransactions,
+} from '@/lib/db/schema';
 import { eq, and, isNotNull, inArray } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { handleApiError } from '@/lib/api/response';
@@ -183,6 +192,37 @@ export async function POST(request: Request) {
         .update(transactions)
         .set({ accountId: sourceAccountId })
         .where(eq(transactions.accountId, targetAccountId));
+
+      // 6b. Move holdings, holding snapshots, recurring rules, and transaction rules to source account
+      const sourceHoldings = await tx
+        .select({ securityId: holdings.securityId })
+        .from(holdings)
+        .where(eq(holdings.accountId, sourceAccountId));
+      const sourceSecIds = sourceHoldings.map((h) => h.securityId).filter(Boolean) as string[];
+      if (sourceSecIds.length > 0) {
+        await tx
+          .delete(holdings)
+          .where(
+            and(
+              eq(holdings.accountId, targetAccountId),
+              inArray(holdings.securityId, sourceSecIds)
+            )
+          );
+      }
+      await tx
+        .update(holdings)
+        .set({ accountId: sourceAccountId })
+        .where(eq(holdings.accountId, targetAccountId));
+
+      await tx
+        .update(holdingSnapshots)
+        .set({ accountId: sourceAccountId })
+        .where(eq(holdingSnapshots.accountId, targetAccountId));
+
+      await tx
+        .update(recurringTransactions)
+        .set({ accountId: sourceAccountId })
+        .where(eq(recurringTransactions.accountId, targetAccountId));
 
       // 7. Temporarily clear target account's connection IDs and change its externalId
       // to avoid unique constraint conflicts when updating the source account.

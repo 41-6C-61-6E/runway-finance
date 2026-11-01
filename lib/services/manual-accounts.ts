@@ -155,7 +155,9 @@ export async function fetchRedfinValuationDetails(
 
   try {
     const avmUrl = `${baseUrl}/api/home/details/avm?propertyId=${propertyId}&accessLevel=1`;
-    const avmRes = await fetch(avmUrl, {
+    const avmRes = await fetchSecure(avmUrl, {
+      requireHttps: true,
+      timeoutMs: 10000,
       headers: {
         'User-Agent': userAgent,
         'Accept': 'application/json, text/plain, */*',
@@ -1105,7 +1107,7 @@ async function updateNetWorthSnapshot(userId: string, dek?: Uint8Array) {
     totalAssets: String(totalAssets),
     totalLiabilities: String(totalLiabilities),
     netWorth: String(netWorth),
-    breakdown,
+    breakdown: typeof breakdown === 'string' ? breakdown : JSON.stringify(breakdown),
   };
   const encryptedNw = dek ? await encryptRow('net_worth_snapshots', nwValues, dek) : nwValues;
 

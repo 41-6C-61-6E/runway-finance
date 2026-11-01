@@ -1,16 +1,34 @@
 import 'dotenv/config';
 import { getDb } from '../lib/db';
-import { accounts, accountSnapshots, transactions, netWorthSnapshots, users, monthlyCashFlow, categorySpendingSummary, categoryIncomeSummary, budgets, financialGoals, goalAllocationHistory } from '../lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import {
+  accounts,
+  accountSnapshots,
+  transactions,
+  netWorthSnapshots,
+  users,
+  monthlyCashFlow,
+  categorySpendingSummary,
+  categoryIncomeSummary,
+  budgets,
+  financialGoals,
+  goalAllocationHistory,
+} from '../lib/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 import { decryptField, encryptField } from '../lib/crypto';
 import { getServerDEK } from '../lib/crypto-context';
 import { formatToCents } from '../lib/services/account-history';
 
 async function main() {
+  const isDryRun = process.argv.includes('--dry-run');
   const db = getDb();
-  console.log('Starting financial precision cleanup script...\n');
+  console.log('Starting financial precision cleanup script...');
+  if (isDryRun) {
+    console.log('[DRY-RUN MODE] No updates will be written to the database.\n');
+  } else {
+    console.log('');
+  }
 
-  const allUsers = await db.select({ username: users.username, email: users.email }).from(users);
+  const allUsers = await db.select({ id: users.id, username: users.username, email: users.email }).from(users);
   console.log(`Found ${allUsers.length} user(s) in database.\n`);
 
   let totalAccountsUpdated = 0;
@@ -25,24 +43,26 @@ async function main() {
   let totalGahUpdated = 0;
 
   for (const user of allUsers) {
-    if (!user.username) {
-      console.log(`  [Skip] User has no username: email=${user.email}`);
-      continue;
-    }
-    console.log(`Processing user: ${user.username} (Email: ${user.email})...`);
+    const targetUserId = String(user.id);
+    const userIds = Array.from(new Set([targetUserId, user.username].filter(Boolean)));
+    console.log(`Processing user: ${user.username} (ID: ${user.id}, Email: ${user.email})...`);
     let dek: Uint8Array;
     try {
-      dek = await getServerDEK(user.username);
-    } catch (err) {
-      console.error(`  [Error] Failed to resolve server DEK for user ${user.username}:`, err);
-      continue;
+      dek = await getServerDEK(targetUserId);
+    } catch {
+      try {
+        dek = await getServerDEK(user.username);
+      } catch (err) {
+        console.error(`  [Error] Failed to resolve server DEK for user ${user.username} (ID: ${user.id}):`, err);
+        continue;
+      }
     }
 
     // 1. Clean up accounts balance
     const userAccounts = await db
       .select({ id: accounts.id, name: accounts.name, balance: accounts.balance })
       .from(accounts)
-      .where(eq(accounts.userId, user.username));
+      .where(inArray(accounts.userId, userIds));
 
     let accountsUpdated = 0;
     for (const acc of userAccounts) {
@@ -53,10 +73,12 @@ async function main() {
         const formatted = formatToCents(parseFloat(decrypted) || 0);
         if (decrypted !== formatted) {
           const encrypted = await encryptField(formatted, dek);
-          await db
-            .update(accounts)
-            .set({ balance: encrypted, updatedAt: new Date() })
-            .where(eq(accounts.id, acc.id));
+          if (!isDryRun) {
+            await db
+              .update(accounts)
+              .set({ balance: encrypted, updatedAt: new Date() })
+              .where(eq(accounts.id, acc.id));
+          }
           accountsUpdated++;
         }
       } catch (err) {
@@ -72,7 +94,7 @@ async function main() {
     const userSnapshots = await db
       .select({ id: accountSnapshots.id, snapshotDate: accountSnapshots.snapshotDate, balance: accountSnapshots.balance })
       .from(accountSnapshots)
-      .where(eq(accountSnapshots.userId, user.username));
+      .where(inArray(accountSnapshots.userId, userIds));
 
     let snapshotsUpdated = 0;
     for (const snap of userSnapshots) {
@@ -83,10 +105,12 @@ async function main() {
         const formatted = formatToCents(parseFloat(decrypted) || 0);
         if (decrypted !== formatted) {
           const encrypted = await encryptField(formatted, dek);
-          await db
-            .update(accountSnapshots)
-            .set({ balance: encrypted })
-            .where(eq(accountSnapshots.id, snap.id));
+          if (!isDryRun) {
+            await db
+              .update(accountSnapshots)
+              .set({ balance: encrypted })
+              .where(eq(accountSnapshots.id, snap.id));
+          }
           snapshotsUpdated++;
         }
       } catch (err) {
@@ -102,7 +126,7 @@ async function main() {
     const userTxs = await db
       .select({ id: transactions.id, date: transactions.date, amount: transactions.amount })
       .from(transactions)
-      .where(eq(transactions.userId, user.username));
+      .where(inArray(transactions.userId, userIds));
 
     let txsUpdated = 0;
     for (const tx of userTxs) {
@@ -113,10 +137,12 @@ async function main() {
         const formatted = formatToCents(parseFloat(decrypted) || 0);
         if (decrypted !== formatted) {
           const encrypted = await encryptField(formatted, dek);
-          await db
-            .update(transactions)
-            .set({ amount: encrypted })
-            .where(eq(transactions.id, tx.id));
+          if (!isDryRun) {
+            await db
+              .update(transactions)
+              .set({ amount: encrypted })
+              .where(eq(transactions.id, tx.id));
+          }
           txsUpdated++;
         }
       } catch (err) {
@@ -131,13 +157,14 @@ async function main() {
     // 4. Clean up net worth snapshots
     const userNwSnaps = await db
       .select({
+        userId: netWorthSnapshots.userId,
         snapshotDate: netWorthSnapshots.snapshotDate,
         totalAssets: netWorthSnapshots.totalAssets,
         totalLiabilities: netWorthSnapshots.totalLiabilities,
         netWorth: netWorthSnapshots.netWorth,
       })
       .from(netWorthSnapshots)
-      .where(eq(netWorthSnapshots.userId, user.username));
+      .where(inArray(netWorthSnapshots.userId, userIds));
 
     let nwUpdated = 0;
     for (const nw of userNwSnaps) {
@@ -155,19 +182,21 @@ async function main() {
           const encLiab = await encryptField(formLiab, dek);
           const encNw = await encryptField(formNw, dek);
 
-          await db
-            .update(netWorthSnapshots)
-            .set({
-              totalAssets: encAssets,
-              totalLiabilities: encLiab,
-              netWorth: encNw,
-            })
-            .where(
-              and(
-                eq(netWorthSnapshots.userId, user.username),
-                eq(netWorthSnapshots.snapshotDate, nw.snapshotDate)
-              )
-            );
+          if (!isDryRun) {
+            await db
+              .update(netWorthSnapshots)
+              .set({
+                totalAssets: encAssets,
+                totalLiabilities: encLiab,
+                netWorth: encNw,
+              })
+              .where(
+                and(
+                  eq(netWorthSnapshots.userId, nw.userId),
+                  eq(netWorthSnapshots.snapshotDate, nw.snapshotDate)
+                )
+              );
+          }
           nwUpdated++;
         }
       } catch (err) {
@@ -182,13 +211,14 @@ async function main() {
     // 5. Clean up monthly cash flow
     const userMcf = await db
       .select({
+        userId: monthlyCashFlow.userId,
         yearMonth: monthlyCashFlow.yearMonth,
         totalIncome: monthlyCashFlow.totalIncome,
         totalExpenses: monthlyCashFlow.totalExpenses,
         netCashFlow: monthlyCashFlow.netCashFlow,
       })
       .from(monthlyCashFlow)
-      .where(eq(monthlyCashFlow.userId, user.username));
+      .where(inArray(monthlyCashFlow.userId, userIds));
 
     let mcfUpdated = 0;
     for (const m of userMcf) {
@@ -206,19 +236,21 @@ async function main() {
           const encExp = await encryptField(formExp, dek);
           const encNet = await encryptField(formNet, dek);
 
-          await db
-            .update(monthlyCashFlow)
-            .set({
-              totalIncome: encInc,
-              totalExpenses: encExp,
-              netCashFlow: encNet,
-            })
-            .where(
-              and(
-                eq(monthlyCashFlow.userId, user.username),
-                eq(monthlyCashFlow.yearMonth, m.yearMonth)
-              )
-            );
+          if (!isDryRun) {
+            await db
+              .update(monthlyCashFlow)
+              .set({
+                totalIncome: encInc,
+                totalExpenses: encExp,
+                netCashFlow: encNet,
+              })
+              .where(
+                and(
+                  eq(monthlyCashFlow.userId, m.userId),
+                  eq(monthlyCashFlow.yearMonth, m.yearMonth)
+                )
+              );
+          }
           mcfUpdated++;
         }
       } catch (err) {
@@ -233,13 +265,14 @@ async function main() {
     // 6. Clean up category spending summaries
     const userCss = await db
       .select({
+        userId: categorySpendingSummary.userId,
         categoryId: categorySpendingSummary.categoryId,
         accountId: categorySpendingSummary.accountId,
         yearMonth: categorySpendingSummary.yearMonth,
         amount: categorySpendingSummary.amount,
       })
       .from(categorySpendingSummary)
-      .where(eq(categorySpendingSummary.userId, user.username));
+      .where(inArray(categorySpendingSummary.userId, userIds));
 
     let cssUpdated = 0;
     for (const s of userCss) {
@@ -250,17 +283,19 @@ async function main() {
         const formAmt = formatToCents(parseFloat(decAmt) || 0);
         if (decAmt !== formAmt) {
           const encAmt = await encryptField(formAmt, dek);
-          await db
-            .update(categorySpendingSummary)
-            .set({ amount: encAmt })
-            .where(
-              and(
-                eq(categorySpendingSummary.userId, user.username),
-                eq(categorySpendingSummary.categoryId, s.categoryId),
-                eq(categorySpendingSummary.accountId, s.accountId),
-                eq(categorySpendingSummary.yearMonth, s.yearMonth)
-              )
-            );
+          if (!isDryRun) {
+            await db
+              .update(categorySpendingSummary)
+              .set({ amount: encAmt })
+              .where(
+                and(
+                  eq(categorySpendingSummary.userId, s.userId),
+                  eq(categorySpendingSummary.categoryId, s.categoryId),
+                  eq(categorySpendingSummary.accountId, s.accountId),
+                  eq(categorySpendingSummary.yearMonth, s.yearMonth)
+                )
+              );
+          }
           cssUpdated++;
         }
       } catch (err) {
@@ -275,13 +310,14 @@ async function main() {
     // 7. Clean up category income summaries
     const userCis = await db
       .select({
+        userId: categoryIncomeSummary.userId,
         categoryId: categoryIncomeSummary.categoryId,
         accountId: categoryIncomeSummary.accountId,
         yearMonth: categoryIncomeSummary.yearMonth,
         amount: categoryIncomeSummary.amount,
       })
       .from(categoryIncomeSummary)
-      .where(eq(categoryIncomeSummary.userId, user.username));
+      .where(inArray(categoryIncomeSummary.userId, userIds));
 
     let cisUpdated = 0;
     for (const s of userCis) {
@@ -292,17 +328,19 @@ async function main() {
         const formAmt = formatToCents(parseFloat(decAmt) || 0);
         if (decAmt !== formAmt) {
           const encAmt = await encryptField(formAmt, dek);
-          await db
-            .update(categoryIncomeSummary)
-            .set({ amount: encAmt })
-            .where(
-              and(
-                eq(categoryIncomeSummary.userId, user.username),
-                eq(categoryIncomeSummary.categoryId, s.categoryId),
-                eq(categoryIncomeSummary.accountId, s.accountId),
-                eq(categoryIncomeSummary.yearMonth, s.yearMonth)
-              )
-            );
+          if (!isDryRun) {
+            await db
+              .update(categoryIncomeSummary)
+              .set({ amount: encAmt })
+              .where(
+                and(
+                  eq(categoryIncomeSummary.userId, s.userId),
+                  eq(categoryIncomeSummary.categoryId, s.categoryId),
+                  eq(categoryIncomeSummary.accountId, s.accountId),
+                  eq(categoryIncomeSummary.yearMonth, s.yearMonth)
+                )
+              );
+          }
           cisUpdated++;
         }
       } catch (err) {
@@ -318,7 +356,7 @@ async function main() {
     const userBudgets = await db
       .select({ id: budgets.id, amount: budgets.amount })
       .from(budgets)
-      .where(eq(budgets.userId, user.username));
+      .where(inArray(budgets.userId, userIds));
 
     let budgetsUpdated = 0;
     for (const b of userBudgets) {
@@ -329,10 +367,12 @@ async function main() {
         const formatted = formatToCents(parseFloat(decrypted) || 0);
         if (decrypted !== formatted) {
           const encrypted = await encryptField(formatted, dek);
-          await db
-            .update(budgets)
-            .set({ amount: encrypted })
-            .where(eq(budgets.id, b.id));
+          if (!isDryRun) {
+            await db
+              .update(budgets)
+              .set({ amount: encrypted })
+              .where(eq(budgets.id, b.id));
+          }
           budgetsUpdated++;
         }
       } catch (err) {
@@ -354,7 +394,7 @@ async function main() {
         allocatedAmount: financialGoals.allocatedAmount,
       })
       .from(financialGoals)
-      .where(eq(financialGoals.userId, user.username));
+      .where(inArray(financialGoals.userId, userIds));
 
     let goalsUpdated = 0;
     for (const g of userGoals) {
@@ -374,15 +414,17 @@ async function main() {
           const encCur = await encryptField(formCur, dek);
           const encRes = await encryptField(formRes, dek);
 
-          await db
-            .update(financialGoals)
-            .set({
-              targetAmount: encTar,
-              currentAmount: encCur,
-              reserve: encRes,
-              allocatedAmount: formAlloc || null,
-            })
-            .where(eq(financialGoals.id, g.id));
+          if (!isDryRun) {
+            await db
+              .update(financialGoals)
+              .set({
+                targetAmount: encTar,
+                currentAmount: encCur,
+                reserve: encRes,
+                allocatedAmount: formAlloc || null,
+              })
+              .where(eq(financialGoals.id, g.id));
+          }
           goalsUpdated++;
         }
       } catch (err) {
@@ -404,7 +446,7 @@ async function main() {
         remainingOnAccount: goalAllocationHistory.remainingOnAccount,
       })
       .from(goalAllocationHistory)
-      .where(eq(goalAllocationHistory.userId, user.username));
+      .where(inArray(goalAllocationHistory.userId, userIds));
 
     let gahUpdated = 0;
     for (const g of userGah) {
@@ -419,15 +461,17 @@ async function main() {
       const formRem = formatToCents(parseFloat(decRem) || 0);
 
       if (decBal !== formBal || decAlloc !== formAlloc || decDes !== formDes || decRem !== formRem) {
-        await db
-          .update(goalAllocationHistory)
-          .set({
-            accountBalance: formBal,
-            allocatedAmount: formAlloc,
-            desiredAmount: formDes,
-            remainingOnAccount: formRem,
-          })
-          .where(eq(goalAllocationHistory.id, g.id));
+        if (!isDryRun) {
+          await db
+            .update(goalAllocationHistory)
+            .set({
+              accountBalance: formBal,
+              allocatedAmount: formAlloc,
+              desiredAmount: formDes,
+              remainingOnAccount: formRem,
+            })
+            .where(eq(goalAllocationHistory.id, g.id));
+        }
         gahUpdated++;
       }
     }

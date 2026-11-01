@@ -153,25 +153,25 @@ export function IrmaaTab({
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-muted-foreground">Lookback Period</span>
-            <ShieldCheck className="w-4 h-4 text-indigo-500" />
+            <ShieldCheck className="w-4 h-4 text-chart-2" />
           </div>
-          <div className="text-xl font-bold font-mono text-indigo-500">
+          <div className="text-xl font-bold font-mono text-chart-2">
             {rules.irmaaLookbackYears || 2} Years (Age 63+)
           </div>
         </div>
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-muted-foreground">Tier 1 Threshold</span>
-            <DollarSign className="w-4 h-4 text-emerald-500" />
+            <DollarSign className="w-4 h-4 text-constructive" />
           </div>
           <div className="text-xl font-bold font-mono text-foreground">{formatCurrency(tier1Limit)}</div>
         </div>
         <div className="bg-card border border-border p-4 rounded-2xl shadow-sm space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-muted-foreground">Lifetime Savings</span>
-            <Sparkles className="w-4 h-4 text-emerald-500" />
+            <Sparkles className="w-4 h-4 text-constructive" />
           </div>
-          <div className="text-xl font-bold font-mono text-emerald-500">{formatCurrency(irmaaStats.totalSaved)}</div>
+          <div className="text-xl font-bold font-mono text-constructive">{formatCurrency(irmaaStats.totalSaved)}</div>
           <span className="text-[10px] text-muted-foreground block">Guardrail vs unguarded difference</span>
         </div>
       </div>
@@ -249,11 +249,11 @@ export function IrmaaTab({
                 />
                 <div className="flex items-center justify-between text-[11px] font-mono pt-0.5">
                   <span className="text-muted-foreground">
-                    <strong className={testMagiCalc.tier > 0 ? 'text-amber-500' : 'text-emerald-500'}>
+                    <strong className={testMagiCalc.tier > 0 ? 'text-status-warning' : 'text-constructive'}>
                       {testMagiCalc.tier > 0 ? `Tier ${testMagiCalc.tier}` : 'Standard (No Surcharge)'}
                     </strong>
                   </span>
-                  <span className="text-rose-400 font-bold">
+                  <span className="text-destructive font-bold">
                     +{formatCurrency(testMagiCalc.monthlySurchargePerPerson)}/mo/person ({formatCurrency(testMagiCalc.annualHouseholdSurcharge)}/yr)
                   </span>
                 </div>
@@ -362,13 +362,13 @@ export function IrmaaTab({
                         <td className="px-3 py-2 text-muted-foreground">
                           {isStandard ? '≤ $206,000' : `> ${formatCurrency(tier.magiJoint)}`}
                         </td>
-                        <td className="px-3 py-2 text-right text-rose-400">
+                        <td className="px-3 py-2 text-right text-destructive">
                           {isStandard ? '$0.00/mo' : `+${formatCurrency(tier.partBMonthly)}/mo`}
                         </td>
-                        <td className="px-3 py-2 text-right text-purple-400">
+                        <td className="px-3 py-2 text-right text-chart-5">
                           {isStandard ? '$0.00/mo' : `+${formatCurrency(tier.partDMonthly)}/mo`}
                         </td>
-                        <td className={`px-3 py-2 text-right font-bold ${isStandard ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        <td className={`px-3 py-2 text-right font-bold ${isStandard ? 'text-constructive' : 'text-destructive'}`}>
                           {isStandard ? '$0/yr (No Surcharge)' : `+${formatCurrency(annualCost)}/yr`}
                         </td>
                       </tr>
@@ -395,24 +395,24 @@ function IrmaaTooltip({ active, payload }: any) {
   const tier4 = Number(data.tier4Cliff || 0);
 
   let badgeLabel = '✅ Standard Premium';
-  let badgeColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+  let badgeColor = 'bg-constructive/10 text-constructive border-constructive/20';
   let hasBreach = false;
 
   if (tier4 > 0 && magi > tier4) {
     badgeLabel = '⚠️ Tier 4 Cliff';
-    badgeColor = 'bg-red-500/10 text-red-500 border-red-500/20';
+    badgeColor = 'bg-destructive/10 text-destructive border-destructive/20';
     hasBreach = true;
   } else if (tier3 > 0 && magi > tier3) {
     badgeLabel = '⚠️ Tier 3 Cliff';
-    badgeColor = 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+    badgeColor = 'bg-destructive/10 text-destructive border-destructive/20';
     hasBreach = true;
   } else if (tier2 > 0 && magi > tier2) {
     badgeLabel = '⚠️ Tier 2 Cliff';
-    badgeColor = 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+    badgeColor = 'bg-status-warning/10 text-status-warning border-status-warning/20';
     hasBreach = true;
   } else if (tier1 > 0 && magi > tier1) {
     badgeLabel = '⚠️ Tier 1 Cliff';
-    badgeColor = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+    badgeColor = 'bg-status-warning/10 text-status-warning border-status-warning/20';
     hasBreach = true;
   }
 
@@ -453,8 +453,8 @@ function IrmaaTooltip({ active, payload }: any) {
       </div>
 
       {hasBreach && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 space-y-0.5 font-sans">
-          <div className="flex items-center gap-1.5 font-bold text-amber-500 text-[11px]">
+        <div className="bg-status-warning/10 border border-status-warning/20 rounded-lg p-2 space-y-0.5 font-sans">
+          <div className="flex items-center gap-1.5 font-bold text-status-warning text-[11px]">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
             <span>IRMAA Surcharge Warning</span>
           </div>

@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUserSettings } from '@/components/user-settings-provider';
 import ImportTab from './ImportTab';
 import { Select } from '@/components/ui/select';
+import { formatFileSize } from '@/lib/utils/format';
 
 type SubTab = 'import' | 'export';
 
@@ -924,7 +925,7 @@ export default function ImportExportTab() {
                 </p>
                 {restoreFile && (
                   <div className="rounded-lg bg-muted/50 border border-border p-3 text-xs font-mono">
-                    {restoreFile.name} ({(restoreFile.size / 1024).toFixed(1)} KB)
+                    {restoreFile.name} ({formatFileSize(restoreFile.size)})
                   </div>
                 )}
                 {restoreIsEncrypted && (

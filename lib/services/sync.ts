@@ -4,6 +4,7 @@ import { generateHistoricalAccountSnapshots, getEarliestTransactionDate, formatT
 import { applyRulesToTransactions } from '@/lib/services/rules-engine';
 import { ensureCompoundCategories, ensureEmployerContributions } from '@/lib/db/seed-categories';
 import { invalidateUserSearchCache, getUserTransactionsFromCache } from '@/lib/services/search-cache';
+import { invalidateUserServerCache } from '@/lib/server-cache';
 import { userSettings } from '@/lib/db/schema';
 import { eq, and, or, inArray, isNull, sql, gte, lte, lt, desc } from 'drizzle-orm';
 import { decryptField, encryptField, encryptRow, decryptRow, decryptRows } from '@/lib/crypto';
@@ -16,6 +17,27 @@ import { parseProviderBalance, resolveEffectiveBalance } from '@/lib/utils/balan
 import { isSimilarDescription } from '@/lib/utils/description-matching';
 
 const LOG_TAG = '[sync]';
+
+/**
+ * Prunes sync logs older than the retention threshold (default 90 days).
+ */
+export async function pruneOldSyncLogs(retentionDays = 90): Promise<number> {
+  try {
+    const db = getDb();
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const deleted = await db
+      .delete(syncLogs)
+      .where(lt(syncLogs.startedAt, cutoff))
+      .returning({ id: syncLogs.id });
+    if (deleted.length > 0) {
+      logger.info(`${LOG_TAG} Pruned ${deleted.length} sync log(s) older than ${retentionDays} days`);
+    }
+    return deleted.length;
+  } catch (err) {
+    logger.debug(`${LOG_TAG} Failed to prune sync_logs:`, err);
+    return 0;
+  }
+}
 
 const activeDetectionUsers = new Set<string>();
 
@@ -65,7 +87,7 @@ export async function createNetWorthSnapshot(
     totalAssets: String(totalAssets),
     totalLiabilities: String(totalLiabilities),
     netWorth: String(netWorth),
-    breakdown,
+    breakdown: typeof breakdown === 'string' ? breakdown : JSON.stringify(breakdown),
   };
   const encryptedNw = await encryptRow('net_worth_snapshots', nwValues, dek);
 
@@ -202,6 +224,7 @@ function executeSummariesRebuild(userId: string, dek: Uint8Array): Promise<void>
     updateMonthlyCashFlowSummaries(userId, dek),
   ])
     .then(() => {
+      invalidateUserServerCache(userId);
       logger.info('[sync] Coalesced summaries rebuild completed', { userId });
     })
     .catch((err) => {
@@ -309,9 +332,10 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     }
     if (excluded) continue;
 
-    const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
-    const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-    const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dateStr = String(tx.date || '');
+    const yearMonth = /^\d{4}-\d{2}/.test(dateStr)
+      ? dateStr.substring(0, 7)
+      : new Date().toISOString().substring(0, 7);
     const rawAmount = parseFloat(tx.amount);
     if (isNaN(rawAmount)) continue;
 
@@ -342,8 +366,6 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     }
   }
 
-  await getDb().delete(monthlyCashFlow).where(eq(monthlyCashFlow.userId, userId));
-
   const insertValues = [];
   for (const [yearMonth, data] of Object.entries(monthlyData)) {
     const netCashFlow = data.income - data.expenses;
@@ -357,24 +379,28 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
     });
   }
 
-  if (insertValues.length > 0) {
-    const encryptedValues = await Promise.all(
-      insertValues.map((row) => encryptRow('monthly_cash_flow', row, dek))
-    );
-    await getDb()
-      .insert(monthlyCashFlow)
-      .values(encryptedValues)
-      .onConflictDoUpdate({
-        target: [monthlyCashFlow.userId, monthlyCashFlow.yearMonth],
-        set: {
-          totalIncome: sql`excluded.total_income`,
-          totalExpenses: sql`excluded.total_expenses`,
-          netCashFlow: sql`excluded.net_cash_flow`,
-          transactionCount: sql`excluded.transaction_count`,
-          updatedAt: new Date(),
-        },
-      });
-  }
+  const encryptedValues = insertValues.length > 0
+    ? await Promise.all(insertValues.map((row) => encryptRow('monthly_cash_flow', row, dek)))
+    : [];
+
+  await getDb().transaction(async (tx) => {
+    await tx.delete(monthlyCashFlow).where(eq(monthlyCashFlow.userId, userId));
+    if (encryptedValues.length > 0) {
+      await tx
+        .insert(monthlyCashFlow)
+        .values(encryptedValues)
+        .onConflictDoUpdate({
+          target: [monthlyCashFlow.userId, monthlyCashFlow.yearMonth],
+          set: {
+            totalIncome: sql`excluded.total_income`,
+            totalExpenses: sql`excluded.total_expenses`,
+            netCashFlow: sql`excluded.net_cash_flow`,
+            transactionCount: sql`excluded.transaction_count`,
+            updatedAt: new Date(),
+          },
+        });
+    }
+  });
 
   return { monthsUpdated: insertValues.length, transactionsProcessed };
 }
@@ -450,9 +476,10 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
     }
     if (excluded) continue;
 
-    const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
-    const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-    const yearMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dateStr = String(tx.date || '');
+    const yearMonth = /^\d{4}-\d{2}/.test(dateStr)
+      ? dateStr.substring(0, 7)
+      : new Date().toISOString().substring(0, 7);
     const catId = tx.categoryId.toString();
     const accountId = tx.accountId.toString();
 
@@ -1189,9 +1216,12 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
         })
         .from(transactions)
         .where(
-          inArray(
-            transactions.externalId,
-            rawTxData.map((t) => t.externalId)
+          and(
+            eq(transactions.userId, userId),
+            inArray(
+              transactions.externalId,
+              rawTxData.map((t) => t.externalId)
+            )
           )
         );
 
@@ -1235,7 +1265,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
               await getDb()
                 .update(transactions)
                 .set(updateData)
-                .where(eq(transactions.id, txId));
+                .where(and(eq(transactions.id, txId), eq(transactions.userId, userId)));
             }
           }
 

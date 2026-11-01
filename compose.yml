@@ -46,6 +46,12 @@ services:
     ports:
       - "3001:3000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     security_opt:
       - no-new-privileges:true
     logging:
@@ -71,7 +77,13 @@ services:
       - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
       - REGISTRATION_PIN=${REGISTRATION_PIN}
       - FRED_API_KEY=${FRED_API_KEY}
+      - RENTCAST_API_KEY=${RENTCAST_API_KEY}
       - BUG_REPORTING=${BUG_REPORTING:-false}
+
+      # Web Push Notifications (optional)
+      - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - VAPID_SUBJECT=${VAPID_SUBJECT}
 
 
       # AI provider enforced for all users: when set, endpoint/model/key
@@ -90,6 +102,7 @@ services:
       - NEXTAUTH_TRUST_HOST=true
 
       # File logging and rotation settings
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - LOG_FILE_PATH=/app/logs/finance.log
       - LOG_FILE_MAX_SIZE_MB=100
       - LOG_FILE_MAX_FILES=20

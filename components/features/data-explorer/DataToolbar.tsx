@@ -75,7 +75,7 @@ export default function DataToolbar({
   }, [columns]);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | PointerEvent) => {
       if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) {
         setShowColumnMenu(false);
       }
@@ -83,8 +83,8 @@ export default function DataToolbar({
         setShowFilterBuilder(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
   }, []);
 
   const handleAddFilter = useCallback(() => {

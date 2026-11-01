@@ -60,6 +60,7 @@ export const financialGoals = pgTable(
     reserve: text('reserve').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
     allocatedAmount: text('allocated_amount').notNull().default('0'),
+    initialAmount: text('initial_amount').notNull().default('0'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -98,7 +99,7 @@ export const netWorthSnapshots = pgTable(
     totalAssets: text('total_assets').notNull(),
     totalLiabilities: text('total_liabilities').notNull(),
     netWorth: text('net_worth').notNull(),
-    breakdown: jsonb('breakdown').notNull(),
+    breakdown: text('breakdown').notNull(),
   },
   (t) => [unique().on(t.userId, t.snapshotDate)]
 );

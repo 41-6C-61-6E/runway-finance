@@ -2,7 +2,7 @@ import { getDb } from '@/lib/db';
 import { financialGoals, accounts, goalAllocationHistory, userSettings } from '@/lib/db/schema';
 import { and, eq, asc, desc, inArray, isNotNull } from 'drizzle-orm';
 import { getSessionDEK } from '@/lib/crypto-context';
-import { decryptField, decryptRow, decryptRows, encryptRow } from '@/lib/crypto';
+import { decryptField, decryptRow, decryptRows, encryptRow, encryptField } from '@/lib/crypto';
 import { formatToCents } from '@/lib/services/account-history';
 
 export interface GoalAllocation {
@@ -238,10 +238,11 @@ export async function updateGoalAllocations(userId: string, dek?: Uint8Array): P
 
   for (const account of allocation.accounts) {
     for (const goal of account.goals) {
+      const allocVal = String(isNaN(goal.allocatedAmount) ? 0 : goal.allocatedAmount);
       await db
         .update(financialGoals)
         .set({
-          allocatedAmount: String(isNaN(goal.allocatedAmount) ? 0 : goal.allocatedAmount),
+          allocatedAmount: resolvedDek ? await encryptField(allocVal, resolvedDek) : allocVal,
           updatedAt: new Date(),
         })
         .where(and(

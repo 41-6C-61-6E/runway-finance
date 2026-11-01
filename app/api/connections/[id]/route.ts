@@ -291,5 +291,39 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
   syncScheduler.cancel(id);
   logger.info('Connection deleted', { connectionId: id, keepData, isSimplefin });
+
+  try {
+    const { invalidateUserSearchCache } = await import('@/lib/services/search-cache');
+    const { invalidateSyncHealthCache } = await import('@/lib/services/sync-health');
+    invalidateUserSearchCache(userId);
+    invalidateSyncHealthCache(userId);
+
+    const { getSessionDEK } = await import('@/lib/crypto-context');
+    const {
+      createAccountSnapshots,
+      createNetWorthSnapshot,
+      updateMonthlyCashFlowSummaries,
+      updateCategorySpendingSummaries,
+    } = await import('@/lib/services/sync');
+    const dek = await getSessionDEK();
+    const today = new Date().toISOString().split('T')[0];
+    Promise.all([
+      createNetWorthSnapshot(userId, dek, today, { skipNotifications: true }),
+      createAccountSnapshots(userId, dek, today),
+      updateMonthlyCashFlowSummaries(userId, dek),
+      updateCategorySpendingSummaries(userId, dek),
+    ]).catch((err) =>
+      logger.error('Failed to rebuild snapshots after connection deletion', {
+        userId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    );
+  } catch (err) {
+    logger.error('Failed to trigger post-connection deletion cache/snapshot updates', {
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   return new NextResponse(null, { status: 204 });
 }

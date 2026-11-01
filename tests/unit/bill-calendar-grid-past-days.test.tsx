@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BillCalendarGrid } from '@/components/cash-flow/bill-calendar-grid';
 import type { UpcomingBill } from '@/lib/services/recurring-detection';
@@ -54,10 +54,16 @@ describe('BillCalendarGrid - Past Days Enhancements', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 20, 12, 0, 0));
     mockPrivacyMode = false;
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   const mockBills: UpcomingBill[] = [

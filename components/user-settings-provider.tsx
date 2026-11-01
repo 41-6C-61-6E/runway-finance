@@ -3,6 +3,7 @@
 import { createContext, useContext, useCallback, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
+import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 
 // Early bootstrap saved text size before React renders
 if (typeof window !== 'undefined') {
@@ -102,18 +103,25 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
 
     // Optimistically update local query cache
     queryClient.setQueryData<Record<string, any>>(queryKeys.userSettings.all, (prev = {}) => {
-      if (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility' || key === 'budgetExclusions') {
+      if (
+        key === 'chartSelections' ||
+        key === 'cardCollapsedStates' ||
+        key === 'accountTagVisibility' ||
+        key === 'budgetExclusions' ||
+        key === 'showSyntheticData' ||
+        key === 'showImportedData' ||
+        key === 'chartVisibility' ||
+        key === 'hiddenPages'
+      ) {
         const existingData = prev[key] || {};
-        const mergedData = { ...existingData, ...value };
+        const mergedData = typeof value === 'object' && value !== null ? { ...existingData, ...value } : value;
         return { ...prev, [key]: mergedData };
       }
       return { ...prev, [key]: value };
     });
 
     try {
-      const bodyPayload = (key === 'chartSelections' || key === 'cardCollapsedStates' || key === 'accountTagVisibility' || key === 'budgetExclusions')
-        ? { [key]: value }
-        : { [key]: value };
+      const bodyPayload = { [key]: value };
 
       const res = await fetch('/api/user-settings', {
         method: 'PATCH',
@@ -127,6 +135,9 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
         throw new Error(errorData.error || `HTTP ${res.status}`);
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.userSettings.all });
+      if (key === 'showImportedData' || key === 'showSyntheticData') {
+        invalidateAfterAccountChange(queryClient);
+      }
       // Notify other open tabs so they refresh their settings cache.
       channelRef.current?.postMessage({ type: 'settings-changed', key });
     } catch (e) {

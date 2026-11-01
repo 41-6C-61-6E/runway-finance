@@ -78,6 +78,7 @@ function Tooltip({
         const target = e.target as HTMLElement | null;
         if (
           target &&
+          typeof target.closest === 'function' &&
           target.closest(
             '[data-radix-tooltip-content], [data-radix-popper-content-wrapper], [role="tooltip"], [data-slot="tooltip-content"]'
           )
@@ -159,7 +160,7 @@ const TooltipContent = React.forwardRef<
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     onClick?.(e);
     const target = e.target as HTMLElement | null;
-    if (target?.closest('a, button, input, select, textarea, [role="button"], [data-interactive]')) {
+    if (target && typeof target.closest === 'function' && target.closest('a, button, input, select, textarea, [role="button"], [data-interactive]')) {
       return;
     }
     setOpen(false);
@@ -168,7 +169,7 @@ const TooltipContent = React.forwardRef<
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     onPointerDown?.(e);
     const target = e.target as HTMLElement | null;
-    if (target?.closest('a, button, input, select, textarea, [role="button"], [data-interactive]')) {
+    if (target && typeof target.closest === 'function' && target.closest('a, button, input, select, textarea, [role="button"], [data-interactive]')) {
       return;
     }
     setOpen(false);

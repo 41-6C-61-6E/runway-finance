@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { streamChat, type ResolvedProvider } from '@/lib/ai/client';
 import { extractJsonObject } from '@/lib/ai/json';
 import { getPack } from './packs';
-import { buildAdvicePromptMessages, type PackBuildResult } from './prompt';
+import { buildAdvicePromptMessages, type PackBuildResult } from './advice-prompt-builder';
 import { getAdviceSnapshot } from './snapshot';
 import { selectPacks, type PageContext } from './router';
 import { ADVICE_CONFIG, getTokenBudgets } from './config';
@@ -166,7 +166,13 @@ export async function* runAdviceOrchestrator(
   if (isNeedRequest) {
     yield { type: 'status', phase: 'fetching_more' };
 
-    const parsedJson = extractJsonObject(buffer);
+    const extracted = extractJsonObject(buffer);
+    let parsedJson: unknown = null;
+    if (extracted) {
+      try {
+        parsedJson = JSON.parse(extracted);
+      } catch {}
+    }
     const needParsed = NeedSchema.safeParse(parsedJson);
 
     let newPacksAdded = false;

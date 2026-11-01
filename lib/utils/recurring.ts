@@ -96,17 +96,28 @@ export function addFrequencyPeriod(dateStr: string, frequency: FrequencyType, an
   }
 
   if (frequency === 'semi_monthly') {
-    const target = new Date(Date.UTC(year, month, 1));
+    const daysInCurrentMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const isEndOfMonthCadence = Boolean(anchorDay && anchorDay > 15);
+
     if (day < 15) {
-      target.setUTCDate(15);
+      return new Date(Date.UTC(year, month, 15)).toISOString().split('T')[0];
+    } else if (day === 15) {
+      if (isEndOfMonthCadence) {
+        const targetDay = Math.min(anchorDay!, daysInCurrentMonth);
+        return new Date(Date.UTC(year, month, targetDay)).toISOString().split('T')[0];
+      } else {
+        const nextMonth = new Date(Date.UTC(year, month + 1, 1));
+        return nextMonth.toISOString().split('T')[0];
+      }
     } else {
       const nextMonth = new Date(Date.UTC(year, month + 1, 1));
-      const daysInNext = new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth() + 1, 0)).getUTCDate();
-      target.setUTCFullYear(nextMonth.getUTCFullYear());
-      target.setUTCMonth(nextMonth.getUTCMonth());
-      target.setUTCDate(Math.min(effectiveDay <= 15 ? 1 : effectiveDay, daysInNext));
+      if (isEndOfMonthCadence) {
+        return new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth(), 15)).toISOString().split('T')[0];
+      } else {
+        const targetDay = anchorDay && anchorDay < 15 ? anchorDay : 1;
+        return new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth(), targetDay)).toISOString().split('T')[0];
+      }
     }
-    return target.toISOString().split('T')[0];
   }
 
   const monthDelta =

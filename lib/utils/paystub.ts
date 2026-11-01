@@ -62,9 +62,11 @@ export interface PaystubTieOutInput {
   taxes: string | number;
   deductions: string | number;
   net: string | number;
+  afterTaxDeductions?: string | number | null;
   grossYtd?: string | number | null;
   taxesYtd?: string | number | null;
   deductionsYtd?: string | number | null;
+  afterTaxDeductionsYtd?: string | number | null;
 }
 
 export function computeTiesOut(
@@ -74,11 +76,13 @@ export function computeTiesOut(
   const gross = Number(stub.gross) || 0;
   const taxes = Number(stub.taxes) || 0;
   const deductions = Number(stub.deductions) || 0;
+  const afterTax = Number(stub.afterTaxDeductions) || 0;
   const net = Number(stub.net) || 0;
 
   // Rule 1: current-period internal consistency (< $0.02 slack covers the
   // common employer rounding-to-penny behavior).
-  const derived = gross - taxes - deductions;
+  // Fundamental payroll identity: Net Pay = Gross - Taxes - PreTax Deductions - PostTax Deductions
+  const derived = gross - taxes - deductions - afterTax;
   if (Math.abs(derived - net) >= 0.02) return false;
 
   // Rule 2: YTD continuity vs the most recent imported stub.
@@ -235,7 +239,17 @@ function normalizeSinglePaycheckContainer(json: any): any[] {
     const grossCurrent = paycheck.totals?.earningsAmount ?? 0;
     const taxesCurrent = paycheck.totals?.taxesAmount ?? 0;
     const deductionsCurrent = paycheck.totals?.deductionsAmount ?? 0;
-    const netCurrent = Number(grossCurrent) - Number(taxesCurrent) - Number(deductionsCurrent);
+    const afterTaxCurrent =
+      paycheck.totals?.afterTaxDeductionsAmount ??
+      (paycheck.afterTaxDeductions || []).reduce(
+        (s: number, d: any) => s + (Number(d.amount) || 0),
+        0
+      );
+    const netCurrent =
+      Number(grossCurrent) -
+      Number(taxesCurrent) -
+      Number(deductionsCurrent) -
+      Number(afterTaxCurrent);
 
     return {
       employeeName,

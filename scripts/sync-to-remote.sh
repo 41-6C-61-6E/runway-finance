@@ -22,7 +22,7 @@ rsync -avz --delete \
   --exclude='.env*' \
   --exclude='*.env' \
   --exclude='scratch' \
-  --exclude='*.sql' \
+  --exclude='/*.sql' \
   --exclude='*.dump' \
   --exclude='*.key' \
   --exclude='*.pem' \

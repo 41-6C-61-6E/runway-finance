@@ -20,6 +20,10 @@ import {
   categoryIncomeSummary,
   budgets,
   financialGoals,
+  holdings,
+  holdingSnapshots,
+  equityGrants,
+  recurringTransactions,
 
   paystubs,
   paystubLineItems,
@@ -128,6 +132,10 @@ export async function DELETE(request: Request) {
       await tx.delete(goalAllocationHistory).where(eq(goalAllocationHistory.userId, userId));
 
       // 4. Financial & connection tables (in foreign key safe order)
+      await tx.delete(equityGrants).where(eq(equityGrants.userId, userId));
+      await tx.delete(holdingSnapshots).where(eq(holdingSnapshots.userId, userId));
+      await tx.delete(holdings).where(eq(holdings.userId, userId));
+      await tx.delete(recurringTransactions).where(eq(recurringTransactions.userId, userId));
       await tx.delete(syncLogs).where(eq(syncLogs.userId, userId));
       await tx.delete(simplifinConnections).where(eq(simplifinConnections.userId, userId));
       await tx.delete(plaidConnections).where(eq(plaidConnections.userId, userId));

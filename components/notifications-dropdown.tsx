@@ -377,6 +377,8 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
             onClick={handleToggleOpen}
             className={`${glassIconButton} focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${open ? glassItemActive : glassItemInactive}`}
             aria-label="Notifications"
+            aria-haspopup="true"
+            aria-expanded={open}
           >
             <Bell className={`w-5 h-5 ${shouldWiggle ? 'animate-bounce' : ''}`} />
             {unreadCount > 0 && (

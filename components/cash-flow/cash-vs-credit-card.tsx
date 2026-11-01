@@ -16,7 +16,7 @@ import {
   Line,
   ComposedChart,
 } from 'recharts';
-import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
+import { formatCurrency, formatPlainPercent, formatMultiplier } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, formatChartDateRange } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
@@ -59,7 +59,7 @@ interface ResponseData {
 
 function formatRatio(ratio: number): string {
   if (!Number.isFinite(ratio)) return '∞';
-  return `${ratio.toFixed(1)}x`;
+  return formatMultiplier(ratio);
 }
 
 function StatBox({ label, value, change, changePercent, color, icon, className }: {

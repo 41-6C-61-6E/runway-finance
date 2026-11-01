@@ -38,7 +38,13 @@ async function runSelfHealingChecks(client) {
       { name: 'upcoming_bills_lead_days', type: 'INTEGER NOT NULL DEFAULT 3' },
       { name: 'birth_year', type: 'INTEGER' },
       { name: 'text_size', type: "TEXT NOT NULL DEFAULT 'default'" },
-      { name: 'notify_app_updates', type: 'BOOLEAN NOT NULL DEFAULT TRUE' }
+      { name: 'notify_app_updates', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'ai_advice_enabled', type: 'BOOLEAN NOT NULL DEFAULT TRUE' },
+      { name: 'ai_advice_model', type: 'TEXT' },
+      { name: 'ai_advice_include_account_names', type: 'BOOLEAN NOT NULL DEFAULT FALSE' },
+      { name: 'ai_advice_consent_host', type: 'TEXT' },
+      { name: 'ai_advice_consent_at', type: 'TIMESTAMP WITH TIME ZONE' },
+      { name: 'ai_advice_token_profile', type: "TEXT NOT NULL DEFAULT 'balanced'" }
     ];
 
     for (const col of columnsToCheck) {
@@ -65,6 +71,19 @@ async function runSelfHealingChecks(client) {
       await client.query(`
         ALTER TABLE ai_providers
         ADD COLUMN IF NOT EXISTS json_mode BOOLEAN NOT NULL DEFAULT FALSE
+      `);
+    }
+
+    // 3b. Check if fallback_models column exists on ai_providers
+    const colCheck3b = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'ai_providers' AND column_name = 'fallback_models'
+    `);
+    if (colCheck3b.rows.length === 0) {
+      console.log('[migrate] [self-heal] Adding missing fallback_models column to ai_providers...');
+      await client.query(`
+        ALTER TABLE ai_providers
+        ADD COLUMN IF NOT EXISTS fallback_models TEXT
       `);
     }
 
@@ -467,6 +486,90 @@ async function runSelfHealingChecks(client) {
     await client.query(`ALTER TABLE sent_notifications DROP CONSTRAINT IF EXISTS sent_notifications_user_id_fkey`);
     await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_user_id_fk`);
     await client.query(`ALTER TABLE custom_alert_rules DROP CONSTRAINT IF EXISTS custom_alert_rules_user_id_fkey`);
+
+    // 12. Ensure equity_grants table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "equity_grants" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "user_id" text NOT NULL,
+        "account_id" uuid NOT NULL REFERENCES "accounts"("id") ON DELETE CASCADE,
+        "company_name" text NOT NULL,
+        "grant_name" text NOT NULL,
+        "grant_type" text DEFAULT 'iso' NOT NULL,
+        "grant_date" date NOT NULL,
+        "vesting_start_date" date NOT NULL,
+        "expiration_date" date,
+        "total_shares" text NOT NULL,
+        "exercised_shares" text DEFAULT '0' NOT NULL,
+        "sold_shares" text DEFAULT '0' NOT NULL,
+        "strike_price" text DEFAULT '0' NOT NULL,
+        "current_fmv" text DEFAULT '0' NOT NULL,
+        "preferred_price" text,
+        "valuation_mode" text DEFAULT 'fmv' NOT NULL,
+        "vesting_schedule" text NOT NULL,
+        "early_exercise_allowed" boolean DEFAULT false NOT NULL,
+        "filed_83b" boolean DEFAULT false NOT NULL,
+        "early_exercise_date" date,
+        "logo_url" text,
+        "notes" text,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+      ALTER TABLE "equity_grants" ADD COLUMN IF NOT EXISTS "logo_url" text;
+      CREATE INDEX IF NOT EXISTS "equity_grants_user_id_idx" ON "equity_grants" ("user_id");
+      CREATE INDEX IF NOT EXISTS "equity_grants_account_id_idx" ON "equity_grants" ("account_id");
+    `);
+
+    // 13. Ensure high-performance composite indexes
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS transactions_user_date_idx ON transactions (user_id, date);
+      CREATE INDEX IF NOT EXISTS transactions_user_account_idx ON transactions (user_id, account_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_category_idx ON transactions (user_id, category_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_deleted_idx ON transactions (user_id, deleted);
+      CREATE INDEX IF NOT EXISTS accounts_user_hidden_idx ON accounts (user_id, is_hidden);
+      CREATE INDEX IF NOT EXISTS transactions_user_uncat_idx ON transactions (user_id, date) WHERE category_id IS NULL AND deleted = false;
+      CREATE INDEX IF NOT EXISTS transactions_user_pending_idx ON transactions (user_id, id) WHERE pending = true;
+      CREATE INDEX IF NOT EXISTS transactions_user_import_idx ON transactions (user_id, import_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_parent_idx ON transactions (user_id, parent_id);
+      CREATE INDEX IF NOT EXISTS transactions_user_posted_date_idx ON transactions (user_id, posted_date);
+      CREATE INDEX IF NOT EXISTS net_worth_snapshots_user_date_idx ON net_worth_snapshots (user_id, snapshot_date);
+      CREATE INDEX IF NOT EXISTS monthly_cash_flow_user_ym_idx ON monthly_cash_flow (user_id, year_month);
+      CREATE INDEX IF NOT EXISTS ai_proposals_user_status_idx ON ai_proposals (user_id, status);
+      CREATE INDEX IF NOT EXISTS ai_proposals_pending_tx_idx ON ai_proposals (user_id, ((payload->>'transactionId'))) WHERE status = 'pending' AND type = 'categorize';
+      CREATE INDEX IF NOT EXISTS scheduler_job_logs_user_started_idx ON scheduler_job_logs (user_id, started_at);
+      CREATE INDEX IF NOT EXISTS scheduler_job_logs_started_at_idx ON scheduler_job_logs (started_at);
+      CREATE INDEX IF NOT EXISTS issues_user_created_idx ON issues (user_id, created_at);
+    `);
+
+    // 14. Self-heal AI proposals: prune duplicates and resolve stale proposals for already categorized transactions
+    await client.query(`
+      DELETE FROM ai_proposals
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY user_id, (payload->>'transactionId')
+                   ORDER BY created_at DESC, id DESC
+                 ) as rn
+          FROM ai_proposals
+          WHERE status = 'pending'
+            AND type = 'categorize'
+            AND (payload->>'transactionId') IS NOT NULL
+        ) dupes
+        WHERE dupes.rn > 1
+      );
+
+      UPDATE ai_proposals
+      SET status = 'applied', updated_at = NOW()
+      WHERE status = 'pending'
+        AND type = 'categorize'
+        AND (payload->>'transactionId') IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM transactions
+          WHERE transactions.id::text = (ai_proposals.payload->>'transactionId')
+            AND (transactions.category_id IS NOT NULL OR transactions.deleted = true)
+        );
+    `);
   } catch (err) {
     console.error('[migrate] Self-healing checks failed:', err.message);
   }

@@ -1,7 +1,7 @@
 {
   "name": "personal-finance",
   "description": "Self-hosted personal finance dashboard for net worth, cash flow, budgets, goals, real estate, and FIRE planning.",
-  "version": "0.1.0",
+  "version": "2026.10.0",
   "private": true,
   "packageManager": "pnpm@10.23.0",
   "engines": {
@@ -17,7 +17,7 @@
     "start": "next start -p 3000",
     "preview": "next start -p 3000",
     "lint": "eslint . && node scripts/ui-ratchet.mjs",
-    "ci": "pnpm --silent lint && pnpm --silent typecheck && TZ=America/New_York pnpm test && pnpm --silent build",
+    "ci": "./scripts/check-financial-consistency.sh && pnpm --silent lint && pnpm --silent typecheck && TZ=America/New_York pnpm test && pnpm --silent build",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

@@ -56,10 +56,12 @@ vi.mock('archiver', () => {
 });
 
 // Setup mock database
-const mockDb = {
+const mockDb: any = {
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockImplementation((table) => {
-    return {
+    const chain: any = {
+      innerJoin: vi.fn().mockImplementation(() => chain),
+      leftJoin: vi.fn().mockImplementation(() => chain),
       where: vi.fn().mockImplementation(() => {
         if (table === accounts) {
           return Promise.resolve([
@@ -108,13 +110,15 @@ const mockDb = {
           ]);
         }
         return Promise.resolve([]);
-      })
+      }),
     };
+    return chain;
   })
 };
 
 vi.mock('@/lib/db', () => ({
   getDb: () => mockDb,
+  getPool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
 }));
 
 describe('CSV Backup Export ID Decoding', () => {

@@ -55,21 +55,51 @@ export function getProgressBgClass(progress: number): string {
 /**
  * Calculate goal progress percentage
  */
-export function calcGoalProgress(targetAmount: number | string, currentAmount: number | string): number {
+export function calcGoalProgress(
+  targetAmount: number | string,
+  currentAmount: number | string,
+  type?: string,
+  initialAmount?: number | string
+): number {
   const target = typeof targetAmount === 'string' ? parseFloat(targetAmount) : targetAmount;
   const current = typeof currentAmount === 'string' ? parseFloat(currentAmount) : currentAmount;
+  if (isNaN(current)) return 0;
+
+  if (type === 'payoff') {
+    const starting = typeof initialAmount === 'string' ? parseFloat(initialAmount) : (initialAmount ?? 0);
+    const targetVal = isNaN(target) ? 0 : Math.max(0, target);
+    const totalToPayOff = starting > targetVal ? starting - targetVal : starting;
+    if (totalToPayOff <= 0) {
+      return current <= targetVal ? 100 : 0;
+    }
+    const paidOff = starting - current;
+    return Math.max(0, Math.min(100, (paidOff / totalToPayOff) * 100));
+  }
+
   if (!target || target <= 0 || isNaN(target)) return 0;
-  if (isNaN(current) || current <= 0) return 0;
+  if (current <= 0) return 0;
   return Math.max(0, Math.min(100, (current / target) * 100));
 }
 
 /**
  * Calculate remaining amount
  */
-export function calcRemaining(targetAmount: number | string, currentAmount: number | string): number {
+export function calcRemaining(
+  targetAmount: number | string,
+  currentAmount: number | string,
+  type?: string,
+  initialAmount?: number | string
+): number {
   const target = typeof targetAmount === 'string' ? parseFloat(targetAmount) : targetAmount;
   const current = typeof currentAmount === 'string' ? parseFloat(currentAmount) : currentAmount;
-  return Math.max(target - current, 0);
+  if (isNaN(current)) return 0;
+
+  if (type === 'payoff') {
+    const targetVal = isNaN(target) ? 0 : Math.max(0, target);
+    return Math.max(current - targetVal, 0);
+  }
+
+  return Math.max((isNaN(target) ? 0 : target) - current, 0);
 }
 
 /**

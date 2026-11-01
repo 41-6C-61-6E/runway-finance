@@ -13,6 +13,12 @@ vi.mock('@/lib/advice/snapshot', () => ({
   getAdviceSnapshot: vi.fn().mockResolvedValue('## Snapshot\nNet Worth: $500,000'),
 }));
 
+vi.mock('@/lib/finance/categories', () => ({
+  getCategorySpending: vi.fn().mockResolvedValue([
+    { name: 'Dining', amount: 500, transactionCount: 10 },
+  ]),
+}));
+
 describe('Advice Orchestrator', () => {
   const dummyCtx = {
     userId: 'u1',
@@ -93,6 +99,11 @@ describe('Advice Orchestrator', () => {
 
     // Assert exactly 2 provider calls were made
     expect(mockStreamChat).toHaveBeenCalledTimes(2);
+
+    // Assert call #2 received the gathered pack
+    const call2Messages = mockStreamChat.mock.calls[1][0].messages;
+    const call2System = call2Messages.find((m: any) => m.role === 'system')?.content ?? '';
+    expect(call2System).toContain('Category Spending');
 
     // Assert @@NEED was NOT yielded to the client
     const tokenTexts = events.filter((e) => e.type === 'token').map((e) => e.text).join('');

@@ -85,7 +85,7 @@ describe('PWARegister Component', () => {
     });
 
     const toastCall = (toast.info as any).mock.calls[0];
-    expect(toastCall[0]).toBe('A new version of Personal Finance is available!');
+    expect(toastCall[0]).toBe('A new version of Runway Finance is available!');
     
     // Render the toast description component to verify deltaCommits
     const descriptionElement = toastCall[1].description;

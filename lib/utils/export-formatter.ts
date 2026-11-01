@@ -36,9 +36,13 @@ export function toCsv(rows: Record<string, unknown>[], customHeaders?: { key: st
 
 function escapeCsvField(val: string): string {
   let sanitized = val;
-  // Prevent CSV / Excel Formula Injection (DDE)
-  if (/^[=+\-@\t\r|]/.test(sanitized)) {
-    sanitized = `'${sanitized}`;
+  const trimmed = sanitized.trimStart();
+  // Prevent CSV / Excel Formula Injection (DDE) including leading whitespace evasion
+  if (/^[=+\-@\t\r|]/.test(trimmed)) {
+    // Do not escape valid negative numbers
+    if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      sanitized = `'${sanitized}`;
+    }
   }
 
   if (sanitized.includes(',') || sanitized.includes('"') || sanitized.includes('\n') || sanitized.includes('\r')) {

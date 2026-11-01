@@ -331,7 +331,7 @@ export function ScenariosTab({
             {!isStrategiesCollapsed && (
               <div className="p-5 space-y-6">
                 {appliedMsg && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200">
+                  <div className="bg-constructive/10 border border-constructive/30 text-constructive px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
                     {appliedMsg}
                   </div>
@@ -432,24 +432,24 @@ export function ScenariosTab({
 
                               <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
                                 {strat.summary.depletionAge ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
                                     <AlertTriangle className="w-3 h-3" /> Depleted Age {strat.summary.depletionAge}
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-constructive/10 text-constructive border border-constructive/20">
                                     <Check className="w-3 h-3" /> Age {plan?.lifeExpectancyAge || 90}+ (100%)
                                   </span>
                                 )}
                               </td>
 
                               <td className="px-3 py-3.5 text-right align-middle whitespace-nowrap">
-                                <span className={`font-mono font-bold text-xs ${isHighestNW ? 'text-emerald-500' : 'text-foreground'}`}>
+                                <span className={`font-mono font-bold text-xs ${isHighestNW ? 'text-constructive' : 'text-foreground'}`}>
                                   {formatCurrency(strat.summary.endNW)}
                                 </span>
                               </td>
 
                               <td className="px-3 py-3.5 text-right align-middle whitespace-nowrap">
-                                <div className={`font-mono font-semibold ${isLowestTax ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                                <div className={`font-mono font-semibold ${isLowestTax ? 'text-constructive' : 'text-muted-foreground'}`}>
                                   {formatCurrency(strat.summary.totalTaxes)}
                                 </div>
                                 <div className="text-[10px] text-muted-foreground/80 font-mono">
@@ -458,7 +458,7 @@ export function ScenariosTab({
                               </td>
 
                               <td className="px-3 py-3.5 text-right align-middle whitespace-nowrap">
-                                <span className="font-mono text-amber-500 font-semibold">
+                                <span className="font-mono text-status-warning font-semibold">
                                   {strat.summary.maxRmd > 0 ? formatCurrency(strat.summary.maxRmd) : '$0'}
                                 </span>
                               </td>
@@ -517,15 +517,15 @@ export function ScenariosTab({
                                       </div>
                                       <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
                                         <h5 className="font-bold text-indigo-500 flex items-center gap-1.5 text-xs">
-                                          <Zap className="w-3.5 h-3.5 text-indigo-500" /> Phase 2: Pre-RMD Window (Ages 59.5 - 74)
+                                          <Zap className="w-3.5 h-3.5 text-chart-2" /> Phase 2: Pre-RMD Window (Ages 59.5 - 74)
                                         </h5>
                                         <p className="text-[11px] text-muted-foreground leading-relaxed">
                                           {strat.phases.preRmd}
                                         </p>
                                       </div>
                                       <div className="bg-card p-4 rounded-xl border border-border space-y-1.5 shadow-sm">
-                                        <h5 className="font-bold text-amber-500 flex items-center gap-1.5 text-xs">
-                                          <ShieldCheck className="w-3.5 h-3.5 text-amber-500" /> Phase 3: RMD & Legacy (Age 75+)
+                                        <h5 className="font-bold text-status-warning flex items-center gap-1.5 text-xs">
+                                          <ShieldCheck className="w-3.5 h-3.5 text-status-warning" /> Phase 3: RMD & Legacy (Age 75+)
                                         </h5>
                                         <p className="text-[11px] text-muted-foreground leading-relaxed">
                                           {strat.phases.rmd}
@@ -560,9 +560,9 @@ export function ScenariosTab({
                                                   <td className="px-3 py-1.5 font-bold text-foreground font-sans">Age {y.primaryAge ?? y.age}</td>
                                                   <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.cash || 0)}</td>
                                                   <td className="px-3 py-1.5 text-right">{formatCurrency(y.drawdownsByType?.taxable || 0)}</td>
-                                                  <td className="px-3 py-1.5 text-right text-amber-500 font-medium">{formatCurrency(y.drawdownsByType?.traditional || 0)}</td>
-                                                  <td className="px-3 py-1.5 text-right text-purple-500 font-medium">{formatCurrency(y.drawdownsByType?.roth || 0)}</td>
-                                                  <td className="px-3 py-1.5 text-right text-rose-400 font-medium">{formatCurrency(y.taxesPaid || 0)}</td>
+                                                  <td className="px-3 py-1.5 text-right text-status-warning font-medium">{formatCurrency(y.drawdownsByType?.traditional || 0)}</td>
+                                                  <td className="px-3 py-1.5 text-right text-chart-5 font-medium">{formatCurrency(y.drawdownsByType?.roth || 0)}</td>
+                                                  <td className="px-3 py-1.5 text-right text-destructive font-medium">{formatCurrency(y.taxesPaid || 0)}</td>
                                                   <td className="px-3 py-1.5 text-right font-bold text-foreground">{formatCurrency(y.netWorth || 0)}</td>
                                                 </tr>
                                               ))}

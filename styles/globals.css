@@ -809,3 +809,16 @@ button,
     transform: translateY(0);
   }
 }
+
+/* ── Reduce Transparency Accessibility Overrides ─────────────────────────── */
+.reduce-transparency-active [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.reduce-transparency-active [class*="bg-background/"],
+.reduce-transparency-active [class*="bg-card/"],
+.reduce-transparency-active [class*="bg-popover/"],
+.reduce-transparency-active [class*="bg-muted/"] {
+  background-opacity: 1 !important;
+}

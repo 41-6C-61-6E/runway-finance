@@ -23,14 +23,18 @@ vi.mock('@/components/user-settings-provider', () => ({
   useUserSettings: () => mockUseUserSettings(),
 }));
 
-vi.mock('@/components/budgets/budget-period-selector', () => ({
-  useBudgetPeriod: () => ({
-    periodType: 'monthly',
-    periodKey: '2026-08',
-    setPeriodType: vi.fn(),
-    setPeriodKey: vi.fn(),
-  }),
-}));
+vi.mock('@/components/budgets/budget-period-selector', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/budgets/budget-period-selector')>();
+  return {
+    ...actual,
+    useBudgetPeriod: () => ({
+      periodType: 'monthly',
+      periodKey: '2026-08',
+      setPeriodType: vi.fn(),
+      setPeriodKey: vi.fn(),
+    }),
+  };
+});
 
 const mockBudgets = [
   {

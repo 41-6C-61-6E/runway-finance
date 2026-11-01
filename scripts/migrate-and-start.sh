@@ -53,8 +53,11 @@ node /app/scripts/migrate.mjs 2>&1
 MIGRATE_EXIT=$?
 if [ $MIGRATE_EXIT -eq 0 ]; then
   echo "[init] Migrations completed successfully."
+elif [ "${IGNORE_MIGRATION_FAILURES:-false}" = "true" ]; then
+  echo "[init] WARNING: Migrations failed with exit code $MIGRATE_EXIT, continuing anyway because IGNORE_MIGRATION_FAILURES=true..."
 else
-  echo "[init] WARNING: Migrations failed with exit code $MIGRATE_EXIT, continuing with server startup..."
+  echo "[init] FATAL: Database migrations failed with exit code $MIGRATE_EXIT. Aborting startup."
+  exit $MIGRATE_EXIT
 fi
 
 echo "[init] Starting Next.js server..."

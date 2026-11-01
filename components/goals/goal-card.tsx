@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { GoalProgressRing } from './goal-progress-ring';
 import { GoalTypeIcon } from './goal-type-icon';
-import { formatCurrency, getDaysRemaining, calcMonthlySavings } from '@/lib/utils/goals';
+import { formatCurrency, getDaysRemaining, calcMonthlySavings, calcGoalProgress, calcRemaining } from '@/lib/utils/goals';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Target, AlertCircle, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -18,6 +18,7 @@ interface Goal {
   type: string;
   targetAmount: string;
   currentAmount: string;
+  initialAmount?: string;
   allocatedAmount?: number;
   isUnderfunded?: boolean;
   accountBalance?: number | null;
@@ -123,14 +124,15 @@ export function GoalCard({
   const target = Math.max(0, parseFloat(goal.targetAmount) || 0);
   // Use allocatedAmount for linked accounts (considers priority allocation), fall back to currentAmount
   const current = Math.max(0, parseFloat(goal.allocatedAmount?.toString() ?? goal.currentAmount) || 0);
-  const progress = target > 0 ? Math.max(0, Math.min(100, (current / target) * 100)) : 0;
+  const initial = parseFloat(goal.initialAmount?.toString() ?? '0') || 0;
+  const progress = calcGoalProgress(target, current, goal.type, initial);
   const barColor = progress >= 75 ? 'bg-chart-1' :
                    progress >= 50 ? 'bg-chart-3' :
                    progress >= 25 ? 'bg-status-warning' : 'bg-destructive';
   const barBg = progress >= 75 ? 'bg-chart-1/20' :
                 progress >= 50 ? 'bg-chart-3/20' :
                 progress >= 25 ? 'bg-status-warning/20' : 'bg-destructive/20';
-  const remaining = Math.max(target - current, 0);
+  const remaining = calcRemaining(target, current, goal.type, initial);
   const days = getDaysRemaining(goal.targetDate);
   const isOverdue = days !== null && days < 0 && goal.status === 'active';
   const isCompleted = progress >= 100 || goal.status === 'completed';

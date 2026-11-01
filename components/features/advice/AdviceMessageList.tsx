@@ -119,7 +119,7 @@ export function AdviceMessageList({
                 }`}
               >
                 {isUser ? (
-                  <div className="whitespace-pre-wrap">{m.content}</div>
+                  <div className="whitespace-pre-wrap blur-number">{m.content}</div>
                 ) : (
                   <>
                     {m.error ? (

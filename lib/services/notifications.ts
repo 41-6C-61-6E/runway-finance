@@ -659,10 +659,16 @@ export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Ui
     }
 
     // R14: cheap dedup check before the expensive wealth-flow computation.
-    // The key is stable per alert day (e.g. "sunday"), so if we already alerted
-    // for this alert day we can skip the full flow calculation entirely.
-    // Uses the locale-independent day name to avoid timezone/dst inconsistencies.
-    const weeklyKey = `weekly_net_worth_change:${alertDay}`;
+    // Scoped to the alert day and ISO year-week in the user's timezone so subsequent
+    // runs during the same day dedup cleanly, while next week generates a new alert.
+    const dateInTz = userTzDate.toLocaleDateString('en-CA', { timeZone: tz });
+    const [yKey, mKey, dKey] = dateInTz.split('-').map(Number);
+    const tzDate = new Date(Date.UTC(yKey, mKey - 1, dKey));
+    tzDate.setUTCDate(tzDate.getUTCDate() + 4 - (tzDate.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(tzDate.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil(((tzDate.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    const yearWeek = `${tzDate.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+    const weeklyKey = `weekly_net_worth_change:${alertDay}:${yearWeek}`;
     try {
       const [alreadySent] = await db
         .select({ id: sentNotifications.id })
@@ -1932,7 +1938,7 @@ export async function checkStaleConnectionsAndNotify(userId: string, dek: Uint8A
       }
 
       const connectionDisplayName =
-        (await getConnectionDisplayName(connectionId)) ||
+        (await getConnectionDisplayName(connectionId, dek)) ||
         conn?.institutionName ||
         conn?.label ||
         null;

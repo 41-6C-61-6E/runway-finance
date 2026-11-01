@@ -489,7 +489,7 @@ export function MobileNav() {
     return index % 2 === 0 ? 'animate-wiggle-even' : 'animate-wiggle-odd';
   };
 
-  const backdropClasses = `fixed inset-0 z-30 bg-transparent transition-opacity duration-300 md:hidden ${
+  const backdropClasses = `fixed inset-0 z-30 bg-black/50 backdrop-blur-xs transition-opacity duration-300 md:hidden ${
     isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
   }`;
 

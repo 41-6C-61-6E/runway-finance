@@ -8,6 +8,7 @@ import { PieChart, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getDisplayTicker, type InvestmentHolding } from '@/lib/types/investments';
 import type { QuoteData } from '@/app/api/investments/quotes/route';
+import { TaxWrapper, TAX_WRAPPER_MAP, getTaxWrapper } from '@/lib/utils/account-scope';
 
 interface Account {
   id: string;
@@ -24,27 +25,6 @@ interface TaxBreakdownProps {
   quotes?: QuoteData[];
   title?: React.ReactNode;
 }
-
-type TaxWrapper = 'Tax-Free' | 'Tax-Deferred' | 'Taxable' | 'Other';
-
-const TAX_WRAPPER_MAP: Record<string, TaxWrapper> = {
-  rothira: 'Tax-Free',
-  hsa: 'Tax-Free',
-  health: 'Tax-Free',
-  '401k': 'Tax-Deferred',
-  '403b': 'Tax-Deferred',
-  traditionalira: 'Tax-Deferred',
-  sepira: 'Tax-Deferred',
-  simpleira: 'Tax-Deferred',
-  pension: 'Tax-Deferred',
-  retirement: 'Tax-Deferred',
-  investment: 'Taxable',
-  brokerage: 'Taxable',
-  stock_option: 'Taxable',
-  '529': 'Other',
-  otherAsset: 'Other',
-  otherinvestment: 'Other',
-};
 
 const WRAPPER_COLORS: Record<TaxWrapper, string> = {
   'Tax-Free':     'var(--color-chart-1)',
@@ -83,13 +63,16 @@ export function TaxBreakdown({ accounts, holdings, quotes, title }: TaxBreakdown
 
         totals['Tax-Free'] = (totals['Tax-Free'] ?? 0) + rothVal;
 
-        // Non-Roth gets the default wrapper
-        const defaultWrapper = TAX_WRAPPER_MAP[acc.type.toLowerCase()] ?? 'Other';
-        // Note: if the default wrapper is already Tax-Free (e.g. rothira), then the remaining portion should go to Tax-Deferred
-        const nonRothWrapper = defaultWrapper === 'Tax-Free' ? 'Tax-Deferred' : defaultWrapper;
-        totals[nonRothWrapper] = (totals[nonRothWrapper] ?? 0) + nonRothVal;
+        // Non-Roth gets wrapper without Roth override
+        const nonRothWrapper = getTaxWrapper({
+          type: acc.type,
+          name: acc.name?.replace(/roth/gi, ''),
+          metadata: null,
+        });
+        const finalNonRothWrapper = nonRothWrapper === 'Tax-Free' ? 'Tax-Deferred' : nonRothWrapper;
+        totals[finalNonRothWrapper] = (totals[finalNonRothWrapper] ?? 0) + nonRothVal;
       } else {
-        const wrapper = TAX_WRAPPER_MAP[acc.type.toLowerCase()] ?? 'Other';
+        const wrapper = getTaxWrapper(acc);
         totals[wrapper] = (totals[wrapper] ?? 0) + balance;
       }
     }
@@ -126,6 +109,8 @@ export function TaxBreakdown({ accounts, holdings, quotes, title }: TaxBreakdown
       gainLoss: number;
       hasGainLoss: boolean;
       directReturnPct: number | null;
+      weightedReturnSum?: number;
+      weightedReturnVal?: number;
     }>();
 
     for (const h of holdings) {
@@ -148,6 +133,8 @@ export function TaxBreakdown({ accounts, holdings, quotes, title }: TaxBreakdown
           gainLoss: gl != null ? gl : 0,
           hasGainLoss: gl != null,
           directReturnPct: h.unrealizedReturnPct ?? null,
+          weightedReturnSum: h.unrealizedReturnPct != null && val > 0 ? h.unrealizedReturnPct * val : undefined,
+          weightedReturnVal: h.unrealizedReturnPct != null && val > 0 ? val : undefined,
         });
       } else {
         existing.value += val;
@@ -158,6 +145,13 @@ export function TaxBreakdown({ accounts, holdings, quotes, title }: TaxBreakdown
         if (gl != null) {
           existing.gainLoss += gl;
           existing.hasGainLoss = true;
+        }
+        if (h.unrealizedReturnPct != null && val > 0) {
+          const currentSum = (existing.weightedReturnSum ?? (existing.directReturnPct != null ? existing.directReturnPct * (existing.value - val) : 0)) + h.unrealizedReturnPct * val;
+          const currentVal = (existing.weightedReturnVal ?? (existing.value - val)) + val;
+          existing.weightedReturnSum = currentSum;
+          existing.weightedReturnVal = currentVal;
+          existing.directReturnPct = currentVal > 0 ? currentSum / currentVal : h.unrealizedReturnPct;
         }
       }
     }

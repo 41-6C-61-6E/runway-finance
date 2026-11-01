@@ -67,6 +67,8 @@ const ASSET_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
 const DEBT_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
   credit: { label: 'Credit Cards' },
   loan: { label: 'Loans' },
+  heloc: { label: 'Loans' },
+  personal_loan: { label: 'Loans' },
   mortgage: { label: 'Mortgages' },
   studentloan: { label: 'Student Loans' },
   autoloan: { label: 'Auto Loans' },

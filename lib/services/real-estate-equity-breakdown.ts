@@ -137,7 +137,7 @@ export function computeEquityBreakdown(
   //    that balance. A paid-off loan contributes its full original amount;
   //    the final payoff itself is the last principal payment.
   const activeOriginal = activeMortgages.reduce((sum, m) => sum + originalOf(m), 0);
-  const principalPaid =
+  let principalPaid =
     Math.max(0, activeOriginal - currentTotalMortgage) +
     closedMortgages.reduce((sum, m) => {
       const original = originalOf(m);
@@ -147,10 +147,41 @@ export function computeEquityBreakdown(
     }, 0);
 
   // 3. Down Payment and Loan Costs (Initial Equity at Purchase)
-  const downPayment = Math.max(0, pp - originalTotalMortgage);
+  let downPayment = Math.max(0, pp - originalTotalMortgage);
 
   // 4. Value Appreciation (Market Growth)
-  const appreciation = Math.max(0, val - pp);
+  let appreciation = Math.max(0, val - pp);
+
+  // Net equity extraction from cash-out refinances:
+  // When a homeowner refinances into a larger loan than the payoff balance of the old loan,
+  // cash was extracted from home equity. That extraction must reduce accumulated equity components.
+  const totalClosedPayoff = closedMortgages
+    .filter((m) => String(meta(m).mortgageStatus ?? '') === 'refinanced')
+    .reduce((s, m) => s + toMetadataNumber(meta(m).payoffBalance), 0);
+  const netCashOut =
+    closedMortgages.length > 0 && totalClosedPayoff > 0
+      ? Math.max(0, activeOriginal - totalClosedPayoff)
+      : 0;
+
+  if (netCashOut > 0) {
+    let remCashOut = netCashOut;
+    // Absorb cash-out first from prior principal paid, then appreciation, then down payment
+    const prDeduct = Math.min(principalPaid, remCashOut);
+    principalPaid -= prDeduct;
+    remCashOut -= prDeduct;
+
+    if (remCashOut > 0) {
+      const apDeduct = Math.min(appreciation, remCashOut);
+      appreciation -= apDeduct;
+      remCashOut -= apDeduct;
+    }
+
+    if (remCashOut > 0) {
+      const dpDeduct = Math.min(downPayment, remCashOut);
+      downPayment -= dpDeduct;
+      remCashOut -= dpDeduct;
+    }
+  }
 
   // Handle edge case: Depreciated / Underwater property
   // “Underwater” here describes a property whose current value is below its
@@ -165,6 +196,17 @@ export function computeEquityBreakdown(
     const initialTotalEquity = downPayment + principalPaid;
     const ratio = initialTotalEquity > 0 ? Math.min(1, computedTotalEquity / initialTotalEquity) : 0;
     return scaleDown(val, pp, downPayment * ratio, principalPaid * ratio, 0, mortgageOwed, isUnderwater, activeMortgages.length, currentTotalMortgage);
+  }
+
+  // Ensure accounting identity: downPayment + principalPaid + appreciation === totalEquity
+  // If due to other debt additions or edge cases components exceed total equity, scale them
+  const sumComponents = downPayment + principalPaid + appreciation;
+  if (sumComponents > 0 && Math.abs(sumComponents - computedTotalEquity) > 0.01 && sumComponents > computedTotalEquity) {
+    const ratio = computedTotalEquity / sumComponents;
+    const scaledDp = Math.round(downPayment * ratio * 100) / 100;
+    const scaledPr = Math.round(principalPaid * ratio * 100) / 100;
+    const scaledAp = Math.max(0, Math.round((computedTotalEquity - scaledDp - scaledPr) * 100) / 100);
+    return scaleDown(val, pp, scaledDp, scaledPr, scaledAp, mortgageOwed, isUnderwater, activeMortgages.length, currentTotalMortgage);
   }
 
   return {

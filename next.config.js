@@ -94,7 +94,9 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self';",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com;",
+              ...(process.env.NODE_ENV === "production"
+                ? ["script-src 'self' 'unsafe-inline' https://cdn.plaid.com;"]
+                : ["script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com;"]),
               "style-src 'self' 'unsafe-inline';",
               "img-src 'self' blob: data:;",
               "font-src 'self' data:;",
@@ -104,7 +106,9 @@ const nextConfig = {
               "base-uri 'self';",
               "form-action 'self';",
               ...(process.env.NODE_ENV === "production" ? ["frame-ancestors 'none';"] : []),
-              ...(process.env.NODE_ENV === "production" ? ["upgrade-insecure-requests;"] : []),
+              ...(process.env.NODE_ENV === "production" && process.env.ENABLE_HTTPS_UPGRADE === "true"
+                ? ["upgrade-insecure-requests;"]
+                : []),
             ].join(" "),
           },
           ...(process.env.NODE_ENV === "production" ? [{ key: "X-Frame-Options", value: "DENY" }] : []),
@@ -112,7 +116,7 @@ const nextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
           { key: "Permissions-Policy", value: "geolocation=(), microphone=(), camera=(), interest-cohort=()" },
-          ...(process.env.NODE_ENV === "production"
+          ...(process.env.NODE_ENV === "production" && process.env.ENABLE_HTTPS_UPGRADE === "true"
             ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]
             : []),
         ],

@@ -29,8 +29,23 @@ export function ClientErrorReporter({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isBoundaryActive, setIsBoundaryActive] = useState(false);
   const reportedErrorsRef = useRef<Set<string>>(new Set());
+  const reportTimestampsRef = useRef<number[]>([]);
+
+  const canReport = () => {
+    const now = Date.now();
+    // Keep only timestamps from the last 60 seconds
+    reportTimestampsRef.current = reportTimestampsRef.current.filter((t) => now - t < 60000);
+    if (reportTimestampsRef.current.length >= 5) {
+      return false;
+    }
+    reportTimestampsRef.current.push(now);
+    return true;
+  };
 
   const autoReportError = async (payload: { name: string; message: string; stack?: string; url: string }, id: string) => {
+    if (!canReport()) {
+      return;
+    }
     try {
       const response = await fetch('/api/logs/client', {
         method: 'POST',
@@ -71,7 +86,10 @@ export function ClientErrorReporter({ children }: { children: ReactNode }) {
       date: new Date().toISOString(),
     };
 
-    setErrors((prev) => [...prev, newErr]);
+    setErrors((prev) => {
+      const next = [...prev, newErr];
+      return next.length > 50 ? next.slice(next.length - 50) : next;
+    });
     autoReportError(payload, newId);
   };
 

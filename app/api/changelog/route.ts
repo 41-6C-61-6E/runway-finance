@@ -11,8 +11,8 @@ export async function GET() {
   }
 
   try {
-    let buildNumber = process.env.NEXT_PUBLIC_BUILD_NUMBER || 'dev';
-    let buildTime = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString();
+    let buildNumber = process.env.NEXT_PUBLIC_BUILD_NUMBER || process.env.BUILD_NUMBER || 'dev';
+    let buildTime = process.env.NEXT_PUBLIC_BUILD_TIME || process.env.BUILD_TIME || new Date().toISOString();
     let gitHistory: Array<{
       hash: string;
       fullHash: string;
@@ -63,11 +63,14 @@ export async function GET() {
 
     let fileHistory: typeof gitHistory = [];
 
-    // Read version-info.json for fallback history or extra build details
-    const versionInfoPath = path.join(process.cwd(), 'public', 'version-info.json');
-    if (fs.existsSync(versionInfoPath)) {
+    // Read version-info.json for fallback history or extra build details from server-only directory
+    const versionInfoPath = path.join(process.cwd(), 'lib', 'generated', 'version-info.json');
+    const fallbackNextPath = path.join(process.cwd(), '.next', 'version-info.json');
+    const targetPath = fs.existsSync(versionInfoPath) ? versionInfoPath : (fs.existsSync(fallbackNextPath) ? fallbackNextPath : null);
+
+    if (targetPath) {
       try {
-        const fileContent = fs.readFileSync(versionInfoPath, 'utf8');
+        const fileContent = fs.readFileSync(targetPath, 'utf8');
         const info = JSON.parse(fileContent);
         if (info.buildNumber && buildNumber === 'dev') {
           buildNumber = info.buildNumber;

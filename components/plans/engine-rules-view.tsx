@@ -89,35 +89,35 @@ export function EngineRulesView({
       id: 'accumulation' as const,
       title: '1. Pre-Retirement Accumulation',
       ageSpan: 'Age 20 – 55',
-      badgeColor: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
+      badgeColor: 'bg-constructive/10 text-constructive border-constructive/30',
       description: 'Active earned income phase where savings are routed through pre-tax & post-tax investment waterfalls.',
     },
     {
       id: 'early_retirement' as const,
       title: '2. Early Retirement & Penalty Guard',
       ageSpan: 'Age 45 – 59.5',
-      badgeColor: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+      badgeColor: 'bg-status-warning/10 text-status-warning border-status-warning/30',
       description: 'Living off portfolio drawdowns before age 59.5 with strict 10% & 20% early withdrawal penalty checks & Rule of 55 exceptions.',
     },
     {
       id: 'roth_ladder' as const,
       title: '3. Roth Conversion Ladder',
       ageSpan: 'Age 55 – 65',
-      badgeColor: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
+      badgeColor: 'bg-chart-5/10 text-chart-5 border-chart-5/30',
       description: 'Optimized pre-tax to Roth conversions filling lower tax brackets before RMDs begin, with optional IRMAA cliff avoidance.',
     },
     {
       id: 'medicare_irmaa' as const,
       title: '4. Medicare & ACA Healthcare Transition',
       ageSpan: 'Age 60 – 65+',
-      badgeColor: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+      badgeColor: 'bg-chart-1/10 text-chart-1 border-chart-1/30',
       description: 'ACA subsidies bridge early retirement up to age 65; Medicare IRMAA Part B & D surcharges trigger based on MAGI from 2 years prior.',
     },
     {
       id: 'rmd_phase' as const,
       title: '5. Mandatory RMD & Estate Phase',
       ageSpan: 'Age 73 – 100+',
-      badgeColor: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30',
+      badgeColor: 'bg-chart-2/10 text-chart-2 border-chart-2/30',
       description: 'SECURE Act 2.0 mandatory distributions using IRS Table III divisors, plus Social Security taxation (up to 85%) and 10-year inherited IRA rules.',
     },
   ];
@@ -132,7 +132,7 @@ export function EngineRulesView({
             <h3 className="text-lg font-bold text-foreground tracking-tight">
               FIRE Calculation Engine: Rules & Parameters
             </h3>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-constructive bg-constructive/10 px-2.5 py-0.5 rounded-full border border-constructive/30">
               Active Ruleset
             </span>
           </div>

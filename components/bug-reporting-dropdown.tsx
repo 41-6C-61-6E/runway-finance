@@ -346,6 +346,8 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
             onClick={() => setOpen(!open)}
             className={`${glassIconButton} ${open ? glassItemActive : glassItemInactive}`}
             aria-label="Submit Feedback / Track issues"
+            aria-haspopup="true"
+            aria-expanded={open}
           >
             <MessageSquare className="w-5 h-5" />
             {openIssues.length > 0 && (

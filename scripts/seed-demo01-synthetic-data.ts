@@ -6,6 +6,8 @@ import {
   aiProposals,
   budgets,
   categories,
+  customAlertRules,
+  equityGrants,
   financialGoals,
   goalAllocationHistory,
   holdings,
@@ -53,6 +55,8 @@ async function seed() {
   console.log('Cleaning existing demo01 test data...');
   await db.delete(aiProposals).where(eq(aiProposals.userId, USER_ID));
   await db.delete(userNotifications).where(eq(userNotifications.userId, USER_ID));
+  await db.delete(customAlertRules).where(eq(customAlertRules.userId, USER_ID));
+  await db.delete(equityGrants).where(eq(equityGrants.userId, USER_ID));
   await db.delete(transactionTags).where(
     inArray(
       transactionTags.transactionId,
@@ -2237,6 +2241,64 @@ async function seed() {
       urlPath: '/budgets',
       type: 'budget_alert',
       isRead: false,
+    },
+  ]);
+
+  // ── 15b. Equity Grants ───────────────────────────────────────────────────────
+  console.log('Inserting equity grants...');
+  await db.insert(equityGrants).values([
+    {
+      userId: USER_ID,
+      accountId: brokerageId,
+      companyName: 'Pacific Cloud Labs, Inc.',
+      grantName: 'Initial ISO Options Grant',
+      grantType: 'iso',
+      grantDate: '2022-01-15',
+      vestingStartDate: '2022-01-15',
+      expirationDate: '2032-01-15',
+      totalShares: '10000',
+      exercisedShares: '2500',
+      soldShares: '0',
+      strikePrice: '2.50',
+      currentFmv: '18.75',
+      preferredPrice: '24.00',
+      valuationMode: 'fmv',
+      vestingSchedule: JSON.stringify({
+        cliffMonths: 12,
+        totalMonths: 48,
+        cliffPercentage: 25,
+      }),
+      earlyExerciseAllowed: true,
+      filed83b: true,
+      earlyExerciseDate: '2022-02-01',
+      notes: 'Initial hire options grant with 1-year cliff and 83(b) election filed.',
+    },
+  ]);
+
+  // ── 15c. Custom Alert Rules ──────────────────────────────────────────────────
+  console.log('Inserting custom alert rules...');
+  await db.insert(customAlertRules).values([
+    {
+      userId: USER_ID,
+      name: 'High Transaction Alert (> $1,000)',
+      isEnabled: true,
+      triggerType: 'transaction',
+      criteria: { amountMin: 1000 },
+      conditionOperator: 'AND',
+      conditions: [
+        { field: 'amount_min', value: 1000 }
+      ],
+    },
+    {
+      userId: USER_ID,
+      name: 'Emergency Fund Floor Alert (< $30,000)',
+      isEnabled: true,
+      triggerType: 'account_balance',
+      criteria: { value: 30000, operator: 'less_than', compareType: 'value' },
+      conditionOperator: 'AND',
+      conditions: [
+        { field: 'balance_below_value', value: 30000 }
+      ],
     },
   ]);
 

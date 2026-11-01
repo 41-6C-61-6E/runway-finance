@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useUserSettings } from '@/components/user-settings-provider';
 
 export const CHARTS = {
   netWorth: {
@@ -28,7 +29,6 @@ export const CHARTS = {
       cashVsCredit: 'Cash vs Credit',
     },
   },
-
   realEstate: {
     label: 'Real Estate',
     charts: {
@@ -68,21 +68,31 @@ export const CHARTS = {
   },
 } as const;
 
-const defaultVisibility: Partial<Record<string, boolean>> = {};
-
 export function useChartVisibility() {
-  const [visibility, setVisibility] = useState<Partial<Record<string, boolean>>>(defaultVisibility);
-  const [loading, setLoading] = useState(true);
+  const userSettingsCtx = useUserSettings();
+
+  const [localVisibility, setLocalVisibility] = useState<Record<string, boolean>>({});
+  const [localLoading, setLocalLoading] = useState(!userSettingsCtx);
 
   useEffect(() => {
+    if (userSettingsCtx) return;
     fetch('/api/user-settings', { credentials: 'include', cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        setVisibility(data.chartVisibility ?? {});
+        setLocalVisibility(data?.chartVisibility ?? {});
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setLocalLoading(false));
+  }, [userSettingsCtx]);
+
+  const visibility = useMemo<Record<string, boolean>>(() => {
+    if (userSettingsCtx) {
+      return (userSettingsCtx.settings?.chartVisibility as Record<string, boolean>) ?? {};
+    }
+    return localVisibility;
+  }, [userSettingsCtx, userSettingsCtx?.settings?.chartVisibility, localVisibility]);
+
+  const loading = userSettingsCtx ? userSettingsCtx.loading : localLoading;
 
   const isVisible = useCallback(
     (chartId: string) => {
@@ -96,7 +106,13 @@ export function useChartVisibility() {
     async (chartId: string, visible: boolean) => {
       const prev = visibility;
       const next = { ...prev, [chartId]: visible };
-      setVisibility(next);
+
+      if (userSettingsCtx) {
+        await userSettingsCtx.updateSetting('chartVisibility', next);
+        return;
+      }
+
+      setLocalVisibility(next);
       try {
         const res = await fetch('/api/user-settings', {
           method: 'PATCH',
@@ -106,17 +122,23 @@ export function useChartVisibility() {
         });
         if (!res.ok) throw new Error('Failed to save visibility');
       } catch {
-        setVisibility(prev);
+        setLocalVisibility(prev);
       }
     },
-    [visibility]
+    [visibility, userSettingsCtx]
   );
 
   const updateMultiple = useCallback(
     async (updates: Record<string, boolean>) => {
       const prev = visibility;
       const next = { ...prev, ...updates };
-      setVisibility(next);
+
+      if (userSettingsCtx) {
+        await userSettingsCtx.updateSetting('chartVisibility', next);
+        return;
+      }
+
+      setLocalVisibility(next);
       try {
         const res = await fetch('/api/user-settings', {
           method: 'PATCH',
@@ -126,10 +148,10 @@ export function useChartVisibility() {
         });
         if (!res.ok) throw new Error('Failed to save visibility');
       } catch {
-        setVisibility(prev);
+        setLocalVisibility(prev);
       }
     },
-    [visibility]
+    [visibility, userSettingsCtx]
   );
 
   return { visibility, loading, isVisible, updateVisibility, updateMultiple };

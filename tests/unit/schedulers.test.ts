@@ -19,6 +19,10 @@ class TestScheduler extends BaseScheduler<string> {
   }
 }
 
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(async () => ({ user: { id: 'user_1' } })),
+}));
+
 vi.mock('@/lib/crypto-context', () => ({
   getServerDEK: vi.fn(async (userId: string) => {
     if (userId === 'user_valid') return new Uint8Array(32);
@@ -96,6 +100,34 @@ describe('BaseScheduler & Schedulers Suite (base-scheduler.ts)', () => {
       expect(scheduler.isDekUnavailableError(new Error('server-wrapped DEK missing'))).toBe(true);
       expect(scheduler.isDekUnavailableError(new Error('Encryption key unavailable'))).toBe(true);
       expect(scheduler.isDekUnavailableError(new Error('Connection timed out'))).toBe(false);
+    });
+  });
+
+  describe('Node Instrumentation Singleton Guard (Finding 9)', () => {
+    it('prevents multiple registrations on Next.js HMR reloads', async () => {
+      const globalNodeInit = globalThis as unknown as { __runwayNodeInstrumentationInitialized?: boolean };
+      delete globalNodeInit.__runwayNodeInstrumentationInitialized;
+
+      const { registerNodeInstrumentation } = await import('@/instrumentation-node');
+      await registerNodeInstrumentation();
+      expect(globalNodeInit.__runwayNodeInstrumentationInitialized).toBe(true);
+
+      // Second invocation should return early without re-executing
+      await registerNodeInstrumentation();
+      expect(globalNodeInit.__runwayNodeInstrumentationInitialized).toBe(true);
+    });
+  });
+
+  describe('Scheduler Health Check (Finding 12)', () => {
+    it('includes stalenessScheduler in health response', async () => {
+      const { GET } = await import('@/app/api/health/scheduler/route');
+      const response = await GET();
+      const body = await response.json();
+
+      expect(body.schedulers).toBeDefined();
+      expect(body.schedulers.stalenessScheduler).toBeDefined();
+      expect(body.schedulers.stalenessScheduler).toHaveProperty('isRunning');
+      expect(body.schedulers.stalenessScheduler).toHaveProperty('armedCount');
     });
   });
 });

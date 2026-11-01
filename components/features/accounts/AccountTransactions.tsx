@@ -313,14 +313,14 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
                     dataKey="date"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
                     ticks={miniTicks}
                     tickFormatter={(d) => formatChartXAxisDate(d, timeframe, { isMonthly: timeframe !== '1m' })}
                   />
                   <YAxis
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 9 }}
+                    tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
                     domain={[minVal, maxVal]}
                     ticks={miniYTicks}
                     tickFormatter={(v: number) => formatChartYAxisCurrency(v, minVal, maxVal)}

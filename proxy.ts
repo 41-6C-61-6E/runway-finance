@@ -57,25 +57,31 @@ export default async function proxy(request: NextRequest, event?: any) {
 
     const allowedOrigins = new Set<string>();
 
-    // 1. Allowed origins from Host header
-    allowedOrigins.add(`http://${host}`);
-    allowedOrigins.add(`https://${host}`);
-
-    // 2. Allowed origins from NEXTAUTH_URL / APP_URL if configured
+    // 1. Allowed origins from NEXTAUTH_URL / APP_URL if configured
     const configuredUrls = [process.env.NEXTAUTH_URL, process.env.NEXT_PUBLIC_APP_URL, process.env.APP_URL].filter(Boolean) as string[];
+    const configuredHosts = new Set<string>();
     for (const urlStr of configuredUrls) {
       try {
         const parsed = new URL(urlStr);
         allowedOrigins.add(parsed.origin);
+        configuredHosts.add(parsed.host);
       } catch {}
     }
 
-    // 3. In non-production, permit loopback alias variants
-    if (process.env.NODE_ENV !== 'production') {
-      const [hostname, port] = host.split(':');
-      const portSuffix = port ? `:${port}` : '';
-      const loopbacks = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]'];
-      if (loopbacks.includes(hostname)) {
+    // 2. Allowed origins from Host header (WS-05-F13: validate host against loopbacks or configured origins)
+    const [hostname, port] = host.split(':');
+    const portSuffix = port ? `:${port}` : '';
+    const loopbacks = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]'];
+    const isLoopback = loopbacks.includes(hostname);
+
+    if (isLoopback || configuredHosts.has(host) || configuredHosts.has(hostname) || configuredUrls.length === 0 || process.env.NODE_ENV !== 'production') {
+      allowedOrigins.add(`http://${host}`);
+      allowedOrigins.add(`https://${host}`);
+    }
+
+    // 3. In non-production or for loopback, permit loopback alias variants
+    if (process.env.NODE_ENV !== 'production' || isLoopback) {
+      if (isLoopback) {
         for (const lb of loopbacks) {
           allowedOrigins.add(`http://${lb}${portSuffix}`);
           allowedOrigins.add(`https://${lb}${portSuffix}`);

@@ -184,11 +184,12 @@ function formatMetadata(metadata?: Record<string, unknown>): string {
 export const logger = {
   info(message: string, metadata?: Record<string, unknown>) {
     if (getActiveLogLevel() <= LOG_LEVELS.info) {
+      const cleanedMeta = metadata ? cleanMetadata(metadata) : undefined;
       const formattedMeta = formatMetadata(metadata);
       const logLineConsole = `[INFO ${ts()}] ${message}`;
       const logLineFile = `[${ts()}] [INFO] ${message}${formattedMeta}`;
 
-      console.log('%s', logLineConsole, metadata ?? '');
+      console.log('%s', logLineConsole, cleanedMeta ?? '');
       if (fileLogger) {
         fileLogger.write(logLineFile);
       }
@@ -197,11 +198,12 @@ export const logger = {
 
   warn(message: string, metadata?: Record<string, unknown>) {
     if (getActiveLogLevel() <= LOG_LEVELS.warn) {
+      const cleanedMeta = metadata ? cleanMetadata(metadata) : undefined;
       const formattedMeta = formatMetadata(metadata);
       const logLineConsole = `[WARN ${ts()}] ${message}`;
       const logLineFile = `[${ts()}] [WARN] ${message}${formattedMeta}`;
 
-      console.warn('%s', logLineConsole, metadata ?? '');
+      console.warn('%s', logLineConsole, cleanedMeta ?? '');
       if (fileLogger) {
         fileLogger.write(logLineFile);
       }
@@ -210,11 +212,12 @@ export const logger = {
 
   error(message: string, metadata?: Record<string, unknown>) {
     if (getActiveLogLevel() <= LOG_LEVELS.error) {
+      const cleanedMeta = metadata ? cleanMetadata(metadata) : undefined;
       const formattedMeta = formatMetadata(metadata);
       const logLineConsole = `[ERROR ${ts()}] ${message}`;
       const logLineFile = `[${ts()}] [ERROR] ${message}${formattedMeta}`;
 
-      console.error('%s', logLineConsole, metadata ?? '');
+      console.error('%s', logLineConsole, cleanedMeta ?? '');
       if (fileLogger) {
         fileLogger.write(logLineFile);
       }
@@ -223,11 +226,12 @@ export const logger = {
 
   debug(message: string, metadata?: Record<string, unknown>) {
     if (getActiveLogLevel() <= LOG_LEVELS.debug) {
+      const cleanedMeta = metadata ? cleanMetadata(metadata) : undefined;
       const formattedMeta = formatMetadata(metadata);
       const logLineConsole = `[DEBUG ${ts()}] ${message}`;
       const logLineFile = `[${ts()}] [DEBUG] ${message}${formattedMeta}`;
 
-      console.debug('%s', logLineConsole, metadata ?? '');
+      console.debug('%s', logLineConsole, cleanedMeta ?? '');
       if (fileLogger) {
         fileLogger.write(logLineFile);
       }

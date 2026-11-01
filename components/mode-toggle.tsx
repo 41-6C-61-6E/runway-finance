@@ -70,6 +70,7 @@ export default function ModeToggle() {
             type="button"
             className={`${baseClass} rounded-l-md border ${theme === "light" ? activeClass : inactiveClass}`}
             aria-label="Daylight Theme"
+            aria-pressed={theme === "light"}
             onClick={() => handleThemeChange("light")}
           >
             <Sun className="h-4 w-4" />
@@ -84,6 +85,7 @@ export default function ModeToggle() {
             type="button"
             className={`${baseClass} border-y ${theme === "moonlight" ? activeClass : inactiveClass}`}
             aria-label="Moonlight Theme"
+            aria-pressed={theme === "moonlight"}
             onClick={() => handleThemeChange("moonlight")}
           >
             <Moon className="h-4 w-4" />
@@ -98,6 +100,7 @@ export default function ModeToggle() {
             type="button"
             className={`${baseClass} rounded-r-md border ${theme === "dark" ? activeClass : inactiveClass}`}
             aria-label="Starlight Theme"
+            aria-pressed={theme === "dark"}
             onClick={() => handleThemeChange("dark")}
           >
             <Star className="h-4 w-4" />

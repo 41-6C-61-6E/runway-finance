@@ -95,7 +95,10 @@ export async function getCashFlowSummary(ctx: FinanceContext): Promise<CashFlowS
       .where(and(
         eq(accounts.userId, ctx.userId),
         eq(accounts.isHidden, false),
-        eq(accounts.isExcludedFromNetWorth, false)
+        or(
+          eq(accounts.isExcludedFromNetWorth, false),
+          eq(accounts.type, 'paystub')
+        )
       ));
 
     const accountTypeById = new Map<string, string>(userAccounts.map(a => [a.id, String(a.type ?? '')]));
@@ -149,9 +152,10 @@ export async function getCashFlowSummary(ctx: FinanceContext): Promise<CashFlowS
         }
         if (excluded) continue;
 
-        const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
-        const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-        const ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dateStr = String(tx.date || '');
+        const ym = /^\d{4}-\d{2}/.test(dateStr)
+          ? dateStr.substring(0, 7)
+          : new Date().toISOString().substring(0, 7);
         const amount = toCashFlowAmount(rawAmount, accountTypeById.get(tx.accountId.toString()));
 
         if (category?.categoryType === 'transfer') continue;
@@ -252,11 +256,9 @@ export async function getMonthlyCashFlow(ctx: FinanceContext, months: number = 1
       .from(accounts)
       .where(and(
         eq(accounts.userId, ctx.userId),
+        eq(accounts.isHidden, false),
         or(
-          and(
-            eq(accounts.isHidden, false),
-            eq(accounts.isExcludedFromNetWorth, false)
-          ),
+          eq(accounts.isExcludedFromNetWorth, false),
           eq(accounts.type, 'paystub')
         )
       ));
@@ -316,9 +318,10 @@ export async function getMonthlyCashFlow(ctx: FinanceContext, months: number = 1
         }
         if (excluded) continue;
 
-        const parsedDate = tx.date ? (typeof tx.date === 'string' ? new Date(tx.date) : tx.date) : new Date();
-        const dateObj = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
-        const ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dateStr = String(tx.date || '');
+        const ym = /^\d{4}-\d{2}/.test(dateStr)
+          ? dateStr.substring(0, 7)
+          : new Date().toISOString().substring(0, 7);
         const amount = toCashFlowAmount(tx.amount, accountTypeById.get(tx.accountId.toString()));
 
         if (!monthlyData[ym]) {

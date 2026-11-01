@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { categoryRules, transactions, transactionTags } from '@/lib/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
@@ -83,11 +83,12 @@ export async function POST(request: Request) {
 
   // 3. RUN Action
   if (action === 'run') {
-    // Fetch rules to apply
+    // Fetch rules to apply ordered deterministically by priority
     const rules = await getDb()
       .select()
       .from(categoryRules)
-      .where(and(eq(categoryRules.userId, userId), inArray(categoryRules.id, ids)));
+      .where(and(eq(categoryRules.userId, userId), inArray(categoryRules.id, ids)))
+      .orderBy(asc(categoryRules.priority), asc(categoryRules.createdAt), asc(categoryRules.id));
 
     const decryptedRules = await decryptRows('category_rules', rules, dek);
 
@@ -116,69 +117,102 @@ export async function POST(request: Request) {
       : [];
     const txsWithTags = new Set(existingTags.map((t) => t.transactionId));
 
-    let totalMatched = 0;
+    const matchedUpdates = new Map<string, {
+      txId: string;
+      setCategoryId?: string | null;
+      setPayee?: string | null;
+      setReviewed?: boolean | null;
+      setTagId?: string | null;
+      overrideExistingTag?: boolean;
+      shouldUpdateCategory: boolean;
+      shouldUpdateTags: boolean;
+    }>();
 
-    // Apply each rule
-    for (const rule of decryptedRules) {
-      const matchedUpdates: Array<{ txId: string; shouldUpdateTags: boolean; shouldUpdateCategory: boolean }> = [];
-      for (const tx of decryptedTxns) {
+    for (const tx of decryptedTxns) {
+      let catApplied = false;
+      let tagApplied = false;
+      const hasTags = txsWithTags.has(tx.id);
+
+      for (const rule of decryptedRules) {
         if (evaluateCondition(rule, tx)) {
-          const hasTags = txsWithTags.has(tx.id);
-          const shouldUpdateCategory = !tx.categoryId || rule.overrideExisting;
-          const shouldUpdateTags = !hasTags || rule.overrideExisting;
+          const ruleWantsCat = Boolean(rule.setCategoryId || rule.setPayee || rule.setReviewed !== null);
+          const canUpdateCategory = !catApplied && ruleWantsCat && (!tx.categoryId || rule.overrideExisting);
+          const canUpdateTags = !tagApplied && Boolean(rule.setTagId) && (!hasTags || rule.overrideExisting);
 
-          if (shouldUpdateCategory || shouldUpdateTags) {
-            matchedUpdates.push({
+          if (canUpdateCategory || canUpdateTags) {
+            const current = matchedUpdates.get(tx.id) || {
               txId: tx.id,
-              shouldUpdateTags,
-              shouldUpdateCategory,
-            });
+              shouldUpdateCategory: false,
+              shouldUpdateTags: false,
+            };
+
+            if (canUpdateCategory) {
+              current.shouldUpdateCategory = true;
+              current.setCategoryId = rule.setCategoryId;
+              current.setPayee = rule.setPayee ?? null;
+              current.setReviewed = rule.setReviewed ?? null;
+              catApplied = true;
+            }
+
+            if (canUpdateTags) {
+              current.shouldUpdateTags = true;
+              current.setTagId = rule.setTagId ?? null;
+              current.overrideExistingTag = Boolean(rule.overrideExisting);
+              tagApplied = true;
+            }
+
+            matchedUpdates.set(tx.id, current);
+
+            if (catApplied && tagApplied) {
+              break;
+            }
           }
         }
       }
+    }
 
-      if (matchedUpdates.length > 0) {
-        totalMatched += matchedUpdates.length;
-
-        for (const update of matchedUpdates) {
+    const updatesToApply = Array.from(matchedUpdates.values());
+    if (updatesToApply.length > 0) {
+      await getDb().transaction(async (tx) => {
+        for (const update of updatesToApply) {
           const txId = update.txId;
 
           if (update.shouldUpdateCategory) {
             const updateData: Record<string, unknown> = { updatedAt: new Date() };
-            if (rule.setCategoryId) updateData.categoryId = rule.setCategoryId;
-            if (rule.setPayee) {
-              updateData.payee = await encryptField(rule.setPayee, dek);
+            if (update.setCategoryId) updateData.categoryId = update.setCategoryId;
+            if (update.setPayee) {
+              updateData.payee = await encryptField(update.setPayee, dek);
             }
-            if (rule.setReviewed !== null) updateData.reviewed = rule.setReviewed;
+            if (update.setReviewed !== null && update.setReviewed !== undefined) {
+              updateData.reviewed = update.setReviewed;
+            }
 
-            await getDb()
+            await tx
               .update(transactions)
               .set(updateData)
               .where(eq(transactions.id, txId));
           }
 
-          if (update.shouldUpdateTags) {
-            if (rule.overrideExisting) {
-              await getDb()
+          if (update.shouldUpdateTags && update.setTagId) {
+            if (update.overrideExistingTag) {
+              await tx
                 .delete(transactionTags)
                 .where(eq(transactionTags.transactionId, txId));
             }
-            if (rule.setTagId) {
-              await getDb()
-                .insert(transactionTags)
-                .values({ transactionId: txId, tagId: rule.setTagId })
-                .onConflictDoNothing();
-            }
+            await tx
+              .insert(transactionTags)
+              .values({ transactionId: txId, tagId: update.setTagId })
+              .onConflictDoNothing();
           }
         }
-      }
+      });
     }
 
-    if (totalMatched > 0) {
+    if (updatesToApply.length > 0) {
       invalidateUserSearchCache(userId);
     }
 
-    return NextResponse.json({ success: true, matched: totalMatched, total: allTxns.length });
+    return NextResponse.json({ success: true, matched: updatesToApply.length, total: allTxns.length });
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

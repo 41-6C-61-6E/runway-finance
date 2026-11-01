@@ -172,6 +172,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             id: user.username,
             name: user.username,
             email: user.email,
+            tokenVersion: user.token_version ?? 1,
           };
         }
         logger.warn('Auth: failed login attempt', { username })
@@ -184,12 +185,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub;
+        (session.user as any).tokenVersion = token.tokenVersion;
       }
       return session;
     },
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
+        token.tokenVersion = (user as any).tokenVersion ?? 1;
       }
       return token;
     }

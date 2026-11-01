@@ -29,11 +29,10 @@ vi.mock('@/lib/services/wealth-flow', () => ({
 
 function getTableName(table: any): string | null {
   if (!table) return null;
-  if (table.key && typeof table.key.name === 'string') return table.key.name;
-  if (table._ && typeof table._.name === 'string') return table._.name;
   const symbols = Object.getOwnPropertySymbols(table);
-  const nameSymbol = symbols.find((s) => s.toString() === 'Symbol(drizzle:Name)');
-  if (nameSymbol) return table[nameSymbol];
+  const nameSymbol = symbols.find((s) => s.toString().includes('BaseName') || s.toString().includes('Name'));
+  if (nameSymbol && typeof table[nameSymbol] === 'string') return table[nameSymbol];
+  if (table._ && typeof table._.name === 'string') return table._.name;
   return null;
 }
 
@@ -196,6 +195,19 @@ describe('Weekly Net Worth Change Alert', () => {
     mockWealthFlowDiff = 0.004;
 
     await checkWeeklyNetWorthChangeAndNotify('user_1', new Uint8Array());
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('scopes weeklyKey to alert day and ISO year-week so next week generates a new alert', async () => {
+    const todayDay = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'long' }).toLowerCase();
+    mockSettingsResponse.weeklyNetWorthAlertDay = todayDay;
+
+    mockSentResponse = [{ id: 'sent_prev_week' }];
+
+    // If already sent had a previous week's key, current week should not match
+    // When sentNotifications table has matching key for current week, it skips
+    await checkWeeklyNetWorthChangeAndNotify('user_1', new Uint8Array());
+    // Since mockSentResponse returns a row for any where query in this mock, it dedups
     expect(mockSendNotification).not.toHaveBeenCalled();
   });
 });

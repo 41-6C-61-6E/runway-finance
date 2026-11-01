@@ -3,8 +3,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo, createContext, useContext, type ReactNode } from 'react';
 import { useUserSettings } from '@/components/user-settings-provider';
 
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 200;
+const MIN_WIDTH = 160;
+const MAX_WIDTH = 320;
 const DEFAULT_WIDTH = 200;
 const COLLAPSED_WIDTH = 64;
 

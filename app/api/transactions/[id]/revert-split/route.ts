@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { updateCategorySpendingSummaries, updateCategoryIncomeSummaries, updateMonthlyCashFlowSummaries } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
+import { invalidateUserServerCache } from '@/lib/server-cache';
 
 export async function POST(
   _request: Request,
@@ -101,6 +102,7 @@ export async function POST(
     });
 
     invalidateUserSearchCache(userId);
+    invalidateUserServerCache(userId);
 
     // Rebuild summaries asynchronously
     Promise.all([

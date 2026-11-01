@@ -129,3 +129,19 @@ export async function getOrFetch<T = unknown>(
 function isInflight(value: unknown): value is Inflight {
   return typeof value === 'object' && value !== null && 'promise' in value;
 }
+
+export function clearFetchCache(): void {
+  cache.clear();
+}
+
+export function invalidateFetchCache(prefixOrKey?: string): void {
+  if (!prefixOrKey) {
+    cache.clear();
+    return;
+  }
+  for (const k of cache.keys()) {
+    if (k.startsWith(prefixOrKey)) {
+      cache.delete(k);
+    }
+  }
+}

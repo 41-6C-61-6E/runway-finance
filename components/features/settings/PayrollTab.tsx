@@ -449,7 +449,18 @@ export default function PayrollTab() {
         const grossCurrent = paycheck.totals?.earningsAmount ?? 0;
         const taxesCurrent = paycheck.totals?.taxesAmount ?? 0;
         const deductionsCurrent = paycheck.totals?.deductionsAmount ?? 0;
-        const netCurrent = Number(grossCurrent) - Number(taxesCurrent) - Number(deductionsCurrent);
+        const afterTaxDeductionsList = (paycheck.afterTaxDeductions || []).map((d: any) => ({
+          description: d.description,
+          amount: d.amount,
+        }));
+        const afterTaxCurrent =
+          paycheck.totals?.afterTaxDeductionsAmount ??
+          afterTaxDeductionsList.reduce((s: number, d: any) => s + (Number(d.amount) || 0), 0);
+        const netCurrent =
+          Number(grossCurrent) -
+          Number(taxesCurrent) -
+          Number(deductionsCurrent) -
+          Number(afterTaxCurrent);
 
         // Build earnings
         const hoursAndEarnings = (paycheck.earnings || []).map((e: any) => ({
@@ -483,7 +494,7 @@ export default function PayrollTab() {
           hoursAndEarnings,
           taxes,
           beforeTaxDeductions,
-          afterTaxDeductions: [],
+          afterTaxDeductions: afterTaxDeductionsList,
         };
       });
     }

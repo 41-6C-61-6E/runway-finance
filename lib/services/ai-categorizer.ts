@@ -249,6 +249,11 @@ export async function analyzeUncategorized(
   dekOverride?: Uint8Array,
   transactionIds?: string[],
 ): Promise<{ proposalsCreated: number; autoApproved: number; errors: string[] }> {
+  if (abortController?.signal.aborted) {
+    onLog?.('Analysis cancelled by user.');
+    return { proposalsCreated: 0, autoApproved: 0, errors: [] };
+  }
+
   if (transactionIds && transactionIds.length === 0) {
     onLog?.('No uncategorized transactions to analyze.');
     return { proposalsCreated: 0, autoApproved: 0, errors: [] };
@@ -714,10 +719,10 @@ export async function analyzeUncategorized(
         logger.info(`${LOG_TAG} Batch ${batchNum} complete`, { userId, batchProposals, batchAutoApproved });
       } catch (err) {
         if (abortController?.signal.aborted) {
-          onLog?.('Analysis cancelled by user');
-          break;
+          onLog?.('Analysis cancelled by user.');
+          return { proposalsCreated, autoApproved, errors };
         }
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (batchAbortController.signal.aborted && !abortController?.signal.aborted) {
           const sizeHint = batchSize <= 5
             ? ' The model may be stalled or extremely slow — check the provider logs and that the model isn’t still loading.'
             : ' Lower the batch size in Settings → AI Suggestions → Automation for slower models.';

@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -46,7 +47,9 @@ export const plans = pgTable('plans', {
   spouseSalaryOverrides: jsonb('spouse_salary_overrides'), // { [year: number]: number }
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+},
+(t) => [index('plans_user_id_idx').on(t.userId)]
+);
 
 // ── Plan Accounts (Asset Holdings) ────────────────────────────────────────────
 export const planAccounts = pgTable('plan_accounts', {
@@ -70,9 +73,15 @@ export const planAccounts = pgTable('plan_accounts', {
   companyMatchRate: text('company_match_rate'), // e.g., '1.0' for 100% match
   companyMatchLimit: text('company_match_limit'), // Max % of salary the match applies to
   isSurplusDestination: boolean('is_surplus_destination').notNull().default(false),
+  conversionVintages: jsonb('conversion_vintages'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+},
+(t) => [
+  index('plan_accounts_plan_id_idx').on(t.planId),
+  index('plan_accounts_user_id_idx').on(t.userId),
+]
+);
 
 // ── Plan Liabilities (Loans & Mortgages) ──────────────────────────────────────
 export const planLiabilities = pgTable('plan_liabilities', {
@@ -85,10 +94,15 @@ export const planLiabilities = pgTable('plan_liabilities', {
   interestRate: text('interest_rate').notNull().default('4.5'),
   monthlyPayment: text('monthly_payment').notNull().default('0'),
   yearsRemaining: text('years_remaining').notNull().default('30'),
-  linkedAssetId: uuid('linked_asset_id'),
+  linkedAssetId: uuid('linked_asset_id').references(() => planAccounts.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+},
+(t) => [
+  index('plan_liabilities_plan_id_idx').on(t.planId),
+  index('plan_liabilities_user_id_idx').on(t.userId),
+]
+);
 
 // ── Plan Events (Timeline Scheduled Incomes & Expenses) ───────────────────────
 export const planEvents = pgTable('plan_events', {
@@ -112,7 +126,12 @@ export const planEvents = pgTable('plan_events', {
   inflationPerRecurrence: text('inflation_per_recurrence'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+},
+(t) => [
+  index('plan_events_plan_id_idx').on(t.planId),
+  index('plan_events_user_id_idx').on(t.userId),
+]
+);
 
 // ── Plan Flows (Cash-Flow Savings Priorities) ─────────────────────────────────
 export const planFlows = pgTable('plan_flows', {
@@ -135,7 +154,12 @@ export const planFlows = pgTable('plan_flows', {
   salarySource: text('salary_source'), // 'primary' | 'spouse' | 'combined'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+},
+(t) => [
+  index('plan_flows_plan_id_idx').on(t.planId),
+  index('plan_flows_user_id_idx').on(t.userId),
+]
+);
 
 // ── Plan Settings (Assumptions Overrides) ─────────────────────────────────────
 export const planSettings = pgTable('plan_settings', {

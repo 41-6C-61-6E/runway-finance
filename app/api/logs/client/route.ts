@@ -4,6 +4,11 @@ import { auth } from '@/lib/auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
+  const contentLength = Number(request.headers.get('content-length') || '0');
+  if (contentLength > 32_768) {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+  }
+
   const ip = getClientIp(request);
   if (!(await checkRateLimit(`client-logs:${ip}`, 30, 60_000))) {
     return NextResponse.json({ error: 'Too many log requests' }, { status: 429 });

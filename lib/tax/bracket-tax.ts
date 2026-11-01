@@ -83,7 +83,8 @@ export function computeStateTax(
   grossIncome: number,
   incomeTaxModifier: number,
   cfg: StateTaxConfig | undefined,
-  scale: number = 1
+  scale: number = 1,
+  federalAgi?: number
 ): number {
   const modifierRate = (incomeTaxModifier || 0) / 100;
   const brackets = cfg?.stateTaxBrackets;
@@ -96,7 +97,9 @@ export function computeStateTax(
   const scaleFactor = scale * (cfg.bracketMultOverride ?? 1);
   const stdDed = (cfg.stateTaxStandardDeduction || 0) * scaleFactor;
   const floorRate = (cfg.stateGrossFloorRate || 0) / 100;
-  const base = Math.max(0, taxableOrdinary - stdDed);
+  // If federalAgi is provided, use it so the federal standard deduction is not double-deducted
+  const stateAgi = federalAgi !== undefined ? federalAgi : taxableOrdinary;
+  const base = Math.max(0, stateAgi - stdDed);
   return grossIncome * floorRate + computeBracketTax(base, brackets, scaleFactor);
 }
 

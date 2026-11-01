@@ -71,20 +71,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ duplicateGroups: [] });
     }
 
-    // Decrypt all transactions and account names
-    const decryptedRows = await Promise.all(
-      activeTxns.map(async (row) => {
-        const decTx = await decryptRows('transactions', [row.transaction], dek);
-        let accountName = null;
-        if (row.accountName) {
-          accountName = await decryptField(row.accountName, dek);
-        }
-        return {
-          ...decTx[0],
-          accountName,
-        };
-      })
-    );
+    // Decrypt all transactions and account names in batch
+    const allRawTxns = activeTxns.map((r) => r.transaction);
+    const decryptedTxns = await decryptRows('transactions', allRawTxns, dek);
+
+    // Cache decrypted unique account names
+    const accountNameCache = new Map<string, string>();
+    for (const row of activeTxns) {
+      if (row.accountName && !accountNameCache.has(row.accountName)) {
+        accountNameCache.set(row.accountName, await decryptField(row.accountName, dek));
+      }
+    }
+
+    const decryptedRows = decryptedTxns.map((decTx, idx) => {
+      const rawRow = activeTxns[idx];
+      return {
+        ...decTx,
+        accountName: rawRow.accountName ? (accountNameCache.get(rawRow.accountName) ?? null) : null,
+      };
+    });
 
     // Group transactions by account and absolute amount
     const groups: Record<string, typeof decryptedRows> = {};

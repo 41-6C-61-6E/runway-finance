@@ -178,6 +178,31 @@ describe('lib/utils/vesting', () => {
       expect(m.unexercisedVestedShares).toBe(0);
       expect(m.vestedIntrinsicValue).toBe(0);
     });
+
+    it('WS-03-F05: computes positive AMT bargain element and ordinary income spread even if filed83b is true on unexercised options', () => {
+      // Unexercised ISO with filed83b: true
+      const isoGrant: EquityGrantInput = {
+        ...BASE_STOKE_GRANT,
+        grantType: 'iso',
+        filed83b: true,
+      };
+      const isoMetrics = computeGrantMetrics(isoGrant, '2025-01-15');
+      // 2500 vested unexercised shares * ($6.50 - $1.50 = $5.00) = $12,500 bargain element
+      expect(isoMetrics.unexercisedVestedShares).toBe(2500);
+      expect(isoMetrics.isoAmtBargainElement).toBe(12500);
+      expect(isoMetrics.estimatedTaxOnVestedExercise).toBeCloseTo(12500 * 0.26, 2);
+
+      // Unexercised NSO with filed83b: true
+      const nsoGrant: EquityGrantInput = {
+        ...BASE_STOKE_GRANT,
+        grantType: 'nso',
+        filed83b: true,
+      };
+      const nsoMetrics = computeGrantMetrics(nsoGrant, '2025-01-15');
+      expect(nsoMetrics.unexercisedVestedShares).toBe(2500);
+      expect(nsoMetrics.nsoOrdinaryIncomeSpread).toBe(12500);
+      expect(nsoMetrics.estimatedTaxOnVestedExercise).toBeCloseTo(12500 * 0.32, 2);
+    });
   });
 
   describe('buildPortfolioVestingTimeline', () => {

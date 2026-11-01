@@ -192,12 +192,17 @@ export async function POST(request: Request) {
         deductionsYtd: p.deductionsYtd,
       }));
 
+    const afterTaxTotal = Array.isArray(raw.afterTaxDeductions)
+      ? raw.afterTaxDeductions.reduce((s: number, d: any) => s + (Number(d.amount) || 0), 0)
+      : Number(raw.afterTaxCurrent) || 0;
+
     const tiesOut = computeTiesOut(
       {
         checkDate,
         gross: raw.grossCurrent ?? 0,
         taxes: raw.taxesCurrent ?? 0,
         deductions: raw.deductionsCurrent ?? 0,
+        afterTaxDeductions: afterTaxTotal,
         net: raw.netCurrent ?? 0,
         grossYtd: raw.grossYTD,
         taxesYtd: raw.taxesYTD,

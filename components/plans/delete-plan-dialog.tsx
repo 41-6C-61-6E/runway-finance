@@ -1,7 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 export interface DeletePlanDialogProps {
   isOpen: boolean;
@@ -20,8 +27,6 @@ export function DeletePlanDialog({
 }: DeletePlanDialogProps) {
   const [deleting, setDeleting] = useState(false);
 
-  if (!isOpen) return null;
-
   const handleDelete = async () => {
     if (deleting) return;
     setDeleting(true);
@@ -36,25 +41,19 @@ export function DeletePlanDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4">
-      <div className="bg-card z-50 border border-border rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-foreground">Confirm Plan Deletion</h3>
-              <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
-            </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md p-6 space-y-4">
+        <DialogHeader className="flex flex-row items-start gap-3 space-y-0 text-left">
+          <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 shrink-0">
+            <AlertTriangle className="w-6 h-6" />
           </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-lg transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <div>
+            <DialogTitle className="text-base font-bold text-foreground">Confirm Plan Deletion</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+              This action cannot be undone.
+            </DialogDescription>
+          </div>
+        </DialogHeader>
 
         <div className="space-y-2 text-xs text-muted-foreground bg-muted/20 border border-border rounded-xl p-3.5">
           <p>
@@ -95,7 +94,7 @@ export function DeletePlanDialog({
             )}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -9,7 +9,7 @@ import "../styles/globals.css";
 const isDev = process.env.NODE_ENV !== "production";
 
 export const metadata: Metadata = {
-  title: "Personal Finance",
+  title: "Runway Finance",
   description: "Self-hosted personal finance tracking and planning.",
   icons: {
     icon: isDev ? "/favicon-dev.svg" : "/favicon.svg",
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Finance",
+    title: "Runway",
   },
 };
 
