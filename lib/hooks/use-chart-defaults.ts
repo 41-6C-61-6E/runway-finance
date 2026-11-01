@@ -14,12 +14,31 @@ type ChartDefaults = {
   forecastLookbackMonths: number;
 };
 
-const DEFAULT_CHART_DEFAULTS: ChartDefaults = {
+export const DEFAULT_CHART_DEFAULTS: ChartDefaults = {
   defaultTimeRange: '1y',
   defaultChartType: 'line',
   forecastMode: 'hybrid',
   forecastLookbackMonths: 3,
 };
+
+export const chartGridDefaults = {
+  strokeDasharray: '3 3',
+  stroke: 'var(--color-border)',
+  vertical: false,
+  opacity: 0.3,
+} as const;
+
+export const chartXAxisDefaults = {
+  tick: { fontSize: 11, fill: 'var(--color-muted-foreground)' },
+  tickLine: false,
+  axisLine: false,
+} as const;
+
+export const chartYAxisDefaults = {
+  tick: { fontSize: 11, fill: 'var(--color-muted-foreground)' },
+  tickLine: false,
+  axisLine: false,
+} as const;
 
 export function useChartDefaults() {
   const userSettingsCtx = useUserSettings();

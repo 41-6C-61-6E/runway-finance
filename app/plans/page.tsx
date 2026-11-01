@@ -1,13 +1,22 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
+import { ChartSkeleton } from '@/components/ui/skeleton';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { Flame, TrendingUp, BarChart3, Settings, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { AppTabs } from '@/components/ui/app-tabs';
-import { ProjectionTab } from '@/components/plans/projection-tab';
-import { ScenariosTab } from '@/components/plans/scenarios-tab';
+
+const ProjectionTab = dynamic(
+  () => import('@/components/plans/projection-tab').then((m) => m.ProjectionTab),
+  { loading: () => <ChartSkeleton className="h-[500px] w-full" />, ssr: false }
+);
+const ScenariosTab = dynamic(
+  () => import('@/components/plans/scenarios-tab').then((m) => m.ScenariosTab),
+  { loading: () => <ChartSkeleton className="h-[500px] w-full" />, ssr: false }
+);
 import { SettingsTab } from '@/components/plans/settings-tab';
 import { PlanWizardModal } from '@/components/plans/plan-wizard-modal';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';

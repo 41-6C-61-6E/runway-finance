@@ -8,6 +8,9 @@ interface ChartTypeSelectorProps {
   onChange: (type: ChartType) => void;
 }
 
+/**
+ * @deprecated CC-10: Use `SegPill` from `@/components/ui/seg-pill` instead.
+ */
 export function ChartTypeSelector({ value, options, onChange }: ChartTypeSelectorProps) {
   if (options.length <= 1) return null;
 

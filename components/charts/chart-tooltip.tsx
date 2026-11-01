@@ -1,8 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
+import { useIsMobileOrTouch } from '@/lib/hooks/use-is-mobile';
+import { formatCurrency } from '@/lib/utils/format';
 
-interface ChartTooltipProps {
+export interface ChartTooltipProps {
   children: ReactNode;
   x?: number;
   y?: number;
@@ -28,19 +30,7 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const isCustomPositioned = typeof x === 'number' && typeof y === 'number';
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => {
-      setIsMobile(
-        typeof window !== 'undefined' &&
-        (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window)
-      );
-    };
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+  const isMobile = useIsMobileOrTouch();
 
   useIsomorphicLayoutEffect(() => {
     if (isMobile) return undefined;
@@ -88,13 +78,13 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
       window.removeEventListener('scroll', updatePosition, true);
       scrollParent?.removeEventListener('scroll', updatePosition);
     };
-  }, [children, x, y, containerRef, isCustomPositioned]);
+  }, [children, x, y, containerRef, isCustomPositioned, isMobile]);
 
   const tooltipContent = (
     <div
       ref={ref}
       className={cn(
-        "z-[100] max-w-[280px] min-w-[160px] overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 space-y-1 break-words",
+        "z-50 max-w-[280px] min-w-[160px] overflow-hidden rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium text-popover-foreground shadow-xl animate-in fade-in-0 zoom-in-95 space-y-1 break-words",
         className
       )}
       style={{
@@ -130,7 +120,7 @@ export function ChartTooltip({ children, x, y, containerRef, className }: ChartT
   return tooltipContent;
 }
 
-interface TooltipRowProps {
+export interface TooltipRowProps {
   label: string;
   value: string;
   color?: string;
@@ -154,7 +144,7 @@ export function TooltipRow({ label, value, color, className }: TooltipRowProps) 
   );
 }
 
-interface TooltipHeaderProps {
+export interface TooltipHeaderProps {
   children: ReactNode;
   className?: string;
 }
@@ -166,3 +156,86 @@ export function TooltipHeader({ children, className }: TooltipHeaderProps) {
     </div>
   );
 }
+
+export interface ChartTooltipPayloadItem {
+  value?: number | string | null;
+  name?: string;
+  dataKey?: string;
+  color?: string;
+  fill?: string;
+  stroke?: string;
+  [key: string]: unknown;
+}
+
+export interface ChartTooltipContentProps {
+  active?: boolean;
+  payload?: ChartTooltipPayloadItem[];
+  label?: string | number;
+  formatter?: (value: number | string | null, name: string, item: ChartTooltipPayloadItem, index: number) => [string, string] | string;
+  labelFormatter?: (label: string | number | undefined) => ReactNode;
+  showTotal?: boolean;
+  totalLabel?: string;
+  className?: string;
+}
+
+export function ChartTooltipContent({
+  active,
+  payload,
+  label,
+  formatter,
+  labelFormatter,
+  showTotal = false,
+  totalLabel = 'Total',
+  className,
+}: ChartTooltipContentProps) {
+  if (!active || !payload || !payload.length) {
+    return null;
+  }
+
+  const headerText = labelFormatter ? labelFormatter(label) : label;
+  let total = 0;
+
+  return (
+    <div className={cn("rounded-lg border border-border/60 bg-popover px-3 py-2 text-xs shadow-md space-y-1 min-w-[140px]", className)}>
+      {headerText && <TooltipHeader>{headerText}</TooltipHeader>}
+      <div className="space-y-1">
+        {payload.map((item: ChartTooltipPayloadItem, i: number) => {
+          if (item.value === undefined || item.value === null) return null;
+          const numVal = typeof item.value === 'number' ? item.value : parseFloat(item.value);
+          if (!Number.isNaN(numVal)) {
+            total += numVal;
+          }
+
+          let displayVal = typeof item.value === 'number' ? formatCurrency(item.value) : String(item.value);
+          let displayName = item.name || item.dataKey || `Series ${i + 1}`;
+
+          if (formatter) {
+            const formatted = formatter(item.value, displayName, item, i);
+            if (Array.isArray(formatted)) {
+              displayVal = formatted[0];
+              displayName = formatted[1];
+            } else {
+              displayVal = formatted;
+            }
+          }
+
+          return (
+            <TooltipRow
+              key={item.dataKey || item.name || i}
+              label={displayName}
+              value={displayVal}
+              color={item.color || item.fill || item.stroke}
+            />
+          );
+        })}
+      </div>
+      {showTotal && payload.length > 1 && (
+        <div className="pt-1 mt-1 border-t border-border/50">
+          <TooltipRow label={totalLabel} value={formatCurrency(total)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export { ChartHoverTooltip } from './chart-hover-tooltip';

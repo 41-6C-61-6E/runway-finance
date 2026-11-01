@@ -6,6 +6,21 @@ import FlowsPage from '@/app/flows/page';
 
 // Mock the heavy chart components with lightweight markers so we can
 // assert which panels are mounted.
+vi.mock('next/dynamic', () => ({
+  default: (importer: () => Promise<any>) => {
+    const fnStr = importer.toString();
+    if (fnStr.includes('wealth-flow-sankey')) {
+      return () => <div data-testid="wealth-chart" />;
+    }
+    if (fnStr.includes('cash-flow-sankey')) {
+      return () => <div data-testid="cash-chart" />;
+    }
+    if (fnStr.includes('income-expense-chart')) {
+      return () => <div data-testid="income-chart" />;
+    }
+    return () => null;
+  },
+}));
 vi.mock('@/components/net-worth/wealth-flow-sankey', () => ({
   WealthFlowSankey: () => <div data-testid="wealth-chart" />,
 }));

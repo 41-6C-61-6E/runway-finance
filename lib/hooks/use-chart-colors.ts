@@ -71,3 +71,26 @@ export function useChartColorScheme() {
 
   return { scheme, loading, updateScheme };
 }
+
+export function useChartColors() {
+  const { scheme, loading, updateScheme } = useChartColorScheme();
+
+  const getSeriesColorByIndex = useCallback((index: number) => {
+    const chartNum = (index % 5) + 1;
+    return `var(--chart-${chartNum})`;
+  }, []);
+
+  return {
+    scheme,
+    loading,
+    updateScheme,
+    getSeriesColor: getSeriesColorByIndex,
+    chart1: 'var(--chart-1)',
+    chart2: 'var(--chart-2)',
+    chart3: 'var(--chart-3)',
+    chart4: 'var(--chart-4)',
+    chart5: 'var(--chart-5)',
+    constructive: 'var(--constructive)',
+    destructive: 'var(--destructive)',
+  };
+}

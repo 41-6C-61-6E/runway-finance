@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ChartSkeleton } from '@/components/ui/skeleton';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { MobileTabSwipeContainer, MobileViewSwitcher } from '@/components/ui/mobile-view-switcher';
 
@@ -15,11 +17,17 @@ const INVESTMENT_TABS = [
   { id: 'income', label: 'Activity' },
 ];
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
-import { PerformanceChart } from '@/components/investments/performance-chart';
+const PerformanceChart = dynamic(
+  () => import('@/components/investments/performance-chart').then((m) => m.PerformanceChart),
+  { loading: () => <ChartSkeleton className="h-[350px] w-full" />, ssr: false }
+);
 import { TaxBreakdown } from '@/components/investments/tax-breakdown';
 import { HoldingSparklineCards } from '@/components/investments/holding-sparkline-cards';
 import { HoldingsAllocation } from '@/components/investments/holdings-allocation';
-import { IncomeDividendsPanel } from '@/components/investments/income-dividends-panel';
+const IncomeDividendsPanel = dynamic(
+  () => import('@/components/investments/income-dividends-panel').then((m) => m.IncomeDividendsPanel),
+  { loading: () => <ChartSkeleton className="h-[350px] w-full" />, ssr: false }
+);
 import { RecentActivity } from '@/components/investments/recent-activity';
 import { HoldingsTable } from '@/components/investments/holdings-table';
 import { HoldingDetailSheet } from '@/components/investments/holding-detail-modal';

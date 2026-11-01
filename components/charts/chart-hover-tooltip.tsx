@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, type ReactNode, type ReactElement } from 'react';
 import { ChartTooltip } from '@/components/charts/chart-tooltip';
+import { useIsMobileOrTouch } from '@/lib/hooks/use-is-mobile';
 
 interface ChartHoverTooltipProps {
   content: ReactNode;
@@ -11,19 +12,7 @@ interface ChartHoverTooltipProps {
 export function ChartHoverTooltip({ content, children }: ChartHoverTooltipProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => {
-      setIsMobile(
-        typeof window !== 'undefined' &&
-        (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window)
-      );
-    };
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+  const isMobile = useIsMobileOrTouch();
 
   const updatePos = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (isMobile) return;

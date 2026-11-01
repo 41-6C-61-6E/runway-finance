@@ -1,10 +1,19 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { ChartSkeleton } from '@/components/ui/skeleton';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { PropertyCards } from '@/components/real-estate/property-cards';
-import { EquityOverTimeChart } from '@/components/real-estate/equity-over-time-chart';
-import { PortfolioAllocationChart } from '@/components/real-estate/portfolio-allocation-chart';
+
+const EquityOverTimeChart = dynamic(
+  () => import('@/components/real-estate/equity-over-time-chart').then((m) => m.EquityOverTimeChart),
+  { loading: () => <ChartSkeleton className="h-[400px] w-full" />, ssr: false }
+);
+const PortfolioAllocationChart = dynamic(
+  () => import('@/components/real-estate/portfolio-allocation-chart').then((m) => m.PortfolioAllocationChart),
+  { loading: () => <ChartSkeleton className="h-[300px] w-full" />, ssr: false }
+);
 import { useChartVisibility } from '@/lib/hooks/use-chart-visibility';
 import { Home } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';

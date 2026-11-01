@@ -12,37 +12,15 @@ export interface NetWorthChangeBarDataPoint {
   endNetWorth: number;
 }
 
+import {
+  getWeekStart,
+  getBiweeklyStart,
+  getMonthStart,
+  getQuarterStart,
+  getYearStart,
+} from './chart-aggregation';
+
 export type NetWorthChangeBucketSize = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
-
-function getWeekStart(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  const day = d.getUTCDay();
-  d.setUTCDate(d.getUTCDate() - day);
-  return d.toISOString().split('T')[0];
-}
-
-function getBiweeklyStart(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  const startOfYear = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const dayOfYear = Math.floor((d.getTime() - startOfYear.getTime()) / 86400000);
-  const periodStartDay = Math.floor(dayOfYear / 14) * 14;
-  d.setUTCMonth(0, 1 + periodStartDay);
-  return d.toISOString().split('T')[0];
-}
-
-function getMonthStart(dateStr: string): string {
-  return dateStr.slice(0, 7) + '-01';
-}
-
-function getQuarterStart(dateStr: string): string {
-  const month = parseInt(dateStr.slice(5, 7), 10);
-  const qMonth = (Math.ceil(month / 3) - 1) * 3 + 1;
-  return dateStr.slice(0, 4) + '-' + String(qMonth).padStart(2, '0') + '-01';
-}
-
-function getYearStart(dateStr: string): string {
-  return dateStr.slice(0, 4) + '-01-01';
-}
 
 function getBucketPeriodEnd(key: string, bucketSize: NetWorthChangeBucketSize): string {
   const [y, m] = key.split('-').map(Number);

@@ -1,9 +1,21 @@
 'use client';
 
 import { useState, Suspense, useEffect } from 'react';
-import { WealthFlowSankey } from '@/components/net-worth/wealth-flow-sankey';
-import { CashFlowSankey } from '@/components/cash-flow/cash-flow-sankey';
-import { IncomeExpenseChart } from '@/components/cash-flow/income-expense-chart';
+import dynamic from 'next/dynamic';
+import { ChartSkeleton } from '@/components/ui/skeleton';
+
+const WealthFlowSankey = dynamic(
+  () => import('@/components/net-worth/wealth-flow-sankey').then((m) => m.WealthFlowSankey),
+  { loading: () => <ChartSkeleton className="h-[600px] w-full" />, ssr: false }
+);
+const CashFlowSankey = dynamic(
+  () => import('@/components/cash-flow/cash-flow-sankey').then((m) => m.CashFlowSankey),
+  { loading: () => <ChartSkeleton className="h-[600px] w-full" />, ssr: false }
+);
+const IncomeExpenseChart = dynamic(
+  () => import('@/components/cash-flow/income-expense-chart').then((m) => m.IncomeExpenseChart),
+  { loading: () => <ChartSkeleton className="h-[400px] w-full" />, ssr: false }
+);
 import { ArrowLeftRight } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/page-header';

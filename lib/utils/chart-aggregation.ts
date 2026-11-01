@@ -210,3 +210,84 @@ export function computeMedianFilter<T extends Record<string, any>>(
     return smoothedPoint;
   });
 }
+
+/**
+ * Period boundary start date helpers
+ */
+export function getWeekStart(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  const day = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - day);
+  return d.toISOString().split('T')[0];
+}
+
+export function getBiweeklyStart(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  const startOfYear = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const dayOfYear = Math.floor((d.getTime() - startOfYear.getTime()) / 86400000);
+  const periodStartDay = Math.floor(dayOfYear / 14) * 14;
+  d.setUTCMonth(0, 1 + periodStartDay);
+  return d.toISOString().split('T')[0];
+}
+
+export function getMonthStart(dateStr: string): string {
+  return dateStr.slice(0, 7) + '-01';
+}
+
+export function getQuarterStart(dateStr: string): string {
+  const month = parseInt(dateStr.slice(5, 7), 10);
+  const qMonth = (Math.ceil(month / 3) - 1) * 3 + 1;
+  return dateStr.slice(0, 4) + '-' + String(qMonth).padStart(2, '0') + '-01';
+}
+
+export function getYearStart(dateStr: string): string {
+  return dateStr.slice(0, 4) + '-01-01';
+}
+
+/**
+ * Pick the top N series keys with highest average absolute value.
+ */
+export function pickTopSeries(
+  keys: string[],
+  rows: Array<Record<string, unknown>>,
+  topN = 6
+): string[] {
+  const avgs = new Map<string, number>();
+  for (const key of keys) {
+    let sum = 0;
+    let count = 0;
+    for (const row of rows) {
+      const v = row[key];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        sum += Math.abs(v);
+        count += 1;
+      }
+    }
+    avgs.set(key, count > 0 ? sum / count : 0);
+  }
+  return [...keys]
+    .sort((a, b) => avgs.get(b)! - avgs.get(a)! || a.localeCompare(b))
+    .slice(0, topN);
+}
+
+/**
+ * Merge hidden series keys into a single aggregated row value.
+ */
+export function buildAggregatedValues(
+  rows: Array<Record<string, unknown>>,
+  hiddenKeys: string[]
+): Array<{ value: number | undefined; hasData: boolean }> {
+  return rows.map((row: Record<string, unknown>) => {
+    let acc = 0;
+    let hasData = false;
+    for (const key of hiddenKeys) {
+      const v = row[key];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        acc += v;
+        hasData = true;
+      }
+    }
+    return { value: hasData ? acc : undefined, hasData };
+  });
+}
+

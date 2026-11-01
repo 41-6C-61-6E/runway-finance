@@ -73,31 +73,8 @@ export const DEFAULT_PRESETS: ChartPreset[] = [
  */
 export { TYPE_HIERARCHY, GROUP_ORDER, getHierarchy } from '@/lib/constants/account-types';
 
-export const getSeriesColor = (key: string, mode: GroupingMode, index: number, isAsset: boolean) => {
-  const cycle = Math.floor(index / 5);
-  const chartNum = (index % 5) + 1;
-  const baseVar = `var(--chart-${chartNum})`;
-  
-  if (isAsset) {
-    if (cycle === 0) {
-      return baseVar;
-    } else if (cycle % 2 === 1) {
-      const mixPct = Math.min(75, 20 + Math.floor(cycle / 2) * 20);
-      return `color-mix(in oklch, ${baseVar}, white ${mixPct}%)`;
-    } else {
-      const mixPct = Math.min(75, 20 + (Math.floor(cycle / 2) - 1) * 20);
-      return `color-mix(in oklch, ${baseVar}, black ${mixPct}%)`;
-    }
-  } else {
-    const baseMixed = `color-mix(in oklch, ${baseVar}, var(--destructive) 60%)`;
-    if (cycle === 0) {
-      return baseMixed;
-    } else if (cycle % 2 === 1) {
-      const mixPct = Math.min(75, 20 + Math.floor(cycle / 2) * 20);
-      return `color-mix(in oklch, ${baseMixed}, white ${mixPct}%)`;
-    } else {
-      const mixPct = Math.min(75, 20 + (Math.floor(cycle / 2) - 1) * 20);
-      return `color-mix(in oklch, ${baseMixed}, black ${mixPct}%)`;
-    }
-  }
-};
+/**
+ * @deprecated CC-10: Consolidated into `@/lib/utils/chart-color-schemes`.
+ * Import directly from `@/lib/utils/chart-color-schemes` instead.
+ */
+export { getSeriesColor } from '@/lib/utils/chart-color-schemes';

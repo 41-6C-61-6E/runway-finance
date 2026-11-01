@@ -17,11 +17,12 @@ import {
 
 import { Card, CardContent } from '@/components/ui/card';
 import { CollapsibleFilterPanel } from '@/components/ui/collapsible-filter-panel';
-import { ChartTypeSelector } from '@/components/charts/chart-type-selector';
+import { SegPill } from '@/components/ui/seg-pill';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { ChartFrame } from '@/components/charts/chart-frame';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
@@ -90,57 +91,15 @@ const getTimeframeIndices = (data: any[], range: TimeRange): [number, number] =>
 // series is folded into a single muted `OTHER_KEY` layer holding the exact
 // sum of the hidden rows (the stacked total area is unchanged). Expanding
 // "Other" restores the individual series.
+import { pickTopSeries as pickTopSeriesShared, buildAggregatedValues as buildAggregatedValuesShared } from '@/lib/utils/chart-aggregation';
 export const TOP_N = 6;
 export const OTHER_KEY = 'other-aggregate';
 const OTHER_COLOR = 'var(--muted-foreground)';
-/**
- * Pick the TOP_N series keys (of `keys`) with the highest average absolute
- * value in `rows`. Ties break alphabetically so the pick — and therefore the
- * stable color assignment — is deterministic across renders/panning.
- */
-export const pickTopSeries = (keys: string[], rows: Array<Record<string, any>>) => {
-  const avgs = new Map<string, number>();
-  for (const key of keys) {
-    let sum = 0;
-    let count = 0;
-    for (const row of rows) {
-      const v = row[key];
-      if (typeof v === 'number' && Number.isFinite(v)) {
-        sum += Math.abs(v);
-        count += 1;
-      }
-    }
-    avgs.set(key, count > 0 ? sum / count : 0);
-  }
-  return [...keys]
-    .sort(
-      (a, b) =>
-        avgs.get(b)! - avgs.get(a)! || a.localeCompare(b)
-    )
-    .slice(0, TOP_N);
-};
 
-/**
- * Merge the rows of the hidden keys into a single aggregated row value so the
- * collapsed "Other" layer is the exact sum of the hidden series (signs are
- * preserved, so the stacked total area is unchanged).
- */
-export const buildAggregatedValues = (
-  rows: Array<Record<string, any>>,
-  hiddenKeys: string[]
-): Array<{ value: number | undefined; hasData: boolean }> =>
-  rows.map((row: any) => {
-    let acc = 0;
-    let hasData = false;
-    for (const key of hiddenKeys) {
-      const v = row[key];
-      if (typeof v === 'number' && Number.isFinite(v)) {
-        acc += v;
-        hasData = true;
-      }
-    }
-    return { value: hasData ? acc : undefined, hasData };
-  });
+export const pickTopSeries = (keys: string[], rows: Array<Record<string, unknown>>) =>
+  pickTopSeriesShared(keys, rows, TOP_N);
+
+export const buildAggregatedValues = buildAggregatedValuesShared;
 
 interface AccountHistoryChartProps {
   filteredAllAccounts: Account[];
@@ -933,11 +892,11 @@ export default function AccountHistoryChart({
               <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/20 border border-border/20 rounded-xl">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">Style</span>
-                  <ChartTypeSelector 
+                  <SegPill
                     value={chartType} 
                     options={[
-                      { value: 'line', label: 'Area' },
-                      { value: 'bar', label: 'Bar' }
+                      { id: 'line', label: 'Area' },
+                      { id: 'bar', label: 'Bar' }
                     ]} 
                     onChange={(t) => setChartType(t as ChartType)} 
                   />
@@ -1436,7 +1395,7 @@ export default function AccountHistoryChart({
                     onMouseLeave={handleChartMouseUp}
                     onDoubleClick={handleChartDoubleClick}
                   >
-                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
+                    <ChartFrame className="h-full" name="Account History">
                       {chartType === 'bar' ? (
                         <BarChart
                           data={visibleData}
@@ -1606,7 +1565,7 @@ export default function AccountHistoryChart({
                           )}
                         </ComposedChart>
                       )}
-                    </ResponsiveContainer>
+                    </ChartFrame>
 
                     {isPanned && (
                       <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
