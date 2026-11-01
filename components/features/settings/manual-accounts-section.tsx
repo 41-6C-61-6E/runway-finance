@@ -55,26 +55,10 @@ const PROPERTY_TYPES = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-const SYNC_FREQUENCIES = [
-  { value: 'manual', label: 'Manual only' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-] as const;
-
-const SYNC_INTERVALS: Record<string, number> = {
-  manual: 0,
-  daily: 24 * 60 * 60 * 1000,
-  weekly: 7 * 24 * 60 * 60 * 1000,
-  monthly: 30 * 24 * 60 * 60 * 1000,
-};
+import { SYNC_FREQUENCIES, SYNC_INTERVALS, computeNextSync as baseComputeNextSync } from './accounts/sync-intervals';
 
 function computeNextSync(syncFrequency: string, balanceDate: string | null): Date | null {
-  if (syncFrequency === 'manual') return null;
-  const interval = SYNC_INTERVALS[syncFrequency];
-  if (!interval) return null;
-  if (!balanceDate) return new Date();
-  return new Date(new Date(balanceDate).getTime() + interval);
+  return baseComputeNextSync(syncFrequency, balanceDate, { fallbackNowIfMissingDate: true });
 }
 
 const SYNC_FREQUENCY_LABELS: Record<string, string> = {

@@ -29,22 +29,10 @@ import { useUserSettings } from '@/components/user-settings-provider';
 import { useRouter } from 'next/navigation';
 import type { SettingsAccount, SettingsConnection } from './orphaned-accounts-section';
 import { Select } from '@/components/ui/select';
-
-const SYNC_INTERVALS: Record<string, number> = {
-  manual: 0,
-  hourly: 60 * 60 * 1000,
-  daily: 24 * 60 * 60 * 1000,
-  weekly: 7 * 24 * 60 * 60 * 1000,
-  margin: 0,
-  monthly: 30 * 24 * 60 * 60 * 1000,
-};
+import { SYNC_INTERVALS, computeNextSync as baseComputeNextSync } from './accounts/sync-intervals';
 
 function computeNextSync(syncFrequency: string, lastSyncAt: string | null): Date | null {
-  if (syncFrequency === 'manual') return null;
-  const interval = SYNC_INTERVALS[syncFrequency];
-  if (!interval) return null;
-  if (!lastSyncAt) return new Date();
-  return new Date(new Date(lastSyncAt).getTime() + interval);
+  return baseComputeNextSync(syncFrequency, lastSyncAt, { fallbackNowIfMissingDate: true });
 }
 
 interface PlaidLinkHandlerProps {

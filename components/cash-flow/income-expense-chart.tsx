@@ -3,6 +3,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
+import { CashFlowBreakdownModal } from './cash-flow-breakdown-modal';
+import { SavingsRateBreakdownModal } from './savings-rate-breakdown-modal';
+import { IncomeExpenseTooltip, SavingsChartTooltip, type TooltipProps } from './income-expense-chart-tooltips';
 import {
   ComposedChart,
   Bar,
@@ -64,17 +67,11 @@ interface SavingsRatePoint {
 }
 
 const MONTH_MAP: Record<string, number> = {
-  '7d': 1, '30d': 1, '90d': 3, '365d': 12,
-  '1m': 1, '3m': 3, '6m': 6, '1y': 12, '3y': 36, '5y': 60, 'ytd': 12, 'all': 120,
-  '7d_discrete': 1,
+  '7d': 1, '30d': 1, '90d': 3, '365d': 12, '1m': 1, '3m': 3, '6m': 6, '1y': 12, '3y': 36, '5y': 60, 'ytd': 12, 'all': 120, '7d_discrete': 1,
 };
 
 const incomeExpensePresets = TIME_RANGE_PRESETS.filter((p) => ['1m', '3m', '6m', '1y', '3y', 'ytd', 'all', '30d', '90d', '365d', '5y', '7d', '7d_discrete'].includes(p.value));
-
-const typeOptions = [
-  { value: 'bar' as ChartType, label: 'Bar' },
-  { value: 'line' as ChartType, label: 'Area' },
-];
+const typeOptions = [{ value: 'bar' as ChartType, label: 'Bar' }, { value: 'line' as ChartType, label: 'Area' }];
 
 export function IncomeExpenseChart() {
   const { privacyMode } = usePrivacyMode();
@@ -364,48 +361,13 @@ export function IncomeExpenseChart() {
   };
 
   // Tooltips
-  const CustomTooltip = useCallback(({ active, payload }: any) => {
-    if (!active || !payload || !payload.length) return null;
-    const point = payload[0]?.payload;
-    if (!point) return null;
-    const headerDate = formatChartXAxisDate(point.yearMonth + '-01', timeframe, { isMonthly: true });
-    return (
-      <ChartTooltip>
-        <TooltipHeader>{headerDate}</TooltipHeader>
-        <TooltipRow label="Income" value={formatCurrency(point.income)} color="var(--color-chart-1)" />
-        <TooltipRow label="Expenses" value={formatCurrency(Math.abs(point.expenses))} color="var(--color-destructive)" />
-        <TooltipRow label="Net Income" value={formatCurrency(point.net)} color="var(--color-primary)" />
-      </ChartTooltip>
-    );
-  }, [timeframe]);
+  const CustomTooltip = useCallback((props: Omit<TooltipProps, 'timeframe'>) => (
+    <IncomeExpenseTooltip {...props} timeframe={timeframe} />
+  ), [timeframe]);
 
-  const SavingsTooltip = useCallback(({ active, payload }: any) => {
-    if (!active || !payload || !payload.length) return null;
-    const point = payload[0]?.payload;
-    if (!point) return null;
-    const headerDate = formatChartXAxisDate(point.yearMonth + '-01', timeframe, { isMonthly: true });
-
-    const totalSavings = (point.retirement || 0) + (point.hsa || 0) + (point.brokerage || 0) + (point.savingsAccount || 0) + (point.cash || 0);
-
-    return (
-      <ChartTooltip>
-        <TooltipHeader>{headerDate}</TooltipHeader>
-        <TooltipRow label="Retirement" value={formatCurrency(point.retirement || 0)} color="var(--color-chart-1)" />
-        <TooltipRow label="HSA" value={formatCurrency(point.hsa || 0)} color="var(--color-chart-2)" />
-        <TooltipRow label="Brokerage" value={formatCurrency(point.brokerage || 0)} color="var(--color-chart-3)" />
-        <TooltipRow label="Savings Account" value={formatCurrency(point.savingsAccount || 0)} color="var(--color-chart-4)" />
-        <TooltipRow label="Leftover Cash" value={formatCurrency(point.cash || 0)} color="var(--color-chart-5)" />
-        <div className="border-t border-border my-1 pt-1 font-semibold text-foreground flex justify-between gap-8 text-xs">
-          <span>Total Savings:</span>
-          <span>{formatCurrency(totalSavings)}</span>
-        </div>
-        <div className="font-semibold text-primary flex justify-between gap-8 text-xs">
-          <span>Savings Rate:</span>
-          <span>{formatPlainPercent(point.savingsRate)}</span>
-        </div>
-      </ChartTooltip>
-    );
-  }, [timeframe]);
+  const SavingsTooltip = useCallback((props: Omit<TooltipProps, 'timeframe'>) => (
+    <SavingsChartTooltip {...props} timeframe={timeframe} />
+  ), [timeframe]);
 
   if (isLoading) {
     return (
@@ -1017,342 +979,19 @@ export function IncomeExpenseChart() {
         </>
 
       {/* ── Cash Flow Breakdown Popup Modal ── */}
-      {selectedCashFlowPoint && (
-        <Dialog open={true} onOpenChange={(open) => !open && handleCloseCashFlowModal()}>
-          <DialogContent className="max-w-xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
-            {/* Header */}
-            <DialogHeader className="p-5 border-b border-border bg-muted/20 shrink-0">
-              <div className="flex items-center gap-2">
-                <ArrowRightLeft className="w-4 h-4 text-primary" />
-                <DialogTitle className="text-base font-semibold text-foreground">
-                  Cash Flow Analysis — {formatChartXAxisDate(selectedCashFlowPoint.yearMonth + '-01', timeframe, { isMonthly: true })}
-                </DialogTitle>
-              </div>
-            </DialogHeader>
-
-            {/* Content */}
-            <div className="p-5 space-y-5 bg-background text-sm">
-              {/* Summary Hero Box */}
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-center space-y-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Net Cash Flow</div>
-                <div className={`text-3xl font-extrabold font-mono blur-number ${selectedCashFlowPoint.net >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                  {selectedCashFlowPoint.net >= 0 ? '+' : ''}{formatCurrency(selectedCashFlowPoint.net)}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Income: <span className="font-semibold text-foreground blur-number">{formatCurrency(selectedCashFlowPoint.income)}</span>
-                  {' '}• Expenses: <span className="font-semibold text-foreground blur-number">{formatCurrency(Math.abs(selectedCashFlowPoint.expenses))}</span>
-                </div>
-              </div>
-
-              {/* Cash Flow Breakdown */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Details breakdown</h4>
-                  <span className="text-[10px] text-muted-foreground italic">Click any row below to drill down into transaction details</span>
-                </div>
-                <div className="border border-border rounded-xl divide-y divide-border overflow-hidden bg-background">
-                  {/* Total Income */}
-                  <div 
-                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
-                    onClick={() => setExpandedBucket(expandedBucket === 'income' ? null : 'income')}
-                  >
-                    <div className="flex justify-between p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-chart-1" style={{ backgroundColor: 'var(--color-chart-1)' }} />
-                        <span className="text-muted-foreground font-medium">Total Income</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
-                        <span className="blur-number">{formatCurrency(selectedCashFlowPoint.income)}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'income' ? 'rotate-180' : ''}`} />
-                      </div>
-                    </div>
-                    {expandedBucket === 'income' && (
-                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
-                        {selectedCashFlowPoint.details?.income?.length > 0 ? (
-                          selectedCashFlowPoint.details.income.map((tx: any, idx: number) => (
-                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-foreground">{tx.description}</span>
-                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
-                              </div>
-                              <span className="font-mono font-medium text-primary">
-                                +{formatCurrency(Math.abs(tx.amount))}
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-muted-foreground text-center py-3 italic">No income transactions found in this period.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Total Expenses */}
-                  <div 
-                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
-                    onClick={() => setExpandedBucket(expandedBucket === 'expenses' ? null : 'expenses')}
-                  >
-                    <div className="flex justify-between p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-destructive" style={{ backgroundColor: 'var(--color-destructive)' }} />
-                        <span className="text-muted-foreground font-medium">Total Expenses</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
-                        <span className="blur-number">{formatCurrency(Math.abs(selectedCashFlowPoint.expenses))}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'expenses' ? 'rotate-180' : ''}`} />
-                      </div>
-                    </div>
-                    {expandedBucket === 'expenses' && (
-                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
-                        {selectedCashFlowPoint.details?.expenses?.length > 0 ? (
-                          selectedCashFlowPoint.details.expenses.map((tx: any, idx: number) => (
-                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-foreground">{tx.description}</span>
-                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
-                              </div>
-                              <span className="font-mono font-medium text-destructive">
-                                -{formatCurrency(Math.abs(tx.amount))}
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-muted-foreground text-center py-3 italic">No expense transactions found in this period.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-between p-3 bg-primary/[0.03] font-semibold text-foreground border-t border-border">
-                    <span>Net Cash Flow</span>
-                    <span className={`font-mono blur-number ${selectedCashFlowPoint.net >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                      {selectedCashFlowPoint.net >= 0 ? '+' : ''}{formatCurrency(selectedCashFlowPoint.net)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Informative Note */}
-              <div className="text-xs text-muted-foreground bg-muted/30 border border-border/20 rounded-xl p-3 flex items-start gap-2 leading-relaxed">
-                <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground/60" />
-                <span>
-                  <strong>Calculation Formula:</strong> Net Cash Flow is computed as Total Income minus Total Expenses. Standard category exclusion rules (e.g. transfers) are automatically applied to reflect true household cash inflows and outflows.
-                </span>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <CashFlowBreakdownModal
+        selectedPoint={selectedCashFlowPoint}
+        timeframe={timeframe}
+        onClose={handleCloseCashFlowModal}
+      />
 
       {/* ── Savings Rate Breakdown Popup Modal ── */}
-      {selectedSavingsPoint && (
-        <Dialog open={true} onOpenChange={(open) => !open && handleCloseSavingsModal()}>
-          <DialogContent className="max-w-xl max-h-[85vh] p-0 overflow-hidden flex flex-col">
-            {/* Header */}
-            <DialogHeader className="p-5 border-b border-border bg-muted/20 shrink-0">
-              <div className="flex items-center gap-2">
-                <PiggyBank className="w-4 h-4 text-primary" />
-                <DialogTitle className="text-base font-semibold text-foreground">
-                  Savings Rate Analysis — {formatChartXAxisDate(selectedSavingsPoint.yearMonth + '-01', timeframe, { isMonthly: true })}
-                </DialogTitle>
-              </div>
-            </DialogHeader>
-
-            {/* Content */}
-            <div className="p-5 space-y-5 bg-background text-sm">
-              {/* Summary Hero Box */}
-              {(() => {
-                const totSav = (selectedSavingsPoint.retirement || 0) + (selectedSavingsPoint.hsa || 0) + (selectedSavingsPoint.brokerage || 0) + (selectedSavingsPoint.savingsAccount || 0) + (selectedSavingsPoint.cash || 0);
-                return (
-                  <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-center space-y-1">
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Savings</div>
-                    <div className={`text-3xl font-extrabold font-mono blur-number ${totSav >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                      {totSav >= 0 ? '+' : ''}{formatCurrency(totSav)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Savings Rate: <span className="font-bold text-primary blur-number">{formatPlainPercent(selectedSavingsPoint.savingsRate)}</span>
-                      {' '}• Total Income: <span className="font-semibold text-foreground blur-number">{formatCurrency(selectedSavingsPoint.income || 0)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Savings Breakdown */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Components breakdown</h4>
-                  <span className="text-[10px] text-muted-foreground italic">Click any bucket to inspect tracked items</span>
-                </div>
-                <div className="border border-border rounded-xl divide-y divide-border overflow-hidden bg-background">
-                  {/* Retirement */}
-                  <div
-                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
-                    onClick={() => setExpandedBucket(expandedBucket === 'retirement' ? null : 'retirement')}
-                  >
-                    <div className="flex justify-between p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-1)' }} />
-                        <span className="text-muted-foreground font-medium">Retirement (401k / IRA)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
-                        <span className="blur-number">{formatCurrency(selectedSavingsPoint.retirement || 0)}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'retirement' ? 'rotate-180' : ''}`} />
-                      </div>
-                    </div>
-                    {expandedBucket === 'retirement' && (
-                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
-                        {selectedSavingsPoint.details?.retirement?.length > 0 ? (
-                          selectedSavingsPoint.details.retirement.map((tx: any, idx: number) => (
-                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-foreground">{tx.description}</span>
-                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
-                              </div>
-                              <span className="font-mono font-medium text-primary">
-                                +{formatCurrency(Math.abs(tx.amount))}
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-muted-foreground text-center py-3 italic">No specific retirement transactions in this period.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* HSA */}
-                  <div
-                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
-                    onClick={() => setExpandedBucket(expandedBucket === 'hsa' ? null : 'hsa')}
-                  >
-                    <div className="flex justify-between p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-2)' }} />
-                        <span className="text-muted-foreground font-medium">HSA Contributions</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
-                        <span className="blur-number">{formatCurrency(selectedSavingsPoint.hsa || 0)}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'hsa' ? 'rotate-180' : ''}`} />
-                      </div>
-                    </div>
-                    {expandedBucket === 'hsa' && (
-                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
-                        {selectedSavingsPoint.details?.hsa?.length > 0 ? (
-                          selectedSavingsPoint.details.hsa.map((tx: any, idx: number) => (
-                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-foreground">{tx.description}</span>
-                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
-                              </div>
-                              <span className="font-mono font-medium text-primary">
-                                +{formatCurrency(Math.abs(tx.amount))}
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-muted-foreground text-center py-3 italic">No specific HSA transactions in this period.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Brokerage */}
-                  <div
-                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
-                    onClick={() => setExpandedBucket(expandedBucket === 'brokerage' ? null : 'brokerage')}
-                  >
-                    <div className="flex justify-between p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-3)' }} />
-                        <span className="text-muted-foreground font-medium">Taxable Brokerage</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
-                        <span className="blur-number">{formatCurrency(selectedSavingsPoint.brokerage || 0)}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'brokerage' ? 'rotate-180' : ''}`} />
-                      </div>
-                    </div>
-                    {expandedBucket === 'brokerage' && (
-                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
-                        {selectedSavingsPoint.details?.brokerage?.length > 0 ? (
-                          selectedSavingsPoint.details.brokerage.map((tx: any, idx: number) => (
-                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-foreground">{tx.description}</span>
-                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
-                              </div>
-                              <span className="font-mono font-medium text-primary">
-                                +{formatCurrency(Math.abs(tx.amount))}
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-muted-foreground text-center py-3 italic">No specific brokerage transfers in this period.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Savings Account */}
-                  <div
-                    className="flex flex-col hover:bg-muted/5 transition-colors cursor-pointer"
-                    onClick={() => setExpandedBucket(expandedBucket === 'savingsAccount' ? null : 'savingsAccount')}
-                  >
-                    <div className="flex justify-between p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-4)' }} />
-                        <span className="text-muted-foreground font-medium">Savings Accounts</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-semibold font-mono text-foreground">
-                        <span className="blur-number">{formatCurrency(selectedSavingsPoint.savingsAccount || 0)}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedBucket === 'savingsAccount' ? 'rotate-180' : ''}`} />
-                      </div>
-                    </div>
-                    {expandedBucket === 'savingsAccount' && (
-                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
-                        {selectedSavingsPoint.details?.savingsAccount?.length > 0 ? (
-                          selectedSavingsPoint.details.savingsAccount.map((tx: any, idx: number) => (
-                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-foreground">{tx.description}</span>
-                                <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
-                              </div>
-                              <span className="font-mono font-medium text-primary">
-                                +{formatCurrency(Math.abs(tx.amount))}
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-muted-foreground text-center py-3 italic">No specific savings account transfers in this period.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Leftover Cash */}
-                  <div className="flex justify-between p-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-chart-5)' }} />
-                      <span className="text-muted-foreground font-medium">Leftover Operating Cash Surplus</span>
-                    </div>
-                    <div className="font-semibold font-mono text-foreground blur-number">
-                      {formatCurrency(selectedSavingsPoint.cash || 0)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Informative Note */}
-              <div className="text-xs text-muted-foreground bg-muted/30 border border-border/20 rounded-xl p-3 flex items-start gap-2 leading-relaxed space-y-1">
-                <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground/60" />
-                <div>
-                  <strong>Calculation Formula:</strong> Savings Rate is computed as (Total Tracked Savings / Total Income) × 100%. Debt principal reductions (e.g. mortgage/loans) are accounted for as cash outflows in cash flow analysis and accrue to net worth via liability reduction.
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
+      <SavingsRateBreakdownModal
+        selectedPoint={selectedSavingsPoint}
+        timeframe={timeframe}
+        onClose={handleCloseSavingsModal}
+      />
     </div>
   );
 }
+
