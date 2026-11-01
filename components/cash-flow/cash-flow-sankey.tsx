@@ -14,7 +14,7 @@ import { rgbToHsl, hslToRgb } from '@/lib/utils/color';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
-import { getOrFetch } from '@/lib/fetch-cache';
+import { apiFetch } from '@/lib/utils/api-client';
 import { SegPill } from '@/components/ui/seg-pill';
 
 interface CategoryData {
@@ -751,8 +751,7 @@ export function CashFlowSankey() {
   }, []);
 
   useEffect(() => {
-    getOrFetch('/api/categories')
-      .then((r) => r.json())
+    apiFetch<CategoryInfo[]>('/api/categories')
       .then((data) => setAllCategoryInfo(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
@@ -779,14 +778,9 @@ export function CashFlowSankey() {
         let totalIncome = 0;
         let totalExpenses = 0;
 
-        const categoriesRes = await getOrFetch(
+        categories = await apiFetch<CategoryData[]>(
           `/api/cash-flow/categories?startDate=${dateRange.start}&endDate=${dateRange.end}`
         );
-        if (!categoriesRes.ok) {
-          const body = await categoriesRes.text().catch(() => '');
-          throw new Error(`Failed to fetch sankey data (${categoriesRes.status}): ${body}`);
-        }
-        categories = (await categoriesRes.json()) as CategoryData[];
 
         totalIncome = categories
           .filter((c) => c.isIncome && c.amount > 0)

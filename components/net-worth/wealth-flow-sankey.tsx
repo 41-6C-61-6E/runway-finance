@@ -13,7 +13,7 @@ import { TrendingUp, TrendingDown, Info, ChevronDown } from 'lucide-react';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
-import { getOrFetch } from '@/lib/fetch-cache';
+import { apiFetch } from '@/lib/utils/api-client';
 import { SegPill } from '@/components/ui/seg-pill';
 import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
 
@@ -472,8 +472,7 @@ export function WealthFlowSankey() {
   }, []);
 
   useEffect(() => {
-    getOrFetch('/api/accounts')
-      .then((r) => (r.ok ? r.json() : []))
+    apiFetch<AccountData[]>('/api/accounts')
       .then((json) => setAllAccounts(Array.isArray(json) ? json : []))
       .catch(() => setAllAccounts([]));
   }, []);
@@ -503,10 +502,7 @@ export function WealthFlowSankey() {
         setError(null);
 
         const url = `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}&timeframe=${timeframe}`;
-
-        const res = await getOrFetch(url);
-        if (!res.ok) throw new Error(`Failed to load wealth flow data (${res.status})`);
-        const data = (await res.json()) as WealthFlowData;
+        const data = await apiFetch<WealthFlowData>(url);
         if (isCurrent) setWealthFlowData(data);
       } catch (err) {
         if (isCurrent) setError(err instanceof Error ? err.message : String(err));

@@ -131,7 +131,7 @@ const RULES = [
     mode: 'occurrences',
     dirs: ['components', 'app', 'lib'],
     regex: '\\blocalStorage\\.',
-    exclude: (rel) => rel === 'lib/hooks/use-persistent-state.ts',
+    exclude: (rel) => rel === 'lib/hooks/use-persistent-state.ts' || rel === 'lib/utils/storage.ts',
   },
   {
     key: 'consoleInProd',

@@ -1,114 +1,109 @@
 /**
  * Centralized React Query Key Registry & Factories
- *
- * This is the single source of truth for query-key *prefixes* used by the
- * invalidation helpers in `lib/query-invalidation.ts`.
- *
- * IMPORTANT — current state of the codebase:
- * Most `useQuery` call sites still use inline string keys (e.g. `['accounts-all']`).
- * The prefixes below are written to MATCH those real keys so that prefix-based
- * invalidation works correctly. As call sites are migrated to use these factories,
- * the keys will converge on this registry.
- *
- * React Query matches by structural prefix: `invalidateQueries({ queryKey: ['accounts'] })`
- * matches `['accounts']`, `['accounts', false]` and `['accounts', true]`, but NOT
- * `['accounts-all']` (a different first element). That is why the accounts family
- * exposes BOTH `all` and `allIncl` prefixes.
+ * Single source of truth for query-key prefixes used across the application.
  */
 
 export const queryKeys = {
   accounts: {
-    /** Matches `['accounts']`, `['accounts', false]`, `['accounts', true]`. */
     all: ['accounts'] as const,
-    /** Matches `['accounts-all']` (includeHidden + includeVirtual variant). */
     allIncl: ['accounts-all'] as const,
-    /** Matches `['accounts-history']`. */
     history: ['accounts-history'] as const,
-    /** Matches `['account-transactions', ...]`. */
     transactions: ['account-transactions'] as const,
-    /** Factory for a specific account's transactions. */
-    transactionsFor: (accountId: string, startDate: string, endDate: string) =>
+    transactionsFor: (accountId: string, startDate?: string, endDate?: string) =>
       ['account-transactions', accountId, startDate, endDate] as const,
   },
 
   budgets: {
-    /** Matches `['budgets', periodType, periodKey]`. */
     all: ['budgets'] as const,
-    /** Matches `['budget-top-transactions', ...]`. */
+    byPeriod: (periodType?: string, periodKey?: string) =>
+      ['budgets', periodType, periodKey] as const,
     topTransactions: ['budget-top-transactions'] as const,
   },
 
   categories: {
-    /** Matches `['categories']`. */
     all: ['categories'] as const,
-    /** Matches `['categories-all']`. */
     allIncl: ['categories-all'] as const,
   },
 
   tags: {
-    /** Matches `['tags']`. */
     all: ['tags'] as const,
   },
 
   transactions: {
-    /** Matches `['account-transactions', ...]` (the only RQ-backed transaction key). */
     all: ['account-transactions'] as const,
   },
 
+  goals: {
+    all: ['goals'] as const,
+    allocation: ['goals-allocation'] as const,
+    history: ['goals-history'] as const,
+    projections: ['goals-projections'] as const,
+  },
+
+  plans: {
+    all: ['plans'] as const,
+    rules: ['plans-rules'] as const,
+  },
+
+  connections: {
+    all: ['connections'] as const,
+    detail: (id: string) => ['connections', id] as const,
+  },
+
+  paystubs: {
+    all: ['paystubs'] as const,
+    mappings: ['paystubs-mappings'] as const,
+  },
+
+  devMode: {
+    all: ['dev-mode'] as const,
+  },
+
+  issues: {
+    all: ['issues'] as const,
+    config: ['bug-reporting-config'] as const,
+  },
+
   netWorth: {
-    /** Matches `['net-worth-chart', ...]` (both the side-panel and main-chart shapes). */
     chart: ['net-worth-chart'] as const,
+    chartRange: (range: string) => ['net-worth-chart', range] as const,
   },
 
   investments: {
-    /** Matches `['investments']`. */
     all: ['investments'] as const,
-    /** Matches `['investments-income']`. */
     income: ['investments-income'] as const,
-    /** Matches `['investments-history', ...]`. */
+    incomeTimeframe: (timeframe: string) => ['investments-income', timeframe] as const,
     history: ['investments-history'] as const,
-    /** Matches `['investments-quotes', ...]`. */
+    historyRange: (range: string) => ['investments-history', range] as const,
     quotes: ['investments-quotes'] as const,
-    /** Matches `['equity-grants']`. */
     equityGrants: ['equity-grants'] as const,
   },
 
   cashFlow: {
-    /** Matches `['cash-flow-categories', ...]`. */
     categories: ['cash-flow-categories'] as const,
-    /** Matches `['cash-vs-credit', ...]`. */
+    categoriesRange: (start?: string, end?: string) => ['cash-flow-categories', start, end] as const,
     cashVsCredit: ['cash-vs-credit'] as const,
-    /** Matches `['savings-rate-monthly', ...]`. */
     savingsRate: ['savings-rate-monthly'] as const,
   },
 
   realEstate: {
-    /** Matches `['real-estate-properties']`. */
     properties: ['real-estate-properties'] as const,
   },
 
   userSettings: {
-    /** Matches `['user-settings']`. */
     all: ['user-settings'] as const,
   },
 
   recurring: {
-    /** Matches `['recurring', ...]` (currently local-state only; kept for future RQ migration). */
     all: ['recurring'] as const,
   },
 
   calendar: {
-    /** Matches `['daily-cash-flow', ...]`. */
     dailyCashFlow: ['daily-cash-flow'] as const,
-    /** Matches `['calendar-day-transactions', ...]`. */
     dayTransactions: ['calendar-day-transactions'] as const,
   },
 } as const;
 
-/**
- * Convenience: every top-level prefix that is affected when an account's data
- * (balance, type, hidden/virtual flags, existence) changes.
- */
 export const ACCOUNT_AFFECTED_PREFIXES = [
   queryKeys.accounts.all,
   queryKeys.accounts.allIncl,
@@ -130,10 +125,6 @@ export const ACCOUNT_AFFECTED_PREFIXES = [
   queryKeys.realEstate.properties,
 ] as const;
 
-/**
- * Convenience: every top-level prefix that is affected when a transaction is
- * created, edited, split, categorized, or deleted.
- */
 export const TRANSACTION_AFFECTED_PREFIXES = [
   queryKeys.accounts.all,
   queryKeys.accounts.allIncl,
@@ -151,4 +142,3 @@ export const TRANSACTION_AFFECTED_PREFIXES = [
   queryKeys.cashFlow.cashVsCredit,
   queryKeys.cashFlow.savingsRate,
 ] as const;
-

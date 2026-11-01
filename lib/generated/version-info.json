@@ -1,9 +1,21 @@
 {
-  "buildNumber": "26.10.1793503895937",
-  "buildTime": "2026-11-01T03:31:35.937Z",
-  "hash": "0af87ca",
-  "fullHash": "0af87caee639797ce345db8628a5dca6d9f4fa76",
+  "buildNumber": "26.11.1793567062930",
+  "buildTime": "2026-11-01T21:04:22.930Z",
+  "hash": "2e15486",
+  "fullHash": "2e154868e9c079224e29251598b8644b96a9061c",
   "commits": [
+    "refactor(cc-02): standardize api route wrappers, error handling, consolidate goals endpoints, and retire orphan routes",
+    "refactor(cc-08): consolidate bank sync adapter, row decryption, and ai client",
+    "feat(cc-15): add database repositories, query helpers, sql helpers, and server-only isolation",
+    "chore(cc-13): configure eslint flat config, typed env, and logger conventions",
+    "feat(cc-12): enable tsconfig strictness flags stage 1-3, type apiFetch, and resolve implicit returns",
+    "feat(cc-18): create central registries for constants, routes, and errors",
+    "feat(cc-06): unify account taxonomy, domain types, and category validation schemas",
+    "feat(cc-05): consolidate date utilities and canonical currency/percent formatters",
+    "feat(cc-01): prune dead files, unused exports, dead scripts, unused dependencies, and dead css",
+    "feat(cc-00): establish baseline tooling, consolidation ratchets, and characterization test suites",
+    "refactor: improve mobile responsiveness and portal rendering for dropdown menus",
+    "fix: improve account detail panels and mobile layout responsiveness",
     "fix: improve account detail panels and mobile layout responsiveness",
     "all: 168 improvements and bug fixes",
     "refactor: remove account sharing feature and related API endpoints",
@@ -191,35 +203,119 @@
     "refactor: simplify budget actuals calculation by implementing ancestor-based transaction attribution",
     "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses",
     "refactor: implement server-side budget filtering with effective date bounds and dynamic catch-all category breakout",
-    "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
-    "refactor: centralize account exclusion logic and apply consistently across budget proposals and transactions summaries",
-    "feat: add functionality to exclude individual transactions from auto-budget proposals and recalculate totals accordingly",
-    "refactor: remove mobile navigation layout editing and section components from mobile-nav.tsx",
-    "refactor: standardize dialog layout for responsive mobile behavior and enhance auto-budget configuration options",
-    "feat: add support for quarterly and yearly auto-budgets with improved outlier filtering and zero-spending inclusion options.",
-    "feat: implement auto-budgeting system with automated calculation proposals and batch application endpoints",
-    "feat: implement responsive mobile tab navigation and optimize TransactionTable dependency array",
-    "feat: implement responsive mobile tab navigation with swipe gestures and auto-closing notification menus",
-    "feat: decouple sub-navigation into a floating capsule with swipe gesture support and auto-dimming on scroll",
-    "feat: implement mobile sub-navigation context and update bottom navigation to support dynamic tab switching",
-    "feat: implement mobile-responsive view switching and haptic feedback across main dashboard and planning tabs.",
-    "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel"
+    "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic"
   ],
   "history": [
+    {
+      "hash": "2e15486",
+      "fullHash": "2e154868e9c079224e29251598b8644b96a9061c",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T20:49:14Z",
+      "message": "refactor(cc-02): standardize api route wrappers, error handling, consolidate goals endpoints, and retire orphan routes",
+      "type": "refactor",
+      "buildNumber": "26.11.1793567062930"
+    },
+    {
+      "hash": "5c7dc26",
+      "fullHash": "5c7dc269e69e06af08e761f59fc567b31a9fb09d",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T20:37:39Z",
+      "message": "refactor(cc-08): consolidate bank sync adapter, row decryption, and ai client",
+      "type": "refactor"
+    },
+    {
+      "hash": "bd0c2e9",
+      "fullHash": "bd0c2e91dd5454f7cd1c85be794ef7f18a52b52a",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T20:22:57Z",
+      "message": "feat(cc-15): add database repositories, query helpers, sql helpers, and server-only isolation",
+      "type": "feat"
+    },
+    {
+      "hash": "61c78fe",
+      "fullHash": "61c78fe92d975a101fec132fe792ef5b4cc7201d",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T20:06:21Z",
+      "message": "chore(cc-13): configure eslint flat config, typed env, and logger conventions",
+      "type": "chore"
+    },
+    {
+      "hash": "4a48d78",
+      "fullHash": "4a48d7815c575f6c7896d2cc89b119a1f1ade4f3",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T19:56:33Z",
+      "message": "feat(cc-12): enable tsconfig strictness flags stage 1-3, type apiFetch, and resolve implicit returns",
+      "type": "feat"
+    },
+    {
+      "hash": "9c17830",
+      "fullHash": "9c178302b661af128cc76175462bdcba42cef5e0",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T19:39:38Z",
+      "message": "feat(cc-18): create central registries for constants, routes, and errors",
+      "type": "feat"
+    },
+    {
+      "hash": "38ed9fd",
+      "fullHash": "38ed9fd6967969e161be8c18ce2a84f9ee790e95",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T19:34:27Z",
+      "message": "feat(cc-06): unify account taxonomy, domain types, and category validation schemas",
+      "type": "feat"
+    },
+    {
+      "hash": "4f95e13",
+      "fullHash": "4f95e13c136883d7142d046cf0709898ad1ddea9",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T19:22:57Z",
+      "message": "feat(cc-05): consolidate date utilities and canonical currency/percent formatters",
+      "type": "feat"
+    },
+    {
+      "hash": "397ab03",
+      "fullHash": "397ab0313d7eaf333b1accf91b92c8e0b8eae031",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T18:43:41Z",
+      "message": "feat(cc-01): prune dead files, unused exports, dead scripts, unused dependencies, and dead css",
+      "type": "feat"
+    },
+    {
+      "hash": "495be1b",
+      "fullHash": "495be1bd6101c894ac7bf63a84d47e5c42d39836",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T18:32:11Z",
+      "message": "feat(cc-00): establish baseline tooling, consolidation ratchets, and characterization test suites",
+      "type": "feat"
+    },
+    {
+      "hash": "af20f32",
+      "fullHash": "af20f321167f27d2f0971e2446711cfba5643eb4",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T16:12:57Z",
+      "message": "refactor: improve mobile responsiveness and portal rendering for dropdown menus",
+      "type": "refactor"
+    },
+    {
+      "hash": "f654d01",
+      "fullHash": "f654d01bcd49800156564bf5fcf51208df162ff2",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T04:26:14Z",
+      "message": "fix: improve account detail panels and mobile layout responsiveness",
+      "type": "fix"
+    },
     {
       "hash": "0af87ca",
       "fullHash": "0af87caee639797ce345db8628a5dca6d9f4fa76",
       "author": "41-6C-61-6E",
-      "date": "2026-11-01T03:24:29+00:00",
+      "date": "2026-11-01T03:24:29Z",
       "message": "fix: improve account detail panels and mobile layout responsiveness",
-      "type": "fix",
-      "buildNumber": "26.10.1793503895937"
+      "type": "fix"
     },
     {
       "hash": "c80afd1",
       "fullHash": "c80afd1a798c344b89f91064424393731e3f8397",
       "author": "41-6C-61-6E",
-      "date": "2026-11-01T02:21:07+00:00",
+      "date": "2026-11-01T02:21:07Z",
       "message": "all: 168 improvements and bug fixes",
       "type": "all"
     },
@@ -227,7 +323,7 @@
       "hash": "4b87aa0",
       "fullHash": "4b87aa0160963cc2a468ae16e936c0e8318d3613",
       "author": "41-6C-61-6E",
-      "date": "2026-10-31T20:15:14+00:00",
+      "date": "2026-10-31T20:15:14Z",
       "message": "refactor: remove account sharing feature and related API endpoints",
       "type": "refactor"
     },
@@ -235,7 +331,7 @@
       "hash": "6ef2eea",
       "fullHash": "6ef2eeafdf0a2b9abbbdb3a3e187c73a11310386",
       "author": "41-6C-61-6E",
-      "date": "2026-10-31T18:13:08+00:00",
+      "date": "2026-10-31T18:13:08Z",
       "message": "feat: add equity grants support with tracking and vesting management",
       "type": "feat"
     },
@@ -243,7 +339,7 @@
       "hash": "9b33006",
       "fullHash": "9b3300670de8f84bf4c4f4419768dd323c594312",
       "author": "41-6C-61-6E",
-      "date": "2026-10-25T23:33:42+00:00",
+      "date": "2026-10-25T23:33:42Z",
       "message": "refactor: improve category dropdown positioning and click-outside handling in AiSuggestionsModal",
       "type": "refactor"
     },
@@ -251,7 +347,7 @@
       "hash": "c8f0976",
       "fullHash": "c8f0976f39a21816b20d1d159f6987bb783af453",
       "author": "41-6C-61-6E",
-      "date": "2026-10-25T21:49:12+00:00",
+      "date": "2026-10-25T21:49:12Z",
       "message": "fix: prevent 500 errors on mismatched period keys and update tooltip dismiss behavior for interactive elements",
       "type": "fix"
     },
@@ -259,7 +355,7 @@
       "hash": "0c3eba4",
       "fullHash": "0c3eba4d4c99ca77537613ab9983f4b84bad0361",
       "author": "41-6C-61-6E",
-      "date": "2026-10-25T19:57:00+00:00",
+      "date": "2026-10-25T19:57:00Z",
       "message": "feat: add daily cash flow calendar features, API endpoints, and comprehensive unit tests",
       "type": "feat"
     },
@@ -1709,102 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-08-10T11:04:49-07:00",
       "message": "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
-      "type": "feat"
-    },
-    {
-      "hash": "d601185",
-      "fullHash": "d6011850f7dac49cf019b2b15a8a8dbf6e4ae7aa",
-      "author": "Alan Racek",
-      "date": "2026-08-10T10:35:52-07:00",
-      "message": "refactor: centralize account exclusion logic and apply consistently across budget proposals and transactions summaries",
-      "type": "refactor"
-    },
-    {
-      "hash": "b200a49",
-      "fullHash": "b200a49572218287977f22c8b827382b9d0a0d33",
-      "author": "Alan Racek",
-      "date": "2026-08-10T10:19:27-07:00",
-      "message": "feat: add functionality to exclude individual transactions from auto-budget proposals and recalculate totals accordingly",
-      "type": "feat"
-    },
-    {
-      "hash": "daaf765",
-      "fullHash": "daaf765a87b2fe54911d0e0841939441fe858e67",
-      "author": "Alan Racek",
-      "date": "2026-08-10T09:57:33-07:00",
-      "message": "refactor: remove mobile navigation layout editing and section components from mobile-nav.tsx",
-      "type": "refactor"
-    },
-    {
-      "hash": "e51df32",
-      "fullHash": "e51df32117a71f1127578607e7488227afef3511",
-      "author": "Alan Racek",
-      "date": "2026-08-10T09:46:16-07:00",
-      "message": "refactor: standardize dialog layout for responsive mobile behavior and enhance auto-budget configuration options",
-      "type": "refactor"
-    },
-    {
-      "hash": "95f5b1d",
-      "fullHash": "95f5b1d7a577816178bbd107f0581294819ea9e7",
-      "author": "Alan Racek",
-      "date": "2026-08-10T08:58:04-07:00",
-      "message": "feat: add support for quarterly and yearly auto-budgets with improved outlier filtering and zero-spending inclusion options.",
-      "type": "feat"
-    },
-    {
-      "hash": "5ca1aa6",
-      "fullHash": "5ca1aa64d85942c679a5e857856252695b00acda",
-      "author": "Alan Racek",
-      "date": "2026-08-10T08:47:31-07:00",
-      "message": "feat: implement auto-budgeting system with automated calculation proposals and batch application endpoints",
-      "type": "feat"
-    },
-    {
-      "hash": "c887977",
-      "fullHash": "c887977c05308f9c41b699deb0f44bffe8d315d8",
-      "author": "Alan Racek",
-      "date": "2026-08-08T13:51:15-07:00",
-      "message": "feat: implement responsive mobile tab navigation and optimize TransactionTable dependency array",
-      "type": "feat"
-    },
-    {
-      "hash": "ac3f89f",
-      "fullHash": "ac3f89f4060027d8f6a187e9223d2e585e9e7412",
-      "author": "Alan Racek",
-      "date": "2026-08-08T11:19:05-07:00",
-      "message": "feat: implement responsive mobile tab navigation with swipe gestures and auto-closing notification menus",
-      "type": "feat"
-    },
-    {
-      "hash": "9004756",
-      "fullHash": "90047568ff8c591ebbe54a12357e8fd1daadd367",
-      "author": "Alan Racek",
-      "date": "2026-08-08T10:08:20-07:00",
-      "message": "feat: decouple sub-navigation into a floating capsule with swipe gesture support and auto-dimming on scroll",
-      "type": "feat"
-    },
-    {
-      "hash": "73f815e",
-      "fullHash": "73f815eb32137f57d0d875abe32c91b3bbcb9297",
-      "author": "Alan Racek",
-      "date": "2026-08-08T09:36:33-07:00",
-      "message": "feat: implement mobile sub-navigation context and update bottom navigation to support dynamic tab switching",
-      "type": "feat"
-    },
-    {
-      "hash": "9fe7ad6",
-      "fullHash": "9fe7ad6895e0cf4f0a83653415fb2252755500ad",
-      "author": "Alan Racek",
-      "date": "2026-08-08T08:46:35-07:00",
-      "message": "feat: implement mobile-responsive view switching and haptic feedback across main dashboard and planning tabs.",
-      "type": "feat"
-    },
-    {
-      "hash": "0d6e429",
-      "fullHash": "0d6e429a421c57133ade48cc76737150ea4158e8",
-      "author": "Alan Racek",
-      "date": "2026-08-07T20:01:42-07:00",
-      "message": "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel",
       "type": "feat"
     }
   ]

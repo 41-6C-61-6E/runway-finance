@@ -5,17 +5,12 @@ import { useSession } from 'next-auth/react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import AccountsSidebar from '@/components/accounts-sidebar';
 import ResizableSidebar from '@/components/resizable-sidebar';
-import { useSidebar, SidebarProvider, COLLAPSED_WIDTH } from '@/components/sidebar-context';
-import { PrivacyModeProvider } from '@/components/privacy-mode-provider';
-import { AccountSubheadingsProvider } from '@/components/account-subheadings-provider';
-import { ReduceTransparencyProvider } from '@/components/reduce-transparency-provider';
-import { UserSettingsProvider } from '@/components/user-settings-provider';
+import { useSidebar, COLLAPSED_WIDTH } from '@/components/sidebar-context';
+import { AuthenticatedProviders } from '@/components/app-providers';
 import { MobileNav } from '@/components/mobile-nav';
 import { PullToRefresh } from '@/components/pull-to-refresh';
 import { ReactNode, useState, useEffect } from 'react';
-
-import { MobileSubNavProvider } from '@/components/mobile-subnav-context';
-import { AdviceProvider, useAdvice } from '@/components/features/advice/AdviceProvider';
+import { useAdvice } from '@/components/features/advice/AdviceProvider';
 import { AdviceSheet } from '@/components/features/advice/AdviceSheet';
 
 export function AuthenticatedLayout({ children }: { children: ReactNode }) {
@@ -59,27 +54,15 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const hideAccountsSidebar = isSettingsPage;
 
   return (
-    <UserSettingsProvider>
-      <SidebarProvider>
-        <PrivacyModeProvider>
-          <ReduceTransparencyProvider>
-            <AccountSubheadingsProvider>
-              <MobileSubNavProvider>
-                <AdviceProvider>
-                  <ResizableSidebar />
-                  {!hideAccountsSidebar && <AccountsSidebar />}
-                  <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
-                    {children}
-                  </AuthenticatedLayoutContent>
-                  <MobileNav />
-                  <AdviceSheet />
-                </AdviceProvider>
-              </MobileSubNavProvider>
-            </AccountSubheadingsProvider>
-          </ReduceTransparencyProvider>
-        </PrivacyModeProvider>
-      </SidebarProvider>
-    </UserSettingsProvider>
+    <AuthenticatedProviders>
+      <ResizableSidebar />
+      {!hideAccountsSidebar && <AccountsSidebar />}
+      <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
+        {children}
+      </AuthenticatedLayoutContent>
+      <MobileNav />
+      <AdviceSheet />
+    </AuthenticatedProviders>
   );
 }
 

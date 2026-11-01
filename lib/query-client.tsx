@@ -3,7 +3,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PersistQueryClientProvider, type Persister, type PersistedClient } from '@tanstack/react-query-persist-client';
 import { get, set, del } from 'idb-keyval';
-import { clearFetchCache } from '@/lib/fetch-cache';
 import { useState, useMemo, type ReactNode } from 'react';
 
 const IDB_PERSIST_KEY = 'RUNWAY_FINANCE_QUERY_CACHE';
@@ -84,11 +83,15 @@ export async function clearQueryPersistence(idbKey: string = IDB_PERSIST_KEY) {
  */
 export async function clearAllClientCaches() {
   await clearQueryPersistence();
-  clearFetchCache();
   try {
     if (typeof window !== 'undefined') {
       const keysToClear = Object.keys(localStorage).filter(
-        (k) => k.startsWith('finance-') || k.startsWith('pf_') || k.startsWith('cf-chart:') || k.startsWith('runway-')
+        (k) =>
+          k.startsWith('finance-') ||
+          k.startsWith('finance:') ||
+          k.startsWith('pf_') ||
+          k.startsWith('cf-chart:') ||
+          k.startsWith('runway-')
       );
       for (const k of keysToClear) {
         localStorage.removeItem(k);
