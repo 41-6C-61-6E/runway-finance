@@ -11,6 +11,9 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { parseCsv, parseDateField } from '@/lib/utils/csv-parser';
 import { Select } from '@/components/ui/select';
 import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
+import { ImportHistoryTable } from './import/import-history-table';
+import { CategoryMappingStep } from './import/category-mapping-step';
+import { AccountMappingStep } from './import/account-mapping-step';
 
 type ImportType = 'transactions' | 'account_snapshots';
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -779,357 +782,36 @@ export default function ImportTab() {
 
         {/* Step 5: Account Mapping */}
         {step === 5 && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Map each account reference from your CSV to an existing account or create a new one.
-              Accounts left unmapped will be skipped during import.
-            </p>
-
-            {uniqueAccountRefs.filter((ref) => !accountMapping[ref]).length > 0 && (
-              <div className="p-3 rounded-lg border border-chart-3/20 bg-chart-3/10 text-sm text-chart-3">
-                <div className="font-medium mb-1">⚠ Unmapped accounts</div>
-                <p>{uniqueAccountRefs.filter((ref) => !accountMapping[ref]).length} account(s) left unmapped — corresponding rows will be skipped. You can map them or explicitly exclude them.</p>
-              </div>
-            )}
-
-            <div className="space-y-3 max-h-80 overflow-y-auto">
-              {uniqueAccountRefs.map((csvRef) => (
-                <div key={csvRef} className="p-3 rounded-lg border border-border bg-muted/20">
-                  <div className="text-sm font-medium text-foreground mb-2">CSV Account: {csvRef}</div>
-
-                  <Select
-                    className={`h-9 rounded-lg mb-2 ${accountMapping[csvRef] === EXCLUDED || !accountMapping[csvRef] ? 'opacity-50' : ''}`}
-                    value={accountMapping[csvRef] || ''}
-                    onChange={(e) => handleAccountMappingChange(csvRef, e.target.value)}
-                  >
-                    <option value="">— Select account —</option>
-                    <optgroup label="Existing accounts">
-                      {allAccounts.map((acc) => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.name} ({acc.type})
-                        </option>
-                      ))}
-                    </optgroup>
-                    <option value="new">+ Create new account</option>
-                    <option value={EXCLUDED}>— Exclude from import —</option>
-                  </Select>
-                  {(accountMapping[csvRef] === EXCLUDED || !accountMapping[csvRef]) && (
-                    <p className="text-xs text-chart-3 italic">Rows with this account will be skipped during import.</p>
-                  )}
-
-                  {accountMapping[csvRef] === 'new' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 p-2 rounded bg-background border border-border">
-                      <div>
-                        <label className="text-xs text-muted-foreground">Name</label>
-                        <Input
-                          size={1}
-                          value={newAccounts[csvRef]?.name || csvRef}
-                          onChange={(e) => handleNewAccountChange(csvRef, 'name', e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Type</label>
-                        <Select
-                          className="h-8 rounded-lg"
-                          value={newAccounts[csvRef]?.type || 'checking'}
-                          onChange={(e) => handleNewAccountChange(csvRef, 'type', e.target.value)}
-                        >
-                          <option value="checking">Checking</option>
-                          <option value="savings">Savings</option>
-                          <option value="credit">Credit Card</option>
-                          <option value="investment">Investment</option>
-                          <option value="retirement">Retirement</option>
-                          <option value="mortgage">Mortgage</option>
-                          <option value="loan">Loan</option>
-                          <option value="realestate">Real Estate</option>
-                          <option value="vehicle">Vehicle</option>
-                          <option value="other">Other</option>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Currency</label>
-                        <Input
-                          size={1}
-                          value={newAccounts[csvRef]?.currency || 'USD'}
-                          onChange={(e) => handleNewAccountChange(csvRef, 'currency', e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Institution</label>
-                        <Input
-                          size={1}
-                          value={newAccounts[csvRef]?.institution || ''}
-                          onChange={(e) => handleNewAccountChange(csvRef, 'institution', e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setStep(4)}>
-                <ChevronLeft className="w-4 h-4 mr-1" /> Back
-              </Button>
-              <Button size="sm" onClick={handleAccountMappingNext}>
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-          </div>
+          <AccountMappingStep
+            uniqueAccountRefs={uniqueAccountRefs}
+            accountMapping={accountMapping}
+            allAccounts={allAccounts}
+            newAccounts={newAccounts}
+            EXCLUDED={EXCLUDED}
+            handleAccountMappingChange={handleAccountMappingChange}
+            handleNewAccountChange={handleNewAccountChange}
+            handleAccountMappingNext={handleAccountMappingNext}
+            setStep={setStep}
+          />
         )}
 
         {/* Step 6: Category Mapping */}
         {step === 6 && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Map each category from your CSV to an existing category or create a new one.
-            </p>
-
-            {unmappedCategoriesWarnings.length > 0 && (
-              <div className="p-3 rounded-lg border border-chart-3/20 bg-chart-3/10 text-sm text-chart-3">
-                <div className="font-medium mb-1">⚠ Unmapped categories</div>
-                <p>{unmappedCategoriesWarnings[0]}. You can go back and map them, or leave them as-is.</p>
-              </div>
-            )}
-
-            <div className="space-y-3 max-h-96 overflow-y-auto pb-56">
-              {uniqueCategoryNames.map((csvName) => {
-                const fuzzyScore = categoryFuzzyScores[csvName];
-                const isFuzzyMatch = fuzzyScore !== undefined && fuzzyScore < 1.0;
-                return (
-                <div key={csvName} className="p-3 rounded-lg border border-border bg-muted/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-medium text-foreground">CSV Category: {csvName}</span>
-                    {isFuzzyMatch && (
-                      <span
-                        title={`Fuzzy match — ${Math.round(fuzzyScore * 100)}% confidence. Click the dropdown to change.`}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 cursor-default select-none"
-                      >
-                        ~{Math.round(fuzzyScore * 100)}% match
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="relative mb-2">
-                    <button
-                      onClick={() => {
-                        if (activeCategoryDropdown === csvName) {
-                          setActiveCategoryDropdown(null);
-                        } else {
-                          setActiveCategoryDropdown(csvName);
-                          setCategorySearch('');
-                        }
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 bg-background border border-input rounded-lg text-sm text-foreground hover:bg-muted transition-colors text-left"
-                    >
-                      {(() => {
-                        const mappedId = categoryMapping[csvName];
-                        if (mappedId === 'new') {
-                          return (
-                            <>
-                              <span className="text-primary font-medium">+ Create new category</span>
-                            </>
-                          );
-                        }
-                        const selectedCat = mappedId ? allCategories.find((c) => c.id === mappedId) : null;
-                        return selectedCat ? (
-                          <>
-                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selectedCat.color }} />
-                            <span>{selectedCat.name}</span>
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">Select category...</span>
-                        );
-                      })()}
-                      <span className="ml-auto text-muted-foreground">▼</span>
-                    </button>
-
-                    {activeCategoryDropdown === csvName && (
-                      <>
-                        <ClickOutsideBackdrop
-                          onClose={() => {
-                            setActiveCategoryDropdown(null);
-                            setCategorySearch('');
-                          }}
-                        />
-                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col">
-                          <div className="relative p-2 border-b border-border">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                            <input
-                              value={categorySearch}
-                              onChange={(e) => setCategorySearch(e.target.value)}
-                              placeholder="Search categories..."
-                              className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                              autoFocus
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          <div className="flex-1 overflow-y-auto max-h-56">
-                            {(() => {
-                              const filter = categorySearch.toLowerCase();
-                              const parents = allCategories.filter((c) => !c.parentId);
-                              const getChildren = (pId: string) => allCategories.filter((c) => c.parentId === pId);
-
-                              const filteredParents = filter
-                                ? parents.filter((p) =>
-                                    p.name.toLowerCase().includes(filter) ||
-                                    getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
-                                  )
-                                : parents;
-
-                              const noResults = filteredParents.length === 0;
-                              const mappedId = categoryMapping[csvName];
-
-                              return (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      handleCategoryMappingChange(csvName, '');
-                                      setActiveCategoryDropdown(null);
-                                      setCategorySearch('');
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors text-left"
-                                  >
-                                    None (uncategorized)
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handleCategoryMappingChange(csvName, 'new');
-                                      setActiveCategoryDropdown(null);
-                                      setCategorySearch('');
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-muted font-medium transition-colors text-left"
-                                  >
-                                    + Create new category
-                                  </button>
-                                  {filteredParents.map((parent) => {
-                                    const childList = filter
-                                      ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
-                                      : getChildren(parent.id);
-                                    if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
-                                    return (
-                                      <div key={parent.id}>
-                                        <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground bg-muted/30">
-                                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: parent.color }} />
-                                          {parent.name}
-                                        </div>
-                                        <button
-                                          onClick={() => {
-                                            handleCategoryMappingChange(csvName, parent.id);
-                                            setActiveCategoryDropdown(null);
-                                            setCategorySearch('');
-                                          }}
-                                          className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors text-left ${
-                                            mappedId === parent.id
-                                              ? 'text-primary bg-primary/10'
-                                              : 'text-foreground/80 hover:bg-muted'
-                                          }`}
-                                        >
-                                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
-                                          {parent.name}
-                                        </button>
-                                        {childList.map((child) => (
-                                          <button
-                                            key={child.id}
-                                            onClick={() => {
-                                              handleCategoryMappingChange(csvName, child.id);
-                                              setActiveCategoryDropdown(null);
-                                              setCategorySearch('');
-                                            }}
-                                            className={`w-full flex items-center gap-2 px-6 py-2 text-sm transition-colors text-left ${
-                                              mappedId === child.id
-                                                ? 'text-primary bg-primary/10'
-                                                : 'text-foreground/80 hover:bg-muted'
-                                            }`}
-                                          >
-                                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
-                                            {child.name}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    );
-                                  })}
-                                  {noResults && (
-                                    <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-                                      No categories found
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {categoryMapping[csvName] === 'new' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 p-2 rounded bg-background border border-border">
-                      <div>
-                        <label className="text-xs text-muted-foreground">Name</label>
-                        <Input
-                          size={1}
-                          value={newCategories[csvName]?.name || csvName}
-                          onChange={(e) => handleNewCategoryChange(csvName, 'name', e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Parent Category</label>
-                        <Select
-                          className="h-8 rounded-lg"
-                          value={newCategories[csvName]?.parentId || ''}
-                          onChange={(e) => handleNewCategoryChange(csvName, 'parentId', e.target.value || null)}
-                        >
-                          <option value="">None (top-level)</option>
-                          {allCategories.filter((c) => !c.parentId).map((p) => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                          ))}
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Color</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={newCategories[csvName]?.color || '#6366f1'}
-                            onChange={(e) => handleNewCategoryChange(csvName, 'color', e.target.value)}
-                            className="w-8 h-8 rounded cursor-pointer"
-                          />
-                          <span className="text-xs text-muted-foreground">{newCategories[csvName]?.color || '#6366f1'}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`income-${csvName}`}
-                          checked={newCategories[csvName]?.isIncome || false}
-                          onChange={(e) => handleNewCategoryChange(csvName, 'isIncome', e.target.checked)}
-                          className="rounded border-border"
-                        />
-                        <label htmlFor={`income-${csvName}`} className="text-xs text-muted-foreground">Income category</label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                );
-              })}
-
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setStep(5)}>
-                <ChevronLeft className="w-4 h-4 mr-1" /> Back
-              </Button>
-              <Button size="sm" onClick={() => setStep(7)}>
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-          </div>
+          <CategoryMappingStep
+            unmappedCategoriesWarnings={unmappedCategoriesWarnings}
+            uniqueCategoryNames={uniqueCategoryNames}
+            categoryFuzzyScores={categoryFuzzyScores}
+            categoryMapping={categoryMapping}
+            newCategories={newCategories}
+            allCategories={allCategories}
+            activeCategoryDropdown={activeCategoryDropdown}
+            setActiveCategoryDropdown={setActiveCategoryDropdown}
+            categorySearch={categorySearch}
+            setCategorySearch={setCategorySearch}
+            handleCategoryMappingChange={handleCategoryMappingChange}
+            handleNewCategoryChange={handleNewCategoryChange}
+            setStep={setStep}
+          />
         )}
 
         {/* Step 7: Preview & Confirm / Result */}
@@ -1246,109 +928,15 @@ export default function ImportTab() {
       </div>
 
       {/* ═══════════════════════ Import History ═══════════════════════ */}
-      <div className="p-3 sm:p-5 bg-card border border-border rounded-xl">
-        <SectionHeading className="mb-4">Import History</SectionHeading>
-
-        {logsLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Spinner size="sm" /> Loading...
-          </div>
-        ) : logs.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">No imports yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-2 text-muted-foreground font-medium">Date</th>
-                  <th className="text-left p-2 text-muted-foreground font-medium">File</th>
-                  <th className="hidden sm:table-cell text-left p-2 text-muted-foreground font-medium">Type</th>
-                  <th className="hidden sm:table-cell text-right p-2 text-muted-foreground font-medium">Records</th>
-                  <th className="text-center p-2 text-muted-foreground font-medium">Status</th>
-                  <th className="text-right p-2 text-muted-foreground font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                    <td className="p-2 text-foreground whitespace-nowrap">
-                      {new Date(log.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="p-2 text-foreground max-w-[200px] truncate">
-                      <div>{log.fileName}</div>
-                      {log.startDate || log.endDate ? (
-                        <div className="text-[10px] text-muted-foreground">
-                          Filter: {log.startDate ? new Date(log.startDate + 'T00:00:00Z').toLocaleDateString() : 'Start'} - {log.endDate ? new Date(log.endDate + 'T00:00:00Z').toLocaleDateString() : 'End'}
-                        </div>
-                      ) : log.dataStartDate || log.dataEndDate ? (
-                        <div className="text-[10px] text-muted-foreground">
-                          All dates, covers: {log.dataStartDate ? new Date(log.dataStartDate + 'T00:00:00Z').toLocaleDateString() : 'Start'} - {log.dataEndDate ? new Date(log.dataEndDate + 'T00:00:00Z').toLocaleDateString() : 'End'}
-                        </div>
-                      ) : (
-                        <div className="text-[10px] text-muted-foreground">All dates</div>
-                      )}
-                    </td>
-                    <td className="hidden sm:table-cell p-2 text-foreground capitalize">{log.importType === 'account_snapshots' ? 'Snapshots' : 'Transactions'}</td>
-                    <td className="hidden sm:table-cell p-2 text-foreground text-right">{log.recordsImported}</td>
-                    <td className="p-2 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                        log.status === 'completed'
-                          ? 'bg-chart-1/10 text-chart-1'
-                          : log.status === 'partial'
-                          ? 'bg-chart-3/10 text-chart-3'
-                          : 'bg-destructive/10 text-destructive'
-                      }`}>
-                        {log.status}
-                      </span>
-                    </td>
-                    <td className="p-2 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        {log.status !== 'failed' && (
-                          <button
-                            onClick={() => handleDownloadImport(log.id, log.fileName)}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            <Download className="w-3.5 h-3.5" /> Download
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setDeleteConfirm(log.id)}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors animate-none"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Imported Data?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete all transactions and account snapshots imported in this batch, as well as clear any synthetically generated balance history dependent on this data. All charts, summaries, and account balances will be recalculated. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <button
-              type="button"
-              onClick={handleDeleteImport}
-              disabled={deleting}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-            >
-              {deleting ? 'Removing...' : 'Remove Data'}
-            </button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ImportHistoryTable
+        logs={logs}
+        logsLoading={logsLoading}
+        handleDownloadImport={handleDownloadImport}
+        deleteConfirm={deleteConfirm}
+        setDeleteConfirm={setDeleteConfirm}
+        handleDeleteImport={handleDeleteImport}
+        deleting={deleting}
+      />
     </div>
   );
 }

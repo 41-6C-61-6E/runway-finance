@@ -1,0 +1,993 @@
+import { NextResponse } from 'next/server';
+import { getDb } from '@/lib/db';
+import {
+  accounts,
+  budgets,
+  categories,
+  categorySpendingSummary,
+  categoryIncomeSummary,
+  transactions,
+  transactionTags,
+  userSettings,
+} from '@/lib/db/schema';
+import { eq, and, or, isNull, sql, inArray, gte, lt, lte } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
+import { decryptField, decryptRows } from '@/lib/crypto';
+import { formatToCents } from '@/lib/services/account-history';
+import { ensureCategoryDiscretionaryColumn } from '@/lib/db/seed-categories';
+
+function sanitizePeriodKey(periodType: string, periodKey: string | null | undefined, now: Date): { yearMonth: string; start: Date; next: Date } {
+  const currentY = now.getFullYear();
+  const currentM = now.getMonth() + 1;
+  const currentQ = Math.floor(now.getMonth() / 3) + 1;
+
+  if (periodType === 'quarterly') {
+    let y = currentY;
+    let q = currentQ;
+    if (periodKey && typeof periodKey === 'string') {
+      const qMatch = periodKey.match(/^(\d{4})-Q([1-4])$/);
+      if (qMatch) {
+        y = parseInt(qMatch[1], 10);
+        q = parseInt(qMatch[2], 10);
+      } else {
+        const mMatch = periodKey.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+        if (mMatch) {
+          y = parseInt(mMatch[1], 10);
+          q = Math.floor((parseInt(mMatch[2], 10) - 1) / 3) + 1;
+        } else {
+          const yMatch = periodKey.match(/^(\d{4})/);
+          if (yMatch) {
+            y = parseInt(yMatch[1], 10);
+            q = y === currentY ? currentQ : 1;
+          }
+        }
+      }
+    }
+    const start = new Date(Date.UTC(y, (q - 1) * 3, 1));
+    const next = new Date(Date.UTC(y, q * 3, 1));
+    const yearMonth = `${y}-Q${q}`;
+    return { yearMonth, start, next };
+  }
+
+  if (periodType === 'yearly') {
+    let y = currentY;
+    if (periodKey && typeof periodKey === 'string') {
+      const yMatch = periodKey.match(/^(\d{4})/);
+      if (yMatch) {
+        y = parseInt(yMatch[1], 10);
+      }
+    }
+    const start = new Date(Date.UTC(y, 0, 1));
+    const next = new Date(Date.UTC(y + 1, 0, 1));
+    const yearMonth = String(y);
+    return { yearMonth, start, next };
+  }
+
+  // monthly (default)
+  let y = currentY;
+  let m = currentM;
+  if (periodKey && typeof periodKey === 'string') {
+    const mMatch = periodKey.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+    if (mMatch) {
+      y = parseInt(mMatch[1], 10);
+      m = parseInt(mMatch[2], 10);
+    } else {
+      const qMatch = periodKey.match(/^(\d{4})-Q([1-4])$/);
+      if (qMatch) {
+        y = parseInt(qMatch[1], 10);
+        m = (parseInt(qMatch[2], 10) - 1) * 3 + 1;
+      } else {
+        const yMatch = periodKey.match(/^(\d{4})/);
+        if (yMatch) {
+          y = parseInt(yMatch[1], 10);
+          m = y === currentY ? currentM : 1;
+        }
+      }
+    }
+  }
+  const start = new Date(Date.UTC(y, m - 1, 1));
+  const next = new Date(Date.UTC(y, m, 1));
+  const yearMonth = `${y}-${String(m).padStart(2, '0')}`;
+  return { yearMonth, start, next };
+}
+
+function getPeriodBounds(periodType: string, periodKey: string | null, now: Date) {
+  const { yearMonth, start, next } = sanitizePeriodKey(periodType, periodKey, now);
+
+  const safeStart = isNaN(start.getTime()) ? new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)) : start;
+  const safeNext = isNaN(next.getTime()) ? new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)) : next;
+
+  return {
+    yearMonth,
+    startDate: safeStart.toISOString().split('T')[0],
+    endDate: safeNext.toISOString().split('T')[0],
+    label: yearMonth,
+  };
+}
+
+function parsePeriodRange(keyOrDate: string | null | undefined): { start: string; end: string } {
+  if (!keyOrDate || typeof keyOrDate !== 'string') {
+    return { start: '1970-01-01', end: '9999-12-31' };
+  }
+  const s = keyOrDate.trim();
+  const qMatch = s.match(/^(\d{4})-Q([1-4])$/);
+  if (qMatch) {
+    const y = Number(qMatch[1]);
+    const q = Number(qMatch[2]);
+    const startMonth = (q - 1) * 3 + 1;
+    const endMonth = q * 3;
+    const start = `${y}-${String(startMonth).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(y, endMonth, 0)).getUTCDate();
+    const end = `${y}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { start, end };
+  }
+  const mMatch = s.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+  if (mMatch) {
+    const y = Number(mMatch[1]);
+    const m = Number(mMatch[2]);
+    const start = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { start, end };
+  }
+  if (/^\d{4}$/.test(s)) {
+    const y = Number(s);
+    return { start: `${y}-01-01`, end: `${y}-12-31` };
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return { start: s, end: s };
+  }
+  return { start: '1970-01-01', end: '9999-12-31' };
+}
+
+/**
+ * For a budget whose native timeframe spans the viewed period (e.g. a yearly
+ * budget viewed in a monthly view), compute how much has been used of the FULL
+ * native-period envelope up to the end of the viewed period.
+ *
+ * These "lumpy" budgets are NOT prorated: a $12,000/yr vacation budget is
+ * considered within budget for the entire year as long as cumulative spending
+ * at any point does not exceed $12,000. Pace is deliberately not considered —
+ * spending it all in January is valid for these budget types.
+ */
+function resolveEnvelopeForRollDown(budget: { nativeAmount: number; nativePeriodType: string; nativePeriodKey: string | null }) {
+  if (budget.nativePeriodType === 'monthly' || !budget.nativePeriodKey) return undefined;
+
+  const range = parsePeriodRange(budget.nativePeriodKey);
+
+  // Clamp the envelope window to the budget's effective range (mid-year start, etc.)
+  const windowStart = range.start > '1970-01-01' ? range.start : null;
+  const windowEnd = range.end < '9999-12-31' ? range.end : null;
+
+  return {
+    envelopeStart: windowStart,
+    envelopeEnd: windowEnd,
+    envelopeAmount: budget.nativeAmount,
+  };
+}
+
+export function getPreviousPeriodKey(periodType: string, periodKey: string): string {
+  const now = new Date();
+  const safePeriod = sanitizePeriodKey(periodType, periodKey, now).yearMonth;
+  if (periodType === 'quarterly') {
+    const [y, q] = safePeriod.split('-Q').map(Number);
+    if (q === 1) return `${y - 1}-Q4`;
+    return `${y}-Q${q - 1}`;
+  }
+  if (periodType === 'yearly') {
+    return String(Number(safePeriod) - 1);
+  }
+  const [y, m] = safePeriod.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 2, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export async function handleGetBudgets(request: Request, userId: string, dek: Uint8Array | null) {
+  
+  const { searchParams } = new URL(request.url);
+  const now = new Date();
+  const periodType = searchParams.get('periodType') || 'monthly';
+  const periodKey = searchParams.get('periodKey');
+  const includeCategories = searchParams.get('includeCategories') === 'true';
+
+  const db = getDb();
+
+  try {
+    await ensureCategoryDiscretionaryColumn();
+    const bounds = periodKey ? getPeriodBounds(periodType, periodKey, now) : getPeriodBounds(periodType, null, now);
+    const targetPeriodKey = bounds.yearMonth;
+    const targetRange = parsePeriodRange(targetPeriodKey);
+
+    const allUserBudgets = await db
+      .select({
+        id: budgets.id,
+        categoryId: budgets.categoryId,
+        amount: budgets.amount,
+        isRecurring: budgets.isRecurring,
+        effectiveFrom: budgets.effectiveFrom,
+        effectiveTo: budgets.effectiveTo,
+        yearMonth: budgets.yearMonth,
+        periodType: budgets.periodType,
+        periodKey: budgets.periodKey,
+        fundingAccountId: budgets.fundingAccountId,
+        rollover: budgets.rollover,
+        notes: budgets.notes,
+        createdAt: budgets.createdAt,
+        categoryName: categories.name,
+        categoryColor: categories.color,
+        isIncome: categories.isIncome,
+        categoryType: categories.categoryType,
+        isDiscretionary: categories.isDiscretionary,
+      })
+      .from(budgets)
+      .leftJoin(categories, eq(budgets.categoryId, categories.id))
+      .where(
+        and(
+          eq(budgets.userId, userId),
+          or(eq(categories.excludeFromReports, false), isNull(categories.excludeFromReports)),
+        )
+      );
+
+    // Decrypt budget amounts and notes
+    const decryptedBudgetRows = await Promise.all(allUserBudgets.map(async (row) => ({
+      ...row,
+      amount: await decryptField(row.amount, dek),
+      categoryName: row.categoryName ? await decryptField(row.categoryName, dek) : 'Uncategorized',
+      notes: row.notes ? await decryptField(row.notes, dek).catch(() => row.notes) : null,
+    })));
+
+    // Group budgets by categoryId and timeframe
+    const categoryBudgetsMap = new Map<string, typeof decryptedBudgetRows>();
+    for (const b of decryptedBudgetRows) {
+      // Check if budget is active in target period
+      let isActive = false;
+      if (b.isRecurring) {
+        const fromDate = b.effectiveFrom ? parsePeriodRange(b.effectiveFrom).start : '1970-01-01';
+        const toDate = b.effectiveTo ? parsePeriodRange(b.effectiveTo).end : '9999-12-31';
+        isActive = fromDate <= targetRange.end && toDate >= targetRange.start;
+      } else {
+        const oneOffKey = b.yearMonth || b.periodKey || b.effectiveFrom;
+        if (oneOffKey) {
+          const oneOffRange = parsePeriodRange(oneOffKey);
+          isActive = oneOffRange.start <= targetRange.end && oneOffRange.end >= targetRange.start;
+        }
+      }
+
+      if (isActive) {
+        const existingList = categoryBudgetsMap.get(b.categoryId) || [];
+        existingList.push(b);
+        categoryBudgetsMap.set(b.categoryId, existingList);
+      }
+    }
+
+    interface ResolvedBudgetItem {
+      id: string;
+      categoryId: string;
+      categoryName: string;
+      categoryColor: string;
+      periodType: string;
+      nativePeriodType: 'monthly' | 'quarterly' | 'yearly';
+      nativeAmount: number;
+      budgeted: number;
+      periodKey?: string | null;
+      yearMonth?: string | null;
+      effectiveFrom?: string | null;
+      effectiveTo?: string | null;
+      isRecurring: boolean;
+      fundingAccountId: string | null;
+      rollover: boolean;
+      notes: string | null;
+      isIncome: boolean | null;
+      categoryType: string | null;
+      isDiscretionary: boolean | null;
+      /**
+       * true when the budget is expressed in a LONGER timeframe than the
+       * viewed period (a yearly budget shown in a monthly view). `budgeted`
+       * is then an informational monthly/quarterly average, NOT a separate
+       * budget — the full native-period amount is the budget for that envelope.
+       */
+      prorated: boolean;
+      /** The native period key this budget is defined over (e.g. "2026" for a yearly budget), derived from the viewed period for recurring budgets. */
+      nativePeriodKey: string | null;
+      /** Cumulative spending against the full native-period envelope, up to the end of the viewed period. Null when not prorated or not computable. */
+      envelopeSpent: number | null;
+      envelopeRemaining: number | null;
+      envelopePercentUsed: number | null;
+      /** 'within' | 'nearlyUsed' | 'exceeded' — status of the native-period envelope. */
+      envelopeStatus: 'within' | 'nearlyUsed' | 'exceeded' | null;
+      envelopeStart: string | null;
+      envelopeEnd: string | null;
+    }
+
+    const activeBudgetRows: ResolvedBudgetItem[] = [];
+
+    for (const [catId, bList] of categoryBudgetsMap.entries()) {
+      // Sort candidates by parsed start date descending so the newest configured budget takes precedence
+      const sortedCandidates = [...bList].sort((a, b) => {
+        const dateA = a.effectiveFrom ? parsePeriodRange(a.effectiveFrom).start : '1970-01-01';
+        const dateB = b.effectiveFrom ? parsePeriodRange(b.effectiveFrom).start : '1970-01-01';
+        return dateB.localeCompare(dateA);
+      });
+
+      let chosen: typeof decryptedBudgetRows[0] | null = null;
+      let nativePeriodType: 'monthly' | 'quarterly' | 'yearly' = 'monthly';
+      let budgetedMultiplier = 1;
+
+      if (periodType === 'monthly') {
+        // Priority: Direct Monthly (x1) > Quarterly Roll-Down (/3) > Yearly Roll-Down (/12)
+        const directMonthly = sortedCandidates.find((c) => (c.periodType || 'monthly') === 'monthly');
+        if (directMonthly) {
+          chosen = directMonthly;
+          nativePeriodType = 'monthly';
+          budgetedMultiplier = 1;
+        } else {
+          const quarterlyCandidate = sortedCandidates.find((c) => c.periodType === 'quarterly');
+          if (quarterlyCandidate) {
+            chosen = quarterlyCandidate;
+            nativePeriodType = 'quarterly';
+            budgetedMultiplier = 1 / 3;
+          } else {
+            const yearlyCandidate = sortedCandidates.find((c) => c.periodType === 'yearly');
+            if (yearlyCandidate) {
+              chosen = yearlyCandidate;
+              nativePeriodType = 'yearly';
+              budgetedMultiplier = 1 / 12;
+            }
+          }
+        }
+      } else if (periodType === 'quarterly') {
+        // Priority: Direct Quarterly (x1) > Monthly Rollup (x3) > Yearly Roll-Down (/4)
+        const directQuarterly = sortedCandidates.find((c) => c.periodType === 'quarterly');
+        if (directQuarterly) {
+          chosen = directQuarterly;
+          nativePeriodType = 'quarterly';
+          budgetedMultiplier = 1;
+        } else {
+          const monthlyCandidate = sortedCandidates.find((c) => (c.periodType || 'monthly') === 'monthly');
+          if (monthlyCandidate) {
+            chosen = monthlyCandidate;
+            nativePeriodType = 'monthly';
+            budgetedMultiplier = 3;
+          } else {
+            const yearlyCandidate = sortedCandidates.find((c) => c.periodType === 'yearly');
+            if (yearlyCandidate) {
+              chosen = yearlyCandidate;
+              nativePeriodType = 'yearly';
+              budgetedMultiplier = 1 / 4;
+            }
+          }
+        }
+      } else {
+        // Yearly: Priority: Direct Yearly (x1) > Quarterly Rollup (x4) > Monthly Rollup (x12)
+        const directYearly = sortedCandidates.find((c) => c.periodType === 'yearly');
+        if (directYearly) {
+          chosen = directYearly;
+          nativePeriodType = 'yearly';
+          budgetedMultiplier = 1;
+        } else {
+          const quarterlyCandidate = sortedCandidates.find((c) => c.periodType === 'quarterly');
+          if (quarterlyCandidate) {
+            chosen = quarterlyCandidate;
+            nativePeriodType = 'quarterly';
+            budgetedMultiplier = 4;
+          } else {
+            const monthlyCandidate = sortedCandidates.find((c) => (c.periodType || 'monthly') === 'monthly');
+            if (monthlyCandidate) {
+              chosen = monthlyCandidate;
+              nativePeriodType = 'monthly';
+              budgetedMultiplier = 12;
+            }
+          }
+        }
+      }
+
+      if (chosen) {
+        const nativeAmount = parseFloat(chosen.amount) || 0;
+          // Native period key this budget is defined over. One-off budgets carry
+          // it explicitly; recurring budgets are derived from the viewed period.
+          const nativePeriodKey = chosen.periodKey || chosen.yearMonth || (() => {
+            const pStart = parsePeriodRange(targetPeriodKey).start; // YYYY-MM-DD
+            const py = parseInt(pStart.substring(0, 4), 10);
+            const pm = parseInt(pStart.substring(5, 7), 10); // 1-12
+            if (nativePeriodType === 'yearly') return String(py);
+            if (nativePeriodType === 'quarterly') return `${py}-Q${Math.floor((pm - 1) / 3) + 1}`;
+            return targetPeriodKey;
+          })();
+        activeBudgetRows.push({
+            id: chosen.id,
+            categoryId: chosen.categoryId,
+            categoryName: chosen.categoryName,
+            categoryColor: chosen.categoryColor || '#6366f1',
+            periodType: periodType,
+            nativePeriodType,
+            nativeAmount,
+            budgeted: nativeAmount * budgetedMultiplier,
+            periodKey: chosen.periodKey || chosen.yearMonth || null,
+            yearMonth: chosen.yearMonth || null,
+            effectiveFrom: chosen.effectiveFrom || null,
+            effectiveTo: chosen.effectiveTo || null,
+            isRecurring: chosen.isRecurring,
+            fundingAccountId: chosen.fundingAccountId,
+            rollover: chosen.rollover,
+            notes: chosen.notes,
+            isIncome: chosen.isIncome,
+            categoryType: chosen.categoryType,
+            isDiscretionary: chosen.isDiscretionary,
+            prorated: (nativePeriodType === 'quarterly' && periodType === 'monthly') || (nativePeriodType === 'yearly' && (periodType === 'monthly' || periodType === 'quarterly')),
+            nativePeriodKey,
+            envelopeSpent: null,
+            envelopeRemaining: null,
+            envelopePercentUsed: null,
+            envelopeStatus: null,
+            envelopeStart: null,
+            envelopeEnd: null,
+        });
+      }
+    }
+
+    // Fetch all categories for hierarchy mapping
+    const allCategories = await db
+      .select({ 
+        id: categories.id, 
+        name: categories.name, 
+        color: categories.color, 
+        parentId: categories.parentId, 
+        isIncome: categories.isIncome,
+        categoryType: categories.categoryType,
+        isDiscretionary: categories.isDiscretionary,
+      })
+      .from(categories)
+      .where(eq(categories.userId, userId));
+
+    const decryptedAllCategories = await Promise.all(allCategories.map(async (c) => ({
+      ...c,
+      name: c.name ? await decryptField(c.name, dek) : 'Uncategorized',
+    })));
+
+    const categoryByIdMap = new Map(decryptedAllCategories.map(c => [c.id, c]));
+    const parentMap = new Map<string, string | null>(
+      decryptedAllCategories.map(c => [c.id, c.parentId || null])
+    );
+
+    // Set of categories that have an active direct budget item
+    const budgetedCategoryIds = new Set(activeBudgetRows.map((b) => b.categoryId));
+
+    // Find the closest ancestor (or self) that has a budget item
+    const getClosestBudgetedCategory = (catId: string): string | null => {
+      let curr: string | null = catId;
+      while (curr) {
+        if (budgetedCategoryIds.has(curr)) return curr;
+        curr = parentMap.get(curr) || null;
+      }
+      return null;
+    };
+
+    // Build coveredCategoryIds mapping: maps each budgeted category to itself + any unbudgeted descendants that roll into it
+    const coveredCategoriesMap = new Map<string, string[]>();
+    for (const catId of budgetedCategoryIds) {
+      coveredCategoriesMap.set(catId, [catId]);
+    }
+    for (const cat of decryptedAllCategories) {
+      const targetId = getClosestBudgetedCategory(cat.id);
+      if (targetId && targetId !== cat.id) {
+        const list = coveredCategoriesMap.get(targetId) || [targetId];
+        if (!list.includes(cat.id)) {
+          list.push(cat.id);
+        }
+        coveredCategoriesMap.set(targetId, list);
+      }
+    }
+
+    // Everything Else is a catch-all for categories that do not resolve to a
+    // budgeted category. Keep those IDs available for envelope calculations as
+    // well; otherwise an annual Everything Else budget shows the breakout's
+    // actual spending but its yearly envelope still sees zero spending.
+    const everythingElseCategoryIds = decryptedAllCategories
+      .filter((cat) => {
+        if (cat.isIncome || cat.categoryType === 'compound' || cat.categoryType === 'transfer') return false;
+        if (cat.name.toLowerCase() === 'everything else') return false;
+        return getClosestBudgetedCategory(cat.id) === null;
+      })
+      .map((cat) => cat.id);
+
+    // User settings & account exclusion configuration
+    const userSettingsList = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    const userSetting = userSettingsList[0];
+    const rawShowImported = userSetting?.showImportedData;
+    const importSettings = {
+      global: true,
+      netWorth: true,
+      realEstate: true,
+      cashFlowProjections: true,
+      ...(typeof rawShowImported === 'object' && rawShowImported !== null ? rawShowImported : {}),
+    } as Record<string, boolean>;
+
+    const isImportTransactionsEnabled = importSettings.global !== false && importSettings.cashFlowProjections !== false;
+
+    const budgetExclusions = (userSetting?.budgetExclusions as { categoryIds?: string[]; tagIds?: string[] }) || {};
+    const excludedCategoryIds = new Set(budgetExclusions.categoryIds || []);
+    const excludedTagIds = new Set(budgetExclusions.tagIds || []);
+
+    // Direct-match only: a split group is NOT excluded wholesale when one
+    // member carries an excluded tag — only the tagged transaction itself.
+    const excludedTransactionIds = new Set<string>();
+    if (excludedTagIds.size > 0) {
+      const taggedRows = await db
+        .select({ transactionId: transactionTags.transactionId })
+        .from(transactionTags)
+        .where(inArray(transactionTags.tagId, Array.from(excludedTagIds)));
+      for (const r of taggedRows) {
+        if (r.transactionId) excludedTransactionIds.add(r.transactionId);
+      }
+    }
+
+    const userAccounts = await db
+      .select({
+        id: accounts.id,
+        isHidden: accounts.isHidden,
+        isExcludedFromNetWorth: accounts.isExcludedFromNetWorth,
+      })
+      .from(accounts)
+      .where(eq(accounts.userId, userId));
+
+    const excludedAccountIds = new Set(
+      userAccounts.filter((a) => a.isHidden || a.isExcludedFromNetWorth).map((a) => a.id)
+    );
+
+    // Fetch all active period transactions
+    const txConditions = [
+      eq(transactions.userId, userId),
+      gte(transactions.date, bounds.startDate),
+      lt(transactions.date, bounds.endDate),
+      eq(transactions.deleted, false),
+      eq(transactions.ignored, false),
+    ];
+    if (!isImportTransactionsEnabled) {
+      txConditions.push(eq(transactions.isImported, false));
+    }
+
+    const txRows = await db
+      .select({
+        id: transactions.id,
+        date: transactions.date,
+        categoryId: transactions.categoryId,
+        amount: transactions.amount,
+        accountId: transactions.accountId,
+        ignored: transactions.ignored,
+      })
+      .from(transactions)
+      .where(and(...txConditions));
+
+    const budgetActualsMap = new Map<string, number>();
+    const unbudgetedActualsMap = new Map<string, number>();
+
+    for (const row of txRows) {
+      if (!row.categoryId) continue;
+      if (row.ignored) continue;
+      if (row.date) {
+        const txDateStr = typeof row.date === 'string' ? row.date : ((row.date as unknown) instanceof Date ? (row.date as Date).toISOString().split('T')[0] : String(row.date));
+        if (txDateStr < bounds.startDate || txDateStr >= bounds.endDate) continue;
+      }
+      if (row.accountId && excludedAccountIds.has(row.accountId)) continue;
+      if (excludedTransactionIds.has(row.id)) continue;
+      if (excludedCategoryIds.has(row.categoryId)) continue;
+
+      const decrypted = await decryptField(String(row.amount), dek);
+      const amount = parseFloat(decrypted);
+      if (isNaN(amount)) continue;
+
+      const catInfo = categoryByIdMap.get(row.categoryId);
+      const isIncomeCat = catInfo?.isIncome ?? false;
+
+      // Net spending/income calculation:
+      // For expense categories: expense purchases are negative in DB (-amount is spending), returns are positive (+amount reduces spending).
+      // For income categories: income deposits are positive in DB (+amount is income), refunds are negative (-amount reduces income).
+      const netVal = isIncomeCat ? amount : -amount;
+      const targetBudgetCatId = getClosestBudgetedCategory(row.categoryId);
+
+      if (targetBudgetCatId) {
+        // Transaction is covered by a budget item (direct or ancestor)
+        const prev = budgetActualsMap.get(targetBudgetCatId) || 0;
+        budgetActualsMap.set(targetBudgetCatId, prev + netVal);
+      } else {
+        // Transaction is UNBUDGETED - evaluate for Everything Else bucket
+        if (
+          catInfo &&
+          !catInfo.isIncome &&
+          catInfo.categoryType !== 'compound' &&
+          catInfo.categoryType !== 'transfer' &&
+          catInfo.name.toLowerCase() !== 'everything else' &&
+          !excludedCategoryIds.has(row.categoryId)
+        ) {
+          const prev = unbudgetedActualsMap.get(row.categoryId) || 0;
+          unbudgetedActualsMap.set(row.categoryId, prev + netVal);
+        }
+      }
+    }
+
+    // Build Everything Else breakout list
+    const everythingElseBreakout = Array.from(unbudgetedActualsMap.entries())
+      .map(([catId, actual]) => {
+        const cat = categoryByIdMap.get(catId);
+        return {
+          categoryId: catId,
+          categoryName: cat?.name || 'Uncategorized',
+          categoryColor: cat?.color || '#6366f1',
+          actual,
+        };
+      })
+      .filter((c) => c.actual > 0)
+      .sort((a, b) => b.actual - a.actual);
+
+    // Calculate rollover carryover for active monthly expense budgets with rollover: true
+    const rolloverCarryoverMap = new Map<string, number>();
+
+    // ── Envelope spending for rolled-down (prorated) budgets ─────────────
+    // ── Envelope spending for rolled-down (prorated) budgets ─────────────
+    // A yearly/quarterly budget viewed in a shorter period is judged against
+    // its ENTIRE native period, not the prorated slice. Compute cumulative
+    // spending from the envelope start up to the end of the viewed period.
+    // Pace is intentionally NOT applied — lumpy budgets (vacations, annual
+    // insurance) can spend their full amount early in the period and still
+    // be within budget.
+    {
+      const envelopeRows = activeBudgetRows.filter((r) => r.prorated);
+      if (envelopeRows.length > 0) {
+        for (const row of envelopeRows) {
+          const envInfo = resolveEnvelopeForRollDown({
+            nativeAmount: row.nativeAmount,
+            nativePeriodType: row.nativePeriodType,
+            nativePeriodKey: row.nativePeriodKey,
+          });
+          if (!envInfo) continue;
+
+          // Window start: native-period start, clamped forward by the budget's
+          // effectiveFrom (e.g. a budget that starts mid-year). ISO date
+          // strings compare lexicographically, so max() is safe.
+          const effFromStart = row.effectiveFrom ? parsePeriodRange(row.effectiveFrom).start : null;
+          const envInfoStart = envInfo.envelopeStart || '1970-01-01';
+          const effFrom = effFromStart || '1970-01-01';
+          // ISO dates compare correctly lexicographically (Math.max would coerce to numbers).
+          const envStart = effFrom > envInfoStart ? effFrom : envInfoStart;
+          // Stop at the end of the viewed period: for current/future views this
+          // is today's period-end (later actuals in the envelope period haven't
+          // happened yet); for past views it freezes the number as of that period.
+          const stopDate = bounds.endDate;
+
+          row.envelopeStart = envStart;
+          row.envelopeEnd = envInfo.envelopeEnd;
+
+          if (envStart >= stopDate) {
+            // Envelope has not opened before the end of the viewed period
+            row.envelopeSpent = 0;
+            row.envelopeRemaining = envInfo.envelopeAmount;
+            row.envelopePercentUsed = 0;
+            row.envelopeStatus = 'within';
+            continue;
+          }
+
+          const isEverythingElse = (row.categoryName || '').toLowerCase().includes('everything else') ||
+                                   (row.categoryName || '').toLowerCase().includes('all other') ||
+                                   (row.categoryName || '').toLowerCase().includes('misc');
+          const envelopeCategoryIds = isEverythingElse
+            ? Array.from(new Set([
+                ...(coveredCategoriesMap.get(row.categoryId) || [row.categoryId]),
+                ...everythingElseCategoryIds,
+              ]))
+            : (coveredCategoriesMap.get(row.categoryId) || [row.categoryId]);
+
+          const envTxConditions = [
+            eq(transactions.userId, userId),
+            gte(transactions.date, envStart),
+            lt(transactions.date, stopDate),
+            eq(transactions.deleted, false),
+            eq(transactions.ignored, false),
+            inArray(transactions.categoryId, envelopeCategoryIds),
+          ];
+          if (!isImportTransactionsEnabled) {
+            envTxConditions.push(eq(transactions.isImported, false));
+          }
+
+          const envTxRows = await db
+            .select({
+              id: transactions.id,
+              date: transactions.date,
+              amount: transactions.amount,
+              accountId: transactions.accountId,
+              categoryId: transactions.categoryId,
+            })
+            .from(transactions)
+            .where(and(...envTxConditions));
+
+          let spent = 0;
+          for (const tx of envTxRows) {
+            if (tx.accountId && excludedAccountIds.has(tx.accountId)) continue;
+            if (excludedTransactionIds.has(tx.id)) continue;
+            if (tx.categoryId && excludedCategoryIds.has(tx.categoryId)) continue;
+            const txDateStr = typeof tx.date === 'string' ? tx.date : ((tx.date as unknown) instanceof Date ? (tx.date as Date).toISOString().split('T')[0] : String(tx.date));
+            if (txDateStr < envStart || txDateStr >= stopDate) continue;
+            const decrypted = await decryptField(String(tx.amount), dek);
+            const amt = parseFloat(decrypted);
+            if (isNaN(amt)) continue;
+            const catInfo = categoryByIdMap.get(tx.categoryId);
+            // Income categories: deposits are positive in DB, and they
+            // INCREASE the remaining envelope (income envelope = budget).
+            spent += catInfo?.isIncome ? amt : -amt;
+          }
+
+          const remaining = envInfo.envelopeAmount - spent;
+          const percentUsed = envInfo.envelopeAmount > 0 ? (spent / envInfo.envelopeAmount) * 100 : 0;
+          row.envelopeSpent = Math.round(spent * 100) / 100;
+          row.envelopeRemaining = Math.round(remaining * 100) / 100;
+          row.envelopePercentUsed = Math.round(percentUsed * 10) / 10;
+          row.envelopeStatus = remaining <= 0
+            ? 'exceeded'
+            : remaining <= envInfo.envelopeAmount * 0.10
+              ? 'nearlyUsed'
+              : 'within';
+        }
+      }
+    }
+
+    if (periodType === 'monthly') {
+      const rolloverRows = activeBudgetRows.filter(
+        // Only budgets Natively defined monthly participate in month-to-month
+        // rollover. A rolled-down yearly/quarterly budget uses its whole-period
+        // envelope instead — carrying the monthly proration forward overstates
+        // the available amount for lumpy categories.
+        (r) => r.rollover && !r.isIncome && r.categoryType !== 'compound' && r.nativePeriodType === 'monthly'
+      );
+
+      if (rolloverRows.length > 0) {
+        const [targetYear, targetMonth] = targetPeriodKey.split('-').map(Number);
+
+        for (const row of rolloverRows) {
+          const fromKey = row.effectiveFrom || '1970-01';
+          const fromRange = parsePeriodRange(fromKey);
+          const fromDate = new Date(fromRange.start);
+          const fromYear = fromDate.getUTCFullYear();
+          const fromMonth = fromDate.getUTCMonth() + 1;
+
+          // Compute list of prior consecutive month keys (up to 12 months back)
+          const priorMonthKeys: string[] = [];
+          for (let offset = 12; offset >= 1; offset--) {
+            const d = new Date(Date.UTC(targetYear, targetMonth - 1 - offset, 1));
+            const y = d.getUTCFullYear();
+            const m = d.getUTCMonth() + 1;
+            const ymKey = `${y}-${String(m).padStart(2, '0')}`;
+            if (y > fromYear || (y === fromYear && m >= fromMonth)) {
+              priorMonthKeys.push(ymKey);
+            }
+          }
+
+          if (priorMonthKeys.length > 0) {
+            const earliestMonthStart = `${priorMonthKeys[0]}-01`;
+            const priorCoveredCatIds = coveredCategoriesMap.get(row.categoryId) || [row.categoryId];
+
+            const priorTxConditions = [
+              eq(transactions.userId, userId),
+              gte(transactions.date, earliestMonthStart),
+              lt(transactions.date, bounds.startDate),
+              eq(transactions.deleted, false),
+              eq(transactions.ignored, false),
+              inArray(transactions.categoryId, priorCoveredCatIds),
+            ];
+            if (!isImportTransactionsEnabled) {
+              priorTxConditions.push(eq(transactions.isImported, false));
+            }
+
+            const priorTxRows = await db
+              .select({
+                id: transactions.id,
+                date: transactions.date,
+                amount: transactions.amount,
+                accountId: transactions.accountId,
+                categoryId: transactions.categoryId,
+              })
+              .from(transactions)
+              .where(and(...priorTxConditions));
+
+            // Group prior actual spending by month (YYYY-MM)
+            const priorMonthlyActuals = new Map<string, number>();
+            for (const tx of priorTxRows) {
+              if (tx.accountId && excludedAccountIds.has(tx.accountId)) continue;
+              if (excludedTransactionIds.has(tx.id)) continue;
+              if (tx.categoryId && excludedCategoryIds.has(tx.categoryId)) continue;
+
+              const decrypted = await decryptField(String(tx.amount), dek);
+              const amt = parseFloat(decrypted);
+              if (isNaN(amt)) continue;
+
+              const txDateStr = typeof tx.date === 'string' ? tx.date : ((tx.date as unknown) instanceof Date ? (tx.date as Date).toISOString().split('T')[0] : String(tx.date));
+              const txYm = txDateStr.substring(0, 7);
+              // For expense categories, purchases are negative in DB (-amount is spending)
+              const netSpend = -amt;
+              priorMonthlyActuals.set(txYm, (priorMonthlyActuals.get(txYm) || 0) + netSpend);
+            }
+
+            // Find historical budget records for this category
+            const catHistoricalBudgets = categoryBudgetsMap.get(row.categoryId) || [];
+
+            let accumulatedCarryover = 0;
+            for (const ym of priorMonthKeys) {
+              const ymRange = parsePeriodRange(ym);
+              const matchingBudget = catHistoricalBudgets.find((b) => {
+                if (b.isRecurring) {
+                  const bFrom = b.effectiveFrom ? parsePeriodRange(b.effectiveFrom).start : '1970-01-01';
+                  const bTo = b.effectiveTo ? parsePeriodRange(b.effectiveTo).end : '9999-12-31';
+                  return bFrom <= ymRange.end && bTo >= ymRange.start;
+                } else {
+                  const oneOff = b.yearMonth || b.periodKey;
+                  return oneOff === ym;
+                }
+              });
+
+              const priorBudgeted = matchingBudget ? (parseFloat(matchingBudget.amount) || 0) : row.budgeted;
+              const priorActual = priorMonthlyActuals.get(ym) || 0;
+              const priorRemaining = priorBudgeted - priorActual;
+
+              // Envelope carryforward: surplus adds to carryover pool, deficit reduces it (floored at 0)
+              accumulatedCarryover = Math.max(0, accumulatedCarryover + priorRemaining);
+            }
+
+            // Cap accumulated carryover at 3x monthly budget to prevent unbounded runaway accumulation
+            const maxCap = (row.budgeted || row.nativeAmount) * 3;
+            accumulatedCarryover = Math.min(accumulatedCarryover, maxCap);
+            rolloverCarryoverMap.set(row.categoryId, Math.round(accumulatedCarryover * 100) / 100);
+          }
+        }
+      }
+    }
+
+    // Map active budget rows with exact calculated actuals and Everything Else breakout
+    let hasExplicitEverythingElse = false;
+    const data = activeBudgetRows.map((row) => {
+      const nativeAmount = row.nativeAmount;
+      const budgeted = row.budgeted;
+
+      const isIncome = row.isIncome ?? false;
+      const isCompound = row.categoryType === 'compound';
+      const effectiveIsIncome = isIncome && !isCompound;
+      let actual = budgetActualsMap.get(row.categoryId) || 0;
+
+      const isEverythingElse = (row.categoryName || '').toLowerCase().includes('everything else') ||
+                               (row.categoryName || '').toLowerCase().includes('all other') ||
+                               (row.categoryName || '').toLowerCase().includes('misc');
+      let groupedBreakout: typeof everythingElseBreakout | undefined = undefined;
+
+      if (isEverythingElse) {
+        hasExplicitEverythingElse = true;
+        groupedBreakout = everythingElseBreakout;
+        const totalUnbudgetedActual = everythingElseBreakout.reduce((s, c) => s + c.actual, 0);
+        actual = Math.max(actual, totalUnbudgetedActual);
+      }
+
+      const rolloverCarryover = rolloverCarryoverMap.get(row.categoryId) || 0;
+      const availableBudget = (row.rollover && !effectiveIsIncome) ? budgeted + rolloverCarryover : budgeted;
+      const remaining = effectiveIsIncome ? actual - budgeted : availableBudget - actual;
+      const percentUsed = availableBudget > 0 ? (actual / availableBudget) * 100 : 0;
+      const coveredCategoryIds = coveredCategoriesMap.get(row.categoryId) || [row.categoryId];
+
+      return {
+        id: row.id,
+        categoryId: row.categoryId,
+        categoryName: isEverythingElse ? 'Everything Else' : row.categoryName,
+        categoryColor: isEverythingElse ? '#64748b' : (row.categoryColor || '#6366f1'),
+        periodType: row.periodType,
+        nativePeriodType: row.nativePeriodType,
+        nativeAmount: nativeAmount,
+        nativePeriodKey: row.nativePeriodKey,
+        prorated: row.prorated,
+        envelopeSpent: row.envelopeSpent,
+        envelopeRemaining: row.envelopeRemaining,
+        envelopePercentUsed: row.envelopePercentUsed,
+        envelopeStatus: row.envelopeStatus,
+        envelopeStart: row.envelopeStart,
+        envelopeEnd: row.envelopeEnd,
+        periodKey: row.periodKey || row.yearMonth || null,
+        yearMonth: row.yearMonth || null,
+        effectiveFrom: row.effectiveFrom || null,
+        effectiveTo: row.effectiveTo || null,
+        isRecurring: row.isRecurring,
+        fundingAccountId: row.fundingAccountId,
+        rollover: row.rollover,
+        rolloverCarryover,
+        availableBudget,
+        notes: row.notes,
+        monthlyAmount: row.nativePeriodType === 'monthly'
+          ? nativeAmount
+          : (row.nativePeriodType === 'quarterly' ? nativeAmount / 3 : nativeAmount / 12),
+        budgeted,
+        actual,
+        remaining,
+        percentUsed,
+        type: effectiveIsIncome ? 'income' : 'expense',
+        isDiscretionary: row.isDiscretionary ?? true,
+        isEverythingElse,
+        isCatchAll: isEverythingElse,
+        groupedBreakout,
+        coveredCategoryIds,
+      };
+    });
+
+    // If there is unbudgeted spending and no explicit Everything Else budget exists, add synthetic Everything Else item
+    if (!hasExplicitEverythingElse && everythingElseBreakout.length > 0) {
+      const totalUnbudgetedActual = everythingElseBreakout.reduce((s, c) => s + c.actual, 0);
+      data.push({
+        id: 'synthetic-everything-else',
+        categoryId: 'everything-else-special',
+        categoryName: 'Everything Else',
+        categoryColor: '#64748b',
+        periodType: periodType,
+        nativePeriodType: periodType as any,
+        nativeAmount: 0,
+        periodKey: null,
+        yearMonth: null,
+        effectiveFrom: null,
+        effectiveTo: null,
+        isRecurring: true,
+        fundingAccountId: null,
+        rollover: false,
+        rolloverCarryover: 0,
+        availableBudget: 0,
+        notes: null,
+        monthlyAmount: 0,
+        prorated: false,
+        nativePeriodKey: null,
+        envelopeSpent: null,
+        envelopeRemaining: null,
+        envelopePercentUsed: null,
+        envelopeStatus: null,
+        envelopeStart: null,
+        envelopeEnd: null,
+        budgeted: 0,
+        actual: totalUnbudgetedActual,
+        remaining: -totalUnbudgetedActual,
+        percentUsed: 0,
+        type: 'expense' as const,
+        isDiscretionary: true,
+        isEverythingElse: true,
+        isCatchAll: true,
+        groupedBreakout: everythingElseBreakout,
+        coveredCategoryIds: everythingElseBreakout.map((b) => b.categoryId),
+      });
+    }
+
+    const result: Record<string, unknown> = { budgets: data, period: bounds };
+
+    if (includeCategories) {
+      let catList = decryptedAllCategories.map((c) => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        isIncome: c.isIncome,
+        parentId: c.parentId,
+        isDiscretionary: c.isDiscretionary,
+      }));
+
+      // Ensure "Everything Else" is in categories list for selection
+      if (!catList.some((c) => c.name.toLowerCase() === 'everything else')) {
+        catList.push({
+          id: 'everything-else-special',
+          name: 'Everything Else',
+          color: '#64748b',
+          isIncome: false,
+          parentId: null,
+          isDiscretionary: true,
+        });
+      }
+
+      result.categories = catList;
+    }
+    return NextResponse.json(result);
+  } catch (error) {
+    logger.error('Error fetching budgets', { error });
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+  }
+}
+

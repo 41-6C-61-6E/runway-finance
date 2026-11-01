@@ -28,6 +28,12 @@ import {
 } from '@/lib/utils/social-security';
 import { formatCurrency } from '@/lib/utils/format';
 import { Select } from '@/components/ui/select';
+import { StepProfile } from './wizard/step-profile';
+import { StepPartner } from './wizard/step-partner';
+import { StepAccounts } from './wizard/step-accounts';
+import { StepExpenses } from './wizard/step-expenses';
+import { StepStrategy } from './wizard/step-strategy';
+import { StepSocialSecurity } from './wizard/step-social-security';
 
 export interface PlanWizardModalProps {
   isOpen: boolean;
@@ -479,600 +485,107 @@ export function PlanWizardModal({
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* STEP 1: Core Profile & Tax Status */}
           {activeKey === 'profile' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Plan Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Default Baseline Plan, Early FIRE at 50, Conservative"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-medium"
-                    autoFocus
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Tax Filing Status</label>
-                  <Select
-                    value={filingStatus}
-                    onChange={(e: any) => handleFilingStatusChange(e.target.value)}
-                    className="rounded-xl bg-muted/40 text-xs font-bold"
-                  >
-                    <option value="single">Single</option>
-                    <option value="married_joint">Married Filing Jointly (MFJ)</option>
-                    <option value="married_separate">Married Filing Separately</option>
-                    <option value="head_of_household">Head of Household</option>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5 flex items-center justify-between bg-muted/20 border border-border rounded-xl px-4 py-2 mt-auto">
-                  <div>
-                    <span className="text-xs font-semibold text-foreground block">Partner / Spouse Plan</span>
-                    <span className="text-[11px] text-muted-foreground">Include partner timelines & benefits</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={hasSpouse}
-                    onChange={(e) => setHasSpouse(e.target.checked)}
-                    className="w-4 h-4 accent-primary rounded cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Primary Birth Year</label>
-                  <input
-                    type="number"
-                    required
-                    min={1940}
-                    max={2010}
-                    value={primaryBirthYear}
-                    onChange={(e) => setPrimaryBirthYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Target Retirement Age</label>
-                  <input
-                    type="number"
-                    required
-                    min={30}
-                    max={80}
-                    value={retirementAge}
-                    onChange={(e) => setRetirementAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Life Expectancy Age</label>
-                  <input
-                    type="number"
-                    required
-                    min={65}
-                    max={110}
-                    value={lifeExpectancyAge}
-                    onChange={(e) => setLifeExpectancyAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Gross Annual Salary ($)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    placeholder="e.g. 120000"
-                    value={primarySalary === 0 ? '' : primarySalary}
-                    onChange={(e) => handlePrimarySalaryChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Yearly Salary Raise (%)</label>
-                  <input
-                    type="number"
-                    step={0.1}
-                    min={0}
-                    placeholder="e.g. 3.0"
-                    value={primarySalaryRaisePct || ''}
-                    onChange={(e) => setPrimarySalaryRaisePct(e.target.value)}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 bg-muted/30 border border-border rounded-xl p-3 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  id="isDefaultCheck"
-                  checked={isDefault}
-                  onChange={(e) => setIsDefault(e.target.checked)}
-                  className="w-4 h-4 accent-primary rounded cursor-pointer shrink-0"
-                />
-                <label htmlFor="isDefaultCheck" className="cursor-pointer font-medium text-foreground">
-                  Set as Default Baseline Plan (Primary plan used to pre-populate future scenarios)
-                </label>
-              </div>
-            </div>
+            <StepProfile
+              name={name}
+              setName={setName}
+              filingStatus={filingStatus}
+              handleFilingStatusChange={handleFilingStatusChange}
+              hasSpouse={hasSpouse}
+              setHasSpouse={setHasSpouse}
+              primaryBirthYear={primaryBirthYear}
+              setPrimaryBirthYear={setPrimaryBirthYear}
+              retirementAge={retirementAge}
+              setRetirementAge={setRetirementAge}
+              lifeExpectancyAge={lifeExpectancyAge}
+              setLifeExpectancyAge={setLifeExpectancyAge}
+              primarySalary={primarySalary}
+              handlePrimarySalaryChange={handlePrimarySalaryChange}
+              primarySalaryRaisePct={primarySalaryRaisePct}
+              setPrimarySalaryRaisePct={setPrimarySalaryRaisePct}
+              isDefault={isDefault}
+              setIsDefault={setIsDefault}
+            />
           )}
 
           {/* STEP 2: Partner Profile & Benefits (Conditional) */}
           {activeKey === 'partner' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-primary flex items-center gap-2">
-                <Users className="w-4 h-4 shrink-0" />
-                <span>Configure partner details for dual-retiree household projections.</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Partner Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Alex, Spouse"
-                    value={spouseName}
-                    onChange={(e) => setSpouseName(e.target.value)}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-medium"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Partner Birth Year</label>
-                  <input
-                    type="number"
-                    min={1940}
-                    max={2010}
-                    value={spouseBirthYear}
-                    onChange={(e) => setSpouseBirthYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Partner Target Retirement Age</label>
-                  <input
-                    type="number"
-                    min={30}
-                    max={80}
-                    value={spouseRetirementAge}
-                    onChange={(e) => setSpouseRetirementAge(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Partner Gross Annual Salary ($)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    placeholder="e.g. 85000"
-                    value={spouseSalary === 0 ? '' : spouseSalary}
-                    onChange={(e) => handleSpouseSalaryChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Partner Yearly Raise (%)</label>
-                  <input
-                    type="number"
-                    step={0.1}
-                    min={0}
-                    placeholder="e.g. 3.0"
-                    value={spouseSalaryRaisePct || ''}
-                    onChange={(e) => setSpouseSalaryRaisePct(e.target.value)}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-              </div>
-            </div>
+            <StepPartner
+              spouseName={spouseName}
+              setSpouseName={setSpouseName}
+              spouseBirthYear={spouseBirthYear}
+              setSpouseBirthYear={setSpouseBirthYear}
+              spouseRetirementAge={spouseRetirementAge}
+              setSpouseRetirementAge={setSpouseRetirementAge}
+              spouseSalary={spouseSalary}
+              handleSpouseSalaryChange={handleSpouseSalaryChange}
+              spouseSalaryRaisePct={spouseSalaryRaisePct}
+              setSpouseSalaryRaisePct={setSpouseSalaryRaisePct}
+            />
           )}
 
           {/* STEP 3: Accounts & Assets Selection */}
           {activeKey === 'accounts' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">Select Portfolio Accounts to Include</h4>
-                  <p className="text-[11px] text-muted-foreground">Checked accounts are included in accumulation savings and drawdown calculations</p>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAllAccounts(true)}
-                    className="text-primary hover:underline font-semibold cursor-pointer"
-                  >
-                    Select All
-                  </button>
-                  <span className="text-muted-foreground">•</span>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAllAccounts(false)}
-                    className="text-muted-foreground hover:underline cursor-pointer"
-                  >
-                    Deselect All
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {accountsToDisplay.length === 0 ? (
-                  <div className="p-4 text-center border border-dashed border-border rounded-xl text-xs text-muted-foreground">
-                    No accounts found. Default starter accounts will be created for this plan.
-                  </div>
-                ) : (
-                  accountsToDisplay.map((acc: any) => {
-                    const isInc = accountInclusions[acc.id] !== false;
-                    return (
-                      <div
-                        key={acc.id}
-                        onClick={() => toggleAccountInclusion(acc.id)}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                          isInc
-                            ? 'bg-muted/30 border-primary/40 shadow-xs'
-                            : 'bg-muted/10 border-border opacity-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={isInc}
-                            onChange={() => toggleAccountInclusion(acc.id)}
-                            className="w-4 h-4 accent-primary rounded cursor-pointer"
-                          />
-                          <div>
-                            <span className="text-xs font-bold text-foreground block">{acc.name || 'Account'}</span>
-                            <span className="text-[10px] uppercase font-semibold text-muted-foreground">
-                              {(acc.type || 'account').replace(/_/g, ' ')}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="font-mono text-xs font-bold text-foreground">
-                          ${(parseFloat(acc.balance) || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+            <StepAccounts
+              accountsToDisplay={accountsToDisplay}
+              accountInclusions={accountInclusions}
+              toggleAccountInclusion={toggleAccountInclusion}
+              handleSelectAllAccounts={handleSelectAllAccounts}
+            />
           )}
 
           {/* STEP 4: Expenses & Passive Income */}
           {activeKey === 'expenses' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Annual Living Expenses ($/year)</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    step={1000}
-                    value={livingExpenseAmount}
-                    onChange={(e) => setLivingExpenseAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3.5 py-2 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 font-bold"
-                  />
-                  <p className="text-[11px] text-muted-foreground">Base annual outflow required in retirement (excluding taxes & healthcare)</p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Healthcare Expenses ($/year)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={500}
-                    value={healthcareExpenseAmount}
-                    onChange={(e) => setHealthcareExpenseAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Pension / Passive Income ($/year)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1000}
-                    value={pensionIncomeAmount}
-                    onChange={(e) => setPensionIncomeAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-              </div>
-            </div>
+            <StepExpenses
+              livingExpenseAmount={livingExpenseAmount}
+              setLivingExpenseAmount={setLivingExpenseAmount}
+              healthcareExpenseAmount={healthcareExpenseAmount}
+              setHealthcareExpenseAmount={setHealthcareExpenseAmount}
+              pensionIncomeAmount={pensionIncomeAmount}
+              setPensionIncomeAmount={setPensionIncomeAmount}
+            />
           )}
 
           {/* STEP 5: Strategy & Tax Optimization Engine */}
           {activeKey === 'strategy' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="space-y-3">
-                <label className="text-xs font-semibold text-muted-foreground">Drawdown Sequence Strategy</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  {[
-                    { id: 'textbook', title: 'Textbook Waterfall', desc: 'Cash → Taxable → Traditional → Roth → HSA' },
-                    { id: 'tax_optimized', title: 'Tax-Optimized', desc: 'Fill lower tax brackets with Traditional first' },
-                    { id: 'proportional', title: 'Proportional', desc: 'Draw evenly across portfolio' },
-                  ].map((strat) => (
-                    <button
-                      key={strat.id}
-                      type="button"
-                      onClick={() => setWithdrawalMethod(strat.id as any)}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                        withdrawalMethod === strat.id
-                          ? 'bg-primary/10 border-primary shadow-xs'
-                          : 'bg-muted/20 border-border hover:bg-muted/40'
-                      }`}
-                    >
-                      <span className="text-xs font-bold text-foreground block">{strat.title}</span>
-                      <span className="text-[10px] text-muted-foreground block mt-1">{strat.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <div className="space-y-1.5 flex items-center justify-between bg-muted/20 border border-border rounded-xl px-3.5 py-2.5">
-                  <div>
-                    <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                      <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-                      Allow Penalty Withdrawals
-                    </span>
-                    <span className="text-[10px] text-muted-foreground block">
-                      Draw penalized accounts if safe funds run out
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={allowPenaltyWithdrawals}
-                    onChange={(e) => setAllowPenaltyWithdrawals(e.target.checked)}
-                    className="w-4 h-4 accent-primary rounded cursor-pointer shrink-0"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Fixed Inflation Rate (%)</label>
-                  <input
-                    type="number"
-                    step={0.1}
-                    min={0}
-                    max={15}
-                    value={fixedInflationRate}
-                    onChange={(e) => setFixedInflationRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5 flex items-center justify-between bg-muted/20 border border-border rounded-xl px-3.5 py-2.5 sm:col-span-2">
-                  <div>
-                    <span className="text-xs font-semibold text-foreground block">Enable Early Roth Conversion Ladder</span>
-                    <span className="text-[10px] text-muted-foreground block">Convert Pre-Tax Traditional balance to Roth tax-free growth in early retirement</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={enableRothConversions}
-                    onChange={(e) => setEnableRothConversions(e.target.checked)}
-                    className="w-4 h-4 accent-primary rounded cursor-pointer shrink-0"
-                  />
-                </div>
-
-                {enableRothConversions && (
-                  <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground">Roth Conversion Target Ceiling</label>
-                      <Select
-                        value={rothConversionTargetCeiling}
-                        onChange={(e: any) => setRothConversionTargetCeiling(e.target.value)}
-                        className="rounded-xl bg-muted/40 text-xs font-bold"
-                      >
-                        <option value="top_of_10">Top of 10% Bracket</option>
-                        <option value="top_of_12">Top of 12% Bracket (Recommended)</option>
-                        <option value="top_of_22">Top of 22% Bracket</option>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1.5 flex items-center justify-between bg-muted/20 border border-border rounded-xl px-3.5 py-2">
-                      <div>
-                        <span className="text-xs font-semibold text-foreground block">Avoid Medicare IRMAA Cliffs</span>
-                        <span className="text-[10px] text-muted-foreground">Cap conversions to avoid Medicare surcharges</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={avoidIrmaaCliffs}
-                        onChange={(e) => setAvoidIrmaaCliffs(e.target.checked)}
-                        className="w-4 h-4 accent-primary rounded cursor-pointer shrink-0"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+            <StepStrategy
+              withdrawalMethod={withdrawalMethod}
+              setWithdrawalMethod={setWithdrawalMethod}
+              allowPenaltyWithdrawals={allowPenaltyWithdrawals}
+              setAllowPenaltyWithdrawals={setAllowPenaltyWithdrawals}
+              fixedInflationRate={fixedInflationRate}
+              setFixedInflationRate={setFixedInflationRate}
+              enableRothConversions={enableRothConversions}
+              setEnableRothConversions={setEnableRothConversions}
+              rothConversionTargetCeiling={rothConversionTargetCeiling}
+              setRothConversionTargetCeiling={setRothConversionTargetCeiling}
+              avoidIrmaaCliffs={avoidIrmaaCliffs}
+              setAvoidIrmaaCliffs={setAvoidIrmaaCliffs}
+            />
           )}
 
           {/* STEP 6: Social Security, FI Target & Summary Review */}
           {activeKey === 'social_security' && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              {/* Primary Social Security Planning Card */}
-              <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-border pb-2.5">
-                  <div>
-                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      <HeartHandshake className="w-4 h-4 text-emerald-500" />
-                      Primary Person Social Security Planning
-                    </h4>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      PIA at Full Retirement Age (67): <span className="font-mono font-bold text-foreground">{formatCurrency(calculateSocialSecurityPIA(Number(primarySalary || 0)) || Number(primarySsMonthlyAmount || 2500))}/mo</span> (from {formatCurrency(Number(primarySalary || 0))}/yr salary)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-muted-foreground">Claiming Strategy</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { age: 62, label: 'Early (Age 62)', sub: '70% FRA' },
-                        { age: 67, label: 'Full (Age 67)', sub: '100% FRA' },
-                        { age: 70, label: 'Late (Age 70)', sub: '124% FRA' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.age}
-                          type="button"
-                          onClick={() => setPrimarySsStartAge(opt.age)}
-                          className={`py-2 px-2 rounded-xl text-center transition-all cursor-pointer border ${
-                            Number(primarySsStartAge) === opt.age
-                              ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
-                              : 'bg-muted/20 border-border text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          <span className="text-xs block font-semibold">{opt.label}</span>
-                          <span className="text-[10px] opacity-80 block">{opt.sub}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2.5 flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Estimated Monthly Benefit at Age {primarySsStartAge || 67}:</span>
-                    <span className="font-mono font-bold text-emerald-500">
-                      {formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(primarySalary || 0)) || Number(primarySsMonthlyAmount || 2500), Number(primarySsStartAge || 67)))}/mo
-                      <span className="text-[10px] font-normal text-muted-foreground ml-1">
-                        ({formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(primarySalary || 0)) || Number(primarySsMonthlyAmount || 2500), Number(primarySsStartAge || 67)) * 12)}/yr)
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Partner / Spouse Social Security Planning Card (Conditional) */}
-              {hasSpouse && (
-                <div className="bg-card border border-primary/30 rounded-xl p-4 space-y-3 bg-primary/[0.02]">
-                  <div className="flex items-center justify-between border-b border-border pb-2.5">
-                    <div>
-                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-primary" />
-                        Partner Social Security Planning ({spouseName || 'Spouse'})
-                      </h4>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        PIA at Full Retirement Age (67): <span className="font-mono font-bold text-foreground">{formatCurrency(calculateSocialSecurityPIA(Number(spouseSalary || 0)) || Number(spouseSsMonthlyAmount || 2000))}/mo</span> (from {formatCurrency(Number(spouseSalary || 0))}/yr salary)
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Partner Claiming Strategy</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { age: 62, label: 'Early (Age 62)', sub: '70% FRA' },
-                          { age: 67, label: 'Full (Age 67)', sub: '100% FRA' },
-                          { age: 70, label: 'Late (Age 70)', sub: '124% FRA' },
-                        ].map((opt) => (
-                          <button
-                            key={opt.age}
-                            type="button"
-                            onClick={() => setSpouseSsStartAge(opt.age)}
-                            className={`py-2 px-2 rounded-xl text-center transition-all cursor-pointer border ${
-                              Number(spouseSsStartAge) === opt.age
-                                ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
-                                : 'bg-muted/20 border-border text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            <span className="text-xs block font-semibold">{opt.label}</span>
-                            <span className="text-[10px] opacity-80 block">{opt.sub}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-primary/10 border border-primary/20 rounded-lg p-2.5 flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Partner Estimated Monthly Benefit at Age {spouseSsStartAge || 67}:</span>
-                      <span className="font-mono font-bold text-primary">
-                        {formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(spouseSalary || 0)) || Number(spouseSsMonthlyAmount || 2000), Number(spouseSsStartAge || 67)))}/mo
-                        <span className="text-[10px] font-normal text-muted-foreground ml-1">
-                          ({formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(spouseSalary || 0)) || Number(spouseSsMonthlyAmount || 2000), Number(spouseSsStartAge || 67)) * 12)}/yr)
-                        </span>
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between bg-muted/20 border border-border rounded-xl px-3 py-2">
-                      <div>
-                        <span className="text-xs font-semibold text-foreground block">Spousal SS Benefit Optimization</span>
-                        <span className="text-[10px] text-muted-foreground">Ensure partner receives at least 50% of primary benefit</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={enableSpousalSsBenefit}
-                        onChange={(e) => setEnableSpousalSsBenefit(e.target.checked)}
-                        className="w-4 h-4 accent-primary rounded cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* FI Target Multiplier Field */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">FI Target Multiplier</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={15}
-                    max={40}
-                    value={fiTargetMultiplier}
-                    onChange={(e) => setFiTargetMultiplier(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                  <span className="text-xs text-muted-foreground shrink-0">x Expenses</span>
-                </div>
-              </div>
-
-              {/* Summary Configuration Card */}
-              <div className="bg-muted/20 border border-border rounded-xl p-3.5 space-y-2.5">
-                <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <Flame className="w-4 h-4 text-amber-500" />
-                  Plan Configuration Summary
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
-                  <div>
-                    <span className="text-muted-foreground block">Retirement Age:</span>
-                    <span className="font-bold text-foreground">{retirementAge || 60} years</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block">Living Expenses:</span>
-                    <span className="font-bold text-foreground">${Number(livingExpenseAmount || 0).toLocaleString()}/yr</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block">Drawdown Strategy:</span>
-                    <span className="font-bold text-foreground capitalize">{(withdrawalMethod || 'textbook').replace(/_/g, ' ')}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block">Primary SS Benefit:</span>
-                    <span className="font-bold text-emerald-500">{formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(primarySalary || 0)) || Number(primarySsMonthlyAmount || 2500), Number(primarySsStartAge || 67)))}/mo (Age {primarySsStartAge})</span>
-                  </div>
-                  {hasSpouse && (
-                    <div>
-                      <span className="text-muted-foreground block">Partner SS Benefit:</span>
-                      <span className="font-bold text-primary">{formatCurrency(calculateAdjustedSsBenefit(calculateSocialSecurityPIA(Number(spouseSalary || 0)) || Number(spouseSsMonthlyAmount || 2000), Number(spouseSsStartAge || 67)))}/mo (Age {spouseSsStartAge})</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-muted-foreground block">FI Target ({fiTargetMultiplier || 25}x):</span>
-                    <span className="font-bold text-foreground">${(Number(livingExpenseAmount || 60000) * Number(fiTargetMultiplier || 25)).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <StepSocialSecurity
+              primarySalary={primarySalary}
+              primarySsMonthlyAmount={primarySsMonthlyAmount}
+              setPrimarySsMonthlyAmount={setPrimarySsMonthlyAmount}
+              primarySsStartAge={primarySsStartAge}
+              setPrimarySsStartAge={setPrimarySsStartAge}
+              hasSpouse={hasSpouse}
+              spouseName={spouseName}
+              spouseSalary={spouseSalary}
+              spouseSsMonthlyAmount={spouseSsMonthlyAmount}
+              setSpouseSsMonthlyAmount={setSpouseSsMonthlyAmount}
+              spouseSsStartAge={spouseSsStartAge}
+              setSpouseSsStartAge={setSpouseSsStartAge}
+              enableSpousalSsBenefit={enableSpousalSsBenefit}
+              setEnableSpousalSsBenefit={setEnableSpousalSsBenefit}
+              fiTargetMultiplier={fiTargetMultiplier}
+              setFiTargetMultiplier={setFiTargetMultiplier}
+              retirementAge={retirementAge}
+              livingExpenseAmount={livingExpenseAmount}
+              withdrawalMethod={withdrawalMethod}
+            />
           )}
 
           {/* Wizard Footer Controls */}
