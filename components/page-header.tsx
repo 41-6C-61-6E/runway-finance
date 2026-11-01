@@ -72,7 +72,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         style={{
           top: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 8px))',
         } as React.CSSProperties}
-        className={`fixed right-4 z-40 md:hidden flex items-center gap-1.5 py-1 px-2.5 rounded-full ${glassBar} transition-all duration-300 ease-out ${isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
+        className={`fixed right-4 z-40 md:hidden flex items-center gap-1.5 py-1 px-2.5 rounded-full ${glassBar} transition-all duration-300 ease-out ${isVisible ? 'translate-y-0 opacity-100 pointer-events-auto visible' : '-translate-y-16 opacity-0 pointer-events-none invisible'
           }`}
       >
         {privacyMode && (

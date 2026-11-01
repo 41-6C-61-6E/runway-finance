@@ -31,14 +31,14 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
               <ThemedToaster />
               <OfflineBanner />
               <ChartColorSchemeInitializer />
-              <div className="min-h-[100dvh] flex flex-col">
-                <Suspense fallback={null}>
-                  <main className="flex-1">{children}</main>
-                </Suspense>
-              </div>
-              <PWARegister />
-              <ChangelogModal />
-              <Analytics />
+                <div className="min-h-[100svh] flex flex-col">
+                  <Suspense fallback={null}>
+                    <main className="flex-1">{children}</main>
+                  </Suspense>
+                </div>
+                <PWARegister />
+                <ChangelogModal />
+                <Analytics />
             </ClientErrorReporter>
           </TooltipProvider>
         </SessionProvider>

@@ -164,40 +164,39 @@ export function PullToRefresh({ children }: PullToRefreshProps) {
     <div ref={containerRef} className="w-full flex flex-col flex-1 relative">
       {/* Floating glassmorphic pull-to-refresh indicator */}
       <div
-        className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none flex items-center justify-center transition-all ${
-          status === 'pulling' ? 'duration-0' : 'duration-300 ease-out'
-        }`}
-        style={{
-          transform: `translate(-50%, ${pullDistance - 55}px) scale(${Math.min(
-            pullDistance / REFRESH_HEIGHT,
-            1
-          )})`,
-          opacity: showIndicator ? 1 : 0,
-        }}
+        className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none flex items-center justify-center transition-all ${status === 'pulling' ? 'duration-0' : 'duration-300 ease-out'
+        } ${showIndicator ? 'visible' : 'invisible'}`}
+      style={{
+        transform: `translate(-50%, ${pullDistance - 55}px) scale(${Math.min(
+          pullDistance / REFRESH_HEIGHT,
+          1
+        )})`,
+        opacity: showIndicator ? 1 : 0,
+      }}
       >
-        <div className="bg-background/85 backdrop-blur-md border border-border shadow-lg rounded-full px-4 py-2 flex items-center gap-2">
-          {status === 'refreshing' ? (
-            <>
-              <Loader2 className="w-4 h-4 text-primary animate-spin" />
-              <span className="text-xs font-semibold text-foreground">Refreshing...</span>
-            </>
-          ) : status === 'ready' ? (
-            <>
-              <RefreshCw className="w-4 h-4 text-primary transition-transform duration-300 rotate-180" />
-              <span className="text-xs font-semibold text-foreground">Release to refresh</span>
-            </>
-          ) : (
-            <>
-              <RefreshCw
-                className="w-4 h-4 text-muted-foreground"
-                style={{ transform: `rotate(${pullDistance * 4}deg)` }}
-              />
-              <span className="text-xs font-medium text-muted-foreground">Pull to refresh</span>
-            </>
-          )}
-        </div>
+      <div className="bg-background/85 backdrop-blur-md border border-border shadow-lg rounded-full px-4 py-2 flex items-center gap-2">
+        {status === 'refreshing' ? (
+          <>
+            <Loader2 className="w-4 h-4 text-primary animate-spin" />
+            <span className="text-xs font-semibold text-foreground">Refreshing...</span>
+          </>
+        ) : status === 'ready' ? (
+          <>
+            <RefreshCw className="w-4 h-4 text-primary transition-transform duration-300 rotate-180" />
+            <span className="text-xs font-semibold text-foreground">Release to refresh</span>
+          </>
+        ) : (
+          <>
+            <RefreshCw
+              className="w-4 h-4 text-muted-foreground"
+              style={{ transform: `rotate(${pullDistance * 4}deg)` }}
+            />
+            <span className="text-xs font-medium text-muted-foreground">Pull to refresh</span>
+          </>
+        )}
       </div>
-      {children}
     </div>
+      { children }
+    </div >
   );
 }

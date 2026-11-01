@@ -489,10 +489,10 @@ export function MobileNav() {
     return index % 2 === 0 ? 'animate-wiggle-even' : 'animate-wiggle-odd';
   };
 
-  const backdropClasses = `fixed inset-0 z-30 bg-black/50 backdrop-blur-xs transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+  const backdropClasses = `fixed inset-0 z-30 bg-black/50 backdrop-blur-xs transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto visible' : 'opacity-0 pointer-events-none invisible'
     }`;
 
-  const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar/45 backdrop-blur-xl border-t border-sidebar-border/30 rounded-t-[2rem] px-6 py-4 transition-transform duration-300 ease-out shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:hidden ${isOpen ? 'translate-y-0 pointer-events-auto' : 'translate-y-full pointer-events-none'
+  const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar/45 backdrop-blur-xl border-t border-sidebar-border/30 rounded-t-[2rem] px-6 py-4 transition-transform duration-300 ease-out shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:hidden ${isOpen ? 'translate-y-0 pointer-events-auto visible' : 'translate-y-full pointer-events-none invisible'
     }`;
 
   if (!mounted) return null;
@@ -517,41 +517,38 @@ export function MobileNav() {
 
       {/* Fixed Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-sidebar/80 backdrop-blur-xl border-t border-sidebar-border/30 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
-        style={{
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6px)',
-        }}
+        className="fixed bottom-0 left-0 right-0 z-40 h-14 md:hidden bg-sidebar/80 backdrop-blur-xl border-t border-sidebar-border/30 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] transform-gpu"
       >
-        <div className="max-w-lg mx-auto flex items-center justify-around gap-1 px-3 pt-1.5">
-          {shownHomeNavItems.map((item) => {
-            const Icon = item.icon;
-            const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
+          <div className="max-w-lg mx-auto h-full flex items-center justify-around gap-1 px-3">
+            {shownHomeNavItems.map((item) => {
+              const Icon = item.icon;
+              const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-label={item.label}
-                onClick={() => setPendingHref(item.href)}
-                className={`flex flex-1 flex-col items-center justify-center p-2 min-w-11 min-h-11 group transition-colors duration-200 ${glassItemBase} ${active ? glassItemActive : glassItemInactive
-                  }`}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-label={item.label}
+                  onClick={() => setPendingHref(item.href)}
+                  className={`flex flex-1 flex-col items-center justify-center p-2 min-w-11 min-h-11 group transition-colors duration-200 ${glassItemBase} ${active ? glassItemActive : glassItemInactive
+                    }`}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                </Link>
+              );
+            })}
 
-          {/* Hamburger Menu Toggle Button */}
-          <button
-            type="button"
-            aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
-            onClick={() => setIsOpen(!isOpen)}
-            className={`flex flex-1 flex-col items-center justify-center p-2 min-w-11 min-h-11 group transition-colors duration-200 ${glassItemBase} ${isOpen ? glassItemActive : glassItemInactive
-              }`}
-          >
-            {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
-          </button>
-        </div>
+            {/* Hamburger Menu Toggle Button */}
+            <button
+              type="button"
+              aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
+              onClick={() => setIsOpen(!isOpen)}
+              className={`flex flex-1 flex-col items-center justify-center p-2 min-w-11 min-h-11 group transition-colors duration-200 ${glassItemBase} ${isOpen ? glassItemActive : glassItemInactive
+                }`}
+            >
+              {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
+            </button>
+          </div>
       </nav>
 
       {/* Slide-up Menu Drawer Backdrop */}

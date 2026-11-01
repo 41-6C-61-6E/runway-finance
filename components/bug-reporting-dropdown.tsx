@@ -367,7 +367,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
       </Tooltip>
 
       {open && (
-        <div className="fixed inset-x-2.5 sm:inset-x-auto top-[calc(env(safe-area-inset-top,0px)+3.5rem)] sm:top-full sm:mt-1 sm:right-0 w-auto sm:w-[420px] max-w-lg mx-auto p-4 bg-card border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right max-h-[calc(100dvh-5.5rem)] sm:max-h-[640px] flex flex-col overflow-hidden">
+        <div className="fixed inset-x-2.5 top-16 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-1 sm:mx-0 w-auto sm:w-[420px] max-w-lg mx-auto p-4 bg-card border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right max-h-[calc(100dvh-5.5rem)] sm:max-h-[640px] flex flex-col overflow-hidden">
           {/* Header Tab Buttons */}
           <div className="flex p-0.5 rounded-lg bg-muted mb-4">
             <button

@@ -78,4 +78,21 @@ describe('MobileNav PWA & Accessibility', () => {
     // The offline preview page is never auto-filled into the home bar.
     expect(barLinks).not.toContain('Offline mode (preview)');
   });
+
+  it('keeps bottom nav height fixed without dynamic safe-area-inset-bottom padding', () => {
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <MobileSubNavProvider>
+          <MobileNav />
+        </MobileSubNavProvider>
+      </QueryClientProvider>
+    );
+
+    const nav = container.querySelector('nav');
+    expect(nav).not.toBeNull();
+    expect(nav?.className).toContain('fixed');
+    expect(nav?.className).toContain('bottom-0');
+    expect(nav?.className).toContain('h-14');
+    expect(nav?.getAttribute('style') ?? '').not.toContain('safe-area-inset-bottom');
+  });
 });

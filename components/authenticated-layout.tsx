@@ -63,19 +63,19 @@ export function AuthenticatedLayout({ children }: { children: ReactNode }) {
       <SidebarProvider>
         <PrivacyModeProvider>
           <ReduceTransparencyProvider>
-          <AccountSubheadingsProvider>
-            <MobileSubNavProvider>
-              <AdviceProvider>
-                <ResizableSidebar />
-                {!hideAccountsSidebar && <AccountsSidebar />}
-                <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
-                  {children}
-                </AuthenticatedLayoutContent>
-                <MobileNav />
-                <AdviceSheet />
-              </AdviceProvider>
-            </MobileSubNavProvider>
-          </AccountSubheadingsProvider>
+            <AccountSubheadingsProvider>
+              <MobileSubNavProvider>
+                <AdviceProvider>
+                  <ResizableSidebar />
+                  {!hideAccountsSidebar && <AccountsSidebar />}
+                  <AuthenticatedLayoutContent hideAccountsSidebar={hideAccountsSidebar}>
+                    {children}
+                  </AuthenticatedLayoutContent>
+                  <MobileNav />
+                  <AdviceSheet />
+                </AdviceProvider>
+              </MobileSubNavProvider>
+            </AccountSubheadingsProvider>
           </ReduceTransparencyProvider>
         </PrivacyModeProvider>
       </SidebarProvider>
@@ -93,19 +93,19 @@ function AuthenticatedLayoutContent({ children, hideAccountsSidebar }: { childre
   }, []);
 
   // Use a stable default (e.g., collapsed) during hydration to match server expectations
-  const desktopMarginLeft = (!mounted || hideAccountsSidebar || accountsCollapsed) 
-    ? `${COLLAPSED_WIDTH}px` 
+  const desktopMarginLeft = (!mounted || hideAccountsSidebar || accountsCollapsed)
+    ? `${COLLAPSED_WIDTH}px`
     : `${COLLAPSED_WIDTH + accountsWidth}px`;
 
   const desktopMarginRight = (!mounted || !isOpen) ? '0px' : '400px';
 
   return (
-    <div 
-      style={{ 
+    <div
+      style={{
         '--sidebar-margin-left': desktopMarginLeft,
         '--advice-margin-right': desktopMarginRight,
-      } as React.CSSProperties} 
-      className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] mr-0 md:mr-[var(--advice-margin-right)] pb-[calc(env(safe-area-inset-bottom,0px)+4.75rem)] md:pb-0"
+      } as React.CSSProperties}
+      className="transition-all duration-300 ml-0 md:ml-[var(--sidebar-margin-left)] mr-0 md:mr-[var(--advice-margin-right)] pb-20 md:pb-0"
     >
       <PullToRefresh>
         {children}

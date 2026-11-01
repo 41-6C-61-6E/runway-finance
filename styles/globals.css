@@ -8,13 +8,16 @@
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--border) 50%, transparent);
   border-radius: 9999px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
 }
@@ -24,21 +27,31 @@
 html,
 body,
 :root {
-  height: 100%;
-  /* Use dynamic viewport height on iOS to prevent toolbar resize issues */
-  min-height: 100dvh;
+  /* Use small viewport height as stable baseline on iOS so root doesn't resize during scroll */
+  min-height: 100svh;
   /* Prevent browser-level horizontal edge swipe back/forward history navigation */
   overscroll-behavior-x: none;
+}
+
+@media (display-mode: standalone) {
+
+  html,
+  body,
+  :root {
+    min-height: 100vh;
+  }
 }
 
 /* Text Size Scaling Settings */
 html.text-size-sm {
   font-size: 14px;
 }
+
 html.text-size-default,
 html.text-size-base {
   font-size: 16px;
 }
+
 html.text-size-lg {
   font-size: 18px;
 }
@@ -54,30 +67,37 @@ html.text-size-lg {
 .compact-layout .page-content.px-4 {
   padding-inline: calc(var(--spacing) * 3);
 }
+
 .compact-layout .page-content .gap-6 {
   gap: calc(var(--spacing) * 4);
 }
+
 /* Tailwind v4 `space-y-*` sets margin-block-end on `> :not(:last-child)`;
    override the end margin so the tighter gap wins on specificity. */
-.compact-layout .page-content .space-y-5 > :not(:last-child),
-.compact-layout .page-content .space-y-6 > :not(:last-child) {
+.compact-layout .page-content .space-y-5> :not(:last-child),
+.compact-layout .page-content .space-y-6> :not(:last-child) {
   margin-block-end: calc(var(--spacing) * 4);
 }
+
 @media (min-width: 640px) {
   .compact-layout .page-content.sm\:px-6 {
     padding-inline: calc(var(--spacing) * 4);
   }
+
   .compact-layout .page-content .sm\:gap-6 {
     gap: calc(var(--spacing) * 4);
   }
-  .compact-layout .page-content .sm\:space-y-6 > :not(:last-child) {
+
+  .compact-layout .page-content .sm\:space-y-6> :not(:last-child) {
     margin-block-end: calc(var(--spacing) * 5);
   }
 }
+
 @media (min-width: 1024px) {
   .compact-layout .page-content.lg\:px-8 {
     padding-inline: calc(var(--spacing) * 6);
   }
+
   .compact-layout .page-content .lg\:gap-6 {
     gap: calc(var(--spacing) * 4);
   }
@@ -86,7 +106,10 @@ html.text-size-lg {
 /* Prevent iOS Safari from zooming in when tapping inputs/selects */
 @supports (-webkit-touch-callout: none) {
   @media screen and (max-width: 768px) {
-    input, select, textarea {
+
+    input,
+    select,
+    textarea {
       font-size: 16px;
     }
   }
@@ -94,6 +117,12 @@ html.text-size-lg {
 
 :root {
   --mobile-header-top: calc(env(safe-area-inset-top, 0px) + 8px);
+}
+
+@supports (-webkit-touch-callout: none) {
+  :root {
+    --mobile-header-top: calc(env(safe-area-inset-top, 0px) + 12px);
+  }
 }
 
 :root {
@@ -196,9 +225,11 @@ html.text-size-lg {
 .bg-card .p-5 {
   padding: 0.25rem !important;
 }
+
 .bg-card .p-6 {
   padding: 0.5rem !important;
 }
+
 .bg-card .px-4,
 .bg-card .px-6 {
   padding-left: 0.375rem !important;
@@ -214,6 +245,7 @@ html.text-size-lg {
   background: var(--card) !important;
   backdrop-filter: none !important;
 }
+
 .bg-card.z-50.border-border,
 .bg-card.z-\[10000\].border-border,
 [role="dialog"].border-border,
@@ -221,6 +253,7 @@ html.text-size-lg {
 [data-radix-portal] .border-border {
   border-color: var(--border) !important;
 }
+
 .bg-card.z-50.rounded-xl,
 .bg-card.z-50.rounded-lg,
 .bg-card.z-\[10000\].rounded-xl,
@@ -233,11 +266,12 @@ html.text-size-lg {
 }
 
 /* Divide borders transparent on light, subtle on dark themes */
-.divide-border > :not(:last-child) {
+.divide-border> :not(:last-child) {
   border-color: transparent !important;
 }
-[data-theme=dark] .divide-border > :not(:last-child),
-[data-theme=moonlight] .divide-border > :not(:last-child) {
+
+[data-theme=dark] .divide-border> :not(:last-child),
+[data-theme=moonlight] .divide-border> :not(:last-child) {
   border-color: color-mix(in srgb, var(--border) 30%, transparent) !important;
 }
 
@@ -305,10 +339,14 @@ html.text-size-lg {
 
 
 @utility no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+
+  /* Firefox */
   &::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
+    display: none;
+    /* Chrome, Safari and Opera */
   }
 }
 
@@ -338,15 +376,13 @@ html.text-size-lg {
    rings (Button / AppTabs pills with focus-visible:ring-2) still win where
    they already exist. Recharts keeps its outline:none !important block, so
    SVG chart nodes stay clean. */
-:where(
-  button,
+:where(button,
   a,
   select,
   input,
   textarea,
   [role='tab'],
-  [role='button']
-):focus-visible {
+  [role='button']):focus-visible {
   outline: 2px solid var(--color-ring);
   outline-offset: 2px;
 }
@@ -406,10 +442,14 @@ html.text-size-lg {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  padding: 0.125rem 0.5rem; /* px-2 py-0.5 */
-  font-size: 0.75rem; /* text-xs */
-  font-weight: 500; /* font-medium */
-  border-radius: 9999px; /* rounded-full */
+  padding: 0.125rem 0.5rem;
+  /* px-2 py-0.5 */
+  font-size: 0.75rem;
+  /* text-xs */
+  font-weight: 500;
+  /* font-medium */
+  border-radius: 9999px;
+  /* rounded-full */
   border: 1px solid transparent;
 }
 
@@ -418,6 +458,7 @@ html.text-size-lg {
   background-color: color-mix(in srgb, var(--status-positive) 15%, transparent);
   color: color-mix(in srgb, var(--status-positive) 35%, black);
 }
+
 [data-theme=dark] .badge-banking,
 [data-theme=dark] .badge-assets,
 [data-theme=moonlight] .badge-banking,
@@ -432,6 +473,7 @@ html.text-size-lg {
   background-color: color-mix(in srgb, var(--destructive) 15%, transparent);
   color: color-mix(in srgb, var(--destructive) 35%, black);
 }
+
 [data-theme=dark] .badge-credit,
 [data-theme=dark] .badge-loans,
 [data-theme=dark] .badge-liabilities,
@@ -448,6 +490,7 @@ html.text-size-lg {
   background-color: color-mix(in srgb, var(--chart-1) 15%, transparent);
   color: color-mix(in srgb, var(--chart-1) 35%, black);
 }
+
 [data-theme=dark] .badge-investments,
 [data-theme=dark] .badge-metals,
 [data-theme=moonlight] .badge-investments,
@@ -459,6 +502,7 @@ html.text-size-lg {
   background-color: color-mix(in srgb, var(--chart-3) 15%, transparent);
   color: color-mix(in srgb, var(--chart-3) 35%, black);
 }
+
 [data-theme=dark] .badge-realestate,
 [data-theme=moonlight] .badge-realestate {
   color: color-mix(in srgb, var(--chart-3) 70%, white);
@@ -468,6 +512,7 @@ html.text-size-lg {
   background-color: color-mix(in srgb, var(--chart-4) 15%, transparent);
   color: color-mix(in srgb, var(--chart-4) 35%, black);
 }
+
 [data-theme=dark] .badge-vehicle,
 [data-theme=moonlight] .badge-vehicle {
   color: color-mix(in srgb, var(--chart-4) 70%, white);
@@ -478,6 +523,7 @@ html.text-size-lg {
   color: color-mix(in srgb, var(--chart-2) 35%, black);
   border-color: color-mix(in srgb, var(--chart-2) 25%, transparent);
 }
+
 [data-theme=dark] .badge-plaid,
 [data-theme=moonlight] .badge-plaid {
   color: color-mix(in srgb, var(--chart-2) 70%, white);
@@ -488,6 +534,7 @@ html.text-size-lg {
   color: color-mix(in srgb, var(--primary) 35%, black);
   border-color: color-mix(in srgb, var(--primary) 25%, transparent);
 }
+
 [data-theme=dark] .badge-simplefin,
 [data-theme=moonlight] .badge-simplefin {
   color: color-mix(in srgb, var(--primary) 70%, white);
@@ -498,6 +545,7 @@ html.text-size-lg {
   color: color-mix(in srgb, var(--status-warning) 35%, black);
   border-color: color-mix(in srgb, var(--status-warning) 25%, transparent);
 }
+
 [data-theme=dark] .badge-hidden,
 [data-theme=moonlight] .badge-hidden {
   color: color-mix(in srgb, var(--status-warning) 70%, white);
@@ -534,26 +582,34 @@ body:has([role="dialog"] input:focus, [role="dialog"] textarea:focus, form input
     background-color: var(--muted) !important;
     opacity: 0.4 !important;
   }
+
   .hover\:bg-muted\/20:hover {
     background-color: var(--muted) !important;
     opacity: 0.1 !important;
   }
+
   .hover\:bg-sidebar-foreground\/5:hover {
     background-color: transparent !important;
   }
+
   .hover\:bg-sidebar-foreground\/8:hover {
     background-color: transparent !important;
   }
+
   .hover\:bg-sidebar-foreground\/15:hover {
     background-color: transparent !important;
   }
+
   .hover\:bg-muted\/50:hover {
     background-color: transparent !important;
   }
 }
 
 /* ── Complete Mobile Tooltip Suppression (< 768px and touch/coarse devices) ── */
-@media (max-width: 767px), (hover: none), (pointer: coarse) {
+@media (max-width: 767px),
+(hover: none),
+(pointer: coarse) {
+
   [data-radix-tooltip-content],
   [role="tooltip"],
   .chart-tooltip,
@@ -582,6 +638,7 @@ input[type="range"]::-webkit-slider-runnable-track {
   height: 8px;
   border-radius: 9999px;
 }
+
 input[type="range"]::-moz-range-track {
   height: 8px;
   border-radius: 9999px;
@@ -667,6 +724,7 @@ button,
 .min-touch-target-inline {
   position: relative;
 }
+
 .min-touch-target-inline::after {
   content: '';
   position: absolute;
@@ -700,10 +758,12 @@ button,
     box-sizing: border-box !important;
     overflow-y: auto !important;
   }
+
   /* Slide from bottom instead of center zoom */
   .dialog-content-responsive[data-state="open"] {
     animation: slideUpFromBottom 300ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
   }
+
   .dialog-content-responsive[data-state="closed"] {
     animation: slideDownToBottom 200ms cubic-bezier(0.4, 0, 1, 1) !important;
   }
@@ -714,6 +774,7 @@ button,
     transform: translateY(100%);
     opacity: 0.5;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -725,6 +786,7 @@ button,
     transform: translateY(0);
     opacity: 1;
   }
+
   to {
     transform: translateY(100%);
     opacity: 0;
@@ -748,9 +810,11 @@ button,
     border-right: none !important;
     border-top: 1px solid var(--border) !important;
   }
+
   .sheet-mobile-bottom[data-state="open"] {
     animation: slideUpFromBottom 350ms cubic-bezier(0.2, 0.8, 0.2, 1) !important;
   }
+
   .sheet-mobile-bottom[data-state="closed"] {
     animation: slideDownToBottom 250ms cubic-bezier(0.4, 0, 1, 1) !important;
   }
@@ -768,16 +832,19 @@ button,
   box-orient: vertical;
   box-line-clamp: 2;
 }
+
 .budget-fade:hover {
   -webkit-line-clamp: initial;
   line-clamp: initial;
 }
+
 /* Progress bar prominent gradient — activated at spacious widths via inline style override */
 .budget-progress-track {
   background: color-mix(in srgb, var(--muted) 70%, transparent);
   border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
-  box-shadow: inset 0 1px 1px rgba(0,0,0,0.06);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.06);
 }
+
 .budget-progress-fill {
   background: linear-gradient(to right, var(--primary), color-mix(in srgb, var(--primary) 82%, white));
 }
@@ -792,6 +859,7 @@ button,
     opacity: 0;
     transform: translateY(4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

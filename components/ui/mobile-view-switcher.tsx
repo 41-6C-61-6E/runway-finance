@@ -324,7 +324,7 @@ export function MobileTabSwipeContainer({
     <div className={cn("w-full", className)}>
       {desktopHeader && <div className="hidden md:block mb-3 sm:mb-3.5">{desktopHeader}</div>}
       {header && <div className="mb-3 sm:mb-3.5">{header}</div>}
-      
+
       {/* Touch Swipe Container with clean fade transition and no rubber-band bounce */}
       <div
         onTouchStart={handleTouchStart}
@@ -341,10 +341,7 @@ export function MobileTabSwipeContainer({
       {/* Pagination dots indicator for tabs on mobile: static and fixed above the main bottom nav */}
       {showDots && tabs.length > 1 && (
         <div
-          className="fixed left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden fixed-pagination-dots transition-all duration-300"
-          style={{
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)',
-          }}
+          className="fixed bottom-16 left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden fixed-pagination-dots"
         >
           <div className="pointer-events-auto">
             <PaginationDots
