@@ -88,13 +88,14 @@ export function formatPercent(
 export function formatPlainPercent(
   value: number | string | undefined | null,
   decimals = 1,
+  options: { trimZero?: boolean } = { trimZero: true }
 ): string {
-  if (value === undefined || value === null) return '0%';
+  if (value === undefined || value === null) return options.trimZero === false ? `${(0).toFixed(decimals)}%` : '0%';
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '0%';
+  if (isNaN(num)) return options.trimZero === false ? `${(0).toFixed(decimals)}%` : '0%';
   const fixed = num.toFixed(decimals);
-  if (Number(fixed) === 0) return '0%'; // -0.04 → "-0%" is meaningless
-  const trimmed = fixed.replace(/\.0+$/, '');
+  if (Number(fixed) === 0 && options.trimZero !== false) return '0%';
+  const trimmed = options.trimZero === false ? fixed : fixed.replace(/\.0+$/, '');
   return `${trimmed}%`;
 }
 
@@ -133,6 +134,20 @@ export function roundToCents(val: number | string | null | undefined): number {
 }
 
 /**
+ * Canonical 2-decimal money string representation for database storage and numeric strings.
+ * E.g. 42.5 -> '42.50', 0 -> '0.00'.
+ */
+export function toMoneyString(val: number | string | null | undefined): string {
+  if (val === null || val === undefined) return '0.00';
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  if (isNaN(num) || !isFinite(num)) return '0.00';
+  return (Math.round(num * 100) / 100).toFixed(2);
+}
+
+/** @alias toMoneyString */
+export const formatToCents = toMoneyString;
+
+/**
  * Role-aware money formatters (G3 / W-3). One rule table for every place a
  * number is printed — balances vs amounts vs projections were drifting:
  *   - **balance**   → whole dollars              $98,635   (cards, lists, net worth)
@@ -164,6 +179,21 @@ export function formatAmount(
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+/** Split formatted currency text and sign for layout and styling */
+export function splitCurrencySign(
+  amount: number | string | null | undefined,
+  role: 'balance' | 'amount' = 'balance',
+  currency = 'USD',
+  locale = 'en-US'
+): { text: string; sign: '+' | '-' | '' } {
+  const val = amount === undefined || amount === null ? 0 : amount;
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  const n = isNaN(num) ? 0 : num;
+  const formatted = role === 'balance' ? formatBalance(Math.abs(n), currency, locale) : formatAmount(Math.abs(n), currency, locale);
+  const sign = n < 0 ? '-' : n > 0 ? '+' : '';
+  return { text: formatted, sign };
 }
 
 /**

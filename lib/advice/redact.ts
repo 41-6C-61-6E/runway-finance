@@ -72,19 +72,18 @@ export function buildAccountLabel(
   return `${baseType} #${currentIdx}`;
 }
 
+import { formatBalance, formatPlainPercent } from '@/lib/utils/format';
+
 /**
  * Formats a number as whole-dollar currency string (e.g. $12,345 or -$1,200).
  */
 export function formatDollar(amount: number): string {
-  const rounded = Math.round(amount);
-  const sign = rounded < 0 ? '-' : '';
-  const abs = Math.abs(rounded).toLocaleString('en-US');
-  return `${sign}$${abs}`;
+  return formatBalance(amount);
 }
 
 /**
  * Formats a percentage string (e.g. 15.2%).
  */
 export function formatPercent(pct: number): string {
-  return `${(Math.round(pct * 10) / 10).toFixed(1)}%`;
+  return formatPlainPercent(pct, 1, { trimZero: false });
 }

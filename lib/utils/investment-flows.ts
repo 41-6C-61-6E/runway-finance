@@ -394,9 +394,3 @@ export function buildMonthlyFlows(months: string[], input: MonthlyFlowInput): Mo
     };
   });
 }
-
-/** Simple percent formatting helper (keeps components free of math). */
-export function formatSignedPct(v: number | null | undefined, digits = 1): string {
-  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
-  return `${v >= 0 ? '+' : ''}${v.toFixed(digits)}%`;
-}

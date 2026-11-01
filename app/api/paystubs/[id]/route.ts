@@ -9,6 +9,7 @@ import {
   updateMonthlyCashFlowSummaries,
 } from '@/lib/services/sync';
 import { getSessionDEK } from '@/lib/crypto-context';
+import { toMoneyString } from '@/lib/utils/format';
 
 export async function GET(
   _request: Request,
@@ -138,11 +139,10 @@ export async function PATCH(
       }
     }
 
-    const fmt = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
-    updates.grossCurrent = fmt(gross);
-    updates.taxesCurrent = fmt(taxes);
-    updates.deductionsCurrent = fmt(deductions);
-    updates.netCurrent = fmt(gross - taxes - deductions);
+    updates.grossCurrent = toMoneyString(gross);
+    updates.taxesCurrent = toMoneyString(taxes);
+    updates.deductionsCurrent = toMoneyString(deductions);
+    updates.netCurrent = toMoneyString(gross - taxes - deductions);
 
     // Update linked transactions
     // Pre-fetch account types to handle asset deduction sign correctly
@@ -158,7 +158,7 @@ export async function PATCH(
     // Earnings: all earnings items share one transaction — recalculate total and category
     const earningsItems = allLineItems.filter((li) => li.section === 'earnings' && li.transactionId);
     if (earningsItems.length > 0) {
-      const earningsTotal = fmt(earningsItems.reduce((sum, li) => sum + parseFloat(li.amount || '0'), 0));
+      const earningsTotal = toMoneyString(earningsItems.reduce((sum, li) => sum + parseFloat(li.amount || '0'), 0));
       const txnId = earningsItems[0].transactionId!;
       const categoryId = earningsItems[0].categoryId || null;
       const txnValues = { amount: earningsTotal, categoryId };
@@ -194,7 +194,7 @@ export async function PATCH(
       const signedAmount = (isDeduction && isAssetDest) ? Math.abs(amt) : -Math.abs(amt);
 
       const txnValues = {
-        amount: fmt(signedAmount),
+        amount: toMoneyString(signedAmount),
         categoryId: li.categoryId || null,
       };
 

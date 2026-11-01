@@ -1,4 +1,5 @@
 import { getDb } from '@/lib/db';
+import { toMoneyString } from '@/lib/utils/format';
 import {
   paystubAutoGenerateSettings,
   paystubs,
@@ -205,7 +206,6 @@ async function generatePaystub(
   // in that section — sparse templates must not have their stored totals
   // zeroed. Net is only derivable when taxes or deduction lines exist.
   const r2 = (n: number) => Math.round(n * 100) / 100;
-  const fmt = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
   const sumSections = (sections: string[]) =>
     r2(resolvedItems.filter(i => sections.includes(i.section)).reduce((s, i) => s + (Number(i.amount) || 0), 0));
   const hasEarningsLines = resolvedItems.some(i => i.section === 'earnings');
@@ -225,10 +225,10 @@ async function generatePaystub(
       payPeriodEnd: newPeriodEnd,
       checkDate: newCheckDate,
       adviceNumber: null,
-      grossCurrent: hasEarningsLines ? fmt(effGross) : template.grossCurrent,
-      taxesCurrent: hasTaxLines ? fmt(effTaxes) : template.taxesCurrent,
-      deductionsCurrent: hasDeductionLines ? fmt(effDeductions) : template.deductionsCurrent,
-      netCurrent: (hasTaxLines || hasDeductionLines) ? fmt(effGross - effTaxes - effDeductions) : template.netCurrent,
+      grossCurrent: hasEarningsLines ? toMoneyString(effGross) : template.grossCurrent,
+      taxesCurrent: hasTaxLines ? toMoneyString(effTaxes) : template.taxesCurrent,
+      deductionsCurrent: hasDeductionLines ? toMoneyString(effDeductions) : template.deductionsCurrent,
+      netCurrent: (hasTaxLines || hasDeductionLines) ? toMoneyString(effGross - effTaxes - effDeductions) : template.netCurrent,
       grossYtd: null,
       taxesYtd: null,
       deductionsYtd: null,

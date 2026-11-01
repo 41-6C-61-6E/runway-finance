@@ -7,6 +7,9 @@ import {
   formatCompactCurrency,
   formatPercent,
   formatPlainPercent,
+  toMoneyString,
+  formatToCents,
+  splitCurrencySign,
   MONEY_ROLES,
 } from '@/lib/utils/format';
 
@@ -82,6 +85,31 @@ describe('R-7 role formatters (G3 / W-3)', () => {
     });
     it('honors an explicit decimal count', () => {
       expect(formatPlainPercent(12.345, 2)).toBe('12.35%');
+    });
+
+    it('honors trimZero option', () => {
+      expect(formatPlainPercent(15, 1, { trimZero: false })).toBe('15.0%');
+      expect(formatPlainPercent(15, 1, { trimZero: true })).toBe('15%');
+    });
+  });
+
+  describe('toMoneyString and formatToCents', () => {
+    it('formats numbers to exactly 2 decimals', () => {
+      expect(toMoneyString(42.5)).toBe('42.50');
+      expect(toMoneyString(0)).toBe('0.00');
+      expect(toMoneyString(-12.34)).toBe('-12.34');
+      expect(formatToCents(100)).toBe('100.00');
+      expect(toMoneyString(NaN)).toBe('0.00');
+      expect(toMoneyString(null)).toBe('0.00');
+    });
+  });
+
+  describe('splitCurrencySign', () => {
+    it('splits text and sign correctly', () => {
+      expect(splitCurrencySign(1234)).toEqual({ text: '$1,234', sign: '+' });
+      expect(splitCurrencySign(-1234)).toEqual({ text: '$1,234', sign: '-' });
+      expect(splitCurrencySign(0)).toEqual({ text: '$0', sign: '' });
+      expect(splitCurrencySign(50.5, 'amount')).toEqual({ text: '$50.50', sign: '+' });
     });
   });
 

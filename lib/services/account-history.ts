@@ -22,10 +22,12 @@ export function roundToCents(value: number): number {
   return formatRoundToCents(value);
 }
 
-export function formatToCents(value: number): string {
-  if (isNaN(value) || !isFinite(value)) return '0.00';
-  return (Math.round(value * 100) / 100).toFixed(2);
-}
+import { formatToCents, toMoneyString } from '@/lib/utils/format';
+
+/**
+ * @deprecated CC-05: Moved to `@/lib/utils/format`. Import directly from `@/lib/utils/format`.
+ */
+export { formatToCents, toMoneyString };
 
 
 async function getLatestRealSnapshot(

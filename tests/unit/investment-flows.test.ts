@@ -6,7 +6,6 @@ import {
   addMonthsClamped,
   monthsBetween,
   buildMonthlyFlows,
-  formatSignedPct,
   isNeutralType,
   isIncomeType,
 } from '@/lib/utils/investment-flows';
@@ -218,14 +217,6 @@ describe('buildMonthlyFlows', () => {
     for (const f of flows) {
       expect(f.net).toBe(f.contributions - f.withdrawals + f.income + f.growth - f.losses);
     }
-  });
-});
-
-describe('formatSignedPct', () => {
-  it('formats with sign and handling null', () => {
-    expect(formatSignedPct(3.4557)).toBe('+3.5%');
-    expect(formatSignedPct(-1.2)).toBe('-1.2%');
-    expect(formatSignedPct(null)).toBe('—');
   });
 });
 
