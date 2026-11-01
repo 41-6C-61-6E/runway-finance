@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 import {
   Landmark,
   Receipt,
@@ -489,7 +490,7 @@ export function MobileNav() {
     return index % 2 === 0 ? 'animate-wiggle-even' : 'animate-wiggle-odd';
   };
 
-  const backdropClasses = `fixed inset-0 z-30 bg-black/50 backdrop-blur-xs transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto visible' : 'opacity-0 pointer-events-none invisible'
+  const backdropClasses = `z-30 bg-black/50 backdrop-blur-xs transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto visible' : 'opacity-0 pointer-events-none invisible'
     }`;
 
   const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar/45 backdrop-blur-xl border-t border-sidebar-border/30 rounded-t-[2rem] px-6 py-4 transition-transform duration-300 ease-out shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:hidden ${isOpen ? 'translate-y-0 pointer-events-auto visible' : 'translate-y-full pointer-events-none invisible'
@@ -552,7 +553,7 @@ export function MobileNav() {
       </nav>
 
       {/* Slide-up Menu Drawer Backdrop */}
-      <div className={backdropClasses} onClick={() => setIsOpen(false)} />
+      <ClickOutsideBackdrop className={backdropClasses} onClose={() => setIsOpen(false)} />
 
       {/* Slide-up Menu Drawer */}
       <div

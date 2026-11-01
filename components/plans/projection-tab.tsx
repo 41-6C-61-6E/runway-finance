@@ -15,6 +15,7 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import { Slider } from '@/components/ui/slider';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
 import { TableScroll } from '@/components/ui/table-scroll';
+import { ClickOutsideBackdrop, ModalBackdrop } from '@/components/ui/modal-overlay';
 import {
   AreaChart,
   Area,
@@ -994,8 +995,7 @@ export function ProjectionTab({
 
                 {showStrategyDropdown && (
                   <>
-                    <div
-                      className="fixed inset-0 z-40"
+                    <ClickOutsideBackdrop
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowStrategyDropdown(false);
@@ -1823,7 +1823,7 @@ function YearDetailModal({ isOpen, yearData, onClose }: { isOpen: boolean; yearD
   if (!isOpen || !yearData) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+    <ModalBackdrop onClose={onClose}>
       <div className="bg-card border border-border rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-4">
@@ -2023,6 +2023,6 @@ function YearDetailModal({ isOpen, yearData, onClose }: { isOpen: boolean; yearD
           </button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }

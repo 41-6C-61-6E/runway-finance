@@ -8,6 +8,7 @@ import { Bell, Check, ExternalLink, Inbox, SlidersHorizontal, Trash2, X } from '
 import { Landmark, Calendar, CreditCard, Target, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { glassIconButton, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 
 interface UserNotification {
@@ -583,10 +584,10 @@ export default function NotificationsDropdown({ onOpenChange }: NotificationsDro
         if (isMobile && mounted && typeof document !== 'undefined') {
           return createPortal(
             <>
-              <div
-                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden"
-                onClick={() => setOpen(false)}
-                aria-hidden="true"
+              <ClickOutsideBackdrop
+                transparent={false}
+                className="md:hidden"
+                onClose={() => setOpen(false)}
               />
               {dropdownElement}
             </>,

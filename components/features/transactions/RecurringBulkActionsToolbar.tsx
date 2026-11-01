@@ -10,8 +10,8 @@ import {
   Merge,
   Trash2,
   X,
-  Loader2,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import { toast } from 'sonner';
@@ -94,7 +94,7 @@ export function RecurringBulkActionsToolbar({
               className="text-xs h-8 font-medium"
             >
               {loadingAction === 'confirm' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                <Spinner size="sm" className="mr-1" />
               ) : (
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 mr-1" />
               )}
@@ -109,7 +109,7 @@ export function RecurringBulkActionsToolbar({
               className="text-xs h-8 font-medium"
             >
               {loadingAction === 'dismiss' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                <Spinner size="sm" className="mr-1" />
               ) : (
                 <EyeOff className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               )}
@@ -148,7 +148,7 @@ export function RecurringBulkActionsToolbar({
               className="text-xs h-8 font-medium"
             >
               {loadingAction === 'resume' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                <Spinner size="sm" className="mr-1" />
               ) : (
                 <Play className="w-3.5 h-3.5 mr-1 text-emerald-500" />
               )}
@@ -163,7 +163,7 @@ export function RecurringBulkActionsToolbar({
               className="text-xs h-8 font-medium"
             >
               {loadingAction === 'delete' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                <Spinner size="sm" className="mr-1" />
               ) : (
                 <Trash2 className="w-3.5 h-3.5 mr-1" />
               )}

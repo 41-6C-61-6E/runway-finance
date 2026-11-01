@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 
 interface PullToRefreshProps {
   children: ReactNode;
@@ -177,7 +178,7 @@ export function PullToRefresh({ children }: PullToRefreshProps) {
       <div className="bg-background/85 backdrop-blur-md border border-border shadow-lg rounded-full px-4 py-2 flex items-center gap-2">
         {status === 'refreshing' ? (
           <>
-            <Loader2 className="w-4 h-4 text-primary animate-spin" />
+            <Spinner size="sm" className="text-primary" />
             <span className="text-xs font-semibold text-foreground">Refreshing...</span>
           </>
         ) : status === 'ready' ? (

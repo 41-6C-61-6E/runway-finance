@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Info, Loader2, ChevronDown, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
+import { Info, ChevronDown, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { Select } from '@/components/ui/select';
 import type {
   AlertCondition,
@@ -897,7 +898,7 @@ export default function CustomAlertRuleForm({ editingRule, accountsList, goalsLi
             </button>
           </div>
           {previewing
-            ? <div className="flex items-center gap-2 text-xs text-muted-foreground p-4"><Loader2 className="h-4 w-4 animate-spin" /> Running preview against your data…</div>
+            ? <div className="flex items-center gap-2 text-xs text-muted-foreground p-4"><Spinner size="sm" /> Running preview against your data…</div>
             : <PreviewResults result={previewResult} />
           }
         </div>
@@ -915,7 +916,7 @@ export default function CustomAlertRuleForm({ editingRule, accountsList, goalsLi
               disabled={previewing}
               className="text-xs"
             >
-              {previewing ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Testing…</> : '🔍 Test Rule'}
+              {previewing ? <><Spinner size="xs" className="mr-1.5" />Testing…</> : '🔍 Test Rule'}
             </Button>
           )}
         </div>
@@ -924,7 +925,7 @@ export default function CustomAlertRuleForm({ editingRule, accountsList, goalsLi
             Cancel
           </Button>
           <Button type="submit" size="sm" disabled={saving}>
-            {saving ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Saving…</> : isEditing ? 'Update Rule' : 'Create Rule'}
+            {saving ? <><Spinner size="xs" className="mr-1.5" />Saving…</> : isEditing ? 'Update Rule' : 'Create Rule'}
           </Button>
         </div>
       </div>

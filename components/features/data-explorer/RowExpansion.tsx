@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Copy, Check, ExternalLink, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
+import { Copy, Check, ExternalLink, Trash2, AlertTriangle } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import JsonViewer from './JsonViewer';
 import { IconButton } from '@/components/ui/icon-button';
 import {
@@ -143,7 +144,7 @@ export default function RowExpansion({ row, columns, onNavigate, tableKey, onRow
                 >
                   {isDeleting ? (
                     <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Spinner size="sm" />
                       Deleting...
                     </>
                   ) : (

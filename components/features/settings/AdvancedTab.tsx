@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { SETTING_DEFINITIONS, API_KEY_FIELD_KEYS, API_KEY_DEFAULTS } from '@/config/defaults';
 import { Switch } from '@/components/ui/switch';
 import { signOut } from 'next-auth/react';
@@ -509,7 +509,7 @@ export default function AdvancedTab() {
                 >
                   {deleting ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Spinner size="sm" />
                       Deleting...
                     </>
                   ) : (

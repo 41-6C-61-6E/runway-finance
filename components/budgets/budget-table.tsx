@@ -15,7 +15,8 @@ import { ActionButton } from '@/components/ui/action-button';
 import { BudgetItemTransactionsIcon, getPeriodDateRange } from './budget-transactions-tooltip';
 import { formatCurrency } from '@/lib/utils/format';
 import { isEnvelopeRow, envelopeExplainText, ENVELOPE_STATUS_META, nativePeriodLabel, type EnvelopeBudgetRow } from '@/lib/utils/budget-envelope';
-import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, History, Layers, Filter, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, History, Layers, Filter, SlidersHorizontal } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
@@ -816,7 +817,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                         className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
                                       >
                                         {convertingCatId === item.categoryId ? (
-                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                          <Spinner size="sm" />
                                         ) : (
                                           <Plus className="w-4 h-4" />
                                         )}
@@ -1192,7 +1193,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                                     className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
                                                   >
                                                     {convertingCatId === item.categoryId ? (
-                                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                      <Spinner size="sm" />
                                                     ) : (
                                                       <Plus className="w-4 h-4" />
                                                     )}

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 
 interface DataExportProps {
   table: string;
@@ -73,7 +74,7 @@ export default function DataExport({ table, filters, search, columns, total }: D
         title="Export CSV"
       >
         {exporting ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <Spinner size="sm" />
         ) : (
           <Download className="h-3.5 w-3.5" />
         )}

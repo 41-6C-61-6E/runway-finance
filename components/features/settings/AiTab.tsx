@@ -15,7 +15,8 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Eye, RotateCcw } from 'lucide-react';
+import { Eye, RotateCcw } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 
 type AutomationSettings = {
   aiSystemPrompt: string | null;
@@ -1034,7 +1035,7 @@ export default function AiTab() {
           <div className="flex-1 overflow-y-auto rounded-lg bg-muted/40 border border-border p-3 text-xs font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
             {previewLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <Spinner size="md" className="text-primary" />
               </div>
             ) : (
               previewText || 'No preview text available.'

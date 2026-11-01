@@ -22,7 +22,6 @@ import {
   Clock,
   Goal,
   TrendingUp,
-  Loader2,
   Plus,
   Pencil,
   Trash2,
@@ -30,6 +29,9 @@ import {
 } from 'lucide-react';
 import CustomAlertRuleForm from './CustomAlertRuleForm';
 import { formatBalance } from '@/lib/utils/format';
+import { ModalBackdrop } from '@/components/ui/modal-overlay';
+import { Spinner } from '@/components/ui/loading-spinner';
+import { EmptyState as UIEmptyState } from '@/components/ui/empty-state';
 import type { AlertCondition, AlertConditionField } from '@/lib/db/schema/notifications';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -215,7 +217,7 @@ function RuleCard({
         {/* Enable/disable toggle */}
         <div className="pt-0.5">
           {toggling
-            ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ? <Spinner size="sm" className="text-muted-foreground" />
             : <Switch checked={rule.isEnabled} onCheckedChange={handleToggle} id={`rule-enabled-${rule.id}`} />
           }
         </div>
@@ -277,7 +279,7 @@ function RuleCard({
                 title="Delete rule"
                 disabled={deleting}
               >
-                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deleting ? <Spinner size="sm" /> : <Trash2 className="h-4 w-4" />}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -344,7 +346,7 @@ function PreviewModal({
   const hasMatches = result && result.matchCount > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+    <ModalBackdrop className="bg-background/80" onClose={onClose}>
       <div className="bg-card border border-border rounded-xl shadow-xl max-w-lg w-full max-h-[80dvh] flex flex-col overflow-hidden">
         <div className="p-5 border-b border-border flex items-start justify-between gap-3">
           <div>
@@ -356,7 +358,7 @@ function PreviewModal({
         <div className="p-5 overflow-y-auto flex-1">
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner size="sm" className="h-4 w-4" />
               Simulating rule against your data…
             </div>
           ) : result ? (
@@ -425,7 +427,7 @@ function PreviewModal({
           <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 
@@ -433,21 +435,18 @@ function PreviewModal({
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="rounded-xl border-2 border-dashed border-border p-8 text-center space-y-4">
-      <div className="flex justify-center">
+    <UIEmptyState
+      icon={Bell}
+      title="No custom alert rules yet"
+      description="Custom alerts let you define exactly when to get notified — by amount, keyword, balance threshold, goal milestone, or cash flow."
+      action={
         <Button variant="outline" size="sm" onClick={onAdd}>
           <Plus className="h-4 w-4 mr-1.5" />
           Create your first rule
         </Button>
-      </div>
-      <Bell className="h-8 w-8 text-muted-foreground mx-auto" />
-      <div className="space-y-1">
-        <p className="font-semibold text-foreground">No custom alert rules yet</p>
-        <p className="text-sm text-muted-foreground">
-          Custom alerts let you define exactly when to get notified — by amount, keyword, balance threshold, goal milestone, or cash flow.
-        </p>
-      </div>
-      <div className="text-left inline-block">
+      }
+    >
+      <div className="text-left inline-block mt-3">
         <p className="text-xs font-semibold text-muted-foreground mb-2">Example rules you could create:</p>
         <ul className="space-y-1 text-xs text-muted-foreground list-disc list-inside">
           <li>Alert when any transaction from "Amazon" exceeds $50</li>
@@ -456,7 +455,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
           <li>Alert when monthly net savings falls below $0 for 2 months</li>
         </ul>
       </div>
-    </div>
+    </UIEmptyState>
   );
 }
 
@@ -523,7 +522,7 @@ export default function CustomAlertRuleList({ accountsList, goalsList }: Props) 
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Spinner size="sm" />
         Loading rules…
       </div>
     );

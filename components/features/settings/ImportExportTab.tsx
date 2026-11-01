@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { UploadCloud, DownloadCloud, FileText, Table, Check, Loader2, Calendar, Filter, Archive, Layers, ShieldCheck, Upload, FileArchive } from 'lucide-react';
+import { UploadCloud, DownloadCloud, FileText, Table, Check, Calendar, Filter, Archive, Layers, ShieldCheck, Upload, FileArchive } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -512,7 +513,7 @@ export default function ImportExportTab() {
                 disabled={backupBusy !== null}
                 className="flex items-center gap-2"
               >
-                {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                {backupBusy === 'export' ? <Spinner size="sm" /> : <ShieldCheck className="h-4 w-4" />}
                 Backup (Encrypted — recommended)
               </Button>
 
@@ -522,7 +523,7 @@ export default function ImportExportTab() {
                 variant="outline"
                 className="flex items-center gap-2"
               >
-                {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <DownloadCloud className="h-4 w-4" />}
+                {backupBusy === 'export' ? <Spinner size="sm" /> : <DownloadCloud className="h-4 w-4" />}
                 Backup (JSON — unencrypted)
               </Button>
 
@@ -532,7 +533,7 @@ export default function ImportExportTab() {
                 variant="outline"
                 className="flex items-center gap-2"
               >
-                {backupBusy === 'csv' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
+                {backupBusy === 'csv' ? <Spinner size="sm" /> : <FileArchive className="h-4 w-4" />}
                 Export All Data (CSV)
               </Button>
 
@@ -542,7 +543,7 @@ export default function ImportExportTab() {
                 variant="outline"
                 className="flex items-center gap-2 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
               >
-                {backupBusy === 'import' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {backupBusy === 'import' ? <Spinner size="sm" /> : <Upload className="h-4 w-4" />}
                 Restore from Backup
               </Button>
 
@@ -663,7 +664,7 @@ export default function ImportExportTab() {
                 variant="outline"
                 className="w-full flex items-center justify-center gap-2 mt-4"
               >
-                {exportingTx ? <Loader2 className="h-4 w-4 animate-spin" /> : <DownloadCloud className="h-4 w-4" />}
+                {exportingTx ? <Spinner size="sm" /> : <DownloadCloud className="h-4 w-4" />}
                 Export Transactions (CSV)
               </Button>
             </div>
@@ -742,7 +743,7 @@ export default function ImportExportTab() {
                 variant="outline"
                 className="w-full flex items-center justify-center gap-2 mt-4"
               >
-                {exportingSnap ? <Loader2 className="h-4 w-4 animate-spin" /> : <DownloadCloud className="h-4 w-4" />}
+                {exportingSnap ? <Spinner size="sm" /> : <DownloadCloud className="h-4 w-4" />}
                 Export Snapshots (CSV)
               </Button>
             </div>
@@ -821,7 +822,7 @@ export default function ImportExportTab() {
                 variant="outline"
                 className="w-full flex items-center justify-center gap-2 mt-4"
               >
-                {exportingPlan ? <Loader2 className="h-4 w-4 animate-spin" /> : <DownloadCloud className="h-4 w-4" />}
+                {exportingPlan ? <Spinner size="sm" /> : <DownloadCloud className="h-4 w-4" />}
                 Export FIRE Plan ({planFormat.toUpperCase()})
               </Button>
             </div>
@@ -905,7 +906,7 @@ export default function ImportExportTab() {
                 variant="outline"
                 className="w-full flex items-center justify-center gap-2 mt-4"
               >
-                {exportingCustom ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+                {exportingCustom ? <Spinner size="sm" /> : <Archive className="h-4 w-4" />}
                 Download Custom Package (.zip)
               </Button>
             </div>
@@ -995,7 +996,7 @@ export default function ImportExportTab() {
               disabled={backupBusy === 'export' || !encExportPassphrase}
               className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
             >
-              {backupBusy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+              {backupBusy === 'export' ? <Spinner size="sm" /> : <ShieldCheck className="h-4 w-4" />}
               <span className="ml-2">Encrypt & Download</span>
             </button>
           </AlertDialogFooter>

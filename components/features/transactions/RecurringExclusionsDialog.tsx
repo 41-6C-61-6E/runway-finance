@@ -19,11 +19,11 @@ import {
   CheckSquare,
   Square,
   MinusSquare,
-  Loader2,
   Plus,
   X,
   Undo2,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 
 interface CategoryItem {
   id: string;
@@ -445,7 +445,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
 
               {categoriesLoading ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                  <Spinner size="sm" className="mx-auto mb-1" />
                   Loading categories...
                 </div>
               ) : (
@@ -550,7 +550,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
 
               {tagsLoading ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                  <Spinner size="sm" className="mx-auto mb-1" />
                   Loading tags...
                 </div>
               ) : (
@@ -621,7 +621,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
 
               {accountsLoading ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                  <Spinner size="sm" className="mx-auto mb-1" />
                   Loading accounts...
                 </div>
               ) : (
@@ -677,7 +677,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
 
               {accountsLoading ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                  <Spinner size="sm" className="mx-auto mb-1" />
                   Loading accounts...
                 </div>
               ) : accountTypesWithCounts.length === 0 ? (
@@ -814,7 +814,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
 
               {dismissedLoading && dismissedItems.length === 0 ? (
                 <div className="py-8 text-center text-xs text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                  <Spinner size="sm" className="mx-auto mb-1" />
                   Loading dismissed items...
                 </div>
               ) : dismissedItems.length === 0 ? (
@@ -847,7 +847,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
                         onClick={() => handleRestoreDismissed(item.id)}
                       >
                         {restoringItemId === item.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                          <Spinner size="xs" className="mr-1" />
                         ) : (
                           <Undo2 className="w-3 h-3 mr-1" />
                         )}
@@ -885,7 +885,7 @@ export function RecurringExclusionsDialog({ open, onClose, onSavedAndRescan }: R
               disabled={saving}
               className="text-xs h-8 font-semibold"
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+              {saving ? <Spinner size="sm" className="mr-1" /> : null}
               Save Exclusions
             </Button>
           </div>

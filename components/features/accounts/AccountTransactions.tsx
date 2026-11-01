@@ -3,7 +3,8 @@
 import { useMemo, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Receipt, ArrowRight, ChevronDown, Search, Check, Loader2 } from 'lucide-react';
+import { Receipt, ArrowRight, ChevronDown, Search, Check } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
@@ -17,6 +18,7 @@ import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/cha
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { invalidateAfterTransactionChange } from '@/lib/query-invalidation';
 import { cn } from '@/lib/utils';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 export interface AccountTransactionsProps {
   accountId: string;
@@ -437,8 +439,7 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
         {/* Category Dropdown Popover */}
         {openCategoryTxId && dropdownPos && (
           <>
-            <div
-              className="fixed inset-0 z-40"
+            <ClickOutsideBackdrop
               onClick={(e) => {
                 e.stopPropagation();
                 setOpenCategoryTxId(null);
@@ -526,7 +527,7 @@ export function AccountTransactions({ accountId, historyData, isLiability, hiera
                       disabled={creatingCategoryLoading || !newCategoryName.trim()}
                       className="flex-1 py-1 text-xs font-semibold text-primary-foreground bg-primary rounded-md hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1"
                     >
-                      {creatingCategoryLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create'}
+                      {creatingCategoryLoading ? <Spinner size="xs" /> : 'Create'}
                     </button>
                   </div>
                 </div>

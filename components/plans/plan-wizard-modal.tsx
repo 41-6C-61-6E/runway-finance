@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { ModalBackdrop } from '@/components/ui/modal-overlay';
 import {
   Sparkles,
   X,
@@ -410,7 +411,7 @@ export function PlanWizardModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 overflow-y-auto">
+    <ModalBackdrop className="overflow-y-auto" onClose={onClose}>
       <div className="bg-card z-50 border border-border rounded-2xl p-6 shadow-2xl max-w-2xl w-full my-8 space-y-6 animate-in fade-in zoom-in-95 duration-200">
         {/* Wizard Header */}
         <div className="flex items-center justify-between border-b border-border pb-4">
@@ -1130,6 +1131,6 @@ export function PlanWizardModal({
           </div>
         </form>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }

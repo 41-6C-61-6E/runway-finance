@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, Check, X, Loader2, Brain, Tag, FolderPlus, ArrowRight, Clock, BarChart3, Layers, AlertTriangle, RefreshCw, ChevronDown, Search } from 'lucide-react';
+import { Sparkles, Check, X, Brain, Tag, FolderPlus, ArrowRight, Clock, BarChart3, Layers, AlertTriangle, RefreshCw, ChevronDown, Search } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { Select } from '@/components/ui/select';
 
 type AiProposal = {
@@ -262,7 +263,7 @@ function CategoryPillSelector({
                   disabled={creatingCategoryLoading || !newCategoryName.trim()}
                   className="flex-1 py-1 text-xs font-semibold text-primary-foreground bg-primary rounded-md hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-1"
                 >
-                  {creatingCategoryLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create'}
+                  {creatingCategoryLoading ? <Spinner size="xs" /> : 'Create'}
                 </button>
               </div>
             </div>
@@ -431,7 +432,7 @@ function ProposalCard({
             aria-label="Approve suggestion"
           >
             {processing === proposal.id ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Spinner size="sm" />
             ) : (
               <Check className="h-3.5 w-3.5" />
             )}
@@ -1110,7 +1111,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
               )}
               {analyzing && (
                 <span className="text-xs px-2.5 py-1 rounded-lg bg-primary/10 text-primary animate-pulse whitespace-nowrap font-medium flex items-center gap-1.5">
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Spinner size="xs" />
                   Analyzing...
                 </span>
               )}
@@ -1121,7 +1122,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
                 className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all disabled:opacity-50 shadow-xs cursor-pointer"
               >
                 {analyzing ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner size="sm" />
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
                 )}
@@ -1144,7 +1145,7 @@ export default function AiSuggestionsModal({ open, onOpenChange, onProposalsUpda
             }`}>
               <div className="flex items-start gap-3">
                 {(analyzing || savedStatus?.status === 'running') ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0 mt-0.5" />
+                  <Spinner size="sm" className="text-primary shrink-0 mt-0.5" />
                 ) : (
                   <div className="h-4 w-4 shrink-0" />
                 )}

@@ -12,7 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Merge, Sparkles, Loader2, Check, Search, ArrowRight } from 'lucide-react';
+import { Merge, Sparkles, Check, Search, ArrowRight } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { formatCurrency } from '@/lib/utils/format';
 import { toast } from 'sonner';
 import type { RecurringItem } from './RecurringCard';
@@ -302,7 +303,7 @@ export function MergeRecurringModal({
             disabled={merging || !targetId}
             className="text-xs h-8 font-semibold"
           >
-            {merging ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Merge className="w-3.5 h-3.5 mr-1.5" />}
+            {merging ? <Spinner size="sm" className="mr-1.5" /> : <Merge className="w-3.5 h-3.5 mr-1.5" />}
             Confirm Merge
           </Button>
         </DialogFooter>

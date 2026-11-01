@@ -8,6 +8,7 @@ import { Search, Sparkles, Plus, Repeat, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import AiCategorizeButton from '@/components/features/transactions/AiCategorizeButton';
 import { MarkAsRecurringModal } from './MarkAsRecurringModal';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 
 
@@ -989,7 +990,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
                 {showCategoryDropdown && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => { setShowCategoryDropdown(false); setCategorySearch(''); }} />
+                    <ClickOutsideBackdrop onClose={() => { setShowCategoryDropdown(false); setCategorySearch(''); }} />
                     <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col">
                       <div className="relative p-2 border-b border-border">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -1120,7 +1121,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
               {showTagDropdown && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => { setShowTagDropdown(false); setTagSearch(''); }} />
+                  <ClickOutsideBackdrop onClose={() => { setShowTagDropdown(false); setTagSearch(''); }} />
                   <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-56 flex flex-col">
                     <div className="relative p-2 border-b border-border">
                       <input

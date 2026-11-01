@@ -15,6 +15,7 @@ import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { apiFetch } from '@/lib/utils/api-client';
 import { SegPill } from '@/components/ui/seg-pill';
+import { ModalBackdrop } from '@/components/ui/modal-overlay';
 import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
 
 interface AccountData {
@@ -321,9 +322,9 @@ function DetailModal({
   const isDecrease = node.type === 'decrease';
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+    <ModalBackdrop
+      className="z-[100] bg-black/60 backdrop-blur-sm"
+      onClose={onClose}
     >
       <div
         className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto"
@@ -436,7 +437,7 @@ function DetailModal({
           ) : null}
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 

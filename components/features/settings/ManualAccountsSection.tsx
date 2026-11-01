@@ -16,6 +16,7 @@ import { isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCompactEstimate, formatRedfinSuccessMessage, extractRedfinPropertyId, isRedfinLinkInput } from '@/components/real-estate/estimate-helpers';
 import { getBadgeClasses } from '@/lib/utils/account-badge';
 import { Select } from '@/components/ui/select';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 type ManualAccount = {
   id: string;
@@ -1295,7 +1296,7 @@ export default function ManualAccountsSection() {
 
                 {showTagDropdown && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => { setShowTagDropdown(false); setTagSearch(''); }} />
+                    <ClickOutsideBackdrop onClose={() => { setShowTagDropdown(false); setTagSearch(''); }} />
                     <div className="absolute z-50 bottom-full mb-1 left-0 right-0 bg-card border border-border rounded-lg shadow-xl max-h-56 flex flex-col">
                       <div className="relative p-2 border-b border-border">
                         <input
@@ -1734,7 +1735,7 @@ export default function ManualAccountsSection() {
 
                 {showEditTagDropdown && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => { setShowEditTagDropdown(false); setTagSearch(''); }} />
+                    <ClickOutsideBackdrop onClose={() => { setShowEditTagDropdown(false); setTagSearch(''); }} />
                     <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-card border border-border rounded-lg shadow-xl max-h-56 flex flex-col">
                       <div className="relative p-2 border-b border-border">
                         <input

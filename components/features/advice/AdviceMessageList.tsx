@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { AlertCircle, RotateCcw, User, Bot, Loader2 } from 'lucide-react';
+import { AlertCircle, RotateCcw, User, Bot } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { Button } from '@/components/ui/button';
 import { AdviceMarkdown } from './AdviceMarkdown';
 import { AdviceSources } from './AdviceSources';
@@ -145,7 +146,7 @@ export function AdviceMessageList({
                         ) : (
                           statusLabel && (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                              <Spinner size="sm" className="text-primary" />
                               <span>{statusLabel}</span>
                             </div>
                           )
@@ -170,7 +171,7 @@ export function AdviceMessageList({
       {/* Floating status indicator when streaming more tokens */}
       {status !== 'idle' && messages.length > 0 && messages[messages.length - 1]?.role === 'user' && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 animate-pulse">
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+          <Spinner size="sm" className="text-primary" />
           <span>{statusLabel || 'Thinking…'}</span>
         </div>
       )}

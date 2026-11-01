@@ -8,6 +8,7 @@ export interface EmptyStateProps {
   title: string;
   description?: string;
   action?: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
 }
 
@@ -16,6 +17,7 @@ export function EmptyState({
   title,
   description,
   action,
+  children,
   className,
 }: EmptyStateProps) {
   return (
@@ -35,6 +37,7 @@ export function EmptyState({
         <p className="text-sm text-muted-foreground max-w-md mb-4">{description}</p>
       )}
       {action && <div className="mt-1">{action}</div>}
+      {children}
     </div>
   );
 }

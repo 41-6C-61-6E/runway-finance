@@ -38,9 +38,9 @@ import {
   Pause,
   AlertCircle,
   Save,
-  Loader2,
   Landmark,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import type { RecurringItem } from './RecurringCard';
 import type { FrequencyType } from '@/lib/services/recurring-detection';
 import { toast } from 'sonner';
@@ -475,7 +475,7 @@ export default function RecurringDetailDrawer({
 
             {loadingDetail ? (
               <div className="py-6 text-center text-xs text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                <Spinner size="sm" className="mx-auto mb-1" />
                 Loading history...
               </div>
             ) : history.length === 0 ? (
@@ -533,7 +533,7 @@ export default function RecurringDetailDrawer({
               disabled={saving}
               className="text-xs h-9 font-semibold"
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+              {saving ? <Spinner size="sm" className="mr-1.5" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
               Save Changes
             </Button>
           </div>

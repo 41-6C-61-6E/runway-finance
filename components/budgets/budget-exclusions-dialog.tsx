@@ -22,8 +22,8 @@ import {
   Layers,
   CheckSquare,
   Square,
-  Loader2,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 
 interface CategoryItem {
   id: string;
@@ -329,7 +329,7 @@ export function BudgetExclusionsDialog({ open, onClose }: BudgetExclusionsDialog
 
               {categoriesLoading ? (
                 <div className="flex items-center justify-center py-12 text-muted-foreground text-xs gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <Spinner size="sm" className="text-primary" />
                   <span>Loading categories...</span>
                 </div>
               ) : categoryTree.length === 0 ? (
@@ -443,7 +443,7 @@ export function BudgetExclusionsDialog({ open, onClose }: BudgetExclusionsDialog
 
               {tagsLoading ? (
                 <div className="flex items-center justify-center py-12 text-muted-foreground text-xs gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <Spinner size="sm" className="text-primary" />
                   <span>Loading tags...</span>
                 </div>
               ) : filteredTags.length === 0 ? (
@@ -617,7 +617,7 @@ export function BudgetExclusionsDialog({ open, onClose }: BudgetExclusionsDialog
               disabled={saving}
               className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              {saving ? <Spinner size="sm" /> : <Check className="w-3.5 h-3.5" />}
               <span>Save Exclusions</span>
             </button>
           </div>

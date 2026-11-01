@@ -12,6 +12,7 @@ import { CollapsibleCardHeader } from '@/components/ui/collapsible-card-header';
 import { Slider } from '@/components/ui/slider';
 import { Select } from '@/components/ui/select';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
+import { ModalBackdrop } from '@/components/ui/modal-overlay';
 
 import { isFireEligibleAccount } from '@/lib/utils/account-scope';
 
@@ -1403,7 +1404,13 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
 
       {/* Fully Opaque Add / Edit Modals */}
       {modalType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
+        <ModalBackdrop
+          className="bg-black/70"
+          onClose={() => {
+            setModalType(null);
+            setEditingItem(null);
+          }}
+        >
           <div className="!bg-slate-900 !text-slate-100 border-2 border-slate-700/80 rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4 animate-in fade-in zoom-in-95 duration-200 z-50">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-100 capitalize">
@@ -1770,7 +1777,7 @@ export function PlanDetailsTab({ plan, onUpdatePlan }: PlanDetailsTabProps) {
               </form>
             )}
           </div>
-        </div>
+        </ModalBackdrop>
       )}
     </div>
   );

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { CURRENT_TAX_YEAR } from '@/lib/constants/tax';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import {
   calculateSocialSecurityPIA,
   calculateAdjustedSsBenefit,
@@ -249,11 +250,10 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
     }
   };
 
-  const handleResetRules = async () => {
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+
+  const executeResetRules = async () => {
     const yearDisplay = rules?.taxYear || CURRENT_TAX_YEAR;
-    if (!confirm(`Are you sure you want to reset all engine rules and tax parameters to ${yearDisplay} IRS defaults?`)) {
-      return;
-    }
     setSavingRules(true);
     try {
       const res = await fetch('/api/retirement/rules', {
@@ -275,6 +275,10 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
     } finally {
       setSavingRules(false);
     }
+  };
+
+  const handleResetRules = async () => {
+    setConfirmResetOpen(true);
   };
 
   if (!plan) {
@@ -1472,6 +1476,15 @@ export function SettingsTab({ plan, onUpdatePlan, desktopHeader, subHeader }: Se
           filingStatus={filingStatus}
         />
       )}
+
+      <ConfirmDeleteDialog
+        open={confirmResetOpen}
+        onOpenChange={setConfirmResetOpen}
+        title="Reset Engine Rules"
+        description={`Are you sure you want to reset all engine rules and tax parameters to ${rules?.taxYear || CURRENT_TAX_YEAR} IRS defaults?`}
+        confirmText="Reset Rules"
+        onConfirm={executeResetRules}
+      />
     </div>
   );
 }

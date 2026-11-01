@@ -15,7 +15,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
-import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, PiggyBank, Loader2, Check } from 'lucide-react';
+import { TrendingUp, Minus, Plus, Calendar, Target, CheckCircle2, AlertCircle, PiggyBank, Check } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { cn } from '@/lib/utils';
 import { IconButton } from '@/components/ui/icon-button';
@@ -439,7 +440,7 @@ export function MilestonesProjections() {
               <span className="text-xs font-semibold text-foreground">Monthly Inflow</span>
               {loading && (
                 <span className="flex items-center gap-1 text-[10px] text-muted-foreground animate-pulse">
-                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <Spinner size="xs" />
                   Updating...
                 </span>
               )}

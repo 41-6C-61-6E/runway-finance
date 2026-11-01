@@ -10,7 +10,7 @@ import { ProjectionTab } from '@/components/plans/projection-tab';
 import { ScenariosTab } from '@/components/plans/scenarios-tab';
 import { SettingsTab } from '@/components/plans/settings-tab';
 import { PlanWizardModal } from '@/components/plans/plan-wizard-modal';
-import { DeletePlanDialog } from '@/components/plans/delete-plan-dialog';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import { PlanManagementMenu } from '@/components/plans/plan-management-menu';
 import { FirePlanExportModal } from '@/components/plans/fire-plan-export-modal';
 import { MobileTabSwipeContainer } from '@/components/ui/mobile-view-switcher';
@@ -420,15 +420,28 @@ export default function PlansPage() {
       />
 
       {/* Delete Plan Confirmation Dialog */}
-      <DeletePlanDialog
-        isOpen={deleteDialogOpen}
-        planName={planToDelete?.name || ''}
-        isDefault={Boolean(planToDelete?.isDefault)}
-        onClose={() => {
-          setDeleteDialogOpen(false);
-          setPlanToDelete(null);
+      <ConfirmDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setPlanToDelete(null);
         }}
-        onConfirmDelete={handleConfirmDeletePlan}
+        title="Confirm Plan Deletion"
+        description={
+          <div className="space-y-2">
+            <p>
+              Are you sure you want to permanently delete{' '}
+              <strong className="text-foreground">{planToDelete?.name}</strong>? This action cannot be undone.
+            </p>
+            {planToDelete?.isDefault && (
+              <p className="text-amber-500 font-semibold pt-1">
+                Note: This is currently your Default Plan. If deleted, another plan will be designated as default, or a fresh default plan will be initialized.
+              </p>
+            )}
+          </div>
+        }
+        confirmText="Delete Plan"
+        onConfirm={handleConfirmDeletePlan}
       />
 
       {/* FIRE Plan Export Modal */}

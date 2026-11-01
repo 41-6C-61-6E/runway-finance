@@ -5,6 +5,7 @@ import { Trash2, GitMerge, AlertCircle, RefreshCw, CheckCircle2 } from 'lucide-r
 import { useUserSettings } from '@/components/user-settings-provider';
 import { AsyncCard } from '@/components/ui/async-card';
 import { Select } from '@/components/ui/select';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 
 type Transaction = {
   id: string;
@@ -177,103 +178,120 @@ export default function DataCleanup() {
   };
 
   const activeGroups = groups.filter((g) => !dismissedGroups.has(g.id));
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
 
   const handleMergeAll = async () => {
     if (activeGroups.length === 0) return;
-    if (!confirm(`Are you sure you want to merge all ${activeGroups.length} duplicate groups?`)) return;
+    setConfirmDialog({
+      open: true,
+      title: 'Merge Duplicate Groups',
+      description: `Are you sure you want to merge all ${activeGroups.length} duplicate groups?`,
+      onConfirm: async () => {
+        setProcessingId('all');
+        let successCount = 0;
 
-    setProcessingId('all');
-    let successCount = 0;
+        try {
+          for (const group of activeGroups) {
+            const keepId = selectedKeeps[group.id];
+            if (!keepId) continue;
 
-    try {
-      for (const group of activeGroups) {
-        const keepId = selectedKeeps[group.id];
-        if (!keepId) continue;
+            const keepTx = group.transactions.find((t) => t.id === keepId);
+            const deleteTxns = group.transactions.filter((t) => t.id !== keepId);
+            if (!keepTx) continue;
 
-        const keepTx = group.transactions.find((t) => t.id === keepId);
-        const deleteTxns = group.transactions.filter((t) => t.id !== keepId);
-        if (!keepTx) continue;
+            // 1. Gather missing info
+            let categoryId = keepTx.categoryId;
+            let notes = keepTx.notes || '';
+            let payee = keepTx.payee || '';
 
-        // 1. Gather missing info
-        let categoryId = keepTx.categoryId;
-        let notes = keepTx.notes || '';
-        let payee = keepTx.payee || '';
+            for (const other of deleteTxns) {
+              if (!categoryId && other.categoryId) {
+                categoryId = other.categoryId;
+              }
+              if (other.notes && !notes.includes(other.notes)) {
+                notes = notes ? `${notes}\n${other.notes}` : other.notes;
+              }
+              if (!payee && other.payee) {
+                payee = other.payee;
+              }
+            }
 
-        for (const other of deleteTxns) {
-          if (!categoryId && other.categoryId) {
-            categoryId = other.categoryId;
+            // 2. Update keep
+            if (categoryId !== keepTx.categoryId || notes !== (keepTx.notes || '') || payee !== (keepTx.payee || '')) {
+              await fetch(`/api/transactions/${keepId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ categoryId, notes, payee }),
+              });
+            }
+
+            // 3. Soft delete duplicates
+            const deleteIds = deleteTxns.map((t) => t.id);
+            await fetch('/api/transactions', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ ids: deleteIds }),
+            });
+
+            successCount++;
           }
-          if (other.notes && !notes.includes(other.notes)) {
-            notes = notes ? `${notes}\n${other.notes}` : other.notes;
-          }
-          if (!payee && other.payee) {
-            payee = other.payee;
-          }
+
+          setSuccessMessage(`Successfully merged ${successCount} duplicate groups!`);
+          setTimeout(() => setSuccessMessage(null), 4000);
+          
+          // Clear all merged groups from state
+          const mergedIds = new Set(activeGroups.map((g) => g.id));
+          setGroups((prev) => prev.filter((g) => !mergedIds.has(g.id)));
+        } catch (err) {
+          console.error('Failed to merge all duplicates:', err);
+        } finally {
+          setProcessingId(null);
         }
-
-        // 2. Update keep
-        if (categoryId !== keepTx.categoryId || notes !== (keepTx.notes || '') || payee !== (keepTx.payee || '')) {
-          await fetch(`/api/transactions/${keepId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ categoryId, notes, payee }),
-          });
-        }
-
-        // 3. Soft delete duplicates
-        const deleteIds = deleteTxns.map((t) => t.id);
-        await fetch('/api/transactions', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ ids: deleteIds }),
-        });
-
-        successCount++;
-      }
-
-      setSuccessMessage(`Successfully merged ${successCount} duplicate groups!`);
-      setTimeout(() => setSuccessMessage(null), 4000);
-      
-      // Clear all merged groups from state
-      const mergedIds = new Set(activeGroups.map((g) => g.id));
-      setGroups((prev) => prev.filter((g) => !mergedIds.has(g.id)));
-    } catch (err) {
-      console.error('Failed to merge all duplicates:', err);
-    } finally {
-      setProcessingId(null);
-    }
+      },
+    });
   };
 
   const handleDeleteIndividual = async (groupId: string, txId: string) => {
-    if (!confirm('Are you sure you want to delete this transaction?')) return;
-    setProcessingId(groupId);
-    try {
-      await fetch(`/api/transactions/${txId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      setSuccessMessage('Transaction deleted successfully.');
-      setTimeout(() => setSuccessMessage(null), 3000);
+    setConfirmDialog({
+      open: true,
+      title: 'Delete Duplicate Transaction',
+      description: 'Are you sure you want to delete this transaction?',
+      onConfirm: async () => {
+        setProcessingId(groupId);
+        try {
+          await fetch(`/api/transactions/${txId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          });
+          setSuccessMessage('Transaction deleted successfully.');
+          setTimeout(() => setSuccessMessage(null), 3000);
 
-      // Update local state to remove just this transaction
-      setGroups((prev) =>
-        prev
-          .map((g) => {
-            if (g.id !== groupId) return g;
-            return {
-              ...g,
-              transactions: g.transactions.filter((t) => t.id !== txId),
-            };
-          })
-          .filter((g) => g.transactions.length >= 2) // Remove group if fewer than 2 transactions remain
-      );
-    } catch (err) {
-      console.error('Failed to delete transaction:', err);
-    } finally {
-      setProcessingId(null);
-    }
+          // Update local state to remove just this transaction
+          setGroups((prev) =>
+            prev
+              .map((g) => {
+                if (g.id !== groupId) return g;
+                return {
+                  ...g,
+                  transactions: g.transactions.filter((t) => t.id !== txId),
+                };
+              })
+              .filter((g) => g.transactions.length >= 2) // Remove group if fewer than 2 transactions remain
+          );
+        } catch (err) {
+          console.error('Failed to delete transaction:', err);
+        } finally {
+          setProcessingId(null);
+        }
+      },
+    });
   };
 
   return (
@@ -575,6 +593,16 @@ export default function DataCleanup() {
           </div>
         </div>
       </AsyncCard>
+
+      {confirmDialog && (
+        <ConfirmDeleteDialog
+          open={confirmDialog.open}
+          onOpenChange={(isOpen) => !isOpen && setConfirmDialog(null)}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          onConfirm={confirmDialog.onConfirm}
+        />
+      )}
     </div>
   );
 }

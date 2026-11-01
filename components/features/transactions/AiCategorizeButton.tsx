@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { toast } from 'sonner';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
@@ -54,7 +55,7 @@ export default function AiCategorizeButton({ transactionId, onSuggested, classNa
           className={`inline-flex items-center justify-center p-1 rounded-md text-primary/70 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50 ${className ?? ''}`}
         >
           {loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner size="sm" />
           ) : (
             <Sparkles className="h-3.5 w-3.5" />
           )}

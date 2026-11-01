@@ -5,6 +5,7 @@ import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { LucideIcon, Plus } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { cn } from '@/lib/utils';
 
 export const actionButtonVariants = cva(
@@ -36,6 +37,7 @@ export interface ActionButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof actionButtonVariants> {
   asChild?: boolean;
+  loading?: boolean;
   /**
    * Optional icon component to render (e.g. Plus, Sliders, Play).
    */
@@ -66,6 +68,7 @@ export const ActionButton = React.forwardRef<HTMLButtonElement, ActionButtonProp
       variant,
       size,
       asChild = false,
+      loading = false,
       icon: Icon,
       iconPosition = 'left',
       tooltip,
@@ -73,13 +76,16 @@ export const ActionButton = React.forwardRef<HTMLButtonElement, ActionButtonProp
       tooltipClassName,
       children,
       type = 'button',
+      disabled,
       ...props
     },
     ref
   ) => {
     const Comp = asChild ? Slot : 'button';
 
-    const iconElement = Icon ? (
+    const iconElement = loading ? (
+      <Spinner size="xs" className="w-3.5 h-3.5 shrink-0" />
+    ) : Icon ? (
       <Icon className="w-3.5 h-3.5 shrink-0" />
     ) : null;
 
@@ -101,6 +107,7 @@ export const ActionButton = React.forwardRef<HTMLButtonElement, ActionButtonProp
       <Comp
         ref={ref}
         type={asChild ? undefined : type}
+        disabled={disabled || loading}
         className={cn(actionButtonVariants({ variant, size, className }))}
         {...props}
       >

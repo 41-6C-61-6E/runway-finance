@@ -9,7 +9,7 @@ import { convertCurrency } from '@/lib/constants/currency-rates';
 import { computeNetWorthTotals } from '@/lib/utils/account-scope';
 import { formatInTimezone } from '@/lib/utils/timeframe';
 import { useUserSettings } from '@/components/user-settings-provider';
-import { EstimatePill } from '@/components/ui/estimate-pill';
+import { EstimatePill } from '@/components/net-worth/estimate-pill';
 import type { AccountData, ChartPoint } from '@/lib/types/financial';
 import { computeMovingAverage, computeMedianFilter } from '@/lib/utils/chart-aggregation';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';

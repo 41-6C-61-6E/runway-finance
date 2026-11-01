@@ -1,9 +1,11 @@
 {
-  "buildNumber": "26.11.1793567062930",
-  "buildTime": "2026-11-01T21:04:22.930Z",
-  "hash": "2e15486",
-  "fullHash": "2e154868e9c079224e29251598b8644b96a9061c",
+  "buildNumber": "26.11.1793568877599",
+  "buildTime": "2026-11-01T21:34:37.599Z",
+  "hash": "8590382",
+  "fullHash": "859038278e8b128f3ff827ff1e65916a985084fc",
   "commits": [
+    "docs(tracker): mark wave 2 workstreams complete",
+    "refactor(cc-03, cc-09): unify query keys, domain queries, retire fetch-cache, compose app providers, and fix logout storage purge",
     "refactor(cc-02): standardize api route wrappers, error handling, consolidate goals endpoints, and retire orphan routes",
     "refactor(cc-08): consolidate bank sync adapter, row decryption, and ai client",
     "feat(cc-15): add database repositories, query helpers, sql helpers, and server-only isolation",
@@ -201,19 +203,33 @@
     "feat: implement collapsible sidebar UI for desktop dashboards and update side panel styling",
     "ui: redesign Everything Else breakout pill for improved compactness and text truncation in budget table",
     "refactor: simplify budget actuals calculation by implementing ancestor-based transaction attribution",
-    "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses",
-    "refactor: implement server-side budget filtering with effective date bounds and dynamic catch-all category breakout",
-    "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic"
+    "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses"
   ],
   "history": [
+    {
+      "hash": "8590382",
+      "fullHash": "859038278e8b128f3ff827ff1e65916a985084fc",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T21:08:17Z",
+      "message": "docs(tracker): mark wave 2 workstreams complete",
+      "type": "docs",
+      "buildNumber": "26.11.1793568877599"
+    },
+    {
+      "hash": "7220426",
+      "fullHash": "722042681e90e75445b82b2b8cba62e00f3bc1e1",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T21:07:54Z",
+      "message": "refactor(cc-03, cc-09): unify query keys, domain queries, retire fetch-cache, compose app providers, and fix logout storage purge",
+      "type": "refactor"
+    },
     {
       "hash": "2e15486",
       "fullHash": "2e154868e9c079224e29251598b8644b96a9061c",
       "author": "41-6C-61-6E",
       "date": "2026-11-01T20:49:14Z",
       "message": "refactor(cc-02): standardize api route wrappers, error handling, consolidate goals endpoints, and retire orphan routes",
-      "type": "refactor",
-      "buildNumber": "26.11.1793567062930"
+      "type": "refactor"
     },
     {
       "hash": "5c7dc26",
@@ -1790,22 +1806,6 @@
       "date": "2026-08-10T14:14:53-07:00",
       "message": "refactor: rename \"All Other\" to \"Everything Else\" and implement persistent category logic for unbudgeted expenses",
       "type": "refactor"
-    },
-    {
-      "hash": "898c427",
-      "fullHash": "898c427fa6bb9b6be58963f098a30ea281327328",
-      "author": "Alan Racek",
-      "date": "2026-08-10T13:46:47-07:00",
-      "message": "refactor: implement server-side budget filtering with effective date bounds and dynamic catch-all category breakout",
-      "type": "refactor"
-    },
-    {
-      "hash": "63ca121",
-      "fullHash": "63ca12165954e91eb463e83de25b5101474b4c0f",
-      "author": "Alan Racek",
-      "date": "2026-08-10T11:04:49-07:00",
-      "message": "feat: add effective_from and effective_to columns to budgets schema and migration self-healing logic",
-      "type": "feat"
     }
   ]
 }

@@ -13,3 +13,8 @@ function Skeleton({
 }
 
 export { Skeleton };
+export {
+  ChartSkeleton,
+  StatCardSkeleton,
+  TransactionListSkeleton,
+} from '@/components/ui/skeleton-loaders';

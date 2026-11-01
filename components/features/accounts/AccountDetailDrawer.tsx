@@ -8,9 +8,12 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { MortgageAttributesForm } from '@/components/features/mortgages/mortgage-attributes-form';
 import { isInvestmentAccount } from '@/lib/utils/account-scope';
-import { AlertTriangle, AlertCircle, RefreshCw, BellOff, Bell, Loader2 } from 'lucide-react';
+import { AlertTriangle, AlertCircle, RefreshCw, BellOff, Bell } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { isRealEstateType, parseAccountMetadata } from '@/lib/constants/account-types';
 import { Select } from '@/components/ui/select';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 type Account = {
   id: string;
@@ -161,24 +164,38 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+
   const handleFullResync = async () => {
     const connId = account?.plaidConnectionId;
     if (!connId) return;
-    if (!confirm('This will clear the sync cursor and trigger a full re-sync of up to 2 years of history. Are you sure?')) return;
-    setResyncingConnection(true);
-    try {
-      const res = await fetch(`/api/connections/${connId}/reset-cursor`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed to start full re-sync');
-      invalidateAllFinanceQueries(queryClient);
-      onSuccess();
-    } catch (err: any) {
-      alert(err.message || 'An error occurred');
-    } finally {
-      setResyncingConnection(false);
-    }
+    setConfirmDialog({
+      open: true,
+      title: 'Reset Bank Sync Cursor',
+      description: 'This will clear the sync cursor and trigger a full re-sync of up to 2 years of history. Are you sure?',
+      onConfirm: async () => {
+        setResyncingConnection(true);
+        try {
+          const res = await fetch(`/api/connections/${connId}/reset-cursor`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+          if (!res.ok) throw new Error('Failed to start full re-sync');
+          invalidateAllFinanceQueries(queryClient);
+          onSuccess();
+        } catch (err: any) {
+          alert(err.message || 'An error occurred');
+        } finally {
+          setResyncingConnection(false);
+        }
+      },
+    });
   };
 
   const handleSyncAccount = async () => {
@@ -201,33 +218,32 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
 
   const handleUnlink = useCallback(async () => {
     if (!account) return;
-    if (
-      !confirm(
-        `Are you sure you want to unlink "${account.name}" from bank sync? It will become a manual/orphaned account, allowing you to re-map it to another synced account or delete it permanently.`
-      )
-    ) {
-      return;
-    }
-    setUnlinking(true);
-    try {
-      const res = await fetch(`/api/accounts/${account.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ connectionId: null, plaidConnectionId: null }),
-      });
-      if (!res.ok) {
-        throw new Error('Failed to unlink account');
-      }
-      invalidateAllFinanceQueries(queryClient);
-      onSuccess();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setUnlinking(false);
-    }
+    setConfirmDialog({
+      open: true,
+      title: 'Unlink Account',
+      description: `Are you sure you want to unlink "${account.name}" from bank sync? It will become a manual/orphaned account, allowing you to re-map it to another synced account or delete it permanently.`,
+      onConfirm: async () => {
+        setUnlinking(true);
+        try {
+          const res = await fetch(`/api/accounts/${account.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ connectionId: null, plaidConnectionId: null }),
+          });
+          if (!res.ok) {
+            throw new Error('Failed to unlink account');
+          }
+          invalidateAllFinanceQueries(queryClient);
+          onSuccess();
+        } catch (err) {
+          alert(err instanceof Error ? err.message : 'An error occurred');
+        } finally {
+          setUnlinking(false);
+        }
+      },
+    });
   }, [account, onSuccess, queryClient]);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (open && allTags.length === 0) {
@@ -240,17 +256,15 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
 
   const handleDeleteAccount = useCallback(async () => {
     if (!account) return;
-    if (
-      !confirm(
-        `Are you sure you want to permanently delete "${account.name}"? All transaction history and balance snapshots will be lost forever.`
-      )
-    ) {
-      return;
-    }
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/manual-accounts/${account.id}`, {
-        method: 'DELETE',
+    setConfirmDialog({
+      open: true,
+      title: 'Delete Account',
+      description: `Are you sure you want to permanently delete "${account.name}"? All transaction history and balance snapshots will be lost forever.`,
+      onConfirm: async () => {
+        setDeleting(true);
+        try {
+          const res = await fetch(`/api/manual-accounts/${account.id}`, {
+            method: 'DELETE',
         headers: {
           'X-Confirm-Delete': 'true',
         },
@@ -266,6 +280,8 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
     } finally {
       setDeleting(false);
     }
+      },
+    });
   }, [account, onSuccess, queryClient]);
   useEffect(() => {
     if (!account || !open) return;
@@ -535,7 +551,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                       className="px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
                     >
                       {syncingConnection ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <Spinner size="sm" />
                       ) : (
                         <RefreshCw className="w-3.5 h-3.5" />
                       )}
@@ -551,7 +567,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                         title="Clear sync cursor and re-pull full history"
                       >
                         {resyncingConnection ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Spinner size="sm" />
                         ) : (
                           <RefreshCw className="w-3.5 h-3.5" />
                         )}
@@ -570,7 +586,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
                     className="px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
                   >
                     {syncingAccount ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Spinner size="sm" />
                     ) : (
                       <RefreshCw className="w-3.5 h-3.5" />
                     )}
@@ -648,7 +664,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
 
                 {showTagDropdown && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => { setShowTagDropdown(false); setTagSearch(''); }} />
+                    <ClickOutsideBackdrop onClose={() => { setShowTagDropdown(false); setTagSearch(''); }} />
                     <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl max-h-56 flex flex-col">
                       <div className="relative p-2 border-b border-border">
                         <input
@@ -911,6 +927,16 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
           </button>
         </div>
       </SheetContent>
+
+      {confirmDialog && (
+        <ConfirmDeleteDialog
+          open={confirmDialog.open}
+          onOpenChange={(isOpen) => !isOpen && setConfirmDialog(null)}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          onConfirm={confirmDialog.onConfirm}
+        />
+      )}
     </Sheet>
   );
 }

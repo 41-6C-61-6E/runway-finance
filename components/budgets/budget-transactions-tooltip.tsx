@@ -4,7 +4,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Receipt, ArrowRight, Loader2 } from 'lucide-react';
+import { Receipt, ArrowRight } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
@@ -251,7 +252,7 @@ export function BudgetItemTransactionsIcon({
           <div className="p-2 space-y-1 max-h-60 overflow-y-auto">
             {isLoading ? (
               <div className="p-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                <Spinner size="sm" className="text-primary" />
                 <span>Loading top transactions...</span>
               </div>
             ) : isError ? (

@@ -52,9 +52,10 @@ import {
   AlertCircle,
   RotateCcw,
   Repeat,
-  Loader2,
 } from "lucide-react";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { LoadingSpinner, Spinner } from "@/components/ui/loading-spinner";
+import { SortableHeader } from "@/components/ui/sortable-header";
+import { ClickOutsideBackdrop } from "@/components/ui/modal-overlay";
 import AiCategorizeButton from "@/components/features/transactions/AiCategorizeButton";
 import { ListRow } from "@/components/ui/list-row";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -171,47 +172,6 @@ const COLUMN_MIN_WIDTHS: Record<string, number> = {
   tags: 50,
   amount: 70,
 };
-
-function SortableHeader({
-  column,
-  title,
-  dragHandleProps,
-}: {
-  column: any;
-  title: string;
-  dragHandleProps?: any;
-}) {
-  const canSort = column.getCanSort();
-  return (
-    <div className="flex items-center gap-1">
-      {dragHandleProps && (
-        <span
-          {...dragHandleProps}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
-        >
-          <GripVertical className="h-3 w-3" />
-        </span>
-      )}
-      {canSort ? (
-        <button
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="flex items-center gap-1 hover:text-foreground transition-colors"
-        >
-          {title}
-          {column.getIsSorted() === "asc" ? (
-            <ChevronUp className="ml-0.5 h-3 w-3" />
-          ) : column.getIsSorted() === "desc" ? (
-            <ChevronDown className="ml-0.5 h-3 w-3" />
-          ) : (
-            <ChevronsUpDown className="ml-0.5 h-3 w-3 opacity-50" />
-          )}
-        </button>
-      ) : (
-        <span>{title}</span>
-      )}
-    </div>
-  );
-}
 
 import { useUserSettings } from "@/components/user-settings-provider";
 import { Select } from '@/components/ui/select';
@@ -1334,8 +1294,7 @@ export default function TransactionTable({
               </button>
               {isOpen && dropdownPos && (
                 <>
-                  <div
-                    className="fixed inset-0 z-40"
+                  <ClickOutsideBackdrop
                     onClick={(e) => {
                       e.stopPropagation();
                       setOpenCategoryTx(null);
@@ -1721,7 +1680,7 @@ export default function TransactionTable({
                     title="View analysis progress"
                     className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition-colors shadow-sm cursor-pointer"
                   >
-                    <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+                    <Spinner size="sm" className="text-primary" />
                     <span>
                       {analysisTotal !== undefined && analysisTotal > 0
                         ? `Analyzing… ${analysisProcessed ?? 0}/${analysisTotal}`
@@ -2064,8 +2023,7 @@ export default function TransactionTable({
                             </button>
                           {isCatOpen && dropdownPos && (
                             <>
-                              <div
-                                className="fixed inset-0 z-40"
+                              <ClickOutsideBackdrop
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenCategoryTx(null);

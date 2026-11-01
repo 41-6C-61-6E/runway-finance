@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, Check, AlertTriangle, Trash2, Loader2, ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
+import { Upload, FileText, Check, AlertTriangle, Trash2, ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { parseCsv, parseDateField } from '@/lib/utils/csv-parser';
 import { Select } from '@/components/ui/select';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 type ImportType = 'transactions' | 'account_snapshots';
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -591,7 +593,7 @@ export default function ImportTab() {
             </label>
             {uploading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Spinner size="sm" />
                 Uploading and parsing...
               </div>
             )}
@@ -948,9 +950,8 @@ export default function ImportTab() {
 
                     {activeCategoryDropdown === csvName && (
                       <>
-                        <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => {
+                        <ClickOutsideBackdrop
+                          onClose={() => {
                             setActiveCategoryDropdown(null);
                             setCategorySearch('');
                           }}
@@ -1232,7 +1233,7 @@ export default function ImportTab() {
                     onClick={handleExecuteImport}
                   >
                     {importing ? (
-                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Importing...</>
+                      <><Spinner size="sm" className="mr-1" /> Importing...</>
                     ) : (
                       <><Download className="w-4 h-4 mr-1" /> Import {getImportableRecordsCount()} Records</>
                     )}
@@ -1250,7 +1251,7 @@ export default function ImportTab() {
 
         {logsLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+            <Spinner size="sm" /> Loading...
           </div>
         ) : logs.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">No imports yet.</p>

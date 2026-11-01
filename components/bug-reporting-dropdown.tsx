@@ -8,7 +8,6 @@ import {
   Bug, 
   Sparkles, 
   Trash2, 
-  Loader2, 
   X, 
   MessageSquare, 
   Check, 
@@ -17,10 +16,12 @@ import {
   Copy,
   Pencil
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/loading-spinner';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { glassIconButton, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
 import { Select } from '@/components/ui/select';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 interface Issue {
   id: string;
@@ -502,7 +503,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
               >
                 {createMutation.isPending ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Spinner size="sm" />
                     Submitting...
                   </>
                 ) : (
@@ -534,7 +535,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
               )}
               {listLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 space-y-2 text-muted-foreground">
-                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <Spinner size="md" />
                   <span className="text-xs">Loading issues...</span>
                 </div>
               ) : issuesList.length === 0 ? (
@@ -651,7 +652,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                                       className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded transition-all disabled:opacity-50 cursor-pointer shadow-xs"
                                     >
                                       {updateIssueMutation.isPending ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        <Spinner size="xs" />
                                       ) : (
                                         <Check className="w-3 h-3" />
                                       )}
@@ -744,7 +745,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                                       className="flex items-center gap-0.5 text-[10px] font-bold text-destructive hover:bg-destructive/10 border border-destructive/20 rounded px-1.5 py-0.5 transition-all cursor-pointer"
                                     >
                                       {deleteMutation.isPending ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        <Spinner size="xs" />
                                       ) : (
                                         <>
                                           <Check className="w-3 h-3" />
@@ -791,10 +792,10 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
         if (isMobile && mounted && typeof document !== 'undefined') {
           return createPortal(
             <>
-              <div
-                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden"
-                onClick={() => setOpen(false)}
-                aria-hidden="true"
+              <ClickOutsideBackdrop
+                transparent={false}
+                className="md:hidden"
+                onClose={() => setOpen(false)}
               />
               {dropdownElement}
             </>,
