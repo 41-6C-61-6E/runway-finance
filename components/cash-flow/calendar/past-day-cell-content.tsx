@@ -60,7 +60,7 @@ export function PastDayCellContent({
               e.stopPropagation();
               openInspector();
             }}
-            className="w-full px-1.5 py-0.5 rounded-[4px] bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium flex items-center justify-between gap-1 leading-tight cursor-pointer hover:bg-amber-500/25 transition-colors"
+            className="w-full px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium flex items-center justify-between gap-1 leading-tight cursor-pointer hover:bg-amber-500/25 transition-colors"
             title={`Overdue: ${bill.displayName} (${bill.amount})`}
           >
             <span className="truncate flex-1 min-w-0">{bill.displayName}</span>
@@ -89,7 +89,7 @@ export function PastDayCellContent({
                   openInspector();
                 }
               }}
-              className="w-full px-1.5 py-0.5 rounded-[4px] bg-muted/30 hover:bg-muted/60 text-foreground text-[11px] font-medium flex items-center justify-between gap-1.5 cursor-pointer transition-colors group/item leading-tight"
+              className="w-full px-1.5 py-0.5 rounded bg-muted/30 hover:bg-muted/60 text-foreground text-[11px] font-medium flex items-center justify-between gap-1.5 cursor-pointer transition-colors group/item leading-tight"
               title={`${item.name}: ${item.amount >= 0 ? '+' : ''}${formatCompactCurrency(item.amount)}`}
             >
               <div className="flex items-center gap-1.5 min-w-0 flex-1">

@@ -238,7 +238,7 @@ export function BudgetItemTransactionsIcon({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           onPointerDown={(e) => e.stopPropagation()}
-          className="hidden md:block w-72 sm:w-80 p-0 overflow-hidden bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl z-[100]"
+          className="hidden md:block w-72 sm:w-80 p-0 overflow-hidden bg-popover/95 backdrop-blur border border-border shadow-xl rounded-xl z-popover"
         >
           {/* Header */}
           <div className="px-3.5 py-2.5 bg-muted/40 border-b border-border">

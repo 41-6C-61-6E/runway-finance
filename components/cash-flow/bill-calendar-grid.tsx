@@ -272,7 +272,7 @@ export function BillCalendarGrid({
                                 setInspectorCell(cell);
                               }
                             }}
-                            className="w-full px-1.5 py-0.5 rounded-[4px] bg-emerald-600/85 hover:bg-emerald-600 text-white text-[11px] font-medium flex items-center justify-between gap-1 shadow-2xs cursor-pointer transition-colors leading-tight"
+                            className="w-full px-1.5 py-0.5 rounded bg-emerald-600/85 hover:bg-emerald-600 text-white text-[11px] font-medium flex items-center justify-between gap-1 shadow-2xs cursor-pointer transition-colors leading-tight"
                             title={`${bill.displayName}: +${formatNoCents(bill.amount)}`}
                           >
                             <span className="truncate flex-1 min-w-0">{bill.displayName}</span>
@@ -299,7 +299,7 @@ export function BillCalendarGrid({
                               setInspectorCell(cell);
                             }
                           }}
-                          className="w-full px-1.5 py-0.5 rounded-[4px] bg-muted/40 hover:bg-muted/70 text-foreground text-[11px] font-medium flex items-center justify-between gap-1.5 cursor-pointer transition-colors group/item leading-tight"
+                          className="w-full px-1.5 py-0.5 rounded bg-muted/40 hover:bg-muted/70 text-foreground text-[11px] font-medium flex items-center justify-between gap-1.5 cursor-pointer transition-colors group/item leading-tight"
                           title={`${bill.displayName}: -${formatNoCents(bill.amount)} (${formatFrequencyLabel(bill.frequency)})`}
                         >
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">

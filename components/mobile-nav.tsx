@@ -624,13 +624,10 @@ export function MobileNav() {
                       onPointerUp={handleItemPointerUp}
                       onPointerCancel={handleItemPointerCancel}
                       onClick={handleItemClick}
-                      className={`p-2.5 min-w-11 min-h-11 rounded-full flex items-center justify-center relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${active
+                      className={`p-2.5 min-w-11 min-h-11 rounded-full flex items-center justify-center relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none touch-none ${active
                         ? 'bg-primary/20 text-primary'
                         : 'bg-sidebar-foreground/8 text-sidebar-foreground/65'
                         }`}
-                      style={{
-                        touchAction: 'none'
-                      }}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
                     </div>
@@ -738,7 +735,7 @@ export function MobileNav() {
       {/* Floating Dragged Item Preview */}
       {draggedItem && (
         <div
-          className="fixed pointer-events-none z-[100] select-none scale-110 opacity-80 flex flex-col items-center gap-1.5 p-2 bg-sidebar border border-primary/30 rounded-2xl shadow-2xl"
+          className="fixed pointer-events-none z-overlay select-none scale-110 opacity-80 flex flex-col items-center gap-1.5 p-2 bg-sidebar border border-primary/30 rounded-2xl shadow-2xl"
           style={{
             left: dragCurrentPos.x - dragOffsetRef.current.x,
             top: dragCurrentPos.y - dragOffsetRef.current.y,

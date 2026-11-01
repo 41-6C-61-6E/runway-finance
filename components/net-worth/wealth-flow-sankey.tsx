@@ -120,7 +120,7 @@ function DetailModal({
 
   return (
     <ModalBackdrop
-      className="z-[100] bg-black/60 backdrop-blur-sm"
+      className="z-modal-backdrop bg-black/60 backdrop-blur-sm"
       onClose={onClose}
     >
       <div

@@ -352,7 +352,7 @@ export function CashVsCreditCard() {
                     Coverage Ratio
                   </span>
                 </div>
-                <div className="text-xl sm:text-2xl font-bold tabular-nums blur-number" style={{ color: 'var(--color-primary)' }}>
+                <div className="text-xl sm:text-2xl font-bold tabular-nums blur-number text-primary">
                   {current && current.coverageRatio > 0
                     ? (Number.isFinite(current.coverageRatio) ? formatRatio(current.coverageRatio) : '∞')
                     : '0x'}
@@ -411,7 +411,7 @@ export function CashVsCreditCard() {
                           iconSize={10}
                           wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
                           formatter={(value: string) => (
-                            <span style={{ color: 'var(--color-foreground)' }}>{value}</span>
+                            <span className="text-foreground">{value}</span>
                           )}
                         />
                         <Area

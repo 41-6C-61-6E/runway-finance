@@ -58,21 +58,13 @@ export function OverflowAware({ children, className }: OverflowAwareProps) {
   return (
     <div
       ref={containerRef}
-      className={cn("flex flex-nowrap items-center gap-1.5 min-w-0 overflow-hidden", className)}
-      style={{ position: 'relative' }}
+      className={cn("relative flex flex-nowrap items-center gap-1.5 min-w-0 overflow-hidden", className)}
     >
       {items.slice(0, count)}
       <div
         ref={measureRef}
         aria-hidden="true"
-        className={cn("flex flex-nowrap items-center gap-1.5", className)}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          visibility: 'hidden',
-          pointerEvents: 'none',
-        }}
+        className={cn("absolute left-0 top-0 invisible pointer-events-none flex flex-nowrap items-center gap-1.5", className)}
       >
         {items}
       </div>

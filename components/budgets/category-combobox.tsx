@@ -164,7 +164,7 @@ export function CategoryCombobox({ categories, value, onSelect, disabled }: Cate
                   }`}
                 >
                   <Check className={`h-4 w-4 shrink-0 ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-[#64748b]" />
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-muted-foreground/60" />
                   <span className="truncate text-foreground">Everything Else (Catch-All Bucket)</span>
                 </div>
               );

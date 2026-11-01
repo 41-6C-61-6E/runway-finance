@@ -854,8 +854,7 @@ export default function AllAccountsDetailPanel({
 
             <div className="flex items-center gap-4 sm:gap-5">
               <div
-                className="relative flex-shrink-0"
-                style={{ width: 130, height: 130 }}
+                className="relative flex-shrink-0 size-[130px]"
               >
                 <ResponsiveContainer
                   width="100%"

@@ -173,7 +173,7 @@ function AppTabsInner({
             disabled={tab.disabled}
             onClick={() => !tab.disabled && onChange(tab.id)}
             className={cn(
-              'relative inline-flex items-center gap-2 font-medium border-b-2 transition-all duration-150 whitespace-nowrap focus:outline-none focus-visible:ring-1 focus-visible:ring-ring touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none -mb-[2px]',
+              'relative inline-flex items-center gap-2 font-medium border-b-2 transition-all duration-150 whitespace-nowrap focus:outline-none focus-visible:ring-1 focus-visible:ring-ring touch-manipulation select-none disabled:opacity-50 disabled:pointer-events-none -mb-0.5',
               fullWidth ? 'flex-1 justify-center text-center' : 'shrink-0',
               size === 'sm' ? 'text-xs pb-2 pt-0.5 min-h-[34px]' : 'text-sm pb-2.5 pt-1 min-h-[38px]',
               isActive

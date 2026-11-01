@@ -192,6 +192,16 @@ html.text-size-lg {
 
   --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
   --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+
+  --z-sticky: 30;
+  --z-dropdown: 40;
+  --z-modal-backdrop: 45;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-overlay: 100;
+  --z-tooltip: 1000;
+  --z-toast: 5000;
+  --z-max: 10000;
 }
 
 /* ── Permanent flat / cardless design ────────────────────────────────────────── */
@@ -238,7 +248,7 @@ html.text-size-lg {
 
 /* Keep dropdown/popover/menu/dialog elements solid */
 .bg-card.z-50,
-.bg-card.z-\[10000\],
+.bg-card.z-modal,
 [role="dialog"],
 [role="dialog"] .bg-card,
 [data-radix-portal] .bg-card {
@@ -247,7 +257,7 @@ html.text-size-lg {
 }
 
 .bg-card.z-50.border-border,
-.bg-card.z-\[10000\].border-border,
+.bg-card.z-modal.border-border,
 [role="dialog"].border-border,
 [role="dialog"] .border-border,
 [data-radix-portal] .border-border {
@@ -256,8 +266,8 @@ html.text-size-lg {
 
 .bg-card.z-50.rounded-xl,
 .bg-card.z-50.rounded-lg,
-.bg-card.z-\[10000\].rounded-xl,
-.bg-card.z-\[10000\].rounded-lg,
+.bg-card.z-modal.rounded-xl,
+.bg-card.z-modal.rounded-lg,
 [role="dialog"].rounded-xl,
 [role="dialog"].rounded-lg,
 [role="dialog"] .rounded-xl,
@@ -359,6 +369,29 @@ html.text-size-lg {
   font-size: 10px;
   line-height: 1.4;
 }
+
+@utility text-caption {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+@utility form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+  margin-bottom: 0.25rem;
+}
+
+@utility z-sticky { z-index: 30; }
+@utility z-dropdown { z-index: 40; }
+@utility z-modal-backdrop { z-index: 45; }
+@utility z-modal { z-index: 50; }
+@utility z-popover { z-index: 60; }
+@utility z-overlay { z-index: 100; }
+@utility z-tooltip { z-index: 1000; }
+@utility z-toast { z-index: 5000; }
+@utility z-max { z-index: 10000; }
 
 /* Ensure Recharts tooltips disappear when the mouse leaves the chart area */
 /* Only apply on devices with hover (mouse/trackpad), not touch */
@@ -826,9 +859,18 @@ button,
   -webkit-backdrop-filter: none !important;
 }
 
-.reduce-transparency-active [class*="bg-background/"],
-.reduce-transparency-active [class*="bg-card/"],
-.reduce-transparency-active [class*="bg-popover/"],
+.reduce-transparency-active [class*="bg-background/"] {
+  background-color: var(--background) !important;
+}
+
+.reduce-transparency-active [class*="bg-card/"] {
+  background-color: var(--card) !important;
+}
+
+.reduce-transparency-active [class*="bg-popover/"] {
+  background-color: var(--popover) !important;
+}
+
 .reduce-transparency-active [class*="bg-muted/"] {
-  background-opacity: 1 !important;
+  background-color: var(--muted) !important;
 }

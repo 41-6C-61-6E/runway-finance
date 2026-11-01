@@ -165,7 +165,7 @@ export function PullToRefresh({ children }: PullToRefreshProps) {
     <div ref={containerRef} className="w-full flex flex-col flex-1 relative">
       {/* Floating glassmorphic pull-to-refresh indicator */}
       <div
-        className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none flex items-center justify-center transition-all ${status === 'pulling' ? 'duration-0' : 'duration-300 ease-out'
+        className={`fixed top-4 left-1/2 -translate-x-1/2 z-toast pointer-events-none flex items-center justify-center transition-all ${status === 'pulling' ? 'duration-0' : 'duration-300 ease-out'
         } ${showIndicator ? 'visible' : 'invisible'}`}
       style={{
         transform: `translate(-50%, ${pullDistance - 55}px) scale(${Math.min(
