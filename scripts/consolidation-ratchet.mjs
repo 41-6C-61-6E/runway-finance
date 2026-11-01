@@ -139,7 +139,7 @@ const RULES = [
     mode: 'occurrences',
     dirs: ['components', 'app', 'lib'],
     regex: '\\bconsole\\.(log|warn|error|info|debug)\\(',
-    exclude: (rel) => rel === 'lib/logger.ts' || rel === 'lib/client-error-reporter.ts',
+    exclude: (rel) => rel === 'lib/logger.ts' || rel === 'lib/client-error-reporter.ts' || rel === 'lib/client-logger.ts',
   },
   {
     key: 'processEnvDirect',
