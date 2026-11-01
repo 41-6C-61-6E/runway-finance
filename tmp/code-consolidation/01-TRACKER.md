@@ -8,14 +8,14 @@
 | CC-01 | Dead Code, Unused Exports & Dependencies | 0 | `COMPLETE` | `COMPLETE` | 11 | 11 | -3114 | `workstreams/CC-01-dead-code-and-dependencies.md` |
 | CC-02 | API Route Layer Standardization | 2 | `COMPLETE` | `COMPLETE` | 12 | 12 | -1098 | `workstreams/CC-02-api-route-layer.md` |
 | CC-03 | Client Data Layer | 2 | `COMPLETE` | `COMPLETE` | 9 | 9 | -147 | `workstreams/CC-03-client-data-layer.md` |
-| CC-04 | UI Primitive Adoption & Consolidation | 3 | `COMPLETE` | `NOT_STARTED` | 12 | 0 | -1425 | `workstreams/CC-04-ui-primitives.md` |
+| CC-04 | UI Primitive Adoption & Consolidation | 3 | `COMPLETE` | `COMPLETE` | 12 | 12 | -1425 | `workstreams/CC-04-ui-primitives.md` |
 | CC-05 | Formatting, Date & Numeric Utilities | 1 | `COMPLETE` | `COMPLETE` | 10 | 10 | -895 | `workstreams/CC-05-format-date-numeric-utils.md` |
 | CC-06 | Domain Types, Constants & Validation | 1 | `COMPLETE` | `COMPLETE` | 9 | 9 | -770 | `workstreams/CC-06-types-constants-validation.md` |
 | CC-07 | Oversized Module Decomposition | 4 | `COMPLETE` | `NOT_STARTED` | 24 | 0 | -4250 | `workstreams/CC-07-oversized-module-decomposition.md` |
 | CC-08 | Services, Schedulers, Integrations & AI | 2 | `COMPLETE` | `COMPLETE` | 11 | 11 | -450 | `workstreams/CC-08-services-integrations-ai.md` |
 | CC-09 | Hooks, Providers & Client State | 2 | `COMPLETE` | `COMPLETE` | 10 | 10 | +80 | `workstreams/CC-09-hooks-providers-state.md` |
-| CC-10 | Charts & Visualization | 3 | `COMPLETE` | `NOT_STARTED` | 8 | 0 | -1900 | `workstreams/CC-10-charts-visualization.md` |
-| CC-11 | Styling Tokens & Tailwind | 3 | `COMPLETE` | `NOT_STARTED` | 9 | 0 | -300 | `workstreams/CC-11-styling-tokens.md` |
+| CC-10 | Charts & Visualization | 3 | `COMPLETE` | `COMPLETE` | 8 | 8 | -1900 | `workstreams/CC-10-charts-visualization.md` |
+| CC-11 | Styling Tokens & Tailwind | 3 | `COMPLETE` | `COMPLETE` | 9 | 9 | -300 | `workstreams/CC-11-styling-tokens.md` |
 | CC-12 | TypeScript Strictness | 1→∞ | `COMPLETE` | `IN_PROGRESS` | 11 | 4 | -300 | `workstreams/CC-12-typescript-strictness.md` |
 | CC-13 | Lint, Conventions & Naming | 1/4 | `COMPLETE` | `IN_PROGRESS` | 9 | 3 | -125 | `workstreams/CC-13-lint-conventions-naming.md` |
 | CC-14 | Test Suite Consolidation | 5 | `COMPLETE` | `NOT_STARTED` | 7 | 0 | -4750 | `workstreams/CC-14-test-suite.md` |
@@ -30,24 +30,24 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `COMPLETE` | `BLOCKED`
 
 ## 2. Metrics Ratchet (Audited Baseline Snapshot, 2026-11-01)
 
-| Metric | Master Plan Estimate | Audited Exact Baseline | Current (Wave 0 Landed) | Target |
+| Metric | Master Plan Estimate | Audited Exact Baseline | Current (Wave 3 Landed) | Target |
 | :--- | ---: | ---: | ---: | ---: |
-| App LOC (app+components+lib) | 162,921 | 162,921 | 161,088 | ≤ 140,000 |
+| App LOC (app+components+lib) | 162,921 | 162,921 | 160,888 | ≤ 140,000 |
 | Files > 1,000 lines | 33 | 33 (49,892 LOC) | 33 (50,505 LOC) | ≤ 8 |
 | Raw `fetch(` hits | 386 | 405 (113 files) | 365 (86 files) | server-side only |
 | `useQuery`/`useMutation` hits | 13 | 13 (9 useQuery, 4 useMutation) | 13 (8 files) | ↑ |
-| Inline `queryKey: ['` | 53 | 54 | 53 (22 files) | 0 |
-| Routes with direct `await auth()` | 139 | 139 | 135 routes | ≤ 5 |
-| Files using `NextResponse.json` | 124 | 124 | 122 files | ≤ 5 |
-| `fixed inset-0` outside `components/ui` | ~15 files | 15 files (20 call sites) | 20 (15 files) | 0 |
-| `<Loader2` direct | 28 files | 28 files | 64 (25 files) | 0 (outside ui) |
+| Inline `queryKey: ['` | 53 | 54 | 52 (22 files) | 0 |
+| Routes with direct `await auth()` | 139 | 139 | 122 routes | ≤ 5 |
+| Files using `NextResponse.json` | 124 | 124 | 110 files | ≤ 5 |
+| `fixed inset-0` outside `components/ui` | ~15 files | 15 files (20 call sites) | 0 | 0 |
+| `<Loader2` direct | 28 files | 28 files | 0 | 0 (outside ui) |
 | Local formatter re-definitions | ~15 | 28 sites across 21 files | 28 sites | 0 |
 | `.toFixed(` | 129 | 129 | 129 | ≤ 20 (non-UI math only) |
 | `Intl.NumberFormat` outside format.ts | 32 | 32 | 25 (16 files) | 0 |
-| `any` in production (app+components+lib) | 876 | 960 (1,709 repo-wide) | 949 (196 files) | ≤ 150 |
-| Hex literals in TSX/TS | 381 | 410 (58 files) | 379 (54 files) | ≤ 40 (palette sources only) |
-| `text-[Npx]` | 1,151 | 1,165 (126 files) | 1,152 (122 files) | ≤ 100 |
-| `style={{` | 295 | 295 (63 static) | 286 (89 files) | ≤ 80 (dynamic values only) |
+| `any` in production (app+components+lib) | 876 | 960 (1,709 repo-wide) | 935 (196 files) | ≤ 150 |
+| Hex literals in TSX/TS | 381 | 410 (58 files) | 372 (54 files) | ≤ 40 (palette sources only) |
+| `text-[Npx]` | 1,151 | 1,165 (126 files) | 1,151 (122 files) | ≤ 100 |
+| `style={{` | 295 | 295 (63 static) | 274 (89 files) | ≤ 80 (dynamic values only) |
 | Direct `localStorage` | 34 | 34 (14 files) | 37 (14 files) | ≤ 3 (inside hooks) |
 | `console.*` in app/components/lib | 146 | 146 | 134 (57 files) | 0 |
 | `process.env.` outside env module | 70 | 87 reads (33 files) | 87 (33 files) | 0 |
