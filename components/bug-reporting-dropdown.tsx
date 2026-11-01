@@ -367,7 +367,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
       </Tooltip>
 
       {open && (
-        <div className="fixed inset-x-4 top-16 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-1 w-auto sm:w-96 p-4 bg-card border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right">
+        <div className="fixed inset-x-2.5 sm:inset-x-auto top-[calc(env(safe-area-inset-top,0px)+3.5rem)] sm:top-full sm:mt-1 sm:right-0 w-auto sm:w-[420px] max-w-lg mx-auto p-4 bg-card border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 ease-out origin-top-right max-h-[calc(100dvh-5.5rem)] sm:max-h-[640px] flex flex-col overflow-hidden">
           {/* Header Tab Buttons */}
           <div className="flex p-0.5 rounded-lg bg-muted mb-4">
             <button
@@ -392,7 +392,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
 
           {/* Tab Content: Report Form */}
           {tab === 'report' ? (
-            <form onSubmit={handleSubmit} className="space-y-3.5">
+            <form onSubmit={handleSubmit} className="space-y-3.5 flex-1 overflow-y-auto pr-1 no-scrollbar">
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -462,12 +462,12 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
             </form>
           ) : (
             /* Tab Content: Track List */
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 flex flex-col min-h-0">
               {openIssues.length > 0 && (
                 <button
                   type="button"
                   onClick={handleCopyOpenIssues}
-                  className="w-full py-1.5 px-3 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 mb-1"
+                  className="w-full py-1.5 px-3 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 mb-1 shrink-0"
                 >
                   {copied ? (
                     <>
@@ -493,7 +493,7 @@ export default function BugReportingDropdown({ onOpenChange }: BugReportingDropd
                   <span className="text-xs">No bugs or features reported yet.</span>
                 </div>
               ) : (
-                <div className="max-h-[320px] overflow-y-auto pr-1 space-y-3 no-scrollbar flex flex-col justify-between">
+                <div className="max-h-[calc(100dvh-13rem)] sm:max-h-[460px] overflow-y-auto pr-1 space-y-3 no-scrollbar flex flex-col justify-between flex-1">
                   <div>
                     {displayedIssues.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 space-y-2 border border-dashed border-border rounded-lg text-muted-foreground bg-muted/10">

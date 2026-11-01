@@ -1669,10 +1669,14 @@ export async function healSyncAlerts(userId: string, targetId: string): Promise<
 /**
  * Sends a month-boundary cash flow summary when the user has
  * `notifyMonthlySummary` enabled (R12a). The summary for month M is sent on the
- * first sync after month M closes, and the stable key
+ * first day of month M+1 in the user's configured timezone, and the stable key
  * `monthly_summary:${yearMonth}` guarantees it fires exactly once per month.
  */
-export async function checkMonthlySummaryAndNotify(userId: string, dek: Uint8Array): Promise<void> {
+export async function checkMonthlySummaryAndNotify(
+  userId: string,
+  dek: Uint8Array,
+  options?: { userTz?: string; force?: boolean; asOfDate?: Date }
+): Promise<void> {
   try {
     const db = getDb();
     const [settings] = await db
@@ -1680,6 +1684,7 @@ export async function checkMonthlySummaryAndNotify(userId: string, dek: Uint8Arr
         notifyMonthlySummary: userSettings.notifyMonthlySummary,
         locale: userSettings.locale,
         currency: userSettings.currency,
+        timezone: userSettings.timezone,
       })
       .from(userSettings)
       .where(eq(userSettings.userId, userId))
@@ -1687,11 +1692,46 @@ export async function checkMonthlySummaryAndNotify(userId: string, dek: Uint8Arr
 
     if (!settings || !settings.notifyMonthlySummary) return;
 
-    // The most recent *closed* month (we summarize the previous month, not the
-    // in-progress one).
-    const now = new Date();
-    const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-    const yearMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
+    // Use user's configured timezone (default America/New_York)
+    const userTz = options?.userTz || settings.timezone || 'America/New_York';
+    const now = options?.asOfDate || new Date();
+
+    // Determine current date in user's timezone (YYYY-MM-DD)
+    const dateInTz = now.toLocaleDateString('en-CA', { timeZone: userTz });
+    const [curYear, curMonth, curDay] = dateInTz.split('-').map(Number);
+
+    // Monthly summary must ONLY trigger on the first day of the next month (day 1)
+    // in the user's local timezone, guaranteeing that the previous month has completely
+    // closed and all end-of-month transactions are accounted for.
+    if (!options?.force && curDay !== 1) {
+      logger.debug('[notifications-service] Skipping monthly summary: not the 1st day of month in user timezone', {
+        userId,
+        curDay,
+        userTz,
+        dateInTz,
+      });
+      return;
+    }
+
+    // The most recent closed month is the month immediately preceding curMonth
+    // (using UTC date math to avoid DST/local offset quirks).
+    const closedDate = new Date(Date.UTC(curYear, curMonth - 2, 1));
+    const yearMonth = `${closedDate.getUTCFullYear()}-${String(closedDate.getUTCMonth() + 1).padStart(2, '0')}`;
+
+    // If an earlier premature notification was sent before day 1 in the user's timezone,
+    // clear the dedup entry so the real, final monthly summary can fire now.
+    try {
+      const day1StartUtc = new Date(Date.UTC(curYear, curMonth - 1, 1));
+      await db.delete(sentNotifications).where(
+        and(
+          eq(sentNotifications.userId, userId),
+          eq(sentNotifications.key, `monthly_summary:${yearMonth}`),
+          sql`${sentNotifications.sentAt} < ${day1StartUtc}`
+        )
+      );
+    } catch (_) {
+      // Non-fatal cleanup
+    }
 
     const [cf] = await db
       .select()
@@ -1720,7 +1760,7 @@ export async function checkMonthlySummaryAndNotify(userId: string, dek: Uint8Arr
         maximumFractionDigits: 0,
       }).format(n);
 
-    const monthLabel = new Date(Date.UTC(prev.getUTCFullYear(), prev.getUTCMonth(), 1)).toLocaleDateString(
+    const monthLabel = closedDate.toLocaleDateString(
       settings.locale || 'en-US',
       { month: 'long', year: 'numeric', timeZone: 'UTC' }
     );

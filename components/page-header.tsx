@@ -30,7 +30,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
 
   const isAnyDropdownOpen = isBugOpen || isNotificationsOpen || isUserOpen;
   const isAnyDropdownOpenRef = useRef(false);
-  
+
   useEffect(() => {
     isAnyDropdownOpenRef.current = isAnyDropdownOpen;
     if (isAnyDropdownOpen) {
@@ -41,7 +41,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      
+
       // Prevent running logic if user scrolls past top boundary (iOS elastic bounce)
       if (currentScrollY < 0) {
         setIsVisible(true);
@@ -57,7 +57,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         // Show if we scroll up
         setIsVisible(true);
       }
-      
+
       lastScrollY.current = currentScrollY;
     };
 
@@ -68,13 +68,12 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
   return (
     <>
       {/* Mobile-only fixed floating actions pill */}
-      <div 
+      <div
         style={{
-          top: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 10px))',
+          top: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 8px))',
         } as React.CSSProperties}
-        className={`fixed right-4 z-40 md:hidden flex items-center gap-1.5 py-1 px-2.5 rounded-full ${glassBar} transition-all duration-300 ease-out ${
-          isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
-        }`}
+        className={`fixed right-4 z-40 md:hidden flex items-center gap-1.5 py-1 px-2.5 rounded-full ${glassBar} transition-all duration-300 ease-out ${isVisible ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-16 opacity-0 pointer-events-none'
+          }`}
       >
         {privacyMode && (
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 mr-0.5" title={`Privacy mode active — ${shortcutLabel} to toggle`}>
@@ -94,13 +93,13 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       </div>
 
       {/* Mobile-only scrolling title & children container */}
-      <div 
+      <div
         style={{
-          paddingTop: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 10px))',
+          paddingTop: 'var(--mobile-header-top, calc(env(safe-area-inset-top, 0px) + 8px))',
         } as React.CSSProperties}
         className="flex flex-col gap-3 px-4 pb-1.5 md:hidden w-full"
       >
-        <div className="flex items-center gap-3 min-h-[42px] pr-[155px]">
+        <div className="flex items-center gap-3 min-h-[42px] pr-[185px]">
           <Icon className="w-6 h-6 text-primary flex-shrink-0" />
           <h1 className="text-xl font-normal tracking-tight text-foreground truncate">{title}</h1>
           {leftExtra}
@@ -113,7 +112,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
       </div>
 
       {/* Desktop-only header bar */}
-      <div 
+      <div
         className="hidden md:flex relative sticky top-0 z-40 pl-10 pr-6 h-16 border-b border-border/30 bg-background/45 backdrop-blur-xl flex-row items-center justify-between transition-all duration-200 w-full"
       >
         <div className="flex items-center gap-3">
@@ -121,7 +120,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
           <h1 className="text-xl font-normal tracking-tight text-foreground truncate">{title}</h1>
           {leftExtra}
         </div>
-        
+
         {children && (
           <div className="flex items-center gap-1.5 overflow-visible justify-end">
             {children}

@@ -51,6 +51,7 @@ interface AllAccountsDetailPanelProps {
   hierarchyTimeframe: TimeRange;
   onHierarchyTimeframeChange?: (tf: TimeRange) => void;
   onClose: () => void;
+  isInline?: boolean;
 }
 
 interface AllAccountsTooltipProps
@@ -77,8 +78,8 @@ function AllAccountsTooltip({
 
   const headerDate = label
     ? formatChartXAxisDate(String(label), timeframe, {
-        isMonthly: timeframe !== '1m',
-      })
+      isMonthly: timeframe !== '1m',
+    })
     : '—';
 
   if (mode === 'net-worth') {
@@ -203,6 +204,7 @@ export default function AllAccountsDetailPanel({
   hierarchyTimeframe,
   onHierarchyTimeframeChange,
   onClose,
+  isInline = false,
 }: AllAccountsDetailPanelProps) {
   const [chartMode, setChartMode] = usePersistentState<'net-worth' | 'by-group'>(
     'finance:all-accounts:chartMode',
@@ -508,8 +510,8 @@ export default function AllAccountsDetailPanel({
     allocationMode === 'debts' && debtAllocation.length > 0
       ? debtAllocation
       : assetAllocation.length > 0
-      ? assetAllocation
-      : debtAllocation;
+        ? assetAllocation
+        : debtAllocation;
 
   const isShowingAssets = activeAllocation === assetAllocation;
   const currentAllocationTotal = isShowingAssets ? assetAllocationTotal : debtAllocationTotal;
@@ -517,56 +519,63 @@ export default function AllAccountsDetailPanel({
   const xAxisTicks = getChartXTicksUnified(chartData, hierarchyTimeframe, false, 'date');
 
   return (
-    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
-      {/* Header */}
-      <div className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                <Layers className="w-3.5 h-3.5" />
+    <div
+      className={
+        isInline
+          ? 'w-full text-sidebar-foreground'
+          : 'bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground'
+      }
+    >
+      {/* Header (desktop/standalone view only; inline view displays row above) */}
+      {!isInline && (
+        <div className="p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                  <Layers className="w-3.5 h-3.5" />
+                </div>
+                <h2 className="text-sm sm:text-base font-bold text-sidebar-foreground truncate">
+                  All Accounts
+                </h2>
+                <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 flex-shrink-0">
+                  {accounts.length} account{accounts.length !== 1 ? 's' : ''}
+                </span>
               </div>
-              <h2 className="text-sm sm:text-base font-bold text-sidebar-foreground truncate">
-                All Accounts
-              </h2>
-              <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 flex-shrink-0">
-                {accounts.length} account{accounts.length !== 1 ? 's' : ''}
-              </span>
             </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close all accounts overview"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close all accounts overview"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Total Net Worth + delta */}
-        <div className="flex items-baseline gap-2.5 mt-2.5 flex-wrap">
-          <p className="text-xl sm:text-2xl font-bold font-mono text-sidebar-foreground blur-number">
-            {formatCurrency(trendStats?.current ?? currentTotals.netWorth)}
-          </p>
-          {trendStats && trendStats.change !== 0 && (
-            <p
-              className={`text-xs sm:text-sm font-medium ${
-                trendStats.isPositive ? 'text-chart-1' : 'text-destructive'
-              }`}
-            >
-              {trendStats.change >= 0 ? (
-                <ArrowUpRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
-              ) : (
-                <ArrowDownRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
-              )}
-              {formatCurrency(Math.abs(trendStats.change))} (
-              {formatPlainPercent(Math.abs(trendStats.percentChange))})
+          {/* Total Net Worth + delta */}
+          <div className="flex items-baseline gap-2.5 mt-2.5 flex-wrap">
+            <p className="text-xl sm:text-2xl font-bold font-mono text-sidebar-foreground blur-number">
+              {formatCurrency(trendStats?.current ?? currentTotals.netWorth)}
             </p>
-          )}
+            {trendStats && trendStats.change !== 0 && (
+              <p
+                className={`text-xs sm:text-sm font-medium ${trendStats.isPositive ? 'text-chart-1' : 'text-destructive'
+                  }`}
+              >
+                {trendStats.change >= 0 ? (
+                  <ArrowUpRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
+                ) : (
+                  <ArrowDownRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
+                )}
+                {formatCurrency(Math.abs(trendStats.change))} (
+                {formatPlainPercent(Math.abs(trendStats.percentChange))})
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <ChartTimeframeBar
         value={hierarchyTimeframe}
@@ -607,22 +616,20 @@ export default function AllAccountsDetailPanel({
               <button
                 type="button"
                 onClick={() => setChartMode('net-worth')}
-                className={`px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  chartMode === 'net-worth'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${chartMode === 'net-worth'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 Net Worth
               </button>
               <button
                 type="button"
                 onClick={() => setChartMode('by-group')}
-                className={`px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  chartMode === 'by-group'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`px-2.5 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${chartMode === 'by-group'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 By Group
               </button>
@@ -824,22 +831,20 @@ export default function AllAccountsDetailPanel({
                   <button
                     type="button"
                     onClick={() => setAllocationMode('assets')}
-                    className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                      isShowingAssets
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                    className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${isShowingAssets
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                      }`}
                   >
                     Assets ({assetAllocation.length})
                   </button>
                   <button
                     type="button"
                     onClick={() => setAllocationMode('debts')}
-                    className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                      !isShowingAssets
-                        ? 'bg-background text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                    className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all cursor-pointer ${!isShowingAssets
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                      }`}
                   >
                     Debts ({debtAllocation.length})
                   </button>

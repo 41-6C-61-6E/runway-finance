@@ -683,9 +683,20 @@ export default function AccountHierarchyTree({
                   {isAllAccountsSelected && (
                     <div
                       id="hierarchy-all-accounts-detail-inline"
-                      className="lg:hidden px-2 py-2.5 sm:px-3 sm:py-3"
+                      className="lg:hidden border-t border-border/10"
                     >
-                      {allAccountsDetailPanel}
+                      <AllAccountsDetailPanel
+                        accounts={allVisibleAccounts}
+                        historyData={historyData}
+                        hierarchyTimeframe={hierarchyTimeframe}
+                        onHierarchyTimeframeChange={setHierarchyTimeframe}
+                        onClose={() => {
+                          setSelectedGroup(null);
+                          setSelectedAccountId('');
+                          setExpandedAccounts({});
+                        }}
+                        isInline
+                      />
                     </div>
                   )}
                 </div>
@@ -759,9 +770,21 @@ export default function AccountHierarchyTree({
 
                         {/* Narrow viewports: selected group's combined chart opens inline under the heading,
                             identical to how an account's transaction card opens under its row */}
-                        {isGroupSelected && (
-                          <div id="hierarchy-group-detail-inline" className="lg:hidden px-2 py-2.5 sm:px-3 sm:py-3">
-                            {groupDetailPanel}
+                        {isGroupSelected && selectedGroupAccounts && (
+                          <div id="hierarchy-group-detail-inline" className="lg:hidden border-t border-border/10">
+                            <GroupDetailPanel
+                              group={selectedGroup}
+                              accounts={selectedGroupAccounts}
+                              historyData={historyData}
+                              hierarchyTimeframe={hierarchyTimeframe}
+                              onHierarchyTimeframeChange={setHierarchyTimeframe}
+                              onClose={() => {
+                                setSelectedGroup(null);
+                                setSelectedAccountId('');
+                                setExpandedAccounts({});
+                              }}
+                              isInline
+                            />
                           </div>
                         )}
                         </div>

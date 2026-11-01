@@ -379,6 +379,8 @@ async function runSelfHealingChecks(client) {
         { tag: '0074_add_allow_penalty_withdrawals', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'plan_settings' AND column_name = 'allow_penalty_withdrawals'` },
         { tag: '0075_naive_secret_warriors', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'weekly_net_worth_alert_day'` },
         { tag: '0088_rate_limits', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'rate_limits'` },
+        { tag: '0103_rename_ask_to_advice', check: `SELECT column_name FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'ai_advice_enabled'` },
+        { tag: '0104_add_equity_grants', check: `SELECT table_name FROM information_schema.tables WHERE table_name = 'equity_grants'` },
       ];
       for (const { tag, check } of migrationArtifacts) {
         if (appliedTags.has(tag)) continue;

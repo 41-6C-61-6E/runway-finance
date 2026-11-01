@@ -126,13 +126,15 @@ import { checkMonthlySummaryAndNotify } from '@/lib/services/notifications';
 
 // The summary covers the most recent *closed* month (computed exactly like
 // the service does), so expected values are derived from the real clock.
-function closedMonthSpec() {
-  const now = new Date();
-  const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  const yearMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
+function closedMonthSpec(targetDate?: Date) {
+  const now = targetDate || new Date();
+  const dateInTz = now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const [cy, cm] = dateInTz.split('-').map(Number);
+  const closedDate = new Date(Date.UTC(cy, cm - 2, 1));
+  const yearMonth = `${closedDate.getUTCFullYear()}-${String(closedDate.getUTCMonth() + 1).padStart(2, '0')}`;
   const [ey, em] = yearMonth.split('-').map(Number);
   const lastDay = String(new Date(Date.UTC(ey, em, 0)).getUTCDate());
-  const monthLabel = new Date(Date.UTC(ey, em - 1, 1)).toLocaleDateString('en-US', {
+  const monthLabel = closedDate.toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric',
     timeZone: 'UTC',
@@ -150,6 +152,7 @@ describe('Monthly Summary Report (R12a)', () => {
       notifyMonthlySummary: true,
       locale: 'en-US',
       currency: 'USD',
+      timezone: 'America/New_York',
     };
     mockCashFlowResponse = [
       {
@@ -175,7 +178,7 @@ describe('Monthly Summary Report (R12a)', () => {
   it('reports the same net worth change the Flows sankey computes for the closed month', async () => {
     const spec = closedMonthSpec();
 
-    await checkMonthlySummaryAndNotify('user_1', new Uint8Array());
+    await checkMonthlySummaryAndNotify('user_1', new Uint8Array(), { force: true });
 
     // The notification must be produced from the sankey's engine with the
     // closed calendar month as the exact window (matching the deep link).
@@ -208,7 +211,7 @@ describe('Monthly Summary Report (R12a)', () => {
     mockNetWorthChange = -90.12;
     mockCashFlowResponse = [];
 
-    await checkMonthlySummaryAndNotify('user_1', new Uint8Array());
+    await checkMonthlySummaryAndNotify('user_1', new Uint8Array(), { force: true });
 
     expect(mockSendNotification).toHaveBeenCalledTimes(1);
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
@@ -220,7 +223,7 @@ describe('Monthly Summary Report (R12a)', () => {
   it('does not notify when notifyMonthlySummary is disabled', async () => {
     mockSettingsResponse.notifyMonthlySummary = false;
 
-    await checkMonthlySummaryAndNotify('user_1', new Uint8Array());
+    await checkMonthlySummaryAndNotify('user_1', new Uint8Array(), { force: true });
 
     expect(mockSendNotification).not.toHaveBeenCalled();
     expect(mockCalculateWealthFlow).not.toHaveBeenCalled();
@@ -230,7 +233,7 @@ describe('Monthly Summary Report (R12a)', () => {
     mockCashFlowResponse = [];
     mockNetWorthChange = 0.004;
 
-    await checkMonthlySummaryAndNotify('user_1', new Uint8Array());
+    await checkMonthlySummaryAndNotify('user_1', new Uint8Array(), { force: true });
 
     expect(mockSendNotification).not.toHaveBeenCalled();
   });
@@ -241,8 +244,39 @@ describe('Monthly Summary Report (R12a)', () => {
     mockExecuteResult = { rows: [] };
     mockSentResponse = [{ id: 'existing' }];
 
-    await checkMonthlySummaryAndNotify('user_1', new Uint8Array());
+    await checkMonthlySummaryAndNotify('user_1', new Uint8Array(), { force: true });
 
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not notify on the 31st of the month before the month closes in the user timezone', async () => {
+    // Oct 31, 2026 at 10:00 PM EDT (UTC is Nov 1 02:00:00Z)
+    const asOfDate = new Date('2026-11-01T02:00:00Z');
+    await checkMonthlySummaryAndNotify('user_1', new Uint8Array(), {
+      userTz: 'America/New_York',
+      asOfDate,
+    });
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('notifies on the 1st day of the next month in the user timezone', async () => {
+    // Nov 1, 2026 at 9:00 AM EDT
+    const asOfDate = new Date('2026-11-01T13:00:00Z');
+    await checkMonthlySummaryAndNotify('user_1', new Uint8Array(), {
+      userTz: 'America/New_York',
+      asOfDate,
+    });
+    expect(mockSendNotification).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+    expect(payload.title).toBe('Monthly Summary: October 2026');
+  });
+
+  it('does not notify on later days of the month (e.g. day 15) without force', async () => {
+    const asOfDate = new Date('2026-11-15T13:00:00Z');
+    await checkMonthlySummaryAndNotify('user_1', new Uint8Array(), {
+      userTz: 'America/New_York',
+      asOfDate,
+    });
     expect(mockSendNotification).not.toHaveBeenCalled();
   });
 });

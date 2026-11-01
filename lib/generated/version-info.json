@@ -1,9 +1,10 @@
 {
-  "buildNumber": "26.10.1793497871992",
-  "buildTime": "2026-11-01T01:51:11.992Z",
-  "hash": "4b87aa0",
-  "fullHash": "4b87aa0160963cc2a468ae16e936c0e8318d3613",
+  "buildNumber": "26.11.1793503197920",
+  "buildTime": "2026-11-01T03:19:57.920Z",
+  "hash": "c80afd1",
+  "fullHash": "c80afd1a798c344b89f91064424393731e3f8397",
   "commits": [
+    "all: 168 improvements and bug fixes",
     "refactor: remove account sharing feature and related API endpoints",
     "feat: add equity grants support with tracking and vesting management",
     "refactor: improve category dropdown positioning and click-outside handling in AiSuggestionsModal",
@@ -202,24 +203,31 @@
     "feat: implement mobile sub-navigation context and update bottom navigation to support dynamic tab switching",
     "feat: implement mobile-responsive view switching and haptic feedback across main dashboard and planning tabs.",
     "feat: add descriptive tooltips to retirement indicators and implement withdrawal strategy logic in FIRE projections panel",
-    "refactor: migrate responsive layouts to container queries and integrate tooltips into the mode toggle component.",
-    "feat: add net worth milestone tracker and liquid asset breakdown to net worth side panel"
+    "refactor: migrate responsive layouts to container queries and integrate tooltips into the mode toggle component."
   ],
   "history": [
+    {
+      "hash": "c80afd1",
+      "fullHash": "c80afd1a798c344b89f91064424393731e3f8397",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T02:21:07Z",
+      "message": "all: 168 improvements and bug fixes",
+      "type": "all",
+      "buildNumber": "26.11.1793503197920"
+    },
     {
       "hash": "4b87aa0",
       "fullHash": "4b87aa0160963cc2a468ae16e936c0e8318d3613",
       "author": "41-6C-61-6E",
-      "date": "2026-10-31T20:15:14+00:00",
+      "date": "2026-10-31T20:15:14Z",
       "message": "refactor: remove account sharing feature and related API endpoints",
-      "type": "refactor",
-      "buildNumber": "26.10.1793497871992"
+      "type": "refactor"
     },
     {
       "hash": "6ef2eea",
       "fullHash": "6ef2eeafdf0a2b9abbbdb3a3e187c73a11310386",
       "author": "41-6C-61-6E",
-      "date": "2026-10-31T18:13:08+00:00",
+      "date": "2026-10-31T18:13:08Z",
       "message": "feat: add equity grants support with tracking and vesting management",
       "type": "feat"
     },
@@ -227,7 +235,7 @@
       "hash": "9b33006",
       "fullHash": "9b3300670de8f84bf4c4f4419768dd323c594312",
       "author": "41-6C-61-6E",
-      "date": "2026-10-25T23:33:42+00:00",
+      "date": "2026-10-25T23:33:42Z",
       "message": "refactor: improve category dropdown positioning and click-outside handling in AiSuggestionsModal",
       "type": "refactor"
     },
@@ -235,7 +243,7 @@
       "hash": "c8f0976",
       "fullHash": "c8f0976f39a21816b20d1d159f6987bb783af453",
       "author": "41-6C-61-6E",
-      "date": "2026-10-25T21:49:12+00:00",
+      "date": "2026-10-25T21:49:12Z",
       "message": "fix: prevent 500 errors on mismatched period keys and update tooltip dismiss behavior for interactive elements",
       "type": "fix"
     },
@@ -243,7 +251,7 @@
       "hash": "0c3eba4",
       "fullHash": "0c3eba4d4c99ca77537613ab9983f4b84bad0361",
       "author": "41-6C-61-6E",
-      "date": "2026-10-25T19:57:00+00:00",
+      "date": "2026-10-25T19:57:00Z",
       "message": "feat: add daily cash flow calendar features, API endpoints, and comprehensive unit tests",
       "type": "feat"
     },
@@ -1798,14 +1806,6 @@
       "date": "2026-08-07T19:39:09-07:00",
       "message": "refactor: migrate responsive layouts to container queries and integrate tooltips into the mode toggle component.",
       "type": "refactor"
-    },
-    {
-      "hash": "5f31a64",
-      "fullHash": "5f31a6460dfc17fba98272c5aadc871195a5d3ef",
-      "author": "Alan Racek",
-      "date": "2026-08-07T19:10:07-07:00",
-      "message": "feat: add net worth milestone tracker and liquid asset breakdown to net worth side panel",
-      "type": "feat"
     }
   ]
 }

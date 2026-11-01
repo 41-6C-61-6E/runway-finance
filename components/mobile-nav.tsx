@@ -3,11 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Landmark, 
-  Receipt, 
-  CreditCard, 
-  Menu, 
+import {
+  Landmark,
+  Receipt,
+  CreditCard,
+  Menu,
   X,
   ChartSpline,
   ChartBar,
@@ -106,7 +106,7 @@ export function MobileNav() {
   // Custom home items (minimized bottom nav items)
   const [homeItemIds, setHomeItemIds] = useState<string[]>(['net-worth', 'accounts', 'transactions', 'flows']);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   // Default pages the user explicitly removed in Edit Layout mode — the
   // auto-fill must not add them back to the home bar.
   const [excludedHomeIds, setExcludedHomeIds] = useState<string[]>([]);
@@ -134,7 +134,7 @@ export function MobileNav() {
       // is N + 1 buttons — solve (N+1) × 44 + N × gap ≤ contentWidth for N.
       const totalButtons = Math.floor(
         (contentWidth + HOME_BAR_ITEM_GAP_PX) /
-          (HOME_BUTTON_MIN_WIDTH_PX + HOME_BAR_ITEM_GAP_PX)
+        (HOME_BUTTON_MIN_WIDTH_PX + HOME_BAR_ITEM_GAP_PX)
       );
       // Floor of 3 page buttons keeps the bar from regressing below the old
       // fixed layout on narrow phones (3 + hamburger fits the 240px min bar).
@@ -294,12 +294,12 @@ export function MobileNav() {
     activeHomeNavItems.length >= homeNavSlotCount
       ? activeHomeNavItems
       : [
-          ...activeHomeNavItems,
-          ...defaultHomeFill
-            .filter((item) => !activeHomeNavItems.some((a) => a.id === item.id))
-            .filter((item) => !excludedHomeIds.includes(item.id))
-            .filter((item) => isItemVisible(item)),
-        ].slice(0, homeNavSlotCount);
+        ...activeHomeNavItems,
+        ...defaultHomeFill
+          .filter((item) => !activeHomeNavItems.some((a) => a.id === item.id))
+          .filter((item) => !excludedHomeIds.includes(item.id))
+          .filter((item) => isItemVisible(item)),
+      ].slice(0, homeNavSlotCount);
 
   // What "Edit Layout" manages: every saved home item, capped to what the
   // widest phone can show. Extra defaults used to auto-fill the bar at some
@@ -371,7 +371,7 @@ export function MobileNav() {
         if (navigator.vibrate) {
           try {
             haptic.heavy();
-          } catch (_) {}
+          } catch (_) { }
         }
         setIsEditing(true);
         setDraggedItem(item);
@@ -418,9 +418,9 @@ export function MobileNav() {
       if (hoveredSlotIndex !== null) {
         const currentHomeIds = homeNavEditItems.map(item => item.id);
         const oldIndex = currentHomeIds.indexOf(draggedItem.id);
-        
+
         let newIds = [...currentHomeIds];
-        
+
         if (oldIndex !== -1) {
           if (hoveredSlotIndex < newIds.length) {
             const temp = newIds[hoveredSlotIndex];
@@ -437,7 +437,7 @@ export function MobileNav() {
             newIds.push(draggedItem.id);
           }
         }
-        
+
         const uniqueIds = Array.from(new Set(newIds)).slice(0, homeNavSlotCount);
         updateHomeItems(uniqueIds);
         setExcludedHomeIds((prev) => prev.filter((id) => id !== draggedItem.id));
@@ -489,19 +489,18 @@ export function MobileNav() {
     return index % 2 === 0 ? 'animate-wiggle-even' : 'animate-wiggle-odd';
   };
 
-  const backdropClasses = `fixed inset-0 z-30 bg-black/50 backdrop-blur-xs transition-opacity duration-300 md:hidden ${
-    isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-  }`;
+  const backdropClasses = `fixed inset-0 z-30 bg-black/50 backdrop-blur-xs transition-opacity duration-300 md:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+    }`;
 
-  const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar/45 backdrop-blur-xl border-t border-sidebar-border/30 rounded-t-[2rem] px-6 py-4 transition-transform duration-300 ease-out shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:hidden ${
-    isOpen ? 'translate-y-0 pointer-events-auto' : 'translate-y-full pointer-events-none'
-  }`;
+  const drawerClasses = `fixed bottom-0 left-0 right-0 z-50 bg-sidebar/45 backdrop-blur-xl border-t border-sidebar-border/30 rounded-t-[2rem] px-6 py-4 transition-transform duration-300 ease-out shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:hidden ${isOpen ? 'translate-y-0 pointer-events-auto' : 'translate-y-full pointer-events-none'
+    }`;
 
   if (!mounted) return null;
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes wiggle {
           0% { transform: rotate(-1deg); }
           50% { transform: rotate(1deg); }
@@ -516,59 +515,59 @@ export function MobileNav() {
         }
       ` }} />
 
-      {/* Main Single-Row Floating Bottom Navigation Bar */}
+      {/* Fixed Bottom Navigation Bar */}
       <nav
-          className={`fixed bottom-2 left-4 right-4 z-40 flex items-center gap-2 md:hidden transition-all duration-300 max-w-lg mx-auto rounded-full py-1 px-3 overflow-hidden ${glassBar}`}
+        className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-sidebar/80 backdrop-blur-xl border-t border-sidebar-border/30 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
         style={{
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6px)',
         }}
-        >
-        {shownHomeNavItems.map((item) => {
-          const Icon = item.icon;
-          const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
+      >
+        <div className="max-w-lg mx-auto flex items-center justify-around gap-1 px-3 pt-1.5">
+          {shownHomeNavItems.map((item) => {
+            const Icon = item.icon;
+            const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={item.label}
-              onClick={() => setPendingHref(item.href)}
-                className={`flex flex-1 flex-col items-center justify-center p-2.5 min-w-11 min-h-11 group transition-all duration-300 ${glassItemBase} ${
-                  active ? glassItemActive : glassItemInactive
-                }`}
-            >
-              <Icon className="h-5 w-5 flex-shrink-0" />
-            </Link>
-          );
-        })}
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-label={item.label}
+                onClick={() => setPendingHref(item.href)}
+                className={`flex flex-1 flex-col items-center justify-center p-2 min-w-11 min-h-11 group transition-colors duration-200 ${glassItemBase} ${active ? glassItemActive : glassItemInactive
+                  }`}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+              </Link>
+            );
+          })}
 
-        {/* Hamburger Menu Toggle Button */}
-        <button
-          type="button"
-          aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
-          onClick={() => setIsOpen(!isOpen)}
-            className={`flex flex-1 flex-col items-center justify-center p-2.5 min-w-11 min-h-11 group transition-all duration-300 ${glassItemBase} ${
-              isOpen ? glassItemActive : glassItemInactive
-            }`}
-        >
-          {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
-        </button>
+          {/* Hamburger Menu Toggle Button */}
+          <button
+            type="button"
+            aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
+            onClick={() => setIsOpen(!isOpen)}
+            className={`flex flex-1 flex-col items-center justify-center p-2 min-w-11 min-h-11 group transition-colors duration-200 ${glassItemBase} ${isOpen ? glassItemActive : glassItemInactive
+              }`}
+          >
+            {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
+          </button>
+        </div>
       </nav>
 
       {/* Slide-up Menu Drawer Backdrop */}
       <div className={backdropClasses} onClick={() => setIsOpen(false)} />
 
       {/* Slide-up Menu Drawer */}
-      <div 
-        className={`${drawerClasses} max-h-[85vh] overflow-y-auto overscroll-contain`} 
+      <div
+        className={`${drawerClasses} max-h-[85vh] overflow-y-auto overscroll-contain`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        style={{ 
+        style={{
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)',
-          transform: isOpen 
-            ? `translateY(${dragOffset}px)` 
+          transform: isOpen
+            ? `translateY(${dragOffset}px)`
             : 'translateY(100%)',
           transition: isDragging ? 'none' : 'transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)',
           touchAction: isDragging ? 'none' : 'pan-y'
@@ -586,7 +585,7 @@ export function MobileNav() {
           >
             {isEditing ? 'Done' : 'Edit Layout'}
           </button>
-          <button 
+          <button
             onClick={() => setIsOpen(false)}
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -613,11 +612,10 @@ export function MobileNav() {
                   <div
                     key={`home-slot-${index}`}
                     data-slot-index={index}
-                    className={`relative flex flex-col items-center gap-1.5 p-2 min-w-11 rounded-xl transition-all duration-200 ${
-                      isHoveredSlot
-                        ? 'bg-primary/10 border border-primary/30 scale-105 shadow-[0_0_8px_rgba(var(--primary-rgb),0.15)]'
-                        : 'border border-transparent'
-                    } ${getWiggleClass(index)}`}
+                    className={`relative flex flex-col items-center gap-1.5 p-2 min-w-11 rounded-xl transition-all duration-200 ${isHoveredSlot
+                      ? 'bg-primary/10 border border-primary/30 scale-105 shadow-[0_0_8px_rgba(var(--primary-rgb),0.15)]'
+                      : 'border border-transparent'
+                      } ${getWiggleClass(index)}`}
                     style={{
                       opacity: isCurrentlyDragged ? 0.3 : 1,
                     }}
@@ -628,18 +626,17 @@ export function MobileNav() {
                       onPointerUp={handleItemPointerUp}
                       onPointerCancel={handleItemPointerCancel}
                       onClick={handleItemClick}
-                      className={`p-2.5 min-w-11 min-h-11 rounded-full flex items-center justify-center relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
-                        active 
-                          ? 'bg-primary/20 text-primary' 
-                          : 'bg-sidebar-foreground/8 text-sidebar-foreground/65'
-                      }`}
+                      className={`p-2.5 min-w-11 min-h-11 rounded-full flex items-center justify-center relative transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${active
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-sidebar-foreground/8 text-sidebar-foreground/65'
+                        }`}
                       style={{
                         touchAction: 'none'
                       }}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
                     </div>
-                    
+
                     {isEditing && (
                       <button
                         type="button"
@@ -657,9 +654,8 @@ export function MobileNav() {
                       </button>
                     )}
 
-                    <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors select-none ${
-                      active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65'
-                    }`}>{item.label}</span>
+                    <span className={`text-[10px] tracking-wide text-center truncate w-full transition-colors select-none ${active ? 'text-primary font-semibold' : 'text-sidebar-foreground/65'
+                      }`}>{item.label}</span>
                   </div>
                 );
               })}
@@ -708,29 +704,26 @@ export function MobileNav() {
                         onPointerMove={handleItemPointerMove}
                         onPointerUp={handleItemPointerUp}
                         onPointerCancel={handleItemPointerCancel}
-                        className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none cursor-grab ${
-                          isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-                        } ${getWiggleClass(globalIndex)}`}
+                        className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all duration-150 active:scale-95 group select-none cursor-grab ${isEditing ? 'cursor-grab active:cursor-grabbing' : ''
+                          } ${getWiggleClass(globalIndex)}`}
                         style={{
                           opacity: isCurrentlyDragged ? 0.3 : 1,
                           touchAction: isEditing ? 'none' : 'pan-y',
                         }}
                       >
                         <div
-                          className={`p-3 rounded-2xl transition-colors ${
-                            active
-                              ? 'bg-primary/20 text-primary'
-                              : 'bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
-                          }`}
+                          className={`p-3 rounded-2xl transition-colors ${active
+                            ? 'bg-primary/20 text-primary'
+                            : 'bg-sidebar-foreground/8 group-hover:bg-sidebar-foreground/15 text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
+                            }`}
                         >
                           <Icon className="h-5 w-5 flex-shrink-0" />
                         </div>
                         <span
-                          className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${
-                            active
-                              ? 'text-primary font-semibold'
-                              : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
-                          }`}
+                          className={`text-[10px] tracking-wide text-center truncate w-full transition-colors ${active
+                            ? 'text-primary font-semibold'
+                            : 'text-sidebar-foreground/65 group-hover:text-sidebar-foreground'
+                            }`}
                         >
                           {item.label}
                         </span>

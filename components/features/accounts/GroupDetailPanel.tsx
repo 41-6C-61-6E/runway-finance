@@ -44,6 +44,7 @@ interface GroupDetailPanelProps {
   hierarchyTimeframe: TimeRange;
   onHierarchyTimeframeChange?: (tf: TimeRange) => void;
   onClose: () => void;
+  isInline?: boolean;
 }
 
 interface GroupTooltipProps
@@ -102,6 +103,7 @@ export default function GroupDetailPanel({
   hierarchyTimeframe,
   onHierarchyTimeframeChange,
   onClose,
+  isInline = false,
 }: GroupDetailPanelProps) {
   const {
     windowEnd, setWindowEnd, prevWindow, nextWindow, isNextDisabled, windowLabel, periodOptions, showWindowNav,
@@ -259,54 +261,61 @@ export default function GroupDetailPanel({
   const xAxisTicks = getChartXTicksUnified(chartData, hierarchyTimeframe, false, 'date');
 
   return (
-    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground">
-      {/* Header */}
-      <div className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <h2 className="text-sm sm:text-base font-bold text-sidebar-foreground truncate">
-                {group}
-              </h2>
-              <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 flex-shrink-0">
-                {accounts.length} account{accounts.length !== 1 ? 's' : ''}
-              </span>
+    <div
+      className={
+        isInline
+          ? 'w-full text-sidebar-foreground'
+          : 'bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground'
+      }
+    >
+      {/* Header (desktop/standalone view only; inline view displays row above) */}
+      {!isInline && (
+        <div className="p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 className="text-sm sm:text-base font-bold text-sidebar-foreground truncate">
+                  {group}
+                </h2>
+                <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 flex-shrink-0">
+                  {accounts.length} account{accounts.length !== 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
 
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close group details"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close group details"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Total + period delta */}
-        <div className="flex items-baseline gap-2.5 mt-2.5 flex-wrap">
-          <p className="text-xl sm:text-2xl font-bold font-mono text-sidebar-foreground blur-number">
-            {formatCurrency(trendStats?.current ?? 0)}
-          </p>
-          {trendStats && trendStats.change !== 0 && (
-            <p
-              className={`text-xs sm:text-sm font-medium ${
-                trendStats.isPositive ? 'text-chart-1' : 'text-destructive'
-              }`}
-            >
-              {trendStats.change >= 0 ? (
-                <ArrowUpRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
-              ) : (
-                <ArrowDownRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
-              )}
-              {formatCurrency(Math.abs(trendStats.change))} (
-              {formatPlainPercent(Math.abs(trendStats.percentChange))})
+          {/* Total + period delta */}
+          <div className="flex items-baseline gap-2.5 mt-2.5 flex-wrap">
+            <p className="text-xl sm:text-2xl font-bold font-mono text-sidebar-foreground blur-number">
+              {formatCurrency(trendStats?.current ?? 0)}
             </p>
-          )}
+            {trendStats && trendStats.change !== 0 && (
+              <p
+                className={`text-xs sm:text-sm font-medium ${
+                  trendStats.isPositive ? 'text-chart-1' : 'text-destructive'
+                }`}
+              >
+                {trendStats.change >= 0 ? (
+                  <ArrowUpRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
+                ) : (
+                  <ArrowDownRight className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
+                )}
+                {formatCurrency(Math.abs(trendStats.change))} (
+                {formatPlainPercent(Math.abs(trendStats.percentChange))})
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       <ChartTimeframeBar
         value={hierarchyTimeframe}
         onChange={(v) => onHierarchyTimeframeChange?.(v)}
