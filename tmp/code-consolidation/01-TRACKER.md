@@ -11,13 +11,13 @@
 | CC-04 | UI Primitive Adoption & Consolidation | 3 | `COMPLETE` | `COMPLETE` | 12 | 12 | -1425 | `workstreams/CC-04-ui-primitives.md` |
 | CC-05 | Formatting, Date & Numeric Utilities | 1 | `COMPLETE` | `COMPLETE` | 10 | 10 | -895 | `workstreams/CC-05-format-date-numeric-utils.md` |
 | CC-06 | Domain Types, Constants & Validation | 1 | `COMPLETE` | `COMPLETE` | 9 | 9 | -770 | `workstreams/CC-06-types-constants-validation.md` |
-| CC-07 | Oversized Module Decomposition | 4 | `COMPLETE` | `NOT_STARTED` | 24 | 0 | -4250 | `workstreams/CC-07-oversized-module-decomposition.md` |
+| CC-07 | Oversized Module Decomposition | 4 | `COMPLETE` | `COMPLETE` | 24 | 24 | -4250 | `workstreams/CC-07-oversized-module-decomposition.md` |
 | CC-08 | Services, Schedulers, Integrations & AI | 2 | `COMPLETE` | `COMPLETE` | 11 | 11 | -450 | `workstreams/CC-08-services-integrations-ai.md` |
 | CC-09 | Hooks, Providers & Client State | 2 | `COMPLETE` | `COMPLETE` | 10 | 10 | +80 | `workstreams/CC-09-hooks-providers-state.md` |
 | CC-10 | Charts & Visualization | 3 | `COMPLETE` | `COMPLETE` | 8 | 8 | -1900 | `workstreams/CC-10-charts-visualization.md` |
 | CC-11 | Styling Tokens & Tailwind | 3 | `COMPLETE` | `COMPLETE` | 9 | 9 | -300 | `workstreams/CC-11-styling-tokens.md` |
-| CC-12 | TypeScript Strictness | 1→∞ | `COMPLETE` | `IN_PROGRESS` | 11 | 4 | -300 | `workstreams/CC-12-typescript-strictness.md` |
-| CC-13 | Lint, Conventions & Naming | 1/4 | `COMPLETE` | `IN_PROGRESS` | 9 | 3 | -125 | `workstreams/CC-13-lint-conventions-naming.md` |
+| CC-12 | TypeScript Strictness | 1→∞ | `COMPLETE` | `COMPLETE` | 11 | 11 | -300 | `workstreams/CC-12-typescript-strictness.md` |
+| CC-13 | Lint, Conventions & Naming | 1/4 | `COMPLETE` | `COMPLETE` | 9 | 9 | -125 | `workstreams/CC-13-lint-conventions-naming.md` |
 | CC-14 | Test Suite Consolidation | 5 | `COMPLETE` | `NOT_STARTED` | 7 | 0 | -4750 | `workstreams/CC-14-test-suite.md` |
 | CC-15 | Database Access Patterns | 2 | `COMPLETE` | `COMPLETE` | 10 | 10 | +820 | `workstreams/CC-15-database-access.md` |
 | CC-16 | Build, Scripts, Config & Repo Hygiene | 5 | `COMPLETE` | `NOT_STARTED` | 11 | 0 | -1450 | `workstreams/CC-16-build-scripts-hygiene.md` |
@@ -30,28 +30,28 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `COMPLETE` | `BLOCKED`
 
 ## 2. Metrics Ratchet (Audited Baseline Snapshot, 2026-11-01)
 
-| Metric | Master Plan Estimate | Audited Exact Baseline | Current (Wave 3 Landed) | Target |
+| Metric | Master Plan Estimate | Audited Exact Baseline | Current (Wave 4 Landed) | Target |
 | :--- | ---: | ---: | ---: | ---: |
-| App LOC (app+components+lib) | 162,921 | 162,921 | 160,888 | ≤ 140,000 |
-| Files > 1,000 lines | 33 | 33 (49,892 LOC) | 33 (50,505 LOC) | ≤ 8 |
-| Raw `fetch(` hits | 386 | 405 (113 files) | 365 (86 files) | server-side only |
-| `useQuery`/`useMutation` hits | 13 | 13 (9 useQuery, 4 useMutation) | 13 (8 files) | ↑ |
-| Inline `queryKey: ['` | 53 | 54 | 52 (22 files) | 0 |
+| App LOC (app+components+lib) | 162,921 | 162,921 | 164,622 | ≤ 140,000 |
+| Files > 1,000 lines | 33 | 33 (49,892 LOC) | 11 (17,909 LOC) | ≤ 8 |
+| Raw `fetch(` hits | 386 | 405 (113 files) | 365 (91 files) | server-side only |
+| `useQuery`/`useMutation` hits | 13 | 13 (9 useQuery, 4 useMutation) | 14 (9 files) | ↑ |
+| Inline `queryKey: ['` | 53 | 54 | 52 (21 files) | 0 |
 | Routes with direct `await auth()` | 139 | 139 | 122 routes | ≤ 5 |
 | Files using `NextResponse.json` | 124 | 124 | 110 files | ≤ 5 |
 | `fixed inset-0` outside `components/ui` | ~15 files | 15 files (20 call sites) | 0 | 0 |
 | `<Loader2` direct | 28 files | 28 files | 0 | 0 (outside ui) |
 | Local formatter re-definitions | ~15 | 28 sites across 21 files | 28 sites | 0 |
 | `.toFixed(` | 129 | 129 | 129 | ≤ 20 (non-UI math only) |
-| `Intl.NumberFormat` outside format.ts | 32 | 32 | 25 (16 files) | 0 |
-| `any` in production (app+components+lib) | 876 | 960 (1,709 repo-wide) | 935 (196 files) | ≤ 150 |
-| Hex literals in TSX/TS | 381 | 410 (58 files) | 372 (54 files) | ≤ 40 (palette sources only) |
-| `text-[Npx]` | 1,151 | 1,165 (126 files) | 1,151 (122 files) | ≤ 100 |
-| `style={{` | 295 | 295 (63 static) | 274 (89 files) | ≤ 80 (dynamic values only) |
+| `Intl.NumberFormat` outside format.ts | 32 | 32 | 25 (18 files) | 0 |
+| `any` in production (app+components+lib) | 876 | 960 (1,709 repo-wide) | 911 (205 files) | ≤ 150 |
+| Hex literals in TSX/TS | 381 | 410 (58 files) | 372 (63 files) | ≤ 40 (palette sources only) |
+| `text-[Npx]` | 1,151 | 1,165 (126 files) | 1,150 (155 files) | ≤ 100 |
+| `style={{` | 295 | 295 (63 static) | 274 (93 files) | ≤ 80 (dynamic values only) |
 | Direct `localStorage` | 34 | 34 (14 files) | 37 (14 files) | ≤ 3 (inside hooks) |
-| `console.*` in app/components/lib | 146 | 146 | 134 (57 files) | 0 |
-| `process.env.` outside env module | 70 | 87 reads (33 files) | 87 (33 files) | 0 |
-| PascalCase component filenames | 59 | 59 (+1 camelCase) | 58 | 0 |
+| `console.*` in app/components/lib | 146 | 146 | 133 (61 files) | 0 |
+| `process.env.` outside env module | 70 | 87 reads (33 files) | 78 (32 files) | 0 |
+| PascalCase component filenames | 59 | 59 (+1 camelCase) | 0 | 0 |
 | Zero-import modules | 21 | 16 verified dead (1,889 LOC) | 0 (all 16 deleted) | 0 |
 | Hard-coded `'/api/` paths outside `routes.ts` | 421 | 420 (106 files) | 415 (102 files) | 0 |
 | Duration literals `N * 60 * 1000` | 114 | 124 (58 files) | 83 (44 files) | 0 |
