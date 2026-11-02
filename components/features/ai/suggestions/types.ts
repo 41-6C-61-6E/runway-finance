@@ -22,3 +22,4 @@ export type Category = {
   parentId: string | null;
   color: string;
 };
+

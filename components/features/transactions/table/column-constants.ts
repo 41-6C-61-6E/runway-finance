@@ -36,3 +36,4 @@ export const COLUMN_MIN_WIDTHS: Record<string, number> = {
   tags: 50,
   amount: 70,
 };
+

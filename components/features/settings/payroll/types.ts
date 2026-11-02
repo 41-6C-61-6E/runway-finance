@@ -61,3 +61,4 @@ export type PaystubLineItem = {
   hours: string | null;
   rate: string | null;
 };
+

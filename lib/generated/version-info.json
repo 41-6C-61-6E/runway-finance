@@ -1,9 +1,14 @@
 {
-  "buildNumber": "26.11.1793572039980",
-  "buildTime": "2026-11-01T22:27:19.980Z",
-  "hash": "19ed5f5",
-  "fullHash": "19ed5f57442c8e9434f3d16f499ee02146ba8936",
+  "buildNumber": "26.11.1793585262543",
+  "buildTime": "2026-11-02T02:07:42.543Z",
+  "hash": "fa87160",
+  "fullHash": "fa87160137d8408db0ece0a19a14a2b92d7a026e",
   "commits": [
+    "refactor(cc-07): decompose payroll-tab, budget-table, manual-accounts, automatic-accounts, and transaction-table",
+    "refactor(cc-07): decompose plan-wizard-modal, user-settings route, budgets route, and import-tab",
+    "refactor(cc-07): decompose engine-rules-view, rules-tab, ai-tab, ai-suggestions-modal, and filter-bar",
+    "refactor(cc-07): decompose retirement-engine, account-history, manual-accounts, income-expense-chart, import-export-tab, transaction-detail-drawer, and sync services",
+    "chore(cc-13): rename PascalCase component files to kebab-case",
     "docs(tracker): record Wave 3 completion (CC-04, CC-10, CC-11)",
     "refactor(cc-11): normalize font tokens, palette variables, z-indices, and inline styles",
     "refactor(cc-10): standardize chart frames, tooltips, and consolidate sankey visualization",
@@ -198,22 +203,57 @@
     "feat: implement time-based budget pacing and date-range logic for rollup calculations in budget API.",
     "docs: update project metadata, dependencies, installation instructions, and license file references in README",
     "style: update collapsible filter panel button height and padding for better alignment",
-    "feat: add 10s request timeout and manual redirects to AI API routes, and restrict SSRF to block all IP literals",
-    "refactor: implement ResizeObserver in budget table to dynamically manage column visibility based on container width",
-    "feat: implement time-based budget pacing and improved health status projections for monthly, quarterly, and yearly periods",
-    "feat: implement net value calculation to correctly handle income versus expense logic in budget actuals",
-    "refactor: improve budget status health logic and update transaction tooltip interaction behavior",
-    "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component"
+    "feat: add 10s request timeout and manual redirects to AI API routes, and restrict SSRF to block all IP literals"
   ],
   "history": [
+    {
+      "hash": "fa87160",
+      "fullHash": "fa87160137d8408db0ece0a19a14a2b92d7a026e",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-02T00:29:13Z",
+      "message": "refactor(cc-07): decompose payroll-tab, budget-table, manual-accounts, automatic-accounts, and transaction-table",
+      "type": "refactor",
+      "buildNumber": "26.11.1793585262543"
+    },
+    {
+      "hash": "b3adffb",
+      "fullHash": "b3adffbbcadf8557e93b7d39f6f280fd549ffb81",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T23:57:16Z",
+      "message": "refactor(cc-07): decompose plan-wizard-modal, user-settings route, budgets route, and import-tab",
+      "type": "refactor"
+    },
+    {
+      "hash": "6dbb51b",
+      "fullHash": "6dbb51b5bb61bae9976075c29552837c53e75ac0",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T23:43:14Z",
+      "message": "refactor(cc-07): decompose engine-rules-view, rules-tab, ai-tab, ai-suggestions-modal, and filter-bar",
+      "type": "refactor"
+    },
+    {
+      "hash": "905e2b4",
+      "fullHash": "905e2b45d32bc55427f495d93fe99a3b875fb5f2",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T23:19:03Z",
+      "message": "refactor(cc-07): decompose retirement-engine, account-history, manual-accounts, income-expense-chart, import-export-tab, transaction-detail-drawer, and sync services",
+      "type": "refactor"
+    },
+    {
+      "hash": "026209d",
+      "fullHash": "026209de1f83a74589b5a40959411ecee43e07b4",
+      "author": "41-6C-61-6E",
+      "date": "2026-11-01T22:30:56Z",
+      "message": "chore(cc-13): rename PascalCase component files to kebab-case",
+      "type": "chore"
+    },
     {
       "hash": "19ed5f5",
       "fullHash": "19ed5f57442c8e9434f3d16f499ee02146ba8936",
       "author": "41-6C-61-6E",
       "date": "2026-11-01T22:20:45Z",
       "message": "docs(tracker): record Wave 3 completion (CC-04, CC-10, CC-11)",
-      "type": "docs",
-      "buildNumber": "26.11.1793572039980"
+      "type": "docs"
     },
     {
       "hash": "caae7d0",
@@ -1765,46 +1805,6 @@
       "author": "Alan Racek",
       "date": "2026-08-12T15:29:19-07:00",
       "message": "feat: add 10s request timeout and manual redirects to AI API routes, and restrict SSRF to block all IP literals",
-      "type": "feat"
-    },
-    {
-      "hash": "248bfde",
-      "fullHash": "248bfdeb250becc45e902070632a6e4eb3a8ff25",
-      "author": "Alan Racek",
-      "date": "2026-08-10T17:39:52-07:00",
-      "message": "refactor: implement ResizeObserver in budget table to dynamically manage column visibility based on container width",
-      "type": "refactor"
-    },
-    {
-      "hash": "e17981e",
-      "fullHash": "e17981e495e5ed778c981cd14efd4138b3aebe8a",
-      "author": "Alan Racek",
-      "date": "2026-08-10T16:39:16-07:00",
-      "message": "feat: implement time-based budget pacing and improved health status projections for monthly, quarterly, and yearly periods",
-      "type": "feat"
-    },
-    {
-      "hash": "18f4ccd",
-      "fullHash": "18f4ccd85073cef51eaecb13505429edeb8d16d6",
-      "author": "Alan Racek",
-      "date": "2026-08-10T16:06:39-07:00",
-      "message": "feat: implement net value calculation to correctly handle income versus expense logic in budget actuals",
-      "type": "feat"
-    },
-    {
-      "hash": "c920979",
-      "fullHash": "c92097934f54f63d3c58bfb2d1efcc67e3a05bcf",
-      "author": "Alan Racek",
-      "date": "2026-08-10T15:50:44-07:00",
-      "message": "refactor: improve budget status health logic and update transaction tooltip interaction behavior",
-      "type": "refactor"
-    },
-    {
-      "hash": "54aca85",
-      "fullHash": "54aca8542c6f4157517988c982327cfbd3e829a3",
-      "author": "Alan Racek",
-      "date": "2026-08-10T15:17:16-07:00",
-      "message": "feat: add transaction preview tooltip to budget table rows via new BudgetItemTransactionsIcon component",
       "type": "feat"
     }
   ]
