@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterBudgetChange } from '@/lib/query-invalidation';
 import { useBudgetPeriod } from './budget-period-selector';
+import { isEnvelope, renderEnvelopeBadge, renderBudgetCell, envelopeSubText } from "./table/budget-envelope-helpers";
+import { BudgetMobileList } from "./table/budget-mobile-list";
+import { BudgetConfirmDialogs } from "./table/budget-confirm-dialogs";
 import { BudgetFormDialog } from './budget-form-dialog';
 import { AutoBudgetDialog } from './auto-budget-dialog';
 import { BudgetExclusionsDialog } from './budget-exclusions-dialog';
@@ -17,7 +20,6 @@ import { formatCurrency } from '@/lib/utils/format';
 import { isEnvelopeRow, envelopeExplainText, ENVELOPE_STATUS_META, nativePeriodLabel, type EnvelopeBudgetRow } from '@/lib/utils/budget-envelope';
 import { Plus, Pencil, Trash2, RotateCcw, Landmark, ArrowUpCircle, TrendingDown, ChevronUp, ChevronDown, ChevronsUpDown, History, Layers, Filter, SlidersHorizontal } from 'lucide-react';
 import { Spinner } from '@/components/ui/loading-spinner';
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -26,54 +28,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Select } from '@/components/ui/select';
 
-type SortField = 'category' | 'budgeted' | 'actual' | 'variance' | 'progress' | 'account';
-type SortDirection = 'asc' | 'desc';
-
-interface BudgetData {
-  id: string;
-  categoryId: string;
-  categoryName: string;
-  categoryColor: string;
-  periodType: string;
-  nativePeriodType?: 'monthly' | 'quarterly' | 'yearly';
-  nativeAmount?: number;
-  /** The native period the budget is defined over (e.g. "2026", "2026-Q3"). */
-  nativePeriodKey?: string | null;
-  /** True when this budget is defined in a longer timeframe than the viewed period (envelope budget). `budgeted` is only an average. */
-  prorated?: boolean;
-  /** Cumulative spend against the full native-period envelope up to end of viewed period. */
-  envelopeSpent?: number | null;
-  envelopeRemaining?: number | null;
-  envelopePercentUsed?: number | null;
-  envelopeStatus?: 'within' | 'nearlyUsed' | 'exceeded' | null;
-  envelopeStart?: string | null;
-  envelopeEnd?: string | null;
-  periodKey?: string | null;
-  yearMonth?: string | null;
-  isRecurring: boolean;
-  fundingAccountId: string | null;
-  rollover: boolean;
-  rolloverCarryover?: number;
-  availableBudget?: number;
-  notes: string | null;
-  monthlyAmount?: number;
-  budgeted: number;
-  actual: number;
-  remaining: number;
-  percentUsed: number;
-  type: 'income' | 'expense';
-  isDiscretionary?: boolean;
-  isEverythingElse?: boolean;
-  isCatchAll?: boolean;
-  groupedBreakout?: Array<{ categoryId: string; categoryName: string; categoryColor?: string; actual: number }>;
-  coveredCategoryIds?: string[];
-}
-
-interface Account {
-  id: string;
-  name: string;
-  tags?: { id: string; name: string; color: string }[];
-}
+import type { SortField, SortDirection, BudgetData, Account } from "./table/types";
 
 export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | null } = {}) {
   const queryClient = useQueryClient();
@@ -379,45 +334,6 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   // native-period total — lumpy budgets (vacations, annual insurance) may
   // spend their entire envelope early in the period and still be within
   // budget, so no pace is applied.
-  const isEnvelope = (b: BudgetData) => isEnvelopeRow(b as EnvelopeBudgetRow);
-
-  const renderEnvelopeBadge = (b: BudgetData) => {
-    if (!isEnvelope(b)) return null;
-    const per = b.nativePeriodType === 'quarterly' ? 'qt' : 'yr';
-    return (
-      <span
-        title={envelopeExplainText(b as EnvelopeBudgetRow, { formatCurrency })}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold border rounded shrink-0 bg-muted/60 text-muted-foreground border-border/60"
-      >
-        <Layers className="w-3 h-3 shrink-0" />
-        {formatCurrency(b.nativeAmount ?? 0)}/{per}
-      </span>
-    );
-  };
-
-  const renderBudgetCell = (b: BudgetData) => {
-    if (!isEnvelope(b)) return <>{formatCurrency(b.budgeted)}</>;
-    return (
-      <span
-        className="text-muted-foreground"
-        title={`Averaged from ${formatCurrency(b.nativeAmount ?? 0)} per ${b.nativePeriodType === 'quarterly' ? 'quarter' : 'year'} — not a separate ${periodType === 'quarterly' ? 'quarterly' : 'monthly'} budget`}
-      >
-        {formatCurrency(b.budgeted)}
-        <span className="text-[11px] font-sans text-muted-foreground/70 ml-0.5">avg</span>
-      </span>
-    );
-  };
-
-  // Small grey qualifier for an envelope row whose native timeframe differs:
-  // e.g. "$300 over $12,000/yr" or "$6,000 of $12,000/yr left".
-  const envelopeSubText = (b: BudgetData): string | null => {
-    if (!isEnvelope(b) || b.envelopeSpent == null || b.envelopeRemaining == null || b.nativeAmount == null) return null;
-    const per = b.nativePeriodType === 'quarterly' ? 'qt' : 'yr';
-    if (b.envelopeRemaining < 0) return `${formatCurrency(Math.abs(b.envelopeRemaining))} over ${formatCurrency(b.nativeAmount)}/${per}`;
-    if (b.envelopeStatus === 'nearlyUsed') return `${formatCurrency(b.envelopeRemaining)} of ${formatCurrency(b.nativeAmount)}/${per} left`;
-    return `${formatCurrency(b.envelopeRemaining)} of ${formatCurrency(b.nativeAmount)}/${per}`;
-  };
-
   const renderEnvelopeProgress = (b: BudgetData) => {
     if (!isEnvelope(b)) return null;
     const pct = b.envelopePercentUsed ?? 0;
@@ -434,58 +350,6 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
         <span className={`text-[10px] font-mono shrink-0 ${meta?.textClass ?? 'text-muted-foreground'}`}>
           {Math.round(pct)}%/{b.nativePeriodType === 'quarterly' ? 'Q' : 'yr'}
         </span>
-      </div>
-    );
-  };
-
-  // Compact mobile treatment: every row gets the same visual budget meter.
-  // Envelope rows use their full native-period total so the label and meter
-  // describe the same number (rather than the informational monthly average).
-  const renderMobileProgress = (b: BudgetData, isIncome = false) => {
-    const envelope = isEnvelope(b);
-    const spent = envelope ? (b.envelopeSpent ?? b.actual) : b.actual;
-    const total = envelope ? (b.nativeAmount ?? b.budgeted) : (b.availableBudget ?? b.budgeted);
-    const pct = envelope
-      ? (b.envelopePercentUsed ?? (total > 0 ? (spent / total) * 100 : 0))
-      : (b.percentUsed ?? 0);
-
-    let fillClass: string;
-    let textClass: string;
-
-    if (envelope) {
-      const meta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
-      fillClass = meta?.barClass ?? (spent > total ? 'bg-destructive' : 'bg-primary');
-      textClass = meta?.textClass ?? (spent > total ? 'text-destructive' : 'text-muted-foreground');
-    } else if (isIncome) {
-      const isTargetMet = b.remaining >= 0;
-      fillClass = isTargetMet ? 'budget-progress-fill' : 'bg-amber-500';
-      textClass = isTargetMet ? 'text-primary' : 'text-muted-foreground';
-    } else {
-      const isOver = b.remaining < 0 || spent > total;
-      fillClass = isOver ? 'bg-destructive' : pct > 85 ? 'bg-amber-500' : 'budget-progress-fill';
-      textClass = isOver ? 'text-destructive' : pct > 85 ? 'text-amber-500' : 'text-muted-foreground';
-    }
-
-    return (
-      <div className="space-y-1.5 pt-0.5">
-        <div className="flex items-center justify-between gap-3 text-xs font-mono">
-          <span className="text-muted-foreground blur-number">
-            {formatCurrency(spent)} <span className="text-muted-foreground/60">of</span> {formatCurrency(total)}
-          </span>
-          <span className={cn('shrink-0 font-medium', textClass)}>
-            {Math.round(pct)}%
-          </span>
-        </div>
-        <div
-          className="h-2 w-full overflow-hidden rounded-full budget-progress-track"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.min(Math.max(Math.round(pct), 0), 100)}
-          aria-label={`${formatCurrency(spent)} of ${formatCurrency(total)} used`}
-        >
-          <div className={`h-full rounded-full transition-all duration-400 ${fillClass}`} style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }} />
-        </div>
       </div>
     );
   };
@@ -650,195 +514,25 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
             <ChartEmptyState variant="nodata" description="No budgets set for this period" />
           </div>
         ) : isMobile ? (
-          <div className="divide-y divide-border">
-            {incomeBudgets.length > 0 && (
-              <div className="px-4 py-2 bg-accent/40 text-xs font-semibold text-foreground uppercase tracking-wider border-y border-border/50 flex items-center gap-1.5">
-                <ArrowUpCircle className="w-3.5 h-3.5 text-primary" />
-                <span>Income</span>
-              </div>
-            )}
-            {incomeBudgets.map((b) => {
-              const isTargetMet = b.remaining >= 0;
-              return (
-                <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/30 shadow-sm" style={{ backgroundColor: b.categoryColor }} />
-                      <Link
-                        href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
-                        title={b.categoryName}
-                        className="text-foreground font-medium text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch]"
-                      >
-                        {b.categoryName}
-                      </Link>
-                      <BudgetItemTransactionsIcon
-                        categoryId={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? undefined : b.categoryId}
-                        categoryIds={b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId]}
-                        categoryName={b.categoryName}
-                        periodType={periodType}
-                        periodKey={periodKey}
-                      />
-                      {b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
-                        <span
-                          title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
-                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
-                        >
-                          {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
-                      <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
-                    </div>
-                  </div>
-                  {renderMobileProgress(b, true)}
-                </div>
-              );
-            })}
-
-            {expenseBudgets.length > 0 && (
-              <div className="px-4 py-2 bg-accent/40 text-xs font-semibold text-foreground uppercase tracking-wider border-y border-border/50 flex items-center gap-1.5">
-                <TrendingDown className="w-3.5 h-3.5 text-primary" />
-                <span>Expenses</span>
-              </div>
-            )}
-            {expenseBudgets.map((b) => {
-              const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
-              return (
-                <div key={b.id} data-budget-category-id={b.categoryId} className={`px-4 py-3 space-y-2 group/row ${flashCategoryId === b.categoryId ? 'ring-2 ring-primary/70 rounded-lg' : ''}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/30 shadow-sm" style={{ backgroundColor: b.categoryColor || '#64748b' }} />
-                      <Link
-                        href={getTxUrl(
-                          isEE && b.groupedBreakout && b.groupedBreakout.length > 0
-                            ? b.groupedBreakout.map((i) => i.categoryId)
-                            : b.coveredCategoryIds,
-                          b.categoryId
-                        )}
-                        title={b.categoryName}
-                        className="text-foreground font-semibold text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch]"
-                      >
-                        {b.categoryName}
-                      </Link>
-                      <BudgetItemTransactionsIcon
-                        categoryId={isEE || (b.coveredCategoryIds && b.coveredCategoryIds.length > 0) ? undefined : b.categoryId}
-                        categoryIds={isEE ? b.groupedBreakout?.map((i) => i.categoryId) : (b.coveredCategoryIds && b.coveredCategoryIds.length > 0 ? b.coveredCategoryIds : [b.categoryId])}
-                        categoryName={b.categoryName}
-                        periodType={periodType}
-                        periodKey={periodKey}
-                      />
-                      {isEnvelope(b) && renderEnvelopeBadge(b)}
-                      {!isEE && !isEnvelope(b) && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
-                        <span
-                          title={`Rolled up from ${b.nativePeriodType} budget (${formatCurrency(b.nativeAmount)}/${b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'})`}
-                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-muted/60 text-muted-foreground border border-border/60 rounded shrink-0"
-                        >
-                          {formatCurrency(b.nativeAmount)}/{b.nativePeriodType === 'monthly' ? 'mo' : b.nativePeriodType === 'quarterly' ? 'quarter' : 'yr'}
-                        </span>
-                      )}
-                      {!isEE && b.rollover && b.rolloverCarryover !== undefined && b.rolloverCarryover > 0 && (
-                        <span
-                          title={`Base: ${formatCurrency(b.budgeted)} + Rollover: ${formatCurrency(b.rolloverCarryover)} = Total Available: ${formatCurrency(b.availableBudget || b.budgeted)}`}
-                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-constructive/10 text-constructive border border-constructive/20 rounded shrink-0"
-                        >
-                          +{formatCurrency(b.rolloverCarryover)} rollover
-                        </span>
-                      )}
-                      {isEE && (
-                        <button
-                          onClick={() => setExpandedCatchAll(!expandedCatchAll)}
-                          className="px-2 py-0.5 text-[10px] font-semibold bg-accent border border-border rounded text-primary flex items-center gap-1 shrink-0"
-                        >
-                          <Layers className="w-3 h-3" />
-                          <span>{b.groupedBreakout ? b.groupedBreakout.length : 0} items</span>
-                          {expandedCatchAll ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
-                      <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
-                    </div>
-                  </div>
-
-                  {renderMobileProgress(b)}
-
-                  {/* Everything Else Mobile Breakout sub-card */}
-                  {isEE && expandedCatchAll && b.groupedBreakout && (
-                    <div className="mt-2.5 p-3 bg-muted/30 rounded-xl border border-border/60 space-y-2.5">
-                      <div className="flex items-center justify-between px-0.5">
-                        <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-primary" />
-                          Unbudgeted Categories
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                            {b.groupedBreakout.length}
-                          </span>
-                        </span>
-                        <span className="text-xs font-mono font-medium text-muted-foreground">
-                          Total: <span className="text-foreground blur-number">{formatCurrency(b.actual)}</span>
-                        </span>
-                      </div>
-                      {b.groupedBreakout.length === 0 ? (
-                        <p className="text-xs text-muted-foreground italic py-1 text-center bg-background/50 rounded-lg border border-border/40">
-                          No unbudgeted spending in this period.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {b.groupedBreakout.map((item) => (
-                            <div key={item.categoryId} className="group/cat flex items-center justify-between px-3 py-2.5 rounded-xl bg-card border border-border/60 gap-3 min-w-0 shadow-xs">
-                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: item.categoryColor || '#6366f1' }} />
-                                <Link
-                                  href={getTxUrl(undefined, item.categoryId)}
-                                  className="font-medium text-foreground text-sm truncate hover:text-primary hover:underline transition-colors min-w-0 block"
-                                  title={item.categoryName}
-                                >
-                                  {item.categoryName}
-                                </Link>
-                                <BudgetItemTransactionsIcon
-                                  categoryId={item.categoryId}
-                                  categoryName={item.categoryName}
-                                  periodType={periodType}
-                                  periodKey={periodKey}
-                                />
-                              </div>
-                              <div className="flex items-center gap-2.5 shrink-0">
-                                <span className="font-mono text-sm font-semibold text-foreground blur-number">{formatCurrency(item.actual)}</span>
-                                <TooltipProvider delayDuration={150}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleConvertToBudget(item)}
-                                        disabled={convertingCatId === item.categoryId}
-                                        aria-label={`Convert ${item.categoryName} to standalone budget`}
-                                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary shrink-0"
-                                      >
-                                        {convertingCatId === item.categoryId ? (
-                                          <Spinner size="sm" />
-                                        ) : (
-                                          <Plus className="w-4 h-4" />
-                                        )}
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-xs">
-                                      Convert &ldquo;{item.categoryName}&rdquo; to standalone budget ({formatCurrency(Math.max(1, Math.round(item.actual)))}{periodSuffix})
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <BudgetMobileList
+            incomeBudgets={incomeBudgets}
+            expenseBudgets={expenseBudgets}
+            flashCategoryId={flashCategoryId}
+            getTxUrl={getTxUrl}
+            periodType={periodType}
+            periodKey={periodKey}
+            periodSuffix={periodSuffix}
+            formatCurrency={formatCurrency}
+            isEnvelope={isEnvelope}
+            renderEnvelopeBadge={renderEnvelopeBadge}
+            setEditBudget={setEditBudget}
+            setShowForm={setShowForm}
+            setDeleteBudget={setDeleteBudget}
+            expandedCatchAll={expandedCatchAll}
+            setExpandedCatchAll={setExpandedCatchAll}
+            handleConvertToBudget={handleConvertToBudget}
+            convertingCatId={convertingCatId}
+          />
         ) : (
           <div className="w-full border-t border-border overflow-hidden">
             {(() => {
@@ -1249,74 +943,20 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
         periodKey={periodKey}
       />
 
-      <AlertDialog open={!!deleteBudget} onOpenChange={(o) => { if (!o) setDeleteBudget(null); }}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Budget</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the budget for <strong>{deleteBudget?.categoryName}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <button
-              onClick={handleDelete}
-              disabled={deleteLoading}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {deleteLoading ? 'Deleting...' : 'Delete'}
-            </button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={confirmResetOpen} onOpenChange={setConfirmResetOpen}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive flex items-center gap-2">
-              <Trash2 className="w-5 h-5" />
-              Reset All Budgets
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to <strong>erase all budget items</strong>? This will permanently remove all recurring and period-specific budgets across all categories.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <button
-              onClick={handleResetBudgets}
-              disabled={actionLoading}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {actionLoading ? 'Resetting...' : 'Reset All Budgets'}
-            </button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={confirmPurgeHistoryOpen} onOpenChange={setConfirmPurgeHistoryOpen}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <History className="w-5 h-5 text-primary" />
-              Remove Prior Budget History
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to <strong>remove historical budget data prior to {periodKey}</strong>? Active recurring budgets will remain in effect for the current period forward.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <button
-              onClick={handlePurgeHistory}
-              disabled={actionLoading}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {actionLoading ? 'Removing...' : 'Remove History'}
-            </button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <BudgetConfirmDialogs
+        deleteBudget={deleteBudget}
+        setDeleteBudget={setDeleteBudget}
+        deleteLoading={deleteLoading}
+        handleDelete={handleDelete}
+        confirmResetOpen={confirmResetOpen}
+        setConfirmResetOpen={setConfirmResetOpen}
+        confirmPurgeHistoryOpen={confirmPurgeHistoryOpen}
+        setConfirmPurgeHistoryOpen={setConfirmPurgeHistoryOpen}
+        actionLoading={actionLoading}
+        periodKey={periodKey}
+        handleResetBudgets={handleResetBudgets}
+        handlePurgeHistory={handlePurgeHistory}
+      />
 
       <BudgetExclusionsDialog
         open={showExclusionsDialog}

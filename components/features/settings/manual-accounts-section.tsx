@@ -18,160 +18,22 @@ import { getBadgeClasses } from '@/lib/utils/account-badge';
 import { Select } from '@/components/ui/select';
 import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
-type ManualAccount = {
-  id: string;
-  name: string;
-  type: string;
-  balance: string;
-  currency: string;
-  metadata: Record<string, unknown> | null;
-  isHidden: boolean;
-  isExcludedFromNetWorth: boolean;
-  balanceDate: string | null;
-  connectionId?: string | null;
-  tags?: { id: string; name: string; color: string }[];
-};
-
-type AssetSubType = string;
-
-const ASSET_TYPE_LABELS: Record<string, string> = {
-  realestate: 'Real Estate',
-  vehicle: 'Vehicle',
-  crypto: 'Bitcoin',
-  gold: 'Gold',
-  silver: 'Silver',
-  otherAsset: 'Other Asset',
-  mortgage: 'Mortgage',
-  cash: 'Cash',
-};
-
-const PROPERTY_TYPES = [
-  { value: 'single-family', label: 'Single Family Home' },
-  { value: 'condo', label: 'Condo' },
-  { value: 'townhouse', label: 'Townhouse' },
-  { value: 'multi-family', label: 'Multi-Family' },
-  { value: 'land', label: 'Land' },
-  { value: 'commercial', label: 'Commercial' },
-  { value: 'other', label: 'Other' },
-] as const;
-
-import { SYNC_FREQUENCIES, SYNC_INTERVALS, computeNextSync as baseComputeNextSync } from './accounts/sync-intervals';
-
-function computeNextSync(syncFrequency: string, balanceDate: string | null): Date | null {
-  return baseComputeNextSync(syncFrequency, balanceDate, { fallbackNowIfMissingDate: true });
-}
-
-const SYNC_FREQUENCY_LABELS: Record<string, string> = {
-  manual: 'Manual',
-  daily: 'Daily',
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-};
-
-const SYNC_FREQ_COLORS: Record<string, string> = {
-  manual: 'text-muted-foreground',
-  daily: 'text-chart-1',
-  weekly: 'text-chart-3',
-  monthly: 'text-chart-4',
-};
-
-const ASSET_TYPE_ICONS: Record<string, string> = {
-  checking: '🏦',
-  savings: '🏦',
-  other: '🏦',
-  credit: '💳',
-  investment: '📈',
-  brokerage: '📈',
-  retirement: '📈',
-  otherinvestment: '📈',
-  rothira: '📈',
-  traditionalira: '📈',
-  '401k': '📈',
-  '403b': '📈',
-  sepira: '📈',
-  simpleira: '📈',
-  '529': '📈',
-  otherAsset: '📦',
-  hsa: '🏥',
-  hsachecking: '🏥',
-  health: '🏥',
-  loan: '📋',
-  mortgage: '📋',
-  realestate: '🏠',
-  primaryhome: '🏠',
-  secondaryhome: '🏠',
-  rentalproperty: '🏠',
-  commercial: '🏢',
-  land: '🌳',
-  otherrealestate: '🏠',
-  otherLiability: '⚠️',
-  vehicle: '🚗',
-  crypto: '₿',
-  gold: '🥇',
-  silver: '🥈',
-  cash: '💵',
-};
-
-const REAL_ESTATE_TYPES = [
-  'realestate', 'primaryhome', 'secondaryhome', 'rentalproperty', 'commercial', 'land', 'otherrealestate',
-  'single-family', 'condo', 'townhouse', 'multi-family'
-];
-
-function getAccountIcon(account: ManualAccount): string {
-  if (account.type === 'metals') {
-    const meta = account.metadata ?? {};
-    const subType = (meta as Record<string, string>).subType ?? 'gold';
-    return ASSET_TYPE_ICONS[subType] ?? '🥇';
-  }
-  return ASSET_TYPE_ICONS[account.type] ?? '📦';
-}
-
-
-const getGroupedOptions = () => {
-  const groups = getTypesByGroup();
-  return groups.map(g => {
-    let types = [...g.types];
-    if (g.group === 'Assets') {
-      types = types.flatMap(t => {
-        if (t.value === 'metals') {
-          return [
-            { value: 'gold', label: 'Gold (Metal)' },
-            { value: 'silver', label: 'Silver (Metal)' }
-          ];
-        }
-        return t;
-      });
-    }
-    if (g.group === 'Banking') {
-      types.push({ value: 'cash', label: 'Cash (Manual)' });
-    }
-    return { ...g, types };
-  });
-};
-
-function getSubTypeLabel(account: ManualAccount): string {
-  if (account.type === 'metals') {
-    const meta = account.metadata ?? {};
-    const subType = (meta as Record<string, string>).subType ?? 'gold';
-    return ASSET_TYPE_LABELS[subType] ?? 'Metals';
-  }
-  for (const [key, val] of Object.entries(ASSET_TYPE_LABELS)) {
-    if (ACCOUNT_TYPE_MAP[key] === account.type) return val;
-  }
-  return ACCOUNT_TYPE_LABELS[account.type] ?? account.type;
-}
-
-const ACCOUNT_TYPE_MAP: Record<string, string> = {
-  realestate: 'realestate',
-  vehicle: 'vehicle',
-  crypto: 'crypto',
-  gold: 'metals',
-  silver: 'metals',
-  otherAsset: 'otherAsset',
-  mortgage: 'mortgage',
-  cash: 'cash',
-};
-
+import {
+  ManualAccount,
+  AssetSubType,
+  computeNextSync,
+  ASSET_TYPE_LABELS,
+  PROPERTY_TYPES,
+  SYNC_FREQUENCY_LABELS,
+  SYNC_FREQ_COLORS,
+  ASSET_TYPE_ICONS,
+  REAL_ESTATE_TYPES,
+  ACCOUNT_TYPE_MAP,
+  getAccountIcon,
+  getGroupedOptions,
+  getSubTypeLabel,
+} from "./accounts/manual-account-constants";
+import { AddSnapshotDialog } from "./accounts/add-snapshot-dialog";
 const formatCurrency = (balance: string, currency: string) => {
   const num = parseFloat(balance);
   const isPositive = num >= 0;
@@ -1360,63 +1222,20 @@ export default function ManualAccountsSection() {
       </Sheet>
 
       {/* Add Snapshot Dialog */}
-      <Dialog open={!!adjustAccount} onOpenChange={(open) => { if (!open) setAdjustAccount(null); setError(''); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Add Balance Snapshot</DialogTitle>
-            <DialogDescription>
-              {isMetalsAdjust
-                ? 'Record the gold/silver ounces you held at a specific point in time. The dollar value will be calculated using the spot price.'
-                : 'A snapshot logs your account balance at a specific point in time. Adding historical snapshots helps build a timeline of your balances to plot your net worth history.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                {isMetalsAdjust ? 'Amount (oz)' : 'Snapshot Balance'}
-              </label>
-              <Input
-                type="number"
-                step="0.01"
-                value={adjustValue}
-                onChange={(e) => setAdjustValue(e.target.value)}
-                placeholder={isMetalsAdjust ? 'e.g., 10.5' : 'Enter balance amount'}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Snapshot Date</label>
-              <Input
-                type="date"
-                value={adjustDate}
-                onChange={(e) => setAdjustDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Note (optional)</label>
-              <Input
-                value={adjustNote}
-                onChange={(e) => setAdjustNote(e.target.value)}
-                placeholder="e.g., Year-end statement balance"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <button
-              onClick={() => setAdjustAccount(null)}
-              className="px-4 py-2 text-sm text-foreground bg-muted hover:bg-accent rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAdjust}
-              disabled={adjustLoading}
-              className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
-            >
-              {adjustLoading ? 'Saving...' : 'Save'}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddSnapshotDialog
+        open={!!adjustAccount}
+        onOpenChange={(open) => { if (!open) setAdjustAccount(null); setError(""); }}
+        isMetalsAdjust={isMetalsAdjust}
+        adjustValue={adjustValue}
+        setAdjustValue={setAdjustValue}
+        adjustDate={adjustDate}
+        setAdjustDate={setAdjustDate}
+        adjustNote={adjustNote}
+        setAdjustNote={setAdjustNote}
+        adjustLoading={adjustLoading}
+        handleAdjust={handleAdjust}
+        onCancel={() => setAdjustAccount(null)}
+      />
 
       {/* Edit Drawer */}
       <Sheet open={!!editAccount} onOpenChange={(open) => { if (!open) setEditAccount(null); setError(''); }}>

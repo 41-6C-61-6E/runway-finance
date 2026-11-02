@@ -134,47 +134,10 @@ interface TransactionTableProps {
   analysisTotal?: number;
 }
 
-const ALL_COLUMNS: string[] = [
-  "select",
-  "date",
-  "postedDate",
-  "description",
-  "ai",
-  "account",
-  "accountType",
-  "category",
-  "tags",
-  "amount",
-];
-
-const COLUMN_LABELS: Record<string, string> = {
-  select: "",
-  date: "Date",
-  postedDate: "Posted",
-  description: "Description",
-  ai: "AI",
-  account: "Account",
-  accountType: "Account Type",
-  category: "Category",
-  tags: "Tags",
-  amount: "Amount",
-};
-
-const COLUMN_MIN_WIDTHS: Record<string, number> = {
-  select: 40,
-  date: 95,
-  postedDate: 70,
-  description: 80,
-  ai: 30,
-  account: 60,
-  accountType: 60,
-  category: 80,
-  tags: 50,
-  amount: 70,
-};
-
 import { useUserSettings } from "@/components/user-settings-provider";
 import { Select } from '@/components/ui/select';
+import { ALL_COLUMNS, COLUMN_LABELS, COLUMN_MIN_WIDTHS } from "./table/column-constants";
+import { ProposedRuleDialog } from "./table/proposed-rule-dialog";
 
 export default function TransactionTable({
   filters,
@@ -2396,67 +2359,12 @@ export default function TransactionTable({
     )}
   </div>
 
-      {/* Proposed Rule Dialog */}
-      <AlertDialog
-        open={!!proposedRule}
-        onOpenChange={(open) => !open && setProposedRule(null)}
-      >
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Create Auto-Tag Rule?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Automatically assign this category to future transactions with the
-              same payee?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {proposedRule && (
-            <div className="space-y-3 py-2">
-              <div className="p-3 bg-muted/30 border border-border rounded-lg space-y-3">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                    When payee contains
-                  </label>
-                  <input
-                    value={proposedRule.payee}
-                    onChange={(e) =>
-                      setProposedRule((prev) =>
-                        prev ? { ...prev, payee: e.target.value } : null,
-                      )
-                    }
-                    className="w-full px-2.5 py-1.5 bg-background border border-input rounded-md text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-ring font-mono"
-                  />
-                </div>
-                <div className="flex items-center justify-between text-xs pt-2.5 border-t border-border/50">
-                  <span className="text-muted-foreground">Set category to</span>
-                  <span className="text-foreground font-medium">
-                    {proposedRule.categoryName}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-3 sm:justify-between sm:items-center">
-            <AlertDialogCancel className="h-10 w-full sm:w-auto px-4 py-2 text-sm font-semibold rounded-lg">
-              No thanks
-            </AlertDialogCancel>
-            <div className="flex flex-col-reverse sm:flex-row gap-3 w-full sm:w-auto">
-              <Button
-                variant="outline"
-                onClick={handleCreateRule}
-                className="h-10 w-full sm:w-auto rounded-lg font-semibold border-border hover:bg-muted"
-              >
-                Create Rule
-              </Button>
-              <Button
-                onClick={handleCreateAndRunRule}
-                className="h-10 w-full sm:w-auto rounded-lg font-semibold"
-              >
-                Create and Run Now
-              </Button>
-            </div>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ProposedRuleDialog
+        proposedRule={proposedRule}
+        setProposedRule={setProposedRule}
+        handleCreateRule={handleCreateRule}
+        handleCreateAndRunRule={handleCreateAndRunRule}
+      />
     </>
   );
 }
