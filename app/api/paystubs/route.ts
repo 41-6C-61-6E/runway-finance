@@ -11,6 +11,7 @@ import {
 } from '@/lib/services/sync';
 import { invalidateUserSearchCache } from '@/lib/services/search-cache';
 import { isAssetAccount } from '@/lib/utils/account-scope';
+import { createTransactionsFromLineItems } from '@/lib/services/payroll';
 
 export async function GET(request: Request) {
   const session = await auth();
