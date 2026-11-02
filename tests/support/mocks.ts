@@ -103,3 +103,4 @@ export const mockNavigation = {
   refresh: vi.fn(),
   prefetch: vi.fn(),
 };
+
