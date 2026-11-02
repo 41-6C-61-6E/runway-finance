@@ -12,23 +12,11 @@ const LOG_TAG = '[api-investments-quotes]';
 // Simple in-memory cache keyed by the PRICE SOURCE that was fetched (not the
 // requested holding ticker), so proxies and their canonical symbols share an
 // entry.
+import type { QuoteData } from '@/lib/types/investments';
+export type { QuoteData };
+
 const cache = new Map<string, { data: QuoteData; expiresAt: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
-
-export interface QuoteData {
-  ticker: string;
-  price: number | null;
-  change: number | null;
-  changePercent: number | null;
-  high52: number | null;
-  low52: number | null;
-  marketCap: number | null;
-  shortName: string | null;
-  // Set when price was sourced from a proxy (e.g. a user-assigned public ETF
-  // equivalent) rather than the holding's own ticker.
-  priceSource?: string;
-  error?: string;
-}
 
 const QUOTE_TICKER_RE = /^[A-Z][A-Z0-9.\-]{0,11}$/;
 

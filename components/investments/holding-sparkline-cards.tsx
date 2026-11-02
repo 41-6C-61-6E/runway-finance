@@ -9,7 +9,7 @@ import { ChartTooltip, TooltipHeader, TooltipRow } from '@/components/charts/cha
 import { TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { formatSafeUTCDate } from '@/lib/utils/date';
-import type { QuoteData } from '@/app/api/investments/quotes/route';
+import type { QuoteData } from '@/lib/types/investments';
 import { getDisplayTicker } from '@/lib/types/investments';
 
 interface Holding {

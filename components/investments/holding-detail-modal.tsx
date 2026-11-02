@@ -37,7 +37,7 @@ import {
   Save,
   X,
 } from 'lucide-react';
-import type { QuoteData } from '@/app/api/investments/quotes/route';
+import type { QuoteData } from '@/lib/types/investments';
 import { getDisplayTicker } from '@/lib/types/investments';
 
 interface Holding {

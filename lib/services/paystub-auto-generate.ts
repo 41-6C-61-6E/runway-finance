@@ -8,7 +8,7 @@ import {
   transactions,
 } from '@/lib/db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
-import { createTransactionsFromLineItems } from '@/app/api/paystubs/route';
+import { createTransactionsFromLineItems } from '@/lib/services/payroll';
 import {
   updateCategorySpendingSummaries,
   updateCategoryIncomeSummaries,

@@ -13,7 +13,7 @@ Personal finance dashboard for tracking net worth, cash flow, investments, budge
 - **Dev Server**: `pnpm dev` (Runs on `http://localhost:3001` via `--turbo`; generates CSS palette and service worker before launch)
 - **Restart Dev Server**: `pnpm restart` or `pnpm dev:restart`
 - **Typecheck**: `pnpm typecheck` (`tsc --noEmit`)
-- **Lint**: `pnpm lint` (`eslint . && node scripts/ui-ratchet.mjs`)
+- **Lint**: `pnpm lint` (`eslint . && node scripts/ui-ratchet.mjs && node scripts/consolidation-ratchet.mjs && node scripts/check-module-boundaries.mjs`)
 - **Unit & Integration Tests**: `pnpm test` (Vitest)
 - **E2E Tests**: `pnpm test:e2e` (Playwright)
 - **CI Suite**: `pnpm ci` (Lint, typecheck, test, and build)
@@ -46,7 +46,10 @@ alias runway-shell='docker exec -it -u abc -w /config/workspace/runway-finance c
 2. **Path Aliases**: Use `@/*` for root imports and `auth` for `@/lib/auth` (configured in `tsconfig.json`).
 3. **Database Modifications**: When altering database structures, update the appropriate schema file in `lib/db/schema/`, ensure it is exported in `lib/db/schema.ts`, and run `pnpm db:generate`. Never manually tweak existing applied migration files.
 4. **Port Number**: The dev server binds to port `3001` (not `3000`).
-5. **UI Ratchet**: The lint step (`pnpm lint`) includes a UI ratchet check (`scripts/ui-ratchet.mjs`). Maintain existing Radix UI and Tailwind patterns without adding superfluous styling dependencies.
+5. **UI & Consolidation Ratchets**: The lint step (`pnpm lint`) includes UI ratchet checks (`scripts/ui-ratchet.mjs`), consolidation metrics ratchets (`scripts/consolidation-ratchet.mjs`), and architectural boundary checks (`scripts/check-module-boundaries.mjs`). Maintain patterns without adding regressions.
 6. **Verification**: Always execute `pnpm typecheck` and `pnpm test` before concluding tasks involving code changes.
-7. **Security**: Never commit secrets or sensitive information to the repository. Always use environment variables for sensitive configuration. Code with security best practices
-7. **Pirimitives**: Always use the existing primitives in `components/ui/*` for UI components. Do not create new ones unless necessary. Follw existing styling patterns.
+7. **Security**: Never commit secrets or sensitive information to the repository. Always use environment variables for sensitive configuration. Code with security best practices.
+8. **Primitives Catalog**: Always use existing primitives in `components/ui/*` (see `docs/ui-primitives.md`). Do not create hand-rolled overlays or modals; use `ModalBackdrop`, `ConfirmDeleteDialog`, `ActionButton`, etc.
+9. **Client Data Layer**: Always use `apiFetch` from `@/lib/utils/api-client` and domain query hooks in `@/lib/queries/*` with query keys from `@/lib/query-keys`. Never call raw `fetch()` directly in client components.
+10. **API Routes**: Wrap all authenticated endpoints with `withAuth` or `withAuthAndDek` from `@/lib/api/with-auth`. Never call `await auth()` directly or emit raw `NextResponse.json`.
+11. **Formatting & Math**: Use canonical formatters in `@/lib/utils/format` and date utilities in `@/lib/utils/date/`. Never reimplement local ad-hoc currency formatters or date addition.

@@ -7,7 +7,7 @@ import {
   accounts,
   transactions,
 } from '@/lib/db/schema';
-import { createTransactionsFromLineItems } from '../route';
+import { createTransactionsFromLineItems } from '@/lib/services/payroll';
 import { getSessionDEK } from '@/lib/crypto-context';
 import {
   updateCategorySpendingSummaries,

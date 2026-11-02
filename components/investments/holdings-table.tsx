@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { IconTip } from '@/components/ui/icon-tip';
-import type { QuoteData } from '@/app/api/investments/quotes/route';
+import type { QuoteData } from '@/lib/types/investments';
 import { getDisplayTicker } from '@/lib/types/investments';
 
 interface Holding {

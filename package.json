@@ -19,7 +19,7 @@
     "build": "next build",
     "start": "next start -p 3000",
     "preview": "pnpm start",
-    "lint": "eslint . && node scripts/ui-ratchet.mjs && node scripts/consolidation-ratchet.mjs",
+    "lint": "eslint . && node scripts/ui-ratchet.mjs && node scripts/consolidation-ratchet.mjs && node scripts/check-module-boundaries.mjs",
     "ci": "./scripts/check-financial-consistency.sh && pnpm --silent lint && pnpm --silent typecheck && TZ=America/New_York pnpm test && pnpm --silent build",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",

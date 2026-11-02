@@ -49,3 +49,17 @@ export function getDisplayTicker(
   const eq = (holding.publicEquivalent ?? '').trim().toUpperCase();
   return eq || null;
 }
+
+export interface QuoteData {
+  ticker: string;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  high52: number | null;
+  low52: number | null;
+  marketCap: number | null;
+  shortName: string | null;
+  priceSource?: string;
+  error?: string;
+}
+

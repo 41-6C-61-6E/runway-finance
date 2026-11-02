@@ -7,7 +7,7 @@ import { SidebarCollapseButton } from '@/components/ui/sidebar-collapse-button';
 import { PieChart, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getDisplayTicker, type InvestmentHolding } from '@/lib/types/investments';
-import type { QuoteData } from '@/app/api/investments/quotes/route';
+import type { QuoteData } from '@/lib/types/investments';
 import { TaxWrapper, TAX_WRAPPER_MAP, getTaxWrapper } from '@/lib/utils/account-scope';
 
 interface Account {

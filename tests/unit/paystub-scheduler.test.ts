@@ -5,11 +5,11 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/crypto-context', () => ({
-  getServerDEK: vi.fn(async () => new Uint8Array([1, 2, 3])),
-  getSessionDEK: vi.fn(async () => new Uint8Array([1, 2, 3])),
+  getServerDEK: vi.fn(async () => new Uint8Array(32).fill(1)),
+  getSessionDEK: vi.fn(async () => new Uint8Array(32).fill(1)),
 }));
 
-vi.mock('@/app/api/paystubs/route', () => ({
+vi.mock('@/lib/services/payroll', () => ({
   createTransactionsFromLineItems: vi.fn(async () => {}),
 }));
 
