@@ -2,6 +2,7 @@
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import '@testing-library/jest-dom';
 import { AdviceSheet } from '@/components/features/advice/advice-sheet';
 import { AdviceProvider, useAdvice } from '@/components/features/advice/advice-provider';
 
@@ -88,5 +89,35 @@ describe('AdviceSheet Component', () => {
     });
 
     expect(await screen.findByPlaceholderText(/Ask for advice about your spending/i)).not.toBeNull();
+  });
+
+  it('renders unconfigured state with Button asChild without slotting error', async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/ai/advice/status')) {
+        return new Response(
+          JSON.stringify({
+            available: false,
+            reason: 'not_configured',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    render(
+      <AdviceProvider>
+        <TestHarness />
+      </AdviceProvider>
+    );
+
+    act(() => {
+      fireEvent.click(screen.getByText('Open Sheet'));
+    });
+
+    expect(await screen.findByText(/AI Provider Required/i)).not.toBeNull();
+    const link = screen.getByRole('link', { name: /Set up an AI provider/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', '/settings');
   });
 });
