@@ -84,6 +84,7 @@ export function usePersistentState<T>(
     // Only initialize from DB/localStorage once per key
     if (loadedKeyRef.current === key) return;
     loadedKeyRef.current = key;
+    lastDbSavedRef.current = undefined;
 
     const dbValue = context.settings.chartSelections?.[key];
 
@@ -161,6 +162,14 @@ export function usePersistentState<T>(
   const setPersistentState = useCallback((value: T | ((prev: T) => T)) => {
     const prev = stateRef.current;
     const newValue = value instanceof Function ? value(prev) : value;
+    const prevForDb = prev instanceof Set ? Array.from(prev) : prev;
+    const valForDb = newValue instanceof Set ? Array.from(newValue) : newValue;
+    const serialized = JSON.stringify(valForDb);
+    const prevSerialized = JSON.stringify(prevForDb);
+
+    if (Object.is(newValue, prev) || serialized === prevSerialized) {
+      return;
+    }
 
     stateRef.current = newValue;
     setState(newValue);
@@ -180,11 +189,16 @@ export function usePersistentState<T>(
     //    race conditions where the context hasn't re-rendered yet after a prior PATCH.
     const currentContext = contextRef.current;
     if (currentContext && !currentContext.loading) {
-      const valForDb = newValue instanceof Set ? Array.from(newValue) : newValue;
-      const serialized = JSON.stringify(valForDb);
-      if (lastDbSavedRef.current !== serialized) {
+      const existingDbVal = currentContext.settings?.chartSelections?.[key];
+      const existingDbSerialized =
+        existingDbVal !== undefined && existingDbVal !== null
+          ? JSON.stringify(existingDbVal)
+          : undefined;
+      if (lastDbSavedRef.current !== serialized && existingDbSerialized !== serialized) {
         lastDbSavedRef.current = serialized;
         currentContext.updateSetting('chartSelections', { [key]: valForDb });
+      } else {
+        lastDbSavedRef.current = serialized;
       }
     }
   }, [key]);

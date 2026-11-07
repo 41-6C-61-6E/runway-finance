@@ -53,14 +53,15 @@ export function useDateWindow(
     return paramDate && (/^\d{4}-\d{2}-\d{2}$/.test(paramDate) || /^\d{4}-\d{2}$/.test(paramDate)) ? paramDate : null;
   }, [searchParams]);
 
-  const [timeframeState, _setTimeframe] = usePersistentState<TimeRange>(
+  const [timeframeState, _setTimeframe, isTimeframeLoaded] = usePersistentState<TimeRange>(
     timeframeKey || '',
     urlTimeframe ?? defaultTimeframe,
     { skipRestore: urlTimeframe !== null },
   );
-  const [windowEnd, setWindowEnd] = usePersistentState<string>(
+  const initialTimeframe = controlledTimeframe !== undefined ? controlledTimeframe : (urlTimeframe ?? defaultTimeframe);
+  const [windowEnd, setWindowEnd, isWindowEndLoaded] = usePersistentState<string>(
     windowEndKey,
-    urlWindowEnd ?? currentMonth,
+    urlWindowEnd ?? snapToPeriod(currentMonth, initialTimeframe),
     { skipRestore: urlWindowEnd !== null },
   );
 
@@ -117,11 +118,12 @@ export function useDateWindow(
     // persisted monthly values (e.g. after the user switches to a discrete
     // timeframe, which already snaps synchronously in setTimeframe).
     if (urlWindowEnd !== null) return;
+    if (!isWindowEndLoaded || (controlledTimeframe === undefined && !isTimeframeLoaded)) return;
     const snapped = snapToPeriod(windowEnd, timeframe);
     if (snapped !== windowEnd) {
       setWindowEnd(snapped);
     }
-  }, [timeframe, windowEnd, setWindowEnd, urlWindowEnd]);
+  }, [timeframe, windowEnd, setWindowEnd, urlWindowEnd, isWindowEndLoaded, isTimeframeLoaded, controlledTimeframe]);
 
   // Auto-migrate deprecated 1d values persisted in DB/localStorage
   useEffect(() => {

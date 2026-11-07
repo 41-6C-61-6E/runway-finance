@@ -30,9 +30,26 @@ type UserSettingsContextType = {
 
 const UserSettingsContext = createContext<UserSettingsContextType | null>(null);
 
+function isTransientNetworkOrAbortError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const name = (err as { name?: string }).name;
+  const message = String((err as { message?: string }).message || '');
+  if (name === 'AbortError') return true;
+  if (
+    name === 'TypeError' &&
+    /load failed|failed to fetch|networkerror|network connection was lost|cancelled|canceled|aborted/i.test(message)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function UserSettingsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const pendingChartSelectionsRef = useRef<Record<string, Record<string, any>>>({});
+  const chartFlushPromiseRef = useRef<Promise<void> | null>(null);
+  const inFlightChartPatchRef = useRef<Promise<void>>(Promise.resolve());
 
   const { data: settings = {}, isLoading: loading, refetch } = useQuery<Record<string, any>>({
     queryKey: queryKeys.userSettings.all,
@@ -120,30 +137,70 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       return { ...prev, [key]: value };
     });
 
-    try {
-      const bodyPayload = { [key]: value };
+    const sendPatchRequest = async (bodyPayload: Record<string, any>, keys: string[]) => {
+      try {
+        const res = await fetch('/api/user-settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(bodyPayload),
+        });
 
-      const res = await fetch('/api/user-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(bodyPayload),
-      });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || `HTTP ${res.status}`);
+        }
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${res.status}`);
+        if (Object.keys(pendingChartSelectionsRef.current).length === 0) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.userSettings.all });
+        }
+        if (keys.includes('showImportedData') || keys.includes('showSyntheticData')) {
+          invalidateAfterAccountChange(queryClient);
+        }
+        // Notify other open tabs so they refresh their settings cache.
+        for (const k of keys) {
+          channelRef.current?.postMessage({ type: 'settings-changed', key: k });
+        }
+      } catch (e) {
+        if (isTransientNetworkOrAbortError(e)) {
+          return;
+        }
+        console.error(`Failed to update setting ${keys.join(', ')}:`, e);
+        if (Object.keys(pendingChartSelectionsRef.current).length === 0) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.userSettings.all });
+        }
       }
-      queryClient.invalidateQueries({ queryKey: queryKeys.userSettings.all });
-      if (key === 'showImportedData' || key === 'showSyntheticData') {
-        invalidateAfterAccountChange(queryClient);
+    };
+
+    if (
+      (key === 'chartSelections' || key === 'cardCollapsedStates') &&
+      typeof value === 'object' &&
+      value !== null
+    ) {
+      pendingChartSelectionsRef.current[key] = {
+        ...(pendingChartSelectionsRef.current[key] || {}),
+        ...value,
+      };
+
+      if (!chartFlushPromiseRef.current) {
+        chartFlushPromiseRef.current = Promise.resolve().then(() => {
+          chartFlushPromiseRef.current = null;
+          const nextPatch = inFlightChartPatchRef.current.then(async () => {
+            const payload = pendingChartSelectionsRef.current;
+            const keys = Object.keys(payload);
+            if (keys.length === 0) return;
+            pendingChartSelectionsRef.current = {};
+            await sendPatchRequest(payload, keys);
+          });
+          inFlightChartPatchRef.current = nextPatch.catch(() => {});
+          return nextPatch;
+        });
       }
-      // Notify other open tabs so they refresh their settings cache.
-      channelRef.current?.postMessage({ type: 'settings-changed', key });
-    } catch (e) {
-      console.error(`Failed to update setting ${key}:`, e);
-      queryClient.invalidateQueries({ queryKey: queryKeys.userSettings.all });
+
+      return chartFlushPromiseRef.current;
     }
+
+    await sendPatchRequest({ [key]: value }, [key]);
   }, [queryClient]);
 
   const value = useMemo(

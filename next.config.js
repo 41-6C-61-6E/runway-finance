@@ -19,6 +19,13 @@ const getLocalIPs = () => {
       }
     }
   }
+  for (const envUrl of [process.env.NEXTAUTH_URL, process.env.APP_URL, process.env.NEXT_PUBLIC_APP_URL]) {
+    if (!envUrl) continue;
+    try {
+      const { hostname } = new URL(envUrl);
+      if (hostname && !ips.includes(hostname)) ips.push(hostname);
+    } catch {}
+  }
   return ips;
 };
 
@@ -56,6 +63,7 @@ const nextConfig = {
     'localhost',
     '127.0.0.1',
     '10.1.1.5',
+    '10.1.1.6',
     ...getLocalIPs(),
   ],
   output: "standalone",

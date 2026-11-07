@@ -76,12 +76,12 @@ export default function AccountHierarchyTree({
   );
   const [expandedAccounts, setExpandedAccounts] = usePersistentState<Record<string, boolean>>(
     'finance:accounts:expandedAccounts',
-    {},
+    targetAccountId ? { [targetAccountId]: true } : {},
     { skipRestore: Boolean(targetAccountId) }
   );
   const [selectedGroup, setSelectedGroup] = usePersistentState<string | null>(
     'finance:accounts:selectedGroup',
-    'All Accounts',
+    targetAccountId ? null : 'All Accounts',
     { skipRestore: Boolean(targetAccountId) }
   );
 
@@ -155,8 +155,8 @@ export default function AccountHierarchyTree({
       const acc = filteredAllAccounts.find((a) => a.id === effectiveAccountId);
       if (acc) {
         const { group, subGroup } = getHierarchy(acc.type);
-        setExpandedGroups((prev) => (prev[group] ? prev : { ...prev, [group]: true }));
-        setExpandedSubgroups((prev) => (prev[`${group}::${subGroup}`] ? prev : { ...prev, [`${group}::${subGroup}`]: true }));
+        setExpandedGroups((prev) => (prev[group] !== false ? prev : { ...prev, [group]: true }));
+        setExpandedSubgroups((prev) => (prev[`${group}::${subGroup}`] !== false ? prev : { ...prev, [`${group}::${subGroup}`]: true }));
 
         if (!hasAutoScrolledRef.current) {
           hasAutoScrolledRef.current = true;
@@ -494,8 +494,8 @@ export default function AccountHierarchyTree({
       const acc = filteredAllAccounts.find((a) => a.id === accountId);
       if (acc) {
         const { group, subGroup } = getHierarchy(acc.type);
-        setExpandedGroups((prev) => (prev[group] ? prev : { ...prev, [group]: true }));
-        setExpandedSubgroups((prev) => (prev[`${group}::${subGroup}`] ? prev : { ...prev, [`${group}::${subGroup}`]: true }));
+        setExpandedGroups((prev) => (prev[group] !== false ? prev : { ...prev, [group]: true }));
+        setExpandedSubgroups((prev) => (prev[`${group}::${subGroup}`] !== false ? prev : { ...prev, [`${group}::${subGroup}`]: true }));
       }
     }
   }, [filteredAllAccounts, setSelectedAccountId, setExpandedAccounts, setSelectedGroup, setExpandedGroups, setExpandedSubgroups]);
