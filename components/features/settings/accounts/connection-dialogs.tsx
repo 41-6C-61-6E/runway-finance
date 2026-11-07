@@ -7,6 +7,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import type { SettingsConnection } from '../orphaned-accounts-section';
+import { SYNC_FREQUENCY_LABELS } from './sync-intervals';
 
 export interface PlaidCredentialsDialogProps {
   open: boolean;
@@ -246,7 +247,9 @@ export function ConnectionDetailsDialog({
               </div>
               <div>
                 <label className="text-xs text-muted-foreground font-medium">Sync Frequency</label>
-                <div className="mt-1 text-foreground text-sm capitalize">{detailsConn.syncFrequency}</div>
+                <div className="mt-1 text-foreground text-sm capitalize">
+                  {SYNC_FREQUENCY_LABELS[detailsConn.syncFrequency === 'hourly' ? 'daily' : detailsConn.syncFrequency] ?? detailsConn.syncFrequency}
+                </div>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground font-medium">Balance Preference</label>

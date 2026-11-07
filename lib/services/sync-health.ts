@@ -218,8 +218,12 @@ export async function getAccountsSyncStatus(
 
           const lastSyncTime = new Date(conn.lastSyncAt).getTime();
           const elapsedHours = (now - lastSyncTime) / (1000 * 60 * 60);
+          const effectiveFrequency = conn.syncFrequency === 'hourly' ? 'daily' : conn.syncFrequency;
 
-          if (conn.syncFrequency === 'daily' && elapsedHours > 72) {
+          if (
+            (effectiveFrequency === 'daily' || effectiveFrequency === '4h' || effectiveFrequency === '12h') &&
+            elapsedHours > 72
+          ) {
             statuses[accountId] = {
               status: 'warning',
               reason: `Connection has not successfully synced in over 3 days (last sync was ${Math.round(elapsedHours / 24)} days ago).`,

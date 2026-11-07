@@ -454,6 +454,14 @@ export default function AutomaticAccountsSection({
     } catch {}
   }, [fetchConnections]);
 
+  useEffect(() => {
+    for (const conn of connections) {
+      if (conn.syncFrequency === 'hourly' && (!currentUserId || conn.userId === currentUserId)) {
+        void handleSyncFrequencyChange(conn.id, 'daily');
+      }
+    }
+  }, [connections, currentUserId, handleSyncFrequencyChange]);
+
   const handleBalanceSourceChange = useCallback(async (connectionId: string, source: string) => {
     try {
       const res = await fetch(`/api/connections/${connectionId}`, {
@@ -720,8 +728,9 @@ export default function AutomaticAccountsSection({
 
     const baseFee = 0.30 + (hasInvestments ? 0.30 : 0);
     let refreshesPerMonth = 0;
-    if (conn.syncFrequency === 'hourly') refreshesPerMonth = 24 * 30;
-    else if (conn.syncFrequency === 'daily') refreshesPerMonth = 1 * 30;
+    if (conn.syncFrequency === '4h') refreshesPerMonth = 6 * 30;
+    else if (conn.syncFrequency === '12h') refreshesPerMonth = 2 * 30;
+    else if (conn.syncFrequency === 'daily' || conn.syncFrequency === 'hourly') refreshesPerMonth = 1 * 30;
     else if (conn.syncFrequency === 'weekly') refreshesPerMonth = 4.3;
     else if (conn.syncFrequency === 'monthly') refreshesPerMonth = 1;
 
@@ -1014,7 +1023,8 @@ export default function AutomaticAccountsSection({
           ) : (
             <div className="space-y-3">
               {connections.map((conn) => {
-                const nextSync = computeNextSync(conn.syncFrequency, conn.lastSyncAt);
+                const effectiveSyncFrequency = conn.syncFrequency === 'hourly' ? 'daily' : conn.syncFrequency;
+                const nextSync = computeNextSync(effectiveSyncFrequency, conn.lastSyncAt);
                 return (
                   <div
                     key={conn.id}
@@ -1124,34 +1134,35 @@ export default function AutomaticAccountsSection({
                     {conn.lastSyncError && (
                       <div className="text-xs text-destructive truncate">{conn.lastSyncError}</div>
                     )}
-                    <div className="flex items-center justify-between pt-1.5">
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-muted-foreground">Sync frequency:</label>
-                        <Select
-                          className="h-7 text-xs"
-                          value={conn.syncFrequency}
-                          disabled={currentUserId !== undefined && conn.userId !== currentUserId}
-                          onChange={(e) => handleSyncFrequencyChange(conn.id, e.target.value)}
-                        >
-                          <option value="manual">Manual</option>
-                          <option value="hourly">Hourly</option>
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                          <option value="monthly">Monthly</option>
-                        </Select>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {syncingId === conn.id ? (
-                          <span className="text-chart-1 animate-pulse">Syncing...</span>
-                        ) : conn.syncFrequency === 'manual' ? (
-                          <span>Not scheduled</span>
-                        ) : nextSync && nextSync.getTime() > Date.now() ? (
-                          <span>Next sync: {formatTimeUntil(nextSync)}</span>
-                        ) : (
-                          <span className="text-chart-3">Next sync: Overdue</span>
-                        )}
-                      </div>
-                    </div>
+                     <div className="flex items-center justify-between pt-1.5">
+                       <div className="flex items-center gap-2">
+                         <label className="text-xs text-muted-foreground">Sync frequency:</label>
+                         <Select
+                           className="h-7 text-xs"
+                           value={effectiveSyncFrequency}
+                           disabled={currentUserId !== undefined && conn.userId !== currentUserId}
+                           onChange={(e) => handleSyncFrequencyChange(conn.id, e.target.value)}
+                         >
+                           <option value="manual">Manual</option>
+                           <option value="4h">Every 4 hours</option>
+                           <option value="12h">Every 12 hours</option>
+                           <option value="daily">Daily</option>
+                           <option value="weekly">Weekly</option>
+                           <option value="monthly">Monthly</option>
+                         </Select>
+                       </div>
+                       <div className="text-xs text-muted-foreground">
+                         {syncingId === conn.id ? (
+                           <span className="text-chart-1 animate-pulse">Syncing...</span>
+                         ) : effectiveSyncFrequency === 'manual' ? (
+                           <span>Not scheduled</span>
+                         ) : nextSync && nextSync.getTime() > Date.now() ? (
+                           <span>Next sync: {formatTimeUntil(nextSync)}</span>
+                         ) : (
+                           <span className="text-chart-3">Next sync: Overdue</span>
+                         )}
+                       </div>
+                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-border/40 gap-2">
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-muted-foreground">Balance type:</label>

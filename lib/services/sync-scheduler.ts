@@ -11,7 +11,8 @@ const LOG_TAG = '[sync-scheduler]';
 
 const SYNC_INTERVALS: Record<string, number> = {
   manual: 0,
-  hourly: 60 * 60 * 1000,
+  '4h': 4 * 60 * 60 * 1000,
+  '12h': 12 * 60 * 60 * 1000,
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
   monthly: 30 * 24 * 60 * 60 * 1000,
@@ -79,6 +80,27 @@ class SyncScheduler extends BaseScheduler<string> {
     let scheduled = 0;
     let skipped = 0;
     for (const conn of allConnections) {
+      if (conn.syncFrequency === 'hourly') {
+        conn.syncFrequency = 'daily';
+        try {
+          if (conn.type === 'simplefin') {
+            await getDb()
+              .update(simplifinConnections)
+              .set({ syncFrequency: 'daily' })
+              .where(eq(simplifinConnections.id, conn.id));
+          } else {
+            await getDb()
+              .update(plaidConnections)
+              .set({ syncFrequency: 'daily' })
+              .where(eq(plaidConnections.id, conn.id));
+          }
+          logger.info(`${LOG_TAG} Automatically switched connection from hourly to daily`, {
+            connectionId: conn.id,
+            type: conn.type,
+          });
+        } catch {}
+      }
+
       if (!(await this.canSyncUser(conn.userId))) {
         logger.warn(`${LOG_TAG} Skipping connection — server DEK unavailable`, {
           connectionId: conn.id,
@@ -106,16 +128,17 @@ class SyncScheduler extends BaseScheduler<string> {
   ): Promise<boolean> {
     this.cancel(id);
 
-    if (syncFrequency === 'manual') return false;
+    const effectiveFrequency = syncFrequency === 'hourly' ? 'daily' : syncFrequency;
+    if (effectiveFrequency === 'manual') return false;
 
-    const interval = SYNC_INTERVALS[syncFrequency];
+    const interval = SYNC_INTERVALS[effectiveFrequency];
     if (!interval) return false;
 
     const now = Date.now();
     const lastSyncTime = lastSyncAt ? lastSyncAt.getTime() : 0;
     let delay: number;
 
-    if (syncFrequency === 'daily') {
+    if (effectiveFrequency === 'daily') {
       // Find the user's timezone and preferred daily sync hour (default: midnight / 0)
       let userTz = 'America/New_York';
       let targetHour = 0; // 00:00 (midnight)
@@ -165,7 +188,7 @@ class SyncScheduler extends BaseScheduler<string> {
         delay = Math.max(0, nextSyncTime - now);
       }
     } else {
-      // Non-daily intervals (hourly, weekly, monthly)
+      // Non-daily intervals (4h, 12h, weekly, monthly)
       const nextSyncTime = lastSyncTime + interval;
       delay = Math.max(0, nextSyncTime - now);
     }
@@ -174,7 +197,7 @@ class SyncScheduler extends BaseScheduler<string> {
 
     logger.info(`${LOG_TAG} Scheduled`, {
       connectionId: id,
-      frequency: syncFrequency,
+      frequency: effectiveFrequency,
       delay: `${Math.round(delay / 1000 / 60)}m`,
     });
 
@@ -208,9 +231,28 @@ class SyncScheduler extends BaseScheduler<string> {
       .from(plaidConnections)
       .where(eq(plaidConnections.userId, userId));
 
-    const all = [...sfConnections, ...pConnections];
+    const all = [
+      ...sfConnections.map((c) => ({ ...c, type: 'simplefin' as const })),
+      ...pConnections.map((c) => ({ ...c, type: 'plaid' as const })),
+    ];
 
     for (const conn of all) {
+      if (conn.syncFrequency === 'hourly') {
+        conn.syncFrequency = 'daily';
+        try {
+          if (conn.type === 'simplefin') {
+            await getDb()
+              .update(simplifinConnections)
+              .set({ syncFrequency: 'daily' })
+              .where(eq(simplifinConnections.id, conn.id));
+          } else {
+            await getDb()
+              .update(plaidConnections)
+              .set({ syncFrequency: 'daily' })
+              .where(eq(plaidConnections.id, conn.id));
+          }
+        } catch {}
+      }
       await this.schedule(conn.id, conn.syncFrequency, conn.lastSyncAt, userId);
     }
   }

@@ -8,7 +8,10 @@ export const CreateConnectionSchema = z.object({
 
 export const UpdateConnectionSchema = z.object({
   label: z.string().min(1).max(100).optional(),
-  syncFrequency: z.enum(['manual', 'hourly', 'daily', 'weekly', 'monthly']).optional(),
+  syncFrequency: z
+    .enum(['manual', '4h', '12h', 'daily', 'weekly', 'monthly', 'hourly'])
+    .transform((val) => (val === 'hourly' ? 'daily' : val))
+    .optional(),
   disabledAccounts: z.array(z.string()).optional(),
   setupToken: z.string().min(1).optional(),
   accessUrl: z.string().min(1).optional(),

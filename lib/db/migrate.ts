@@ -214,6 +214,35 @@ async function runSelfHealingChecks(client: any): Promise<void> {
       `);
     }
 
+    // 3h. Migrate deprecated 'hourly' sync_frequency to 'daily' on connections
+    const hourlySfCheck = await client.query(`
+      SELECT id FROM simplefin_connections
+      WHERE sync_frequency = 'hourly'
+      LIMIT 1
+    `);
+    if (hourlySfCheck.rows.length > 0) {
+      logger.info('[migrate] [self-heal] Migrating simplefin_connections from hourly to daily sync_frequency...');
+      await client.query(`
+        UPDATE simplefin_connections
+        SET sync_frequency = 'daily'
+        WHERE sync_frequency = 'hourly'
+      `);
+    }
+
+    const hourlyPlaidCheck = await client.query(`
+      SELECT id FROM plaid_connections
+      WHERE sync_frequency = 'hourly'
+      LIMIT 1
+    `);
+    if (hourlyPlaidCheck.rows.length > 0) {
+      logger.info('[migrate] [self-heal] Migrating plaid_connections from hourly to daily sync_frequency...');
+      await client.query(`
+        UPDATE plaid_connections
+        SET sync_frequency = 'daily'
+        WHERE sync_frequency = 'hourly'
+      `);
+    }
+
     // 6. Check if push_subscriptions table exists
     const tableCheckPush = await client.query(`
       SELECT table_name FROM information_schema.tables

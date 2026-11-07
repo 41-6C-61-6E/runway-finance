@@ -47,6 +47,32 @@ export async function GET() {
     .from(plaidConnections)
     .where(eq(plaidConnections.userId, userId));
 
+  for (const c of sfConnections) {
+    if (c.syncFrequency === 'hourly') {
+      c.syncFrequency = 'daily';
+      try {
+        await getDb()
+          .update(simplifinConnections)
+          .set({ syncFrequency: 'daily' })
+          .where(eq(simplifinConnections.id, c.id));
+        await syncScheduler.schedule(c.id, 'daily', c.lastSyncAt, c.userId);
+      } catch {}
+    }
+  }
+
+  for (const c of pConnections) {
+    if (c.syncFrequency === 'hourly') {
+      c.syncFrequency = 'daily';
+      try {
+        await getDb()
+          .update(plaidConnections)
+          .set({ syncFrequency: 'daily' })
+          .where(eq(plaidConnections.id, c.id));
+        await syncScheduler.schedule(c.id, 'daily', c.lastSyncAt, c.userId);
+      } catch {}
+    }
+  }
+
   const allConnections = [
     ...sfConnections.map((c) => ({ ...c, provider: 'simplefin' })),
     ...pConnections.map((c) => ({ ...c, provider: 'plaid' })),
@@ -99,7 +125,8 @@ export async function POST(request: Request) {
   }
 
   const { setupToken, label, balanceSource = 'current' } = parsed.data;
-  const syncFrequency = body.syncFrequency || 'manual';
+  const rawFrequency = body.syncFrequency || 'manual';
+  const syncFrequency = rawFrequency === 'hourly' ? 'daily' : rawFrequency;
 
   // Claim access URL from SimpleFIN
   let accessUrl: string;

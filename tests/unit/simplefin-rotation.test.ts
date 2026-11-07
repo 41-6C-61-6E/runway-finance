@@ -147,4 +147,38 @@ describe('PATCH /api/connections/[id] - SimpleFIN URL/Token Rotation', () => {
     expect(res.status).toBe(400);
     expect(data.error).toBe('claim_failed');
   });
+
+  it('accepts 4h and 12h sync frequencies and coerces legacy hourly to daily', async () => {
+    const { PATCH } = await import('@/app/api/connections/[id]/route');
+
+    for (const freq of ['4h', '12h'] as const) {
+      mockLimit.mockResolvedValueOnce([mockConnection]);
+      mockReturning.mockResolvedValueOnce([{ ...mockConnection, syncFrequency: freq }]);
+
+      const req = new Request('http://localhost:3000/api/connections/conn_sf_1', {
+        method: 'PATCH',
+        body: JSON.stringify({ syncFrequency: freq }),
+      });
+
+      const res = await PATCH(req, { params: Promise.resolve({ id: 'conn_sf_1' }) });
+      const data = await res.json();
+      expect(res.status).toBe(200);
+      expect(mockSet).toHaveBeenLastCalledWith({ syncFrequency: freq });
+      expect(data.syncFrequency).toBe(freq);
+    }
+
+    mockLimit.mockResolvedValueOnce([mockConnection]);
+    mockReturning.mockResolvedValueOnce([{ ...mockConnection, syncFrequency: 'daily' }]);
+
+    const reqHourly = new Request('http://localhost:3000/api/connections/conn_sf_1', {
+      method: 'PATCH',
+      body: JSON.stringify({ syncFrequency: 'hourly' }),
+    });
+
+    const resHourly = await PATCH(reqHourly, { params: Promise.resolve({ id: 'conn_sf_1' }) });
+    const dataHourly = await resHourly.json();
+    expect(resHourly.status).toBe(200);
+    expect(mockSet).toHaveBeenLastCalledWith({ syncFrequency: 'daily' });
+    expect(dataHourly.syncFrequency).toBe('daily');
+  });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { isDekAvailable, BaseScheduler } from '@/lib/services/base-scheduler';
 import { syncScheduler } from '@/lib/services/sync-scheduler';
+import { computeNextSync } from '@/components/features/settings/accounts/sync-intervals';
 
 class TestScheduler extends BaseScheduler<string> {
   constructor() {
@@ -128,6 +129,27 @@ describe('BaseScheduler & Schedulers Suite (base-scheduler.ts)', () => {
       expect(body.schedulers.stalenessScheduler).toBeDefined();
       expect(body.schedulers.stalenessScheduler).toHaveProperty('isRunning');
       expect(body.schedulers.stalenessScheduler).toHaveProperty('armedCount');
+    });
+  });
+
+  describe('SimpleFIN sync intervals (4h, 12h, and hourly -> daily coercion)', () => {
+    it('schedules 4h and 12h intervals and coerces legacy hourly to daily', async () => {
+      const lastSync = new Date(Date.now() - 60 * 60 * 1000); // 1h ago
+      expect(await syncScheduler.schedule('conn_4h', '4h', lastSync)).toBe(true);
+      expect(await syncScheduler.schedule('conn_12h', '12h', lastSync)).toBe(true);
+      expect(await syncScheduler.schedule('conn_hourly', 'hourly', lastSync)).toBe(true);
+      expect(syncScheduler.armedCount).toBe(3);
+
+      const next4h = computeNextSync('4h', lastSync.toISOString());
+      const next12h = computeNextSync('12h', lastSync.toISOString());
+      const nextHourlyCoerced = computeNextSync('hourly', lastSync.toISOString());
+      const nextDaily = computeNextSync('daily', lastSync.toISOString());
+
+      expect(next4h?.getTime()).toBe(lastSync.getTime() + 4 * 60 * 60 * 1000);
+      expect(next12h?.getTime()).toBe(lastSync.getTime() + 12 * 60 * 60 * 1000);
+      expect(nextHourlyCoerced?.getTime()).toBe(nextDaily?.getTime());
+
+      syncScheduler.shutdown();
     });
   });
 });

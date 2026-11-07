@@ -3,6 +3,8 @@
  */
 export const SYNC_INTERVALS: Record<string, number> = {
   manual: 0,
+  '4h': 4 * 60 * 60 * 1000,
+  '12h': 12 * 60 * 60 * 1000,
   daily: 24 * 60 * 60 * 1000,
   weekly: 7 * 24 * 60 * 60 * 1000,
   monthly: 30 * 24 * 60 * 60 * 1000,
@@ -15,12 +17,13 @@ export function computeNextSync(
   lastSyncAt: string | Date | null | undefined,
   frequency = 'daily'
 ): Date | null {
-  if (!lastSyncAt || frequency === 'manual') return null;
+  const normalizedFreq = frequency === 'hourly' ? 'daily' : frequency;
+  if (!lastSyncAt || normalizedFreq === 'manual') return null;
 
   const lastDate = typeof lastSyncAt === 'string' ? new Date(lastSyncAt) : lastSyncAt;
   if (isNaN(lastDate.getTime())) return null;
 
-  const intervalMs = SYNC_INTERVALS[frequency] || SYNC_INTERVALS.daily;
+  const intervalMs = SYNC_INTERVALS[normalizedFreq] || SYNC_INTERVALS.daily;
   return new Date(lastDate.getTime() + intervalMs);
 }
 

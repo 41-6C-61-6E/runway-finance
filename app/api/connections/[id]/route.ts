@@ -73,14 +73,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if ('syncFrequency' in body && body.syncFrequency !== undefined) {
-    const validFrequencies = ['manual', 'hourly', 'daily', 'weekly', 'monthly'];
-    if (!validFrequencies.includes(body.syncFrequency)) {
+    const normalizedFrequency = body.syncFrequency === 'hourly' ? 'daily' : body.syncFrequency;
+    const validFrequencies = ['manual', '4h', '12h', 'daily', 'weekly', 'monthly'];
+    if (!validFrequencies.includes(normalizedFrequency)) {
       return NextResponse.json(
         { error: 'validation_error', message: 'Invalid sync frequency' },
         { status: 400 }
       );
     }
-    updateData.syncFrequency = body.syncFrequency;
+    updateData.syncFrequency = normalizedFrequency;
   }
 
   if ('disabledAccounts' in body && body.disabledAccounts !== undefined) {
