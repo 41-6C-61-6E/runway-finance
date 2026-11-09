@@ -53,7 +53,7 @@ export function PaginationDots({
             aria-label={`Go to slide ${i + 1}: ${label}`}
             title={label}
             onClick={() => handleDotClick(i)}
-            className="p-1.5 flex items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary touch-manipulation cursor-pointer"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary touch-manipulation cursor-pointer"
           >
             <span
               className={cn(

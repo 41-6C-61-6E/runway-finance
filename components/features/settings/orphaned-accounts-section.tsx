@@ -7,6 +7,8 @@ import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select } from '@/components/ui/select';
+import { formatCurrency } from '@/lib/utils/format';
+import { apiFetch } from '@/lib/utils/api-client';
 
 export type SettingsAccount = {
   id: string;
@@ -106,18 +108,13 @@ export default function OrphanedAccountsSection({
     setRemapError('');
     setRemapSuccess('');
     try {
-      const res = await fetch('/api/accounts/remap', {
+      await apiFetch('/api/accounts/remap', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sourceAccountId: remapSourceId,
           targetAccountId: remapTargetId,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to remap accounts');
-      }
       setRemapSuccess('Accounts re-mapped successfully!');
       setRemapSourceId('');
       setRemapTargetId('');
@@ -160,15 +157,10 @@ export default function OrphanedAccountsSection({
         plaidConnectionId: isPlaid ? conn.id : null,
       };
 
-      const res = await fetch(`/api/accounts/${relinkAccount.id}`, {
+      await apiFetch(`/api/accounts/${relinkAccount.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to re-link account');
-      }
       setRelinkSuccess('Account re-linked successfully!');
       await onUpdated();
       invalidateAllFinanceQueries();
@@ -190,16 +182,12 @@ export default function OrphanedAccountsSection({
     setIsDeleteLoading(true);
     setDeleteError('');
     try {
-      const res = await fetch(`/api/accounts/${accountToDelete.id}`, {
+      await apiFetch(`/api/accounts/${accountToDelete.id}`, {
         method: 'DELETE',
         headers: {
           'X-Confirm-Delete': 'true',
         },
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to delete account');
-      }
       setIsDeleteConfirmOpen(false);
       setAccountToDelete(null);
       await onUpdated();
@@ -216,13 +204,9 @@ export default function OrphanedAccountsSection({
     setIsConvertLoading(true);
     setConvertError('');
     try {
-      const res = await fetch(`/api/accounts/${accountToConvert.id}/convert-to-manual`, {
+      await apiFetch(`/api/accounts/${accountToConvert.id}/convert-to-manual`, {
         method: 'POST',
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to convert account to manual');
-      }
       setIsConvertConfirmOpen(false);
       setAccountToConvert(null);
       await onUpdated();
@@ -251,10 +235,10 @@ export default function OrphanedAccountsSection({
 
         <div className="divide-y divide-border/40 border border-border/60 rounded-lg overflow-hidden bg-background/40 backdrop-blur-xs">
           {orphanedAccounts.map((a) => (
-            <div key={a.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 text-xs">
-              <div className="min-w-0 flex-1">
+            <div key={a.id} className="grid grid-cols-1 md:grid-cols-12 items-start md:items-center justify-between gap-3 p-3 text-xs">
+              <div className="min-w-0 md:col-span-6 lg:col-span-7">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-foreground truncate">{a.name}</span>
+                  <span className="font-semibold text-foreground max-w-[220px] truncate">{a.name}</span>
                   <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                     Unlinked
                   </span>
@@ -263,12 +247,12 @@ export default function OrphanedAccountsSection({
                   )}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                  <span>Balance: {parseFloat(a.balance || '0').toLocaleString('en-US', { style: 'currency', currency: a.currency || 'USD' })}</span>
+                  <span>Balance: {formatCurrency(a.balance || '0')}</span>
                   <span>·</span>
                   <span>Type: {a.type}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+              <div className="flex items-center flex-wrap gap-2 self-end md:self-center md:col-span-6 lg:col-span-5 md:justify-end flex-shrink-0">
                 <button
                   onClick={() => {
                     setRelinkAccount(a);

@@ -869,8 +869,9 @@ export async function handleGetBudgets(request: Request, userId: string, dek: Ui
 
       const rolloverCarryover = rolloverCarryoverMap.get(row.categoryId) || 0;
       const availableBudget = (row.rollover && !effectiveIsIncome) ? budgeted + rolloverCarryover : budgeted;
-      const remaining = effectiveIsIncome ? actual - budgeted : availableBudget - actual;
-      const percentUsed = availableBudget > 0 ? (actual / availableBudget) * 100 : 0;
+      const normalizedActual = effectiveIsIncome ? actual : Math.abs(actual);
+      const remaining = effectiveIsIncome ? actual - budgeted : availableBudget - normalizedActual;
+      const percentUsed = availableBudget > 0 ? (normalizedActual / availableBudget) * 100 : 0;
       const coveredCategoryIds = coveredCategoriesMap.get(row.categoryId) || [row.categoryId];
 
       return {
@@ -903,7 +904,7 @@ export async function handleGetBudgets(request: Request, userId: string, dek: Ui
           ? nativeAmount
           : (row.nativePeriodType === 'quarterly' ? nativeAmount / 3 : nativeAmount / 12),
         budgeted,
-        actual,
+        actual: effectiveIsIncome ? actual : normalizedActual,
         remaining,
         percentUsed,
         type: effectiveIsIncome ? 'income' : 'expense',

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Treemap } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
-import { isAccountActiveOnDate, isReportableAccount, computeNetWorthTotals } from '@/lib/utils/account-scope';
+import { isAccountActiveOnDate, isReportableAccount, computeNetWorthTotals, isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { convertCurrency } from '@/lib/constants/currency-rates';
 import { formatInTimezone } from '@/lib/utils/timeframe';
 import { useUserSettings } from '@/components/user-settings-provider';
@@ -39,11 +39,15 @@ const ASSET_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
   hsachecking: { label: 'HSA (Checking)' },
   investment: { label: 'Taxable Brokerage' },
   brokerage: { label: 'Taxable Brokerage' },
+  taxable: { label: 'Taxable Brokerage' },
   otherinvestment: { label: 'Other Investments' },
   retirement: { label: 'Retirement' },
   rothira: { label: 'Retirement' },
+  roth_ira: { label: 'Retirement' },
   traditionalira: { label: 'Retirement' },
+  traditional_ira: { label: 'Retirement' },
   '401k': { label: 'Retirement' },
+  traditional_401k: { label: 'Retirement' },
   '403b': { label: 'Retirement' },
   sepira: { label: 'Retirement' },
   simpleira: { label: 'Retirement' },
@@ -51,15 +55,23 @@ const ASSET_DISPLAY_CATEGORIES: Record<string, { label: string }> = {
   health: { label: 'HSA (Investment)' },
   realestate: { label: 'Real Estate' },
   primaryhome: { label: 'Real Estate' },
+  primary_home: { label: 'Real Estate' },
   secondaryhome: { label: 'Real Estate' },
+  secondary_home: { label: 'Real Estate' },
   rentalproperty: { label: 'Real Estate' },
+  rental_property: { label: 'Real Estate' },
   commercial: { label: 'Real Estate' },
   land: { label: 'Real Estate' },
   otherrealestate: { label: 'Real Estate' },
+  'single-family': { label: 'Real Estate' },
+  condo: { label: 'Real Estate' },
+  townhouse: { label: 'Real Estate' },
+  'multi-family': { label: 'Real Estate' },
   vehicle: { label: 'Vehicle' },
-  crypto: { label: 'Other Investments' },
+  crypto: { label: 'Crypto & Alternatives' },
   metals: { label: 'Other Investments' },
   '529': { label: 'Other Investments' },
+  stock_option: { label: 'Other Investments' },
   otherAsset: { label: 'Other Investments' },
   other: { label: 'Other Investments' },
 };
@@ -142,11 +154,19 @@ export function DebtBreakdown() {
 
     const makeCategories = (colorMap: Record<string, { label: string }>, isDebt: boolean): CategoryEntry[] => {
       const map = isDebt ? DEBT_COLOR_MAP : CHART_COLOR_MAP;
+      const otherMap = isDebt ? ASSET_DISPLAY_CATEGORIES : DEBT_DISPLAY_CATEGORIES;
       const merged: Record<string, { types: Set<string>; label: string; amount: number }> = {};
       for (const acc of reportableAccounts) {
         const rawBalance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
-        const catInfo = colorMap[acc.type];
-        if (!catInfo) continue;
+        const normType = acc.type.toLowerCase();
+        let catInfo = colorMap[acc.type] || colorMap[normType];
+        if (!catInfo) {
+          const isOpposite = isDebt
+            ? (otherMap[acc.type] || otherMap[normType] || isAssetAccount(acc.type))
+            : (otherMap[acc.type] || otherMap[normType] || isLiabilityAccount(acc.type));
+          if (isOpposite) continue;
+          catInfo = isDebt ? { label: 'Other Debt' } : { label: 'Other Investments' };
+        }
         const converted = convertCurrency(rawBalance, acc.currency || 'USD', baseCurrency);
         const val = isDebt ? Math.abs(converted) : converted;
         if (val <= 0) continue;
@@ -278,6 +298,7 @@ export function DebtBreakdown() {
                       paddingAngle={0.5}
                       cornerRadius={3}
                       stroke="none"
+                      isAnimationActive={false}
                       onClick={(data) => {
                         const key = data.key || (data.payload && data.payload.key);
                         if (key) handleClick(key);

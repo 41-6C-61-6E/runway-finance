@@ -10,6 +10,7 @@ import type { Condition, Rule, Category, TagItem } from './rules/types';
 import { FIELD_OPTIONS, OPERATOR_OPTIONS } from './rules/types';
 import { RuleEditorSheet } from './rules/rule-editor-sheet';
 import { RuleBulkEditDialog } from './rules/rule-bulk-edit-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const OPERATOR_LABELS: Record<string, string> = {
   contains: 'contains',
@@ -550,11 +551,14 @@ export default function RulesTab() {
       </div>
 
       {filteredRules.length === 0 && (
-        <div className="p-8 text-center">
-          <p className="text-muted-foreground text-sm">
-            {searchQuery ? 'No rules match your search.' : 'No rules yet. Create rules to automatically categorize transactions during sync.'}
-          </p>
-        </div>
+        <EmptyState
+          title={searchQuery ? 'No matching rules' : 'No rules yet'}
+          description={
+            searchQuery
+              ? 'No rules match your search query.'
+              : 'Create rules to automatically categorize transactions during sync.'
+          }
+        />
       )}
 
       {filteredRules.length > 0 && (

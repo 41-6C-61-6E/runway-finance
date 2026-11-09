@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { getAccountGroupKey } from "@/lib/constants/account-types";
+import { apiFetch } from "@/lib/utils/api-client";
 import { toast } from "sonner";
 import {
   ChevronUp,
@@ -371,8 +372,7 @@ export default function TransactionTable({
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await fetch("/api/categories", { credentials: "include" });
-      const data = await res.json();
+      const data = await apiFetch<Category[]>("/api/categories");
       const catList = Array.isArray(data) ? data : [];
       setCategories(catList);
       return catList;
@@ -485,8 +485,8 @@ export default function TransactionTable({
     const flexRatios: Record<string, number> = {
       date: 1,
       postedDate: 1,
-      description: clientWidth < 1024 ? (clientWidth < 900 ? 1.2 : 1.6) : 2.5,
-      account: clientWidth < 1024 ? (clientWidth < 900 ? 0.6 : 0.8) : 1.2,
+      description: clientWidth < 1024 ? (clientWidth < 900 ? 1.2 : 1.6) : 2.1,
+      account: clientWidth < 1024 ? (clientWidth < 900 ? 0.8 : 1.1) : 1.8,
       accountType: 0.8,
       category: 1.5,
       tags: clientWidth < 1024 ? (clientWidth < 900 ? 0.5 : 0.8) : 1.0,
@@ -689,14 +689,10 @@ export default function TransactionTable({
           totalParams.set(key, value);
         }
       }
-      const res = await fetch(`/api/transactions?${params.toString()}`, {
-        credentials: "include",
-        signal,
-      });
-      if (!res.ok) {
-        throw new Error(await readErrorMessage(res));
-      }
-      const data = await res.json();
+      const data = await apiFetch<{ data?: any[]; total?: number; totalAmount?: number | null }>(
+        `/api/transactions?${params.toString()}`,
+        { signal }
+      );
       const newTxs = (data.data || []).map((tx: any) => ({
         ...tx,
         categoryName: tx.category?.name ?? null,
@@ -724,16 +720,9 @@ export default function TransactionTable({
           lastTotalParamsRef.current = totalParamsStr;
           setTotalAmount(null); // Show "Calculating..."
           totalParams.set("totalAmountOnly", "true");
-          fetch(`/api/transactions?${totalParams.toString()}`, {
-            credentials: "include",
+          apiFetch<{ totalAmount?: number }>(`/api/transactions?${totalParams.toString()}`, {
             signal,
           })
-            .then(async (res) => {
-              if (!res.ok) {
-                throw new Error(await readErrorMessage(res));
-              }
-              return res.json();
-            })
             .then((totalData) => {
               // Ensure we only update state if this fetch matches the current active request
               if (abortControllerRef.current === abortController) {
@@ -761,10 +750,8 @@ export default function TransactionTable({
 
   const handleCreateRule = useCallback(async () => {
     if (!proposedRule) return;
-    await fetch("/api/category-rules", {
+    await apiFetch("/api/category-rules", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({
         name: `Auto-rule: ${proposedRule.payee}`,
         conditionField: "payee",
@@ -784,10 +771,8 @@ export default function TransactionTable({
 
     const runRulePromise = (async () => {
       // Create the rule
-      const createRes = await fetch("/api/category-rules", {
+      const rule = await apiFetch<{ id: string }>("/api/category-rules", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           name: `Auto-rule: ${ruleInfo.payee}`,
           conditionField: "payee",
@@ -796,12 +781,6 @@ export default function TransactionTable({
           setCategoryId: ruleInfo.categoryId,
         }),
       });
-
-      if (!createRes.ok) {
-        throw new Error("Failed to create rule");
-      }
-
-      const rule = await createRes.json();
 
       // Apply the rule to all transactions
       const applyRes = await fetch(`/api/category-rules/${rule.id}/apply`, {
@@ -1085,7 +1064,7 @@ export default function TransactionTable({
                       "noopener,noreferrer",
                     );
                   }}
-                  className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all -m-0.5 p-0.5 ml-1.5 flex-shrink-0 text-muted-foreground/60"
+                  className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center -m-0.5 p-0.5 ml-1.5 flex-shrink-0 text-muted-foreground/60"
                 >
                   <Search className="h-3.5 w-3.5" />
                 </IconButton>
@@ -1792,7 +1771,7 @@ export default function TransactionTable({
                       className={`px-3 sm:px-4 py-2.5 group ${
                         isPending ? "bg-primary/[0.04] dark:bg-primary/[0.08]" : ""
                       }`}
-                      bodyClassName="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2 sm:gap-x-3 gap-y-0.5"
+                      bodyClassName="grid grid-cols-[auto_minmax(0,1fr)_auto] md:grid-cols-12 gap-x-2 sm:gap-x-3 md:gap-x-4 gap-y-0.5 md:gap-y-0 md:items-center"
                       onActivate={() => {
                         const anyTx = tx as any;
                         if (anyTx.isSplitChild && anyTx.parentTxId) {
@@ -1803,14 +1782,14 @@ export default function TransactionTable({
                         }
                       }}
                     >
-                      {/* Row 1, Col 1: Date */}
-                      <div className="flex items-center gap-1 min-w-0">
+                      {/* Row 1, Col 1 (Mobile) / Col 1 (Desktop): Date */}
+                      <div className="flex items-center gap-1 min-w-0 md:col-span-1 md:order-1">
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
                           {formattedDate}
                         </span>
                       </div>
-                      {/* Row 1, Col 2: Description + pending dot + search spyglass + tags */}
-                      <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                      {/* Row 1, Col 2 (Mobile) / Cols 2-5 (Desktop): Description + pending dot + search spyglass + tags */}
+                      <div className="flex items-center gap-1 min-w-0 overflow-hidden md:col-span-4 md:order-2">
                         {(tx as any).isSplitChild && (
                           <span className="text-muted-foreground/45 select-none pl-3 font-mono">
                             ↳
@@ -1875,7 +1854,7 @@ export default function TransactionTable({
                                 "noopener,noreferrer",
                               );
                             }}
-                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all -m-0.5 p-0.5 ml-1 shrink-0 text-muted-foreground/60"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center -m-0.5 p-0.5 ml-1 shrink-0 text-muted-foreground/60"
                           >
                             <Search className="h-3.5 w-3.5" />
                           </IconButton>
@@ -1914,8 +1893,8 @@ export default function TransactionTable({
                           </div>
                         )}
                       </div>
-                      {/* Row 1, Col 3: Amount */}
-                      <div className="flex items-center justify-end gap-1">
+                      {/* Row 1, Col 3 (Mobile) / Cols 11-12 (Desktop): Amount */}
+                      <div className="flex items-center justify-end gap-1 md:col-span-2 md:order-5">
                         {tx.categorizedByAi && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1935,11 +1914,11 @@ export default function TransactionTable({
                         </span>
                       </div>
 
-                      {/* Row 2, Col 1: spacer for date alignment */}
-                      <div />
+                      {/* Row 2, Col 1: spacer for date alignment on mobile */}
+                      <div className="md:hidden" />
 
-                      {/* Row 2, Col 2: Category pill */}
-                      <div className="flex items-center min-w-0">
+                      {/* Row 2, Col 2 (Mobile) / Cols 6-7 (Desktop): Category pill */}
+                      <div className="flex items-center min-w-0 md:col-span-2 md:order-3">
                         {tx.splits && tx.splits.length > 0 ? (
                           <span className="text-xs text-muted-foreground/45">—</span>
                         ) : (
@@ -2164,9 +2143,12 @@ export default function TransactionTable({
 
                       </div>
 
-                      {/* Row 2, Col 3: Account + Tags right-justified */}
-                      <div className="flex items-center justify-end gap-1.5 min-w-0 flex-wrap">
-                        <span className="text-[11px] text-muted-foreground truncate max-w-[120px] shrink-0">
+                      {/* Row 2, Col 3 (Mobile) / Cols 8-10 (Desktop): Account + Tags */}
+                      <div className="flex items-center justify-end md:justify-start gap-1.5 min-w-0 flex-wrap md:col-span-3 md:order-4">
+                        <span
+                          className="text-caption md:text-xs text-muted-foreground truncate max-w-[120px] md:max-w-full shrink-0 md:shrink"
+                          title={tx.accountName || undefined}
+                        >
                           {tx.accountName || "—"}
                         </span>
                         {showAccountTags && tx.accountTags && tx.accountTags.length > 0 && (

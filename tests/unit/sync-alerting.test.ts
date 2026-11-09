@@ -288,6 +288,86 @@ describe('Sync Problem Alerting Suite', () => {
       expect(statuses['acc_crypto_recent'].status).toBe('warning');
       expect(statuses['acc_crypto_stale'].status).toBe('error');
     });
+
+    it('exempts manual equity accounts from stale balance and update alerts (returns ok)', async () => {
+      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+      mockSelectResponses = {
+        simplefin_connections: [],
+        plaid_connections: [],
+        account_snapshots: [],
+        equity_grants: [],
+      };
+
+      const accounts = [
+        {
+          id: 'acc_equity_manual',
+          name: 'Acme Corp Equity',
+          type: 'stock_option',
+          balanceDate: tenDaysAgo,
+          externalId: 'equity-12345',
+          metadata: JSON.stringify({ companyName: 'Acme Corp', isEquityAccount: true }),
+        },
+        {
+          id: 'acc_equity_meta_only',
+          name: 'Beta Inc Options',
+          type: 'otherinvestment',
+          balanceDate: tenDaysAgo,
+          externalId: 'manual-67890',
+          metadata: JSON.stringify({ companyName: 'Beta Inc', isEquityAccount: true }),
+        },
+      ];
+
+      const statuses = await getAccountsSyncStatus(userId, dummyDek, accounts);
+      expect(statuses['acc_equity_manual'].status).toBe('ok');
+      expect(statuses['acc_equity_manual'].reason).toBeUndefined();
+      expect(statuses['acc_equity_meta_only'].status).toBe('ok');
+      expect(statuses['acc_equity_meta_only'].reason).toBeUndefined();
+    });
+
+    it('exempts connected equity accounts from Rule 3 market stagnation and Rule 4 update delay warnings', async () => {
+      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+      mockSelectResponses = {
+        simplefin_connections: [
+          {
+            id: 'conn_brokerage',
+            label: 'Morgan Stanley',
+            syncFrequency: 'daily',
+            lastSyncAt: oneHourAgo,
+            lastSyncStatus: 'ok',
+            lastSyncError: null,
+            createdAt: tenDaysAgo,
+          },
+        ],
+        plaid_connections: [],
+        // 3 identical snapshots for 7 days
+        account_snapshots: [
+          { accountId: 'acc_connected_equity', snapshotDate: '2026-11-01', balance: '10000.00' },
+          { accountId: 'acc_connected_equity', snapshotDate: '2026-11-03', balance: '10000.00' },
+          { accountId: 'acc_connected_equity', snapshotDate: '2026-11-05', balance: '10000.00' },
+        ],
+        equity_grants: [
+          { accountId: 'acc_connected_equity' },
+        ],
+      };
+
+      const accounts = [
+        {
+          id: 'acc_connected_equity',
+          name: 'Morgan Stanley Shareworks',
+          connectionId: 'conn_brokerage',
+          type: 'stock_option',
+          balanceDate: tenDaysAgo,
+          metadata: JSON.stringify({ companyName: 'Acme Corp', isEquityAccount: true }),
+        },
+      ];
+
+      const statuses = await getAccountsSyncStatus(userId, dummyDek, accounts);
+      expect(statuses['acc_connected_equity'].status).toBe('ok');
+      expect(statuses['acc_connected_equity'].reason).toBeUndefined();
+    });
   });
 
   describe('3. checkStaleConnectionsAndNotify (Aggregation & Anti-Spam)', () => {

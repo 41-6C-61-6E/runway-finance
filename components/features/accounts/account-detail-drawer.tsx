@@ -14,6 +14,7 @@ import { isRealEstateType, parseAccountMetadata } from '@/lib/constants/account-
 import { Select } from '@/components/ui/select';
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
+import { toast } from 'sonner';
 
 type Account = {
   id: string;
@@ -158,7 +159,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
       invalidateAllFinanceQueries(queryClient);
       onSuccess();
     } catch (err: any) {
-      alert(err.message || 'An error occurred during sync');
+      toast.error(err.message || 'An error occurred during sync');
     } finally {
       setSyncingConnection(false);
     }
@@ -190,7 +191,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
           invalidateAllFinanceQueries(queryClient);
           onSuccess();
         } catch (err: any) {
-          alert(err.message || 'An error occurred');
+          toast.error(err.message || 'An error occurred');
         } finally {
           setResyncingConnection(false);
         }
@@ -210,7 +211,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
       invalidateAllFinanceQueries(queryClient);
       onSuccess();
     } catch (err: any) {
-      alert(err.message || 'An error occurred');
+      toast.error(err.message || 'An error occurred');
     } finally {
       setSyncingAccount(false);
     }
@@ -237,7 +238,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
           invalidateAllFinanceQueries(queryClient);
           onSuccess();
         } catch (err) {
-          alert(err instanceof Error ? err.message : 'An error occurred');
+          toast.error(err instanceof Error ? err.message : 'An error occurred');
         } finally {
           setUnlinking(false);
         }
@@ -276,7 +277,7 @@ export default function AccountDetailDrawer({ account, open, onClose, onSuccess 
       invalidateAllFinanceQueries(queryClient);
       onSuccess();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
+      toast.error(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setDeleting(false);
     }

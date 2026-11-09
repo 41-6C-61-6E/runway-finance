@@ -46,9 +46,9 @@ export function AdviceButton({
           x2="100%"
           y2="100%"
         >
-          <stop offset="0%" stopColor="#a855f7" />
-          <stop offset="50%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#3b82f6" />
+          <stop offset="0%" stopColor="var(--color-chart-5)" />
+          <stop offset="50%" stopColor="var(--color-chart-2)" />
+          <stop offset="100%" stopColor="var(--color-primary)" />
         </linearGradient>
       </defs>
     </svg>
@@ -144,7 +144,7 @@ export function AdviceButton({
             AI
           </span>
         </div>
-        <span className="text-micro text-muted-foreground/75 truncate">
+        <span className="text-caption text-muted-foreground/75 truncate">
           Financial assistant
         </span>
       </div>

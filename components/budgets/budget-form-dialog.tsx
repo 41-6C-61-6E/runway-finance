@@ -249,13 +249,17 @@ export function BudgetFormDialog({ open, onClose, onSuccess, categories, editBud
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Amount</label>
-              <Input
-                type="number"
-                step="1"
-                value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                placeholder="e.g., 400"
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">$</span>
+                <Input
+                  type="number"
+                  step="1"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                  placeholder="e.g., 400"
+                  className="pl-7"
+                />
+              </div>
             </div>
           </div>
 

@@ -48,7 +48,7 @@ export async function apiFetch<T = unknown>(
     throw new ApiError(errMsg, response.status, response.statusText, errorDetails);
   }
 
-  if (response.status === 204 || response.headers.get('content-length') === '0') {
+  if (response.status === 204 || response.headers?.get?.('content-length') === '0') {
     return {} as T;
   }
 

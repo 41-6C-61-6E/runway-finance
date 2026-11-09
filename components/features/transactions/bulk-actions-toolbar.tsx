@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Check, Repeat } from 'lucide-react';
 import { MarkAsRecurringModal } from './mark-as-recurring-modal';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 
 interface BulkActionsToolbarProps {
   selectedIds: string[];
@@ -30,12 +31,12 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
   const [tags, setTags] = useState<{ id: string; name: string; color: string }[]>([]);
   const [tagSearch, setTagSearch] = useState('');
   const tagRef = useRef<HTMLDivElement>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recurringModalOpen, setRecurringModalOpen] = useState(false);
   const [selectedTxs, setSelectedTxs] = useState<any[]>([]);
 
   useEffect(() => {
-    setConfirmDelete(false);
+    setDeleteDialogOpen(false);
   }, [selectedIds]);
 
   const handleOpenRecurringModal = async () => {
@@ -145,10 +146,6 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
   );
 
   const handleBulkDelete = useCallback(async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
     setActionLoading('delete');
     try {
       let body: Record<string, unknown>;
@@ -178,9 +175,9 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
       console.error('Bulk delete error', err);
     } finally {
       setActionLoading(null);
-      setConfirmDelete(false);
+      setDeleteDialogOpen(false);
     }
-  }, [selectedIds, selectAllMatching, filters, onClear, confirmDelete]);
+  }, [selectedIds, selectAllMatching, filters, onClear]);
 
   const parents = categories.filter((c) => !c.parentId || c.parentId === null);
   const getChildren = (parentId: string) =>
@@ -233,15 +230,11 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
         Mark Ignored
       </button>
       <button
-        onClick={handleBulkDelete}
+        onClick={() => setDeleteDialogOpen(true)}
         disabled={actionLoading !== null}
-        className={`px-3 py-1.5 text-xs font-medium transition-colors border rounded-lg disabled:opacity-50 ${
-          confirmDelete
-            ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
-            : 'bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10'
-        }`}
+        className="px-3 py-1.5 text-xs font-medium transition-colors border rounded-lg disabled:opacity-50 bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10"
       >
-        {actionLoading === 'delete' ? 'Deleting...' : confirmDelete ? 'Are you sure? Confirm' : 'Delete'}
+        {actionLoading === 'delete' ? 'Deleting...' : 'Delete'}
       </button>
       <div className="relative" ref={categoryRef}>
         <button
@@ -368,6 +361,16 @@ export default function BulkActionsToolbar({ selectedIds, onClear, totalCount, s
         onSuccess={() => {
           onClear();
         }}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Transactions"
+        description={`Are you sure you want to delete ${selectAllMatching ? 'all matching' : selectedIds.length} transaction${selectAllMatching || selectedIds.length > 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmText="Delete"
+        busy={actionLoading === 'delete'}
+        onConfirm={handleBulkDelete}
       />
     </div>
   );

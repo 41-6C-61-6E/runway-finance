@@ -30,6 +30,23 @@ const TOOLTIPS: Record<string, string> = {
   'all': 'All time',
 };
 
+const ROLLING_TO_CALENDAR: Partial<Record<TimeRange, TimeRange>> = {
+  '7d': '7d_discrete',
+  '30d': '1m',
+  '90d': '3m',
+  '365d': '1y',
+};
+
+const CALENDAR_TO_ROLLING: Partial<Record<TimeRange, TimeRange>> = {
+  '7d_discrete': '7d',
+  '1m': '30d',
+  '3m': '90d',
+  '1y': '365d',
+};
+
+const ROLLING_VALUES = new Set<TimeRange>(['7d', '30d', '90d', '365d']);
+const CALENDAR_PAIRED_VALUES = new Set<TimeRange>(['7d_discrete', '1m', '3m', '1y']);
+
 function orderPresets(presets: { label: string; value: TimeRange }[]): { label: string; value: TimeRange }[] {
   const order = TIME_RANGE_BAR_ORDER;
   return [...presets].sort((a, b) => {
@@ -44,7 +61,46 @@ function orderPresets(presets: { label: string; value: TimeRange }[]): { label: 
 
 export function ChartTimeframeBar({ value, onChange, presets, windowNav, className }: ChartTimeframeBarProps) {
   const rawPresets = presets ?? TIME_RANGE_PRESETS;
-  const orderedPresets = useMemo(() => orderPresets(rawPresets), [rawPresets]);
+  const hasDualModes = useMemo(
+    () =>
+      rawPresets.some(p => ROLLING_VALUES.has(p.value)) &&
+      rawPresets.some(p => CALENDAR_PAIRED_VALUES.has(p.value)),
+    [rawPresets]
+  );
+
+  const [windowMode, setWindowMode] = useState<'calendar' | 'rolling'>(() =>
+    ROLLING_VALUES.has(value) ? 'rolling' : 'calendar'
+  );
+
+  useEffect(() => {
+    if (ROLLING_VALUES.has(value)) {
+      setWindowMode('rolling');
+    } else if (CALENDAR_PAIRED_VALUES.has(value)) {
+      setWindowMode('calendar');
+    }
+  }, [value]);
+
+  const orderedPresets = useMemo(() => {
+    const sorted = orderPresets(rawPresets);
+    if (!hasDualModes) return sorted;
+    return sorted.filter(p =>
+      windowMode === 'calendar'
+        ? !ROLLING_VALUES.has(p.value)
+        : !CALENDAR_PAIRED_VALUES.has(p.value)
+    );
+  }, [rawPresets, hasDualModes, windowMode]);
+
+  const handleModeToggle = useCallback(
+    (nextMode: 'calendar' | 'rolling') => {
+      setWindowMode(nextMode);
+      const map = nextMode === 'rolling' ? CALENDAR_TO_ROLLING : ROLLING_TO_CALENDAR;
+      const mapped = map[value];
+      if (mapped && rawPresets.some(p => p.value === mapped)) {
+        onChange(mapped);
+      }
+    },
+    [value, rawPresets, onChange]
+  );
 
   const barRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLDivElement>(null);
@@ -71,7 +127,8 @@ export function ChartTimeframeBar({ value, onChange, presets, windowNav, classNa
     if (barW === 0) return;
 
     const navW = navRef.current?.offsetWidth ?? 0;
-    // Reserve space: nav + gaps + padding
+    const modeToggleW = hasDualModes ? 84 : 0;
+    // Reserve space: nav + modeToggle + gaps + padding
     const padding = 16; // px-? combined
     const gap = 4;
     const overflowBtnW = 64;
@@ -88,7 +145,7 @@ export function ChartTimeframeBar({ value, onChange, presets, windowNav, classNa
     for (let n = orderedPresets.length; n >= 1; n--) {
       const pillsW = pillWidths.slice(0, n).reduce((s, w) => s + w, 0) + Math.max(0, n - 1) * gap;
       const needOverflow = n < orderedPresets.length ? overflowBtnW + gap : 0;
-      const needed = pillsW + needOverflow + navW + (navW > 0 ? gap : 0) + padding;
+      const needed = pillsW + needOverflow + modeToggleW + (modeToggleW > 0 ? gap : 0) + navW + (navW > 0 ? gap : 0) + padding;
       if (needed <= barW) {
         best = n;
         break;
@@ -99,7 +156,7 @@ export function ChartTimeframeBar({ value, onChange, presets, windowNav, classNa
     if (barW < 360) best = Math.min(best, 3);
     else if (barW < 480) best = Math.min(best, 5);
     setVisibleCount(best);
-  }, [orderedPresets]);
+  }, [orderedPresets, hasDualModes]);
 
   useLayoutEffect(() => {
     computeVisible();
@@ -150,7 +207,41 @@ export function ChartTimeframeBar({ value, onChange, presets, windowNav, classNa
       )}
     >
       {/* Left: timeframe pills */}
-      <div className="flex items-center gap-1 min-w-0 flex-1">
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        {hasDualModes && (
+          <div
+            className="flex items-center bg-muted/50 p-0.5 rounded-full border border-border/50 shrink-0"
+            role="group"
+            aria-label="Timeframe window mode"
+          >
+            <button
+              type="button"
+              onClick={() => handleModeToggle('calendar')}
+              title="Calendar periods (1W, 1M, 3M, 1Y)"
+              className={cn(
+                'px-2 py-1 rounded-full text-xs font-semibold leading-none transition-all min-h-[26px]',
+                windowMode === 'calendar'
+                  ? 'bg-card text-foreground shadow-xs border border-border/60'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Cal
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeToggle('rolling')}
+              title="Rolling lookback windows (7D, 30D, 90D, 365D)"
+              className={cn(
+                'px-2 py-1 rounded-full text-xs font-semibold leading-none transition-all min-h-[26px]',
+                windowMode === 'rolling'
+                  ? 'bg-card text-foreground shadow-xs border border-border/60'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Roll
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-1 bg-muted/40 p-0.5 rounded-full border border-border/40 shrink-0">
           {visible.map(p => {
             const active = value === p.value;

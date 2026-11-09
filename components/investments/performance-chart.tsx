@@ -443,6 +443,7 @@ export function PerformanceChart({ totalBalance: propTotalBalance }: Performance
                       fill="url(#portfolioHistoryGrad)"
                       dot={false}
                       activeDot={{ r: 4, fill: portfolioColor, stroke: portfolioColor, strokeWidth: 1 }}
+                      isAnimationActive={false}
                     />
                     {/* Benchmark overlay (% only makes sense) */}
                     {showBenchmark && (
@@ -455,6 +456,7 @@ export function PerformanceChart({ totalBalance: propTotalBalance }: Performance
                         fill="url(#benchmarkGrad)"
                         dot={false}
                         activeDot={{ r: 3, fill: benchmarkColor, stroke: benchmarkColor }}
+                        isAnimationActive={false}
                       />
                     )}
                   </AreaChart>

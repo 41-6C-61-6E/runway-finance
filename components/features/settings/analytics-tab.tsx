@@ -1,9 +1,11 @@
 'use client';
 
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { useChartVisibility, CHARTS } from '@/lib/hooks/use-chart-visibility';
+import { apiFetch } from '@/lib/utils/api-client';
 
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import { useImportedData } from '@/lib/hooks/use-imported-data';
@@ -16,9 +18,9 @@ const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
   { value: '1m', label: '1M' },
   { value: '3m', label: '3M' },
   { value: '6m', label: '6M' },
+  { value: 'ytd', label: 'YTD' },
   { value: '1y', label: '1Y' },
   { value: '5y', label: '5Y' },
-  { value: 'ytd', label: 'YTD' },
   { value: 'all', label: 'All' },
 ];
 
@@ -76,12 +78,9 @@ export default function AnalyticsTab() {
 
   const fetchRecalcStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/analytics/recalculate-snapshots', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setRecalcStatus(data.status);
-        return data.status;
-      }
+      const data = await apiFetch<{ status: any }>('/api/analytics/recalculate-snapshots');
+      setRecalcStatus(data.status);
+      return data.status;
     } catch (err) {
       console.error('Failed to fetch recalculation status', err);
     }
@@ -108,15 +107,11 @@ export default function AnalyticsTab() {
   const handleTriggerRecalc = async (type = 'netWorth') => {
     setRecalcLoading(true);
     try {
-      const res = await fetch(`/api/analytics/recalculate-snapshots?type=${type}`, {
+      const data = await apiFetch<{ status?: any }>(`/api/analytics/recalculate-snapshots?type=${type}`, {
         method: 'POST',
-        credentials: 'include',
       });
-      if (res.ok) {
-        const data = await res.json();
-        setRecalcStatus(data.status || { status: 'running' });
-        fetchRecalcStatus();
-      }
+      setRecalcStatus(data.status || { status: 'running' });
+      fetchRecalcStatus();
     } catch (err) {
       console.error('Failed to trigger recalculation', err);
     } finally {
@@ -258,28 +253,15 @@ export default function AnalyticsTab() {
                 <p className="text-xs text-muted-foreground mb-3">
                   Number of prior months evaluated to compute average historical spending and income run-rates.
                 </p>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="1"
-                    max="24"
-                    step="1"
-                    value={defaults.forecastLookbackMonths}
-                    onChange={(e) => updateDefaults({ forecastLookbackMonths: Number(e.target.value) })}
-                    className="flex-1 accent-primary cursor-pointer"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    max="24"
-                    value={defaults.forecastLookbackMonths}
-                    onChange={(e) => {
-                      const val = Math.max(1, Math.min(24, Number(e.target.value) || 1));
-                      updateDefaults({ forecastLookbackMonths: val });
-                    }}
-                    className="w-16 px-2 py-1 bg-background border border-input rounded text-foreground text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                </div>
+                <Slider
+                  min={1}
+                  max={24}
+                  step={1}
+                  value={defaults.forecastLookbackMonths}
+                  ticks={[1, 6, 12, 18, 24]}
+                  onChange={(val) => updateDefaults({ forecastLookbackMonths: Math.round(val) })}
+                  ariaLabel="Historical Lookback Window (Months)"
+                />
               </div>
             </div>
           </div>

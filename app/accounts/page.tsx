@@ -8,6 +8,7 @@ import { Landmark } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import PageContent from '@/components/page-content';
 import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
+import { apiFetch } from '@/lib/utils/api-client';
 import type { Account, TagItem } from '@/components/features/accounts/account-types';
 import AccountHierarchyTree from '@/components/features/accounts/account-hierarchy-tree';
 
@@ -23,33 +24,21 @@ function AccountsContent() {
   // 1. Fetch Accounts list
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ['accounts', true],
-    queryFn: async () => {
-      const res = await fetch('/api/accounts?includeHidden=true', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch accounts');
-      return res.json();
-    },
+    queryFn: () => apiFetch<Account[]>('/api/accounts?includeHidden=true'),
     enabled: !!session?.user,
   });
 
   // 2. Fetch Tags list
   const { data: allTags = [] } = useQuery<TagItem[]>({
     queryKey: ['tags'],
-    queryFn: async () => {
-      const res = await fetch('/api/tags', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch tags');
-      return res.json();
-    },
+    queryFn: () => apiFetch<TagItem[]>('/api/tags'),
     enabled: !!session?.user,
   });
 
   // 3. Fetch Accounts History Data
   const { data: historyRes } = useQuery<{ data: any[]; accounts: any[] }>({
     queryKey: ['accounts-history'],
-    queryFn: async () => {
-      const res = await fetch(`/api/accounts/history?timeframe=all`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch history');
-      return res.json();
-    },
+    queryFn: () => apiFetch<{ data: any[]; accounts: any[] }>('/api/accounts/history?timeframe=all'),
     enabled: !!session?.user,
   });
 

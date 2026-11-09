@@ -10,6 +10,7 @@ import { Search, Sparkles, Plus, Repeat, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import AiCategorizeButton from '@/components/features/transactions/ai-categorize-button';
 import { MarkAsRecurringModal } from './mark-as-recurring-modal';
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog';
 import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 
 
@@ -94,7 +95,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [tagIds, setTagIds] = useState<string[]>(transaction?.tags?.map((t) => t.id) ?? []);
   const [allTags, setAllTags] = useState<TagItem[]>([]);
@@ -136,11 +137,11 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
         onClose();
       } else {
         const errData = await res.json();
-        alert(errData.message || 'Failed to revert split');
+        toast.error(errData.message || 'Failed to revert split');
       }
     } catch (err) {
       console.error(err);
-      alert('An error occurred');
+      toast.error('An error occurred');
     } finally {
       setSaving(false);
     }
@@ -161,7 +162,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     setPending(transaction?.pending ?? false);
     setAccountId(transaction?.accountId ?? '');
     setIsCreatingCategory(false);
-    setConfirmDelete(false);
+    setDeleteDialogOpen(false);
     setIsSplitting(false);
   }, [transaction]);
 
@@ -351,10 +352,6 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   }, [mode, transaction, accountId, date, amount, description, payee, memo, notes, categoryId, tagIds, pending, reviewed, postedDate, onSuccess, onClose]);
 
   const handleDelete = useCallback(async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
     setDeleting(true);
     try {
       if (transaction) {
@@ -364,6 +361,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
         });
         if (res.ok) {
           toast.success('Transaction deleted');
+          setDeleteDialogOpen(false);
           onSuccess();
           onClose();
         } else {
@@ -377,7 +375,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
     } finally {
       setDeleting(false);
     }
-  }, [transaction?.id, confirmDelete, onSuccess, onClose]);
+  }, [transaction?.id, onSuccess, onClose]);
 
 
   const toggleReviewed = async () => {
@@ -410,12 +408,12 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
   return (
     <>
       <Sheet open={open} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="overflow-y-auto">
-        <SheetHeader className="mb-6">
+      <SheetContent side="right" className="flex flex-col h-full p-0 overflow-hidden">
+        <SheetHeader className="p-4 sm:p-6 border-b shrink-0 pr-12">
           <SheetTitle>{mode === 'create' ? 'Add Transaction' : 'Transaction Details'}</SheetTitle>
         </SheetHeader>
 
-        <div className="space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           {/* Warning Banners */}
           {mode === 'edit' && isSynced && (
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
@@ -913,8 +911,13 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="space-y-2 pt-2">
+            </>
+          )}
+        </div>
+
+        {/* Action Buttons (pinned sticky footer) */}
+        {(!transaction?.splits || transaction.splits.length === 0) && !isSplitting && (
+          <div className="p-4 border-t shrink-0 sticky bottom-0 bg-background/95 backdrop-blur z-10 space-y-2">
             <button
               onClick={handleSave}
               disabled={
@@ -932,21 +935,26 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
             {mode === 'edit' && (
               <button
-                onClick={handleDelete}
+                type="button"
+                onClick={() => setDeleteDialogOpen(true)}
                 disabled={saving || deleting}
-                className={`w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border ${
-                  confirmDelete
-                    ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
-                    : 'bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10'
-                } disabled:opacity-50`}
+                className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10 disabled:opacity-50 cursor-pointer"
               >
-                {deleting ? 'Deleting...' : confirmDelete ? 'Are you sure? Click to confirm delete' : 'Delete Transaction'}
+                {deleting ? 'Deleting...' : 'Delete Transaction'}
               </button>
             )}
           </div>
-            </>
-          )}
-        </div>
+        )}
+
+        <ConfirmDeleteDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title="Delete Transaction"
+          description="Are you sure you want to permanently delete this transaction? This action cannot be undone."
+          confirmText="Delete"
+          busy={deleting}
+          onConfirm={handleDelete}
+        />
       </SheetContent>
     </Sheet>
 

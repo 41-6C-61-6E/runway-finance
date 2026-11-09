@@ -518,9 +518,9 @@ export function MobileNav() {
 
       {/* Fixed Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 h-16 md:hidden bg-sidebar/80 backdrop-blur-xl border-t border-sidebar-border/30 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] transform-gpu"
+        className="fixed bottom-0 left-0 right-0 z-40 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] md:hidden bg-sidebar border-t border-sidebar-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)] transform-gpu"
       >
-          <div className="max-w-lg mx-auto h-full flex items-center justify-around gap-1 px-3">
+          <div className="max-w-lg mx-auto h-16 flex items-center justify-around gap-1 px-3">
             {shownHomeNavItems.map((item) => {
               const Icon = item.icon;
               const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);

@@ -597,7 +597,7 @@ function SummaryTile({
           {label}
         </span>
         {onFocusActivity && (
-          <span className="ml-auto text-[11px] font-semibold text-muted-foreground/0 group-hover:text-primary transition-colors">
+          <span className="ml-auto text-[11px] font-semibold text-primary hidden group-hover:inline transition-colors">
             Filter
           </span>
         )}

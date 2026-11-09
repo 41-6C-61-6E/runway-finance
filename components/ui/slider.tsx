@@ -79,11 +79,11 @@ export function Slider({
   const isPink = accentClass.includes('pink');
   const isRose = accentClass.includes('rose');
   const activeColor = isPurple
-    ? '#a855f7'
+    ? 'var(--color-chart-5)'
     : isPink
-    ? '#ec4899'
+    ? 'var(--color-chart-2)'
     : isRose
-    ? '#f43f5e'
+    ? 'var(--color-destructive)'
     : 'var(--primary)';
 
   const normalizedTicks = ticks?.map((t) =>

@@ -17,6 +17,7 @@ import { formatCompactEstimate, formatRedfinSuccessMessage, extractRedfinPropert
 import { getBadgeClasses } from '@/lib/utils/account-badge';
 import { Select } from '@/components/ui/select';
 import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
+import { apiFetch } from '@/lib/utils/api-client';
 
 import {
   ManualAccount,
@@ -126,19 +127,16 @@ export default function ManualAccountsSection() {
 
   const fetchAccounts = useCallback(async () => {
     try {
-      const [res, reRes, mRes, tRes] = await Promise.all([
-        fetch('/api/manual-accounts', { credentials: 'include' }),
-        fetch('/api/accounts?type=realestate', { credentials: 'include' }),
-        fetch('/api/accounts?type=mortgage', { credentials: 'include' }),
-        fetch('/api/tags', { credentials: 'include' }),
+      const [manualData, reData, mortgageData, tagsData] = await Promise.all([
+        apiFetch<ManualAccount[]>('/api/manual-accounts'),
+        apiFetch<ManualAccount[]>('/api/accounts?type=realestate').catch(() => null),
+        apiFetch<ManualAccount[]>('/api/accounts?type=mortgage').catch(() => []),
+        apiFetch<{ id: string; name: string; color: string }[]>('/api/tags').catch(() => []),
       ]);
-      const manualData = await res.json();
-      const mortgageData = mRes.ok ? await mRes.json() : [];
-      const tagsData = tRes.ok ? await tRes.json() : [];
-      
+
       setAccounts(Array.isArray(manualData) ? manualData : []);
-      if (reRes.ok) setRealEstateAccounts(await reRes.json());
-      if (mRes.ok) setAllMortgageAccounts(Array.isArray(mortgageData) ? mortgageData : []);
+      if (reData) setRealEstateAccounts(reData);
+      setAllMortgageAccounts(Array.isArray(mortgageData) ? mortgageData : []);
       setAllTags(Array.isArray(tagsData) ? tagsData : []);
 
       // Invalidate global react-query cache for all financial views
@@ -1075,12 +1073,13 @@ export default function ManualAccountsSection() {
 
       {/* Create Drawer */}
       <Sheet open={showCreate} onOpenChange={(open) => { setShowCreate(open); setError(''); if (open) { setTagIds([]); setTagSearch(''); setShowTagDropdown(false); } }}>
-        <SheetContent side="right" className="overflow-y-auto">
-          <SheetHeader className="pb-4">
+        <SheetContent side="right" className="flex flex-col h-full p-0 overflow-hidden">
+          <SheetHeader className="p-4 sm:p-6 border-b shrink-0 pr-12">
             <SheetTitle>Add Manual Account</SheetTitle>
             <SheetDescription>Track assets or mortgages that aren't connected through SimpleFIN.</SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form onSubmit={handleCreate} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Type</label>
               <Select
@@ -1200,7 +1199,8 @@ export default function ManualAccountsSection() {
                 placeholder={isLiabilityAccount(createType) ? "e.g., 250000" : "e.g., 500000"}
               />
             </div>
-            <div className="flex justify-end gap-2 pt-4">
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t shrink-0 sticky bottom-0 bg-background/95 backdrop-blur z-10">
               <SheetClose asChild>
                 <button
                   type="button"

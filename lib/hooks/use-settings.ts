@@ -3,6 +3,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 
+function isSignInRoute(): boolean {
+  return typeof window !== 'undefined' && (window.location.pathname === '/signin' || window.location.pathname.startsWith('/signin/'));
+}
+
 /**
  * Shared React Query-backed access to the user's settings.
  *
@@ -22,7 +26,8 @@ import { queryKeys } from '@/lib/query-keys';
  *
  * @returns The settings record, plus standard React Query status flags.
  */
-export function useUserSettingsQuery() {
+export function useUserSettingsQuery(options?: { enabled?: boolean }) {
+  const isSignIn = isSignInRoute();
   return useQuery({
     queryKey: queryKeys.userSettings.all,
     queryFn: async () => {
@@ -30,6 +35,7 @@ export function useUserSettingsQuery() {
       if (!res.ok) throw new Error('Failed to load user settings');
       return (await res.json()) as Record<string, any>;
     },
+    enabled: options?.enabled ?? !isSignIn,
     staleTime: 5 * 60 * 1000,
   });
 }

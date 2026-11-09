@@ -200,7 +200,7 @@ export async function getSavingsRate(
         if (tx.source === 'paystub') {
           stats.hasPaystubEarnings = true;
         }
-        if (category && !category.isIncome) {
+        if (category && !category.isIncome && cfAmount <= 0) {
           stats.expenses -= cfAmount;
           addDetail(stats, 'expenses', tx.description, tx.date, -cfAmount, acc?.name || 'Account');
         } else {

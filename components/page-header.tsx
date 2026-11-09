@@ -99,7 +99,7 @@ export function PageHeader({ title, icon: Icon, leftExtra, children }: PageHeade
         } as React.CSSProperties}
         className="flex flex-col gap-3 px-4 pb-1.5 md:hidden w-full"
       >
-        <div className="flex items-center gap-3 min-h-[42px] pr-[185px]">
+        <div className="flex items-center gap-3 min-h-[42px] pr-36 sm:pr-44 min-w-0">
           <Icon className="w-6 h-6 text-primary flex-shrink-0" />
           <h1 className="text-xl font-normal tracking-tight text-foreground truncate">{title}</h1>
           {leftExtra}

@@ -24,7 +24,7 @@ function ThemedToaster() {
 export default function ClientLayout({ children }: { children: ReactNode }) {
   return (
     <ReactQueryProvider>
-      <ThemeProvider defaultTheme="moonlight" attribute="data-theme">
+      <ThemeProvider defaultTheme="moonlight" attribute="data-theme" themes={['light', 'dark', 'moonlight']}>
         <SessionProvider>
           <TooltipProvider delayDuration={300}>
             <ClientErrorReporter>

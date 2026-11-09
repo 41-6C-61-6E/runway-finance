@@ -108,7 +108,7 @@ export function DateWindowNav({ prev, next, nextDisabled, label, options, curren
         disabled={nextDisabled}
         className={`px-3 py-1.5 min-h-8 sm:px-2 sm:py-0.5 rounded-md text-xs transition-all ${
           nextDisabled
-            ? 'bg-muted/50 text-muted-foreground/30 cursor-not-allowed'
+            ? 'opacity-40 text-muted-foreground border border-border/40 cursor-not-allowed bg-muted/30'
             : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         }`}
         type="button"

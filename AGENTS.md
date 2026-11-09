@@ -16,6 +16,9 @@ Personal finance dashboard for tracking net worth, cash flow, investments, budge
 - **Lint**: `pnpm lint` (`eslint . && node scripts/ui-ratchet.mjs && node scripts/consolidation-ratchet.mjs && node scripts/check-module-boundaries.mjs`)
 - **Unit & Integration Tests**: `pnpm test` (Vitest)
 - **E2E Tests**: `pnpm test:e2e` (Playwright)
+- **Visual UI Capture & Audit**: `pnpm ui:capture` (On-demand desktop/mobile screenshot + DOM layout audit CLI; outputs to gitignored `tmp/ui-capture/latest/`)
+- **Full Visual Audit Suite**: `pnpm ui:audit` (Captures all 12 core routes + sub-nav tabs across desktop & mobile)
+- **Seed Synthetic Demo Data**: `pnpm db:seed:demo` (Populates `demo01` user with 5 years of realistic accounts, holdings, transactions, budgets, goals, and FIRE plans)
 - **CI Suite**: `pnpm ci` (Lint, typecheck, test, and build)
 - **Production Deploymets**: external and not reachable from this dev server: from your workspace you can use:
 alias runway-dev='docker exec $([ -t 0 ] && echo "-it") -u abc -w /config/workspace/runway-finance code-server bash -lc "pnpm dev"'
@@ -53,3 +56,16 @@ alias runway-shell='docker exec -it -u abc -w /config/workspace/runway-finance c
 9. **Client Data Layer**: Always use `apiFetch` from `@/lib/utils/api-client` and domain query hooks in `@/lib/queries/*` with query keys from `@/lib/query-keys`. Never call raw `fetch()` directly in client components.
 10. **API Routes**: Wrap all authenticated endpoints with `withAuth` or `withAuthAndDek` from `@/lib/api/with-auth`. Never call `await auth()` directly or emit raw `NextResponse.json`.
 11. **Formatting & Math**: Use canonical formatters in `@/lib/utils/format` and date utilities in `@/lib/utils/date/`. Never reimplement local ad-hoc currency formatters or date addition.
+12. **Visual UI Workflow & Screenshot Storage**: Always store captured screenshots, E2E snapshots, and layout audit reports inside `tmp/ui-capture/` (or `tmp/`), which is gitignored—never commit test screenshots to the repository.
+
+## Visual UI Capture & Iteration Workflow
+When performing UI tweaks, responsive fixes, or visual enhancements, use `scripts/capture-ui.mjs` (`pnpm ui:capture`) to capture and inspect rendered desktop (`1440×900`) and mobile (`390×844`) views with multimodal `read_file`:
+- **Basic route capture (desktop + mobile)**: `pnpm ui:capture --route /spending`
+- **Include capsule sub-nav tabs**: `pnpm ui:capture --route /plans --tabs` (or `--tabs "Projection,Scenarios"`)
+- **Multiple routes**: `pnpm ui:capture --routes /,/accounts,/budgets --tabs`
+- **Dark & Light themes**: `pnpm ui:capture --route / --theme both`
+- **All viewport breakpoints**: `pnpm ui:capture --route / --viewport all` (`desktop` 1440×900, `laptop` 1280×800, `mobile` 390×844, `mobile-compact` 360×780)
+- **Interactive state (modals/sheets/drawers)**: `pnpm ui:capture --route /accounts --click "button:has-text('Add')"`
+- **Full scrollable page**: `pnpm ui:capture --route / --full-page`
+- **How Auth & Data Work Automatically**: `pnpm ui:capture` automatically starts `pnpm dev` if port `3001` is not listening, checks that `demo01` has seeded data (auto-running `pnpm db:seed:demo` if empty), and mints a valid `authjs.session-token` cookie in `tmp/ui-capture/.auth/demo01.json` (or logs in via `/signin` if `--login-via-ui` and `UI_CAPTURE_PASSWORD` in `.env.local` / `tmp/.ui-credentials.env` are provided).
+- **Inspecting Results**: Every run mirrors its latest screenshots and `summary.json` DOM audit report to `tmp/ui-capture/latest/`. Read `tmp/ui-capture/latest/<route>__<viewport>__<theme>.png` with `read_file` to visually verify changes, and check `tmp/ui-capture/latest/summary.json` for horizontal overflow, `R-5` sub-10px fonts, unintentional text clipping, mobile tap-target sizing, and runtime console/API errors.

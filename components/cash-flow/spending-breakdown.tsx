@@ -232,7 +232,7 @@ export function SpendingBreakdown() {
           onChange={setView}
           aria-label="Chart type"
         />
-        <span className="text-xs text-muted-foreground/50">|</span>
+        <span className="text-xs text-muted-foreground/50 hidden sm:inline">|</span>
         <SegPill
           options={[{ id: 'discretionary', label: 'Discretionary' }, { id: 'fixed', label: 'Fixed' }]}
           values={safeSelectedGroups}

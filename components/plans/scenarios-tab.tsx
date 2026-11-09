@@ -373,6 +373,7 @@ export function ScenariosTab({
                             stroke={strat.color}
                             strokeWidth={plan?.withdrawalMethod === strat.method ? 3 : 1.5}
                             dot={false}
+                            isAnimationActive={false}
                           />
                         ))}
                       </LineChart>
@@ -382,15 +383,15 @@ export function ScenariosTab({
 
                 {/* Strategy Metrics Comparison Table */}
                 <TableScroll className="border border-border rounded-xl shadow-sm">
-                  <table className="w-full text-xs text-left min-w-[720px]">
+                  <table className="w-full text-xs text-left min-w-[640px]">
                     <thead className="bg-muted/60 text-muted-foreground font-semibold border-b border-border">
                       <tr>
-                        <th className="px-4 py-3">Strategy Name</th>
-                        <th className="px-3 py-3 text-center">Longevity</th>
-                        <th className="px-3 py-3 text-right">Ending Net Worth</th>
-                        <th className="px-3 py-3 text-right">Lifetime Taxes</th>
-                        <th className="px-3 py-3 text-right">Peak Age 75+ RMD</th>
-                        <th className="px-4 py-3 text-right">Action</th>
+                        <th className="px-3 sm:px-4 py-3">Strategy Name</th>
+                        <th className="px-2.5 sm:px-3 py-3 text-center">Longevity</th>
+                        <th className="px-2.5 sm:px-3 py-3 text-right">Ending Net Worth</th>
+                        <th className="px-2.5 sm:px-3 py-3 text-right">Lifetime Taxes</th>
+                        <th className="px-2.5 sm:px-3 py-3 text-right">Peak Age 75+ RMD</th>
+                        <th className="px-3 sm:px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">

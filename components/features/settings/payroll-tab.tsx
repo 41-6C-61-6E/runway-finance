@@ -15,6 +15,7 @@ import { MappingEditorDialog } from './payroll/mapping-editor-dialog';
 import { AutoGenEditorDialog } from './payroll/auto-gen-editor-dialog';
 import { ManualAddDialog } from './payroll/manual-add-dialog';
 import { PaystubDetailDialog } from './payroll/paystub-detail-dialog';
+import { toast } from 'sonner';
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -778,7 +779,7 @@ export default function PayrollTab() {
       link.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert('Failed to parse or download the original paystub JSON.');
+      toast.error('Failed to parse or download the original paystub JSON.');
     }
   };
 

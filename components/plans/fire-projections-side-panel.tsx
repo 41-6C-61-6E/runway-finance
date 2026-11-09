@@ -275,7 +275,7 @@ export function FireProjectionsSidePanel({
                 <div className="space-y-2 cursor-help">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Compass className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                      <Compass className="w-3.5 h-3.5 text-primary shrink-0" />
                       <span className="text-xs font-bold text-foreground flex items-center gap-1">
                         Coast FIRE Goal
                         <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0" />
@@ -285,18 +285,18 @@ export function FireProjectionsSidePanel({
                       className={cn(
                         'text-[11px] font-bold px-2.5 py-0.5 rounded-full border font-mono',
                         coastFireInfo.isReached
-                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          ? 'bg-status-positive/10 text-status-positive border-status-positive/20'
                           : 'bg-primary/10 text-primary border-primary/20'
                       )}
                     >
                       {coastFireInfo.isReached ? 'Reached' : `${coastFireInfo.progress.toFixed(0)}%`}
                     </span>
                   </div>
-                  <div className="flex items-baseline justify-between text-xs font-mono">
-                    <span className="text-foreground font-semibold blur-number">
+                  <div className="flex items-baseline justify-between gap-1.5 text-xs font-mono min-w-0 flex-wrap">
+                    <span className="text-foreground font-semibold blur-number truncate">
                       {formatCurrency(currentNetWorth)} <span className="text-muted-foreground font-normal">/ {formatCurrency(coastFireInfo.coastTarget)}</span>
                     </span>
-                    <span className="text-muted-foreground text-[11px]">
+                    <span className="text-muted-foreground text-[11px] shrink-0">
                       Age {coastFireInfo.currentAge} → {localRetirementAge}
                     </span>
                   </div>
@@ -304,7 +304,7 @@ export function FireProjectionsSidePanel({
                     <div
                       className={cn(
                         'h-full transition-all duration-500 rounded-full',
-                        coastFireInfo.isReached ? 'bg-emerald-500' : 'bg-cyan-500'
+                        coastFireInfo.isReached ? 'bg-status-positive' : 'bg-primary'
                       )}
                       style={{ width: `${coastFireInfo.progress}%` }}
                     />

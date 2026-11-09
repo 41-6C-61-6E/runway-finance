@@ -665,8 +665,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                           )}
                           <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                              <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
-                              <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
+                              <IconButton size="sm" label="Edit budget" className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center -m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                              <IconButton size="sm" label="Delete budget" className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center -m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                             </div>
                           </td>
                         </tr>
@@ -764,7 +764,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               {isEnvelope(b) && envSub ? (
                                 <span className="text-[10px] font-sans text-muted-foreground block truncate" title={envSub ?? undefined}>{envSub}</span>
                               ) : (
-                                <span className="text-foreground blur-number block truncate">{formatCurrency(b.actual)}</span>
+                                <span className="text-foreground blur-number block truncate">{formatCurrency(b.type === 'income' ? b.actual : Math.abs(b.actual))}</span>
                               )}
                             </td>
                             {showVarianceCol && (
@@ -816,8 +816,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                             )}
                             <td className="px-1.5 sm:px-2 py-2 sm:py-2.5 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-                                <IconButton size="sm" label="Edit budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
-                                <IconButton size="sm" label="Delete budget" className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
+                                <IconButton size="sm" label="Edit budget" className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center -m-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors" onClick={() => { setEditBudget(b); setShowForm(true); }}><Pencil className="w-3.5 h-3.5" /></IconButton>
+                                <IconButton size="sm" label="Delete budget" className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center -m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80 transition-colors" onClick={() => setDeleteBudget(b)}><Trash2 className="w-3.5 h-3.5" /></IconButton>
                               </div>
                             </td>
                           </tr>
@@ -836,7 +836,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                       </span>
                                     </span>
                                     <span className="text-xs font-mono font-medium text-muted-foreground">
-                                      Total: <span className="text-foreground blur-number font-semibold">{formatCurrency(b.actual)}</span>
+                                      Total: <span className="text-foreground blur-number font-semibold">{formatCurrency(b.type === 'income' ? b.actual : Math.abs(b.actual))}</span>
                                     </span>
                                   </div>
                                   {b.groupedBreakout.length === 0 ? (

@@ -10,6 +10,7 @@ import {
 } from "./accounts/connection-dialogs";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterAccountChange } from '@/lib/query-invalidation';
 import { usePlaidLink } from 'react-plaid-link';
@@ -674,7 +675,7 @@ export default function AutomaticAccountsSection({
       if (!res.ok) throw new Error('Failed to mute sync alerts');
       fetchAccounts();
     } catch (err: any) {
-      alert(err.message || 'An error occurred');
+      toast.error(err.message || 'An error occurred');
     } finally {
       setMutingAccountId(null);
     }
@@ -743,9 +744,21 @@ export default function AutomaticAccountsSection({
   const hasConnection = connections.length > 0;
   const hasMySimpleFin = connections.some((conn) => conn.userId === currentUserId && conn.provider === 'simplefin');
 
-  const staleAccounts = accounts.filter(
-    (acc) => acc.syncStatus && acc.syncStatus.status !== 'ok'
-  );
+  const staleAccounts = accounts.filter((acc) => {
+    if (!acc.connectionId && !acc.plaidConnectionId) return false;
+    let meta: any = {};
+    try {
+      meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : (acc.metadata || {});
+    } catch {}
+    if (
+      acc.type === 'stock_option' ||
+      meta.isEquityAccount ||
+      (typeof acc.externalId === 'string' && acc.externalId.startsWith('equity-'))
+    ) {
+      return false;
+    }
+    return acc.syncStatus && acc.syncStatus.status !== 'ok';
+  });
 
   return (
     <>

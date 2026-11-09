@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { simplifinConnections, plaidConnections, accountSnapshots, accounts } from '@/lib/db/schema';
+import { simplifinConnections, plaidConnections, accountSnapshots, accounts, equityGrants } from '@/lib/db/schema';
 import { eq, and, gte } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
@@ -101,7 +101,19 @@ export async function getAccountsSyncStatus(
       connectionsMap.set(conn.id, conn);
     }
 
-    // 2. Fetch all historical snapshots for this user in the last 7 calendar days
+    // 2. Fetch equity grants associated with the user to recognize parent equity accounts
+    let equityAccountIds = new Set<string>();
+    try {
+      const userGrants = await db
+        .select({ accountId: equityGrants.accountId })
+        .from(equityGrants)
+        .where(eq(equityGrants.userId, userId));
+      equityAccountIds = new Set(userGrants.map((g) => g.accountId));
+    } catch {
+      // Non-critical: if table query fails in early test/migration environments
+    }
+
+    // 3. Fetch all historical snapshots for this user in the last 7 calendar days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
@@ -153,6 +165,25 @@ export async function getAccountsSyncStatus(
 
       const connectionId = acc.connectionId || acc.plaidConnectionId;
       const hasConnection = !!connectionId;
+
+      // Check if account is an equity account (stock option / equity grant)
+      const isEquityAccount =
+        acc.type === 'stock_option' ||
+        meta.isEquityAccount === true ||
+        (typeof acc.externalId === 'string' && acc.externalId.startsWith('equity-')) ||
+        equityAccountIds.has(accountId);
+
+      // Manual equity accounts (added in the investments area or configured manually)
+      // do not need balance staleness or update alerts because equity grants / options
+      // can sit for long periods of time without any balance changes.
+      if (
+        meta.isEquityAccount === true ||
+        (typeof acc.externalId === 'string' && acc.externalId.startsWith('equity-')) ||
+        (!hasConnection && isEquityAccount)
+      ) {
+        statuses[accountId] = { status: 'ok' };
+        continue;
+      }
 
       // Check if manual account is API-driven
       const isCryptoApi = acc.type === 'crypto' && typeof meta.xpub === 'string' && meta.xpub.trim() !== '';
@@ -253,7 +284,7 @@ export async function getAccountsSyncStatus(
       }
 
       // ── Rule 3: Stale Balance / Market Stagnation (Applies to Investment/Crypto/Metals with active API) ──
-      if (MARKET_TYPES.has(acc.type)) {
+      if (MARKET_TYPES.has(acc.type) && !isEquityAccount) {
         const accountSnaps = snapshotsByAccount.get(accountId) ?? [];
         if (accountSnaps.length >= 3) {
           // Decrypt balances for comparison
@@ -285,7 +316,7 @@ export async function getAccountsSyncStatus(
 
       // ── Rule 4: Specific Account Update Delay ──
       // If the account balance date is extremely old, despite connection syncs succeeding.
-      if (acc.balanceDate) {
+      if (acc.balanceDate && !isEquityAccount) {
         const balanceTime = new Date(acc.balanceDate).getTime();
         const elapsedDays = (now - balanceTime) / (1000 * 60 * 60 * 24);
         if (elapsedDays > 5) {

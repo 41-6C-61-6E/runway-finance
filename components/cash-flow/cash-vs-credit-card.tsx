@@ -62,7 +62,7 @@ function formatRatio(ratio: number): string {
   return formatMultiplier(ratio);
 }
 
-function StatBox({ label, value, change, changePercent, color, icon, className }: {
+function StatBox({ label, value, change, changePercent, color, icon, className, reverseTrendColor }: {
   label: string;
   value: string;
   change: number | null;
@@ -70,10 +70,16 @@ function StatBox({ label, value, change, changePercent, color, icon, className }
   color?: string;
   icon?: React.ReactNode;
   className?: string;
+  reverseTrendColor?: boolean;
 }) {
-  const isPositive = change !== null && change >= 0;
+  const isPositive = change !== null && change > 0;
   const isNegative = change !== null && change < 0;
   const hasChange = change !== null;
+
+  // When reverseTrendColor is true (liabilities): increase is destructive, decrease is positive
+  const isGood = reverseTrendColor ? isNegative : isPositive;
+  const isBad = reverseTrendColor ? isPositive : isNegative;
+  const trendColorClass = isGood ? 'text-chart-1' : isBad ? 'text-destructive' : 'text-muted-foreground';
 
   return (
     <div className={`flex flex-col gap-0.5 min-w-0 ${className ?? ''}`}>
@@ -88,10 +94,10 @@ function StatBox({ label, value, change, changePercent, color, icon, className }
       </div>
       {hasChange && (
         <div className="flex items-center gap-1 text-[11px]">
-          {isPositive && <TrendingUp className="w-3 h-3 text-chart-1" />}
-          {isNegative && <TrendingDown className="w-3 h-3 text-destructive" />}
+          {isPositive && <TrendingUp className={`w-3 h-3 ${trendColorClass}`} />}
+          {isNegative && <TrendingDown className={`w-3 h-3 ${trendColorClass}`} />}
           {change === 0 && <Minus className="w-3 h-3 text-muted-foreground" />}
-          <span className={isPositive ? 'text-chart-1' : isNegative ? 'text-destructive' : 'text-muted-foreground'}>
+          <span className={trendColorClass}>
             {formatCurrency(change)} ({isPositive ? '+' : ''}{formatPlainPercent(changePercent, 1)})
           </span>
         </div>
@@ -335,8 +341,9 @@ export function CashVsCreditCard() {
               <StatBox
                 label="Credit Card Debt"
                 value={formatCurrency(current?.creditCardDebt ?? 0)}
-                change={creditChange !== null ? -creditChange : null}
-                changePercent={creditChangePercent !== null ? -creditChangePercent : null}
+                change={creditChange}
+                changePercent={creditChangePercent}
+                reverseTrendColor={true}
                 className="pl-4 pb-4 border-b border-border/40 sm:px-6 sm:pb-0 sm:border-b-0 sm:border-r sm:border-border/40"
               />
               <StatBox

@@ -208,6 +208,18 @@ export async function checkStaleConnectionsAndNotify(userId: string, dek: Uint8A
 
     // 2. Process broken standalone manual accounts (e.g. Redfin, crypto xpub, metals)
     for (const acc of brokenManualAccounts) {
+      let meta: any = {};
+      try {
+        meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : (acc.metadata || {});
+      } catch {}
+      if (
+        acc.type === 'stock_option' ||
+        meta.isEquityAccount ||
+        (typeof acc.externalId === 'string' && acc.externalId.startsWith('equity-'))
+      ) {
+        continue;
+      }
+
       const lastSuccessTime = acc.balanceDate
         ? new Date(acc.balanceDate).getTime()
         : acc.createdAt

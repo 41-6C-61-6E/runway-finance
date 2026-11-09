@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { Select } from '@/components/ui/select';
+import { apiFetch } from '@/lib/utils/api-client';
 
 type CategoryType = 'standard' | 'compound' | 'transfer';
 type FormCategoryType = 'expense' | 'income' | 'compound' | 'transfer';
@@ -64,8 +65,7 @@ export default function CategoriesTab() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await fetch('/api/categories', { credentials: 'include' });
-      const data = await res.json();
+      const data = await apiFetch<Category[]>('/api/categories');
       setCategories(Array.isArray(data) ? data : []);
     } catch {
       setCategories([]);
@@ -302,17 +302,13 @@ export default function CategoriesTab() {
       };
 
       if (editing) {
-        await fetch(`/api/categories/${editing.id}`, {
+        await apiFetch(`/api/categories/${editing.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify(body),
         });
       } else {
-        await fetch('/api/categories', {
+        await apiFetch('/api/categories', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify(body),
         });
       }
@@ -329,9 +325,8 @@ export default function CategoriesTab() {
   const handleDelete = async () => {
     if (!deleting) return;
     try {
-      await fetch(`/api/categories/${deleting.id}`, {
+      await apiFetch(`/api/categories/${deleting.id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       setDeleting(null);
       await fetchCategories();
@@ -341,11 +336,9 @@ export default function CategoriesTab() {
   const handleResetToDefaults = async () => {
     setResetting(true);
     try {
-      const res = await fetch('/api/categories/reset', {
+      const data = await apiFetch<{ kept?: number; deleted?: number; created?: number }>('/api/categories/reset', {
         method: 'POST',
-        credentials: 'include',
       });
-      const data = await res.json();
       setShowResetConfirm(false);
       setResetResult({ kept: data.kept ?? 0, deleted: data.deleted ?? 0, created: data.created ?? 0 });
       await fetchCategories();
@@ -513,10 +506,12 @@ export default function CategoriesTab() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {childList.length > 0 && (
+                    {childList.length > 0 ? (
                       <button onClick={(e) => { e.stopPropagation(); toggleExpanded(parent.id); }} className="text-muted-foreground hover:text-foreground flex-shrink-0">
                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </button>
+                    ) : (
+                      <span className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                     )}
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: parent.color }} />
                     <span className="text-foreground text-sm font-medium truncate">{parent.name}</span>

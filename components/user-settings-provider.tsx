@@ -44,8 +44,13 @@ function isTransientNetworkOrAbortError(err: unknown): boolean {
   return false;
 }
 
+function isSignInRoute(): boolean {
+  return typeof window !== 'undefined' && (window.location.pathname === '/signin' || window.location.pathname.startsWith('/signin/'));
+}
+
 export function UserSettingsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const isSignIn = isSignInRoute();
   const channelRef = useRef<BroadcastChannel | null>(null);
   const pendingChartSelectionsRef = useRef<Record<string, Record<string, any>>>({});
   const chartFlushPromiseRef = useRef<Promise<void> | null>(null);
@@ -58,6 +63,7 @@ export function UserSettingsProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error('Failed to load user settings');
       return res.json();
     },
+    enabled: !isSignIn,
     staleTime: 5 * 60 * 1000,
   });
 

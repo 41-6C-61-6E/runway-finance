@@ -724,7 +724,8 @@ export function IncomeExpenseChart() {
               </span>
             </div>
 
-            <ChartFrame className="h-[260px] sm:h-[300px] touch-pan-y" name="Income and Expenses">
+            <div className="relative">
+              <ChartFrame className="h-[260px] sm:h-[300px] touch-pan-y" name="Income and Expenses">
               {activeView === 'income' ? (
                   chartType === 'bar' ? (
                     <ComposedChart role="img" aria-label="Income vs Expenses Composed Chart" data={chartData} stackOffset="sign" margin={{ top: 15, right: 10, left: -10, bottom: 5 }}>
@@ -964,7 +965,7 @@ export function IncomeExpenseChart() {
                 )}
               </ChartFrame>
               {/* On-chart average net income or savings rate label overlay */}
-              <div className="absolute top-1 left-1/2 -translate-x-1/2 bg-muted/95 border border-border rounded-lg px-2.5 py-1 text-[10px] sm:text-xs font-semibold text-muted-foreground shadow-sm pointer-events-none z-10 whitespace-nowrap">
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-muted/95 border border-border rounded-lg px-2.5 py-1 text-[10px] sm:text-xs font-semibold text-muted-foreground shadow-sm pointer-events-none z-10 whitespace-nowrap">
                 {activeView === 'income' ? (
                   <>
                     Avg. Net Income ({windowLabel}): <span className="text-foreground font-bold">{formatCurrency(avgNetIncome)} / mo</span>
@@ -975,6 +976,7 @@ export function IncomeExpenseChart() {
                   </>
                 )}
               </div>
+            </div>
           </div>
         </>
 

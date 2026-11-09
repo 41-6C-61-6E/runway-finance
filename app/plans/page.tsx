@@ -334,16 +334,18 @@ export default function PlansPage() {
       <PageContent>
         {(() => {
           const planSubNav = (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-1 mb-3 sm:mb-3.5 gap-4">
-              <AppTabs
-                tabs={tabs}
-                activeTab={activeTab}
-                onChange={(tabId) => setActiveTab(tabId as any)}
-                variant="underline"
-                className="border-b-0 -mb-1"
-              />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-1 mb-3 sm:mb-3.5 gap-3 min-w-0">
+              <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
+                <AppTabs
+                  tabs={tabs}
+                  activeTab={activeTab}
+                  onChange={(tabId) => setActiveTab(tabId as any)}
+                  variant="underline"
+                  className="border-b-0 -mb-1 w-auto"
+                />
+              </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {/* Plan Selector & Management Controls */}
                 <PlanManagementMenu
                   plans={plansList}
@@ -369,7 +371,7 @@ export default function PlansPage() {
               tabs={tabs}
               activeTabId={activeTab}
               onTabChange={(tabId) => setActiveTab(tabId as 'projection' | 'scenarios' | 'settings')}
-              desktopHeader={planSubNav}
+              header={planSubNav}
             >
               <div className="space-y-6">
                 {/* Tab Content */}

@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { applyChartColorScheme, CHART_COLOR_SCHEMES, type ChartColorSchemeId } from '@/lib/utils/chart-color-schemes';
 
+function isSignInRoute(): boolean {
+  return typeof window !== 'undefined' && (window.location.pathname === '/signin' || window.location.pathname.startsWith('/signin/'));
+}
+
 export function useChartColorScheme() {
   const userSettingsCtx = useUserSettings();
 
@@ -11,9 +15,12 @@ export function useChartColorScheme() {
   const [localLoading, setLocalLoading] = useState(!userSettingsCtx);
 
   useEffect(() => {
-    if (userSettingsCtx) return;
+    if (userSettingsCtx || isSignInRoute()) return;
     fetch('/api/user-settings', { credentials: 'include' })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load user settings');
+        return res.json();
+      })
       .then((data) => {
         let s = (data?.chartColorScheme as ChartColorSchemeId) || 'fauntleroy';
         if (!CHART_COLOR_SCHEMES[s]) {

@@ -1,11 +1,21 @@
+import './_server-only-shim';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local', quiet: true });
+dotenv.config({ path: '.env', quiet: true });
+
 import { getDb } from '@/lib/db';
 import { getServerDEK } from '@/lib/crypto-context';
+import { findUser, addUser, createUserEncryptionKeys } from '@/lib/users';
+import { seedUserCategories } from '@/lib/db/seed-categories';
+import { seedUserDefaultRules } from '@/lib/db/seed-default-rules';
 import {
   accounts,
   accountSnapshots,
   aiProposals,
   budgets,
   categories,
+  categoryIncomeSummary,
+  categorySpendingSummary,
   customAlertRules,
   equityGrants,
   financialGoals,
@@ -27,6 +37,7 @@ import {
   tags,
   transactions,
   transactionTags,
+  userEncryptionKeys,
   userNotifications,
   userSettings,
 } from '@/lib/db/schema';
@@ -45,9 +56,42 @@ import {
 
 const USER_ID = 'demo01';
 
+async function ensureDemoUser() {
+  const db = getDb();
+  const existingUser = await findUser(USER_ID);
+  const demoPassword =
+    process.env.UI_CAPTURE_PASSWORD ||
+    process.env.DEMO_PASSWORD ||
+    'Demo01!RunwayFinance2026';
+
+  if (!existingUser) {
+    console.log(`Creating user ${USER_ID}...`);
+    await addUser({
+      username: USER_ID,
+      password: demoPassword,
+      email: 'demo01@example.com',
+    });
+  }
+
+  const [existingKey] = await db
+    .select()
+    .from(userEncryptionKeys)
+    .where(eq(userEncryptionKeys.userId, USER_ID))
+    .limit(1);
+
+  if (!existingKey) {
+    console.log(`Creating encryption keys for ${USER_ID}...`);
+    await createUserEncryptionKeys(USER_ID, demoPassword);
+  }
+
+  await seedUserCategories(USER_ID);
+  await seedUserDefaultRules(USER_ID);
+}
+
 async function seed() {
   console.log(`Starting synthetic data generation for user: ${USER_ID}...`);
   const db = getDb();
+  await ensureDemoUser();
   const dek = await getServerDEK(USER_ID);
   console.log('Retrieved user DEK successfully.');
 
@@ -86,6 +130,10 @@ async function seed() {
   await db.delete(planSettings).where(eq(planSettings.userId, USER_ID));
   await db.delete(plans).where(eq(plans.userId, USER_ID));
   await db.delete(tags).where(eq(tags.userId, USER_ID));
+  await db.delete(categorySpendingSummary).where(eq(categorySpendingSummary.userId, USER_ID));
+  await db.delete(categoryIncomeSummary).where(eq(categoryIncomeSummary.userId, USER_ID));
+  await db.delete(categories).where(eq(categories.userId, USER_ID));
+  await seedUserCategories(USER_ID);
   await db.delete(accounts).where(eq(accounts.userId, USER_ID));
 
   // ── 2. Update User Settings ────────────────────────────────────────────────
@@ -137,6 +185,10 @@ async function seed() {
     if (fallback) {
       const fb = catMap.get(fallback.toLowerCase().trim());
       if (fb) return fb;
+    }
+    const incomeCat = existingCategories.find((c) => c.isIncome);
+    if (fallback?.toLowerCase() === 'income' && incomeCat) {
+      return incomeCat.id;
     }
     // Return first expense category if not found
     return existingCategories[0]?.id || '';

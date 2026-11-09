@@ -1,3 +1,8 @@
+import './_server-only-shim';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local', quiet: true });
+dotenv.config({ path: '.env', quiet: true });
+
 import { getDb } from '../lib/db';
 import { getServerDEK } from '../lib/crypto-context';
 import { decryptRows } from '../lib/crypto';

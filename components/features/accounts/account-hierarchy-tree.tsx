@@ -664,7 +664,7 @@ export default function AccountHierarchyTree({
                     </div>
 
                     {/* All Accounts Sparkline */}
-                    <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                    <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                       <Sparkline
                         data={allTrendStats.historyPoints}
                         isPositive={allTrendStats.isPositive}
@@ -753,7 +753,7 @@ export default function AccountHierarchyTree({
                         </div>
 
                         {/* Group Sparkline */}
-                        <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                        <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                           <Sparkline 
                             data={groupStats.historyPoints} 
                             isPositive={groupStats.isPositive} 
@@ -902,7 +902,7 @@ export default function AccountHierarchyTree({
                                         </div>
                                       </div>
 
-                                      <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                      <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                         {!isAccExpanded && (
                                         <Sparkline 
                                           data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
@@ -969,7 +969,7 @@ export default function AccountHierarchyTree({
                                         <span className="text-[10px] sm:text-xs text-muted-foreground/50 ml-1">({accs.length})</span>
                                       </div>
 
-                                      <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                      <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                         <Sparkline 
                                           data={subStats.historyPoints} 
                                           isPositive={subStats.isPositive} 
@@ -1081,7 +1081,7 @@ export default function AccountHierarchyTree({
                                               </div>
                                             </div>
 
-                                            <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                            <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                               {!isAccExpanded && (
                                               <Sparkline 
                                                 data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
@@ -1204,7 +1204,7 @@ export default function AccountHierarchyTree({
                                       </div>
                                     </div>
 
-                                    <div className="hidden @md:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                    <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
                                       {!isAccExpanded && (
                                       <Sparkline 
                                         data={singleAcc.isHidden || singleAcc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 

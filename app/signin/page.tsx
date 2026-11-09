@@ -87,15 +87,22 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
-        <div className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
+        {/* Brand Header */}
+        <div className="flex flex-col items-center mb-6 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center text-primary font-bold text-xl mb-3 shadow-xs">
+            $
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Runway Finance</h1>
+          <p className="text-xs text-muted-foreground mt-1">Personal Wealth & FIRE Intelligence</p>
+        </div>
 
-
+        <div className="bg-card border border-border rounded-2xl shadow-xl p-6 sm:p-7 space-y-5">
           <div className="text-center">
             {isLogin ? (
-              <h1 className="text-xl font-bold text-foreground">Sign In</h1>
+              <h2 className="text-xl font-bold text-foreground">Sign In</h2>
             ) : (
               <>
-                <h1 className="text-xl font-bold text-foreground">Create account</h1>
+                <h2 className="text-xl font-bold text-foreground">Create account</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Start managing your finances
                 </p>
@@ -109,81 +116,102 @@ export default function SignInPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Username */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <User className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-1.5">
+              <label htmlFor="username" className="text-xs font-semibold text-muted-foreground">
+                Username
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                  placeholder="Username"
+                  required
+                />
               </div>
-              <input
-                type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                placeholder="Username"
-                required
-              />
             </div>
 
             {/* Password */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Lock className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-xs font-semibold text-muted-foreground">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-12 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                  placeholder="Password"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-0 min-w-[44px] min-h-[44px] flex items-center justify-center pr-3 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                placeholder="Password"
-                required
-                minLength={6}
-              />
-              <button
-                type="button"
-                className="absolute inset-y-0 right-0 flex items-center pr-3"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
             </div>
 
             {/* Standard registration fields */}
             {!isLogin && (
               <>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="text-xs font-semibold text-muted-foreground">
+                    Email (optional)
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                      placeholder="Email (optional)"
+                    />
                   </div>
-                  <input
-                    type="email"
-                    id="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                    placeholder="Email (optional)"
-                  />
                 </div>
 
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <KeyRound className="h-4 w-4 text-muted-foreground" />
+                <div className="space-y-1.5">
+                  <label htmlFor="pin" className="text-xs font-semibold text-muted-foreground">
+                    Registration PIN (if required)
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <KeyRound className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <input
+                      type="text"
+                      id="pin"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
+                      placeholder="Registration PIN"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    id="pin"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder-muted-foreground"
-                    placeholder="Registration PIN (if required)"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground pl-10">
+                  <p className="mt-1 text-xs text-muted-foreground pl-1">
                     Enter the registration PIN provided by your administrator
                   </p>
                 </div>
@@ -210,10 +238,10 @@ export default function SignInPage() {
           </form>
 
           {/* Toggle login/register */}
-          <div className="text-center space-y-2">
+          <div className="text-center">
             <button
               onClick={toggleForm}
-              className="text-sm text-primary hover:text-primary/80 font-medium"
+              className="min-h-[44px] py-2.5 inline-flex items-center justify-center text-sm text-primary hover:text-primary/80 font-medium"
             >
               {isLogin
                 ? "Don't have an account? Sign Up"

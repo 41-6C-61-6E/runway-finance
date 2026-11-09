@@ -24,7 +24,7 @@ describe('MobileTabSwipeContainer', () => {
     { id: 'tab2', label: 'Second Tab' },
   ];
 
-  it('hides top header tab labels on mobile viewports', () => {
+  it('renders top header tab labels on mobile viewports', () => {
     const onTabChange = vi.fn();
     const { container } = render(
       <MobileTabSwipeContainer
@@ -38,7 +38,8 @@ describe('MobileTabSwipeContainer', () => {
     );
 
     const header = container.querySelector('[data-testid="mobile-tabs-header"]')?.parentElement;
-    expect(header?.className).toContain('hidden md:block');
+    expect(header?.className).not.toContain('hidden');
+    expect(header?.className).toContain('w-full min-w-0');
   });
 
   it('provides a full-height swipe container for short content so swiping works below content', () => {
@@ -72,7 +73,7 @@ describe('MobileTabSwipeContainer', () => {
     expect(onTabChange).toHaveBeenCalledWith('tab2');
   });
 
-  it('MobileViewSwitcher hides tab labels on mobile view and retains pagination dots', () => {
+  it('MobileViewSwitcher renders visible sub-nav tabs on mobile view when tabs > 1 and retains pagination dots', () => {
     const { container } = render(
       <MobileViewSwitcher
         main={<div>Main Content</div>}
@@ -86,9 +87,11 @@ describe('MobileTabSwipeContainer', () => {
     const mobileContainer = container.querySelector('.md\\:hidden');
     expect(mobileContainer).not.toBeNull();
 
-    // AppTabs should not be rendered in mobile container
-    const mobileHeader = mobileContainer?.querySelector('[class*="AppTabs"]');
-    expect(mobileHeader).toBeNull();
+    // AppTabs should be rendered in mobile container with underline variant tabs
+    const tablist = mobileContainer?.querySelector('[role="tablist"]');
+    expect(tablist).not.toBeNull();
+    expect(tablist?.textContent).toContain('Main');
+    expect(tablist?.textContent).toContain('Overview');
 
     // Dots should be present
     const dots = container.querySelector('.fixed-pagination-dots');

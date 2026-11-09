@@ -253,12 +253,13 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[90dvh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-4 sm:p-6 border-b shrink-0 pr-12">
           <DialogTitle>{editGoal ? 'Edit Goal' : 'Create New Goal'}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {/* Name */}
           <div className="space-y-1.5">
             <Label htmlFor="goal-name">Goal Name</Label>
@@ -651,9 +652,10 @@ export function GoalFormDialog({ open, onClose, onSuccess, editGoal }: GoalFormD
               <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
+          </div>
 
           {/* Footer */}
-          <DialogFooter>
+          <DialogFooter className="p-4 border-t shrink-0 sticky bottom-0 bg-background/95 backdrop-blur flex justify-end gap-2 z-10">
             <button
               type="button"
               onClick={onClose}

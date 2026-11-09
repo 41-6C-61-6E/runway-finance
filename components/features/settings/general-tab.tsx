@@ -245,7 +245,7 @@ export default function GeneralTab() {
             </div>
             <Select
               className="h-9 text-xs font-medium"
-              wrapperClassName="w-full sm:w-56 sm:shrink-0"
+              wrapperClassName="w-full sm:w-64 sm:min-w-[260px] sm:shrink-0"
               value={currency}
               onChange={(e) => handleCurrencyChange(e.target.value)}
             >
@@ -276,7 +276,7 @@ export default function GeneralTab() {
             </div>
             <Select
               className="h-9 text-xs font-medium"
-              wrapperClassName="w-full sm:w-56 sm:shrink-0"
+              wrapperClassName="w-full sm:w-64 sm:min-w-[260px] sm:shrink-0"
               value={timezone}
               onChange={(e) => handleTimezoneChange(e.target.value)}
             >
@@ -321,7 +321,7 @@ export default function GeneralTab() {
             </div>
             <Select
               className="h-9 text-xs font-medium"
-              wrapperClassName="w-full sm:w-56 sm:shrink-0"
+              wrapperClassName="w-full sm:w-64 sm:min-w-[260px] sm:shrink-0"
               value={locale}
               onChange={(e) => handleLocaleChange(e.target.value)}
             >
@@ -346,7 +346,7 @@ export default function GeneralTab() {
             </div>
             <Select
               className="h-9 text-xs font-medium"
-              wrapperClassName="w-full sm:w-56 sm:shrink-0"
+              wrapperClassName="w-full sm:w-64 sm:min-w-[260px] sm:shrink-0"
               value={dateFormat}
               onChange={(e) => handleDateFormatChange(e.target.value)}
             >
@@ -379,7 +379,7 @@ export default function GeneralTab() {
             </div>
             <Select
               className="h-9 text-xs font-medium"
-              wrapperClassName="w-full sm:w-56 sm:shrink-0"
+              wrapperClassName="w-full sm:w-64 sm:min-w-[260px] sm:shrink-0"
               value={textSize}
               onChange={(e) => handleTextSizeChange(e.target.value)}
             >

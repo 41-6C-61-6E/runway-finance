@@ -14,6 +14,7 @@ import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 import { ImportHistoryTable } from './import/import-history-table';
 import { CategoryMappingStep } from './import/category-mapping-step';
 import { AccountMappingStep } from './import/account-mapping-step';
+import { toast } from 'sonner';
 
 type ImportType = 'transactions' | 'account_snapshots';
 type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -459,7 +460,7 @@ export default function ImportTab() {
       if (!res.ok) throw new Error('Failed to fetch import details');
       const data = await res.json();
       if (!data.fileContent) {
-        alert('No original file content stored for this import.');
+        toast.error('No original file content stored for this import.');
         return;
       }
       
@@ -473,7 +474,7 @@ export default function ImportTab() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err.message || 'Failed to download original file.');
+      toast.error(err.message || 'Failed to download original file.');
     }
   };
 

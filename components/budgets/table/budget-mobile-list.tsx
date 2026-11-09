@@ -159,7 +159,7 @@ export function BudgetMobileList({
                 <IconButton
                   size="sm"
                   label="Edit budget"
-                  className="-m-0.5 p-0.5 text-muted-foreground"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center -m-0.5 p-0.5 text-muted-foreground"
                   onClick={() => {
                     setEditBudget(b);
                     setShowForm(true);
@@ -170,7 +170,7 @@ export function BudgetMobileList({
                 <IconButton
                   size="sm"
                   label="Delete budget"
-                  className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center -m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80"
                   onClick={() => setDeleteBudget(b)}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -254,7 +254,7 @@ export function BudgetMobileList({
                 <IconButton
                   size="sm"
                   label="Edit budget"
-                  className="-m-0.5 p-0.5 text-muted-foreground"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center -m-0.5 p-0.5 text-muted-foreground"
                   onClick={() => {
                     setEditBudget(b);
                     setShowForm(true);
@@ -265,7 +265,7 @@ export function BudgetMobileList({
                 <IconButton
                   size="sm"
                   label="Delete budget"
-                  className="-m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center -m-0.5 p-0.5 text-muted-foreground hover:text-destructive/80"
                   onClick={() => setDeleteBudget(b)}
                 >
                   <Trash2 className="w-3.5 h-3.5" />

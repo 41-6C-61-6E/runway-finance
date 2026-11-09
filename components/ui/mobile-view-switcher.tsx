@@ -160,6 +160,18 @@ export function MobileViewSwitcher({
           tabs={mobileTabs}
           activeTabId={internalTab}
           onTabChange={handleMobileTabChange}
+          header={
+            mobileTabs.length > 1 ? (
+              <div className="mb-3 sm:mb-3.5">
+                <AppTabs
+                  tabs={mobileTabs}
+                  activeTab={internalTab}
+                  onChange={handleMobileTabChange}
+                  variant="underline"
+                />
+              </div>
+            ) : undefined
+          }
         >
           <div className="space-y-5 sm:space-y-6">
             {isSummaryActive ? summary : main}
@@ -313,7 +325,7 @@ export function MobileTabSwipeContainer({
   return (
     <div className={cn("w-full flex-1 flex flex-col", className)}>
       {desktopHeader && <div className="hidden md:block mb-3 sm:mb-3.5">{desktopHeader}</div>}
-      {header && <div className="hidden md:block mb-3 sm:mb-3.5">{header}</div>}
+      {header && <div className="mb-3 sm:mb-3.5 w-full min-w-0">{header}</div>}
 
       {/* Touch Swipe Container with clean fade transition and no rubber-band bounce */}
       <div
@@ -331,7 +343,7 @@ export function MobileTabSwipeContainer({
       {/* Pagination dots indicator for tabs on mobile: static and fixed above the main bottom nav */}
       {showDots && tabs.length > 1 && (
         <div
-          className="fixed bottom-16 left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden fixed-pagination-dots"
+          className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden fixed-pagination-dots"
         >
           <div className="pointer-events-auto">
             <PaginationDots

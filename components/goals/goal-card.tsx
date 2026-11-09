@@ -360,16 +360,16 @@ export function GoalCard({
                   </div>
                   
                   {projection && (
-                    <div className="flex items-center gap-1 text-[10px]">
+                    <div className="flex items-center gap-1 text-[11px]">
                       {projection.isFunded ? (
-                        <div className="flex items-center gap-1 text-status-positive font-semibold">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-positive/10 text-status-positive font-semibold border border-status-positive/20">
                           <CheckCircle2 className="w-3 h-3" />
-                          <span>{projection.projectedFundDate ? formatProjectedDate(projection.projectedFundDate) : 'Funded'}</span>
+                          <span>Funded ({projection.projectedFundDate ? formatProjectedDate(projection.projectedFundDate) : 'Done'})</span>
                         </div>
                       ) : projection.willFund && projection.projectedFundDate ? (
-                        <div className="flex items-center gap-1 text-chart-2 font-semibold">
-                          <Target className="w-3 h-3" />
-                          <span>Projected: {formatProjectedDate(projection.projectedFundDate)}</span>
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
+                          <Target className="w-3 h-3 text-primary shrink-0" />
+                          <span className="font-semibold">Projected: {formatProjectedDate(projection.projectedFundDate)}</span>
                           {projection.monthsToFund !== null && (
                             <span className="text-muted-foreground font-normal">
                               ({projection.monthsToFund === 0 ? 'Now' : `${projection.monthsToFund}mo`})
@@ -377,7 +377,7 @@ export function GoalCard({
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 text-amber-500 font-medium">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-medium border border-amber-500/20">
                           <AlertCircle className="w-3 h-3" />
                           <span>5+ yrs at current rate</span>
                         </div>

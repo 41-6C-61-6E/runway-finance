@@ -54,7 +54,7 @@ export function WhatIfScenarioCard({
         {!isWhatIfCollapsed && (
           <div className="p-5 space-y-4">
 
-        <div className={`grid grid-cols-1 sm:grid-cols-2 ${Boolean(plan?.hasSpouse || plan?.filingStatus === 'married_joint') ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-6`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${Boolean(plan?.hasSpouse || plan?.filingStatus === 'married_joint') ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-2 xl:grid-cols-4'} gap-6`}>
           {/* Primary Retirement Age Slider */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">

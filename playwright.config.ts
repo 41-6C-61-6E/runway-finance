@@ -13,7 +13,8 @@ export default defineConfig({
       animations: 'disabled',
     },
   },
-  snapshotDir: './tests/e2e/snapshots',
+  snapshotDir: './tmp/playwright-snapshots',
+  outputDir: './tmp/playwright-results',
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:3001',
     trace: 'on-first-retry',

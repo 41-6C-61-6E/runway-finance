@@ -152,7 +152,7 @@ function AppTabsInner({
       ref={underlineRef}
       className={cn(
         'flex items-center border-b border-border/60 overflow-x-auto no-scrollbar scroll-contain-x touch-pan-x w-full',
-        fullWidth ? 'gap-2 sm:gap-4' : 'gap-4 md:gap-6 justify-center md:justify-start',
+        fullWidth ? 'gap-2 sm:gap-4' : 'gap-4 md:gap-6 justify-start',
         className
       )}
       role="tablist"

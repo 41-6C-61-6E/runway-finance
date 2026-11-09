@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { formatCurrency } from '@/lib/utils/format';
 import type { SettingsConnection } from '../orphaned-accounts-section';
 import { SYNC_FREQUENCY_LABELS } from './sync-intervals';
 
@@ -168,7 +169,7 @@ export function SimpleFinRotateDialog({
                 required
                 autoFocus
               />
-              <p className="text-[11px] text-muted-foreground mt-1.5">
+              <p className="text-caption text-muted-foreground mt-1.5">
                 Generate a setup token on beta-bridge.simplefin.org or paste your full SimpleFIN access URL.
               </p>
             </div>
@@ -276,7 +277,7 @@ export function ConnectionDetailsDialog({
                         onClose();
                         openRotateSimpleFin(c);
                       }}
-                      className="text-[10px] font-semibold text-primary hover:underline cursor-pointer"
+                      className="text-caption font-semibold text-primary hover:underline cursor-pointer"
                     >
                       Rotate / Update URL
                     </button>
@@ -485,10 +486,10 @@ export function ManageSyncAccountsDialog({
                           {acc.name}
                         </span>
                         <span className="text-xs text-muted-foreground block truncate">
-                          {acc.institution} · {parseFloat(acc.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {acc.currency}
+                          {acc.institution} · {formatCurrency(parseFloat(acc.balance) || 0, acc.currency || 'USD')}
                         </span>
                         {isDisabled && (
-                          <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+                          <p className="text-caption text-amber-600 dark:text-amber-400 font-medium mt-1">
                             ⚠️ Sync disabled. This account will be unlinked locally and won&apos;t sync.
                           </p>
                         )}

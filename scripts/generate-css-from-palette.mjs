@@ -24,16 +24,19 @@ let css = `/* ── AUTO-GENERATED FROM lib/colors/palette.json ─────
 
 // Light theme (:root)
 css += `:root {\n`;
+css += `  color-scheme: light;\n`;
 css += formatVarDeclarations(palette.themes.light);
 css += `\n}\n\n`;
 
 // Dark theme
 css += `[data-theme=dark] {\n`;
+css += `  color-scheme: dark;\n`;
 css += formatVarDeclarations(palette.themes.dark);
 css += `\n}\n\n`;
 
 // Moonlight theme
 css += `[data-theme=moonlight] {\n`;
+css += `  color-scheme: dark;\n`;
 css += formatVarDeclarations(palette.themes.moonlight);
 css += `\n}\n\n`;
 

@@ -143,22 +143,22 @@ function FundEventDot({ cx, cy, payload, eventKey }: any) {
   const matching = payload.fundEvents.filter((e: any) => e.accountKey === eventKey);
   if (!matching.length) return null;
   const text = matching[0].goal;
-  const rectWidth = text.length * 5.2 + 6;
+  const rectWidth = Math.min(180, text.length * 6.2 + 12);
   return (
     <g>
       <circle cx={cx} cy={cy} r={5} fill="var(--color-status-positive)" stroke="white" strokeWidth={2} />
       <rect
         x={cx + 5}
-        y={cy - 6.5}
+        y={cy - 8}
         width={rectWidth}
-        height={13}
+        height={16}
         rx={3}
         fill="var(--color-card)"
         stroke="var(--color-status-positive)"
         strokeWidth={0.5}
         opacity={1}
       />
-      <text x={cx + 8} y={cy + 1} fontSize={9} fontWeight={600} fill="var(--color-status-positive)" dominantBaseline="middle">
+      <text x={cx + 8} y={cy + 1} fontSize={10} fontWeight={600} fill="var(--color-status-positive)" dominantBaseline="middle">
         {text}
       </text>
     </g>
@@ -459,7 +459,7 @@ export function MilestonesProjections() {
                     </span>
                     <button
                       onClick={() => resetInflowForAccount(acct.accountId)}
-                      className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors shrink-0"
+                      className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors shrink-0"
                       title="Reset to calculated default"
                     >
                       reset
@@ -468,7 +468,7 @@ export function MilestonesProjections() {
                   <div className="flex items-center gap-1">
                     <IconButton
                       size="sm" variant="outline" label="Decrease inflow by $500"
-                      className="h-6 w-6 p-0 rounded-md border-border/50 hover:bg-muted hover:text-foreground"
+                      className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:h-6 sm:w-6 p-0 rounded-md border-border/50 hover:bg-muted hover:text-foreground flex items-center justify-center"
                       onClick={() => adjustInflowForAccount(acct.accountId, -500)}
                     >
                       <Minus className="w-3.5 h-3.5" />
@@ -494,7 +494,7 @@ export function MilestonesProjections() {
                     />
                     <IconButton
                       size="sm" variant="outline" label="Increase inflow by $500"
-                      className="h-6 w-6 p-0 rounded-md border-border/50 hover:bg-muted hover:text-foreground"
+                      className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:h-6 sm:w-6 p-0 rounded-md border-border/50 hover:bg-muted hover:text-foreground flex items-center justify-center"
                       onClick={() => adjustInflowForAccount(acct.accountId, 500)}
                     >
                       <Plus className="w-3.5 h-3.5" />

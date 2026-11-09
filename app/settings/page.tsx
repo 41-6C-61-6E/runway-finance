@@ -138,7 +138,7 @@ function SettingsPageBody() {
   }, [fetchAccounts]);
 
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full pb-24 lg:pb-0">
       <PageHeader title="Settings" icon={Settings} />
       <PageContent className="flex flex-col items-center" maxWidth="max-w-6xl">
         {/* Setup Checklist */}
@@ -168,7 +168,7 @@ function SettingsPageBody() {
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-foreground truncate">{tab.label}</div>
-                        <div className="text-xs text-muted-foreground truncate">{tab.description}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-2">{tab.description}</div>
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0 ml-2 group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
@@ -190,7 +190,7 @@ function SettingsPageBody() {
                 params.delete('sub');
                 router.replace(`/settings?${params.toString()}`, { scroll: false });
               }}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3.5 py-2.5 min-h-[44px] rounded-full bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-all active:scale-95 cursor-pointer"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               <span>All Settings</span>

@@ -334,21 +334,6 @@ export default function AiTab() {
     saveSetting({ aiSystemPrompt: null });
   };
 
-  if (loading) {
-    return <div className="text-muted-foreground py-4">Loading AI settings...</div>;
-  }
-
-  const hint = endpointHint(endpoint);
-  const chatUrl = endpoint.trim() ? `${endpoint.trim().replace(/\/+$/, '')}/chat/completions` : null;
-  const isOpenRouter = (() => {
-    try {
-      return new URL(endpoint.trim()).hostname.toLowerCase().endsWith('openrouter.ai');
-    } catch {
-      return false;
-    }
-  })();
-  const fallbackPreview = sanitizeFallbacks(model, fallbackText);
-
   const handleReviewShared = useCallback(async () => {
     setPreviewLoading(true);
     setPreviewOpen(true);
@@ -366,6 +351,21 @@ export default function AiTab() {
       setPreviewLoading(false);
     }
   }, []);
+
+  if (loading) {
+    return <div className="text-muted-foreground py-4">Loading AI settings...</div>;
+  }
+
+  const hint = endpointHint(endpoint);
+  const chatUrl = endpoint.trim() ? `${endpoint.trim().replace(/\/+$/, '')}/chat/completions` : null;
+  const isOpenRouter = (() => {
+    try {
+      return new URL(endpoint.trim()).hostname.toLowerCase().endsWith('openrouter.ai');
+    } catch {
+      return false;
+    }
+  })();
+  const fallbackPreview = sanitizeFallbacks(model, fallbackText);
 
   return (
     <div className="space-y-4">

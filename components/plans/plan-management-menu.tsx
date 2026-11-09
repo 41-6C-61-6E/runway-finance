@@ -74,7 +74,8 @@ export function PlanManagementMenu({
       <Select
         value={selectedPlan?.id || ''}
         onChange={(e) => onSelectPlan(e.target.value)}
-        className="h-8 bg-card text-[11px] font-semibold"
+        wrapperClassName="w-44 sm:w-52 lg:w-60 shrink min-w-0"
+        className="h-8 bg-card text-[11px] font-semibold truncate"
       >
         {plans.map((p) => (
           <option key={p.id} value={p.id}>

@@ -96,11 +96,11 @@ function getNextMilestone(netWorth: number) {
 }
 
 const RATING_THRESHOLDS = [
-  { max: 0.35, label: 'Excellent', colorVar: 'var(--status-positive)', badgeClass: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', barClass: 'bg-chart-1' },
-  { max: 0.45, label: 'Good', colorVar: 'var(--chart-2)', badgeClass: 'bg-blue-500/10 text-blue-500 border-blue-500/20', barClass: 'bg-blue-500' },
-  { max: 0.55, label: 'Fair', colorVar: 'var(--status-warning)', badgeClass: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20', barClass: 'bg-yellow-500' },
-  { max: 0.75, label: 'Poor', colorVar: 'var(--chart-3)', badgeClass: 'bg-orange-500/10 text-orange-500 border-orange-500/20', barClass: 'bg-orange-500' },
-  { max: Infinity, label: 'Critical', colorVar: 'var(--destructive)', badgeClass: 'bg-rose-500/10 text-rose-500 border-rose-500/20', barClass: 'bg-destructive' },
+  { max: 0.35, label: 'Excellent', colorVar: 'var(--status-positive)', badgeClass: 'bg-status-positive/10 text-status-positive border-status-positive/20', barClass: 'bg-status-positive' },
+  { max: 0.45, label: 'Good', colorVar: 'var(--chart-2)', badgeClass: 'bg-chart-2/10 text-chart-2 border-chart-2/20', barClass: 'bg-chart-2' },
+  { max: 0.55, label: 'Fair', colorVar: 'var(--status-warning)', badgeClass: 'bg-status-warning/10 text-status-warning border-status-warning/20', barClass: 'bg-status-warning' },
+  { max: 0.75, label: 'Poor', colorVar: 'var(--chart-3)', badgeClass: 'bg-chart-3/10 text-chart-3 border-chart-3/20', barClass: 'bg-chart-3' },
+  { max: Infinity, label: 'Critical', colorVar: 'var(--destructive)', badgeClass: 'bg-destructive/10 text-destructive border-destructive/20', barClass: 'bg-destructive' },
 ];
 
 function getDebtRatioRating(rawRatio: number) {
@@ -395,11 +395,11 @@ export function NetWorthSidePanel() {
                   <TooltipRow label="Ratio" value={formatPlainPercent(debtPct)} color="var(--color-primary)" />
                   <div className="mt-2 border-t border-border/40 pt-1.5 space-y-1">
                     <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark</div>
-                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />Excellent: &lt;35%</span><span>Healthy</span></div>
-                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" />Good: 35% - 45%</span><span>Moderate</span></div>
-                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500" />Fair: 45% - 55%</span><span>Elevated</span></div>
-                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500" />Poor: 55% - 75%</span><span>High Risk</span></div>
-                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" />Critical: &gt;75%</span><span>Very High</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-status-positive" />Excellent: &lt;35%</span><span>Healthy</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-chart-2" />Good: 35% - 45%</span><span>Moderate</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-status-warning" />Fair: 45% - 55%</span><span>Elevated</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-chart-3" />Poor: 55% - 75%</span><span>High Risk</span></div>
+                    <div className="flex justify-between gap-4 text-[11px] font-mono"><span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-destructive" />Critical: &gt;75%</span><span>Very High</span></div>
                   </div>
                 </>
               }
