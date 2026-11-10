@@ -858,28 +858,6 @@ button,
   }
 }
 
-/* ── Reduce Transparency Accessibility Overrides ─────────────────────────── */
-.reduce-transparency-active [class*="backdrop-blur"] {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-.reduce-transparency-active [class*="bg-background/"] {
-  background-color: var(--background) !important;
-}
-
-.reduce-transparency-active [class*="bg-card/"] {
-  background-color: var(--card) !important;
-}
-
-.reduce-transparency-active [class*="bg-popover/"] {
-  background-color: var(--popover) !important;
-}
-
-.reduce-transparency-active [class*="bg-muted/"] {
-  background-color: var(--muted) !important;
-}
-
 /* ── Accounts Page: Selected Card on Mobile ─────────────────────────────── */
 @media (max-width: 1023px) {
   .account-selected-card {
