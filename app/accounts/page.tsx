@@ -64,7 +64,7 @@ function AccountsContent() {
   }, [allAccounts, isNetWorthEnabled, isRealEstateEnabled]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-12 transition-all">
+    <div className="min-h-screen bg-background text-foreground pb-12">
       <PageHeader title="Accounts" icon={Landmark} />
 
       <PageContent maxWidth="max-w-7xl" className="space-y-5 sm:space-y-6">

@@ -78,6 +78,7 @@ function parseArgs(argv) {
     loginViaUi: false,
     autoSeed: true,
     autoServer: true,
+    stopServerOnExit: false,
     baseUrl: process.env.BASE_URL || 'http://localhost:3001',
     outDir: null,
     waitMs: 600,
@@ -115,6 +116,7 @@ function parseArgs(argv) {
     else if (arg === '--login-via-ui') opts.loginViaUi = true;
     else if (arg === '--no-seed') opts.autoSeed = false;
     else if (arg === '--no-server') opts.autoServer = false;
+    else if (arg === '--stop-server') opts.stopServerOnExit = true;
     else if (arg === '--base-url') opts.baseUrl = next();
     else if (arg === '--out' || arg === '-o') opts.outDir = next();
     else if (arg === '--wait') opts.waitMs = parseInt(next(), 10) || 600;
@@ -201,10 +203,34 @@ function resolveRouteSpecs(opts) {
 }
 
 let currentServerHandle = null;
+let loggedExistingServer = false;
+
+function isPortListening(port, host = '127.0.0.1') {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(400);
+    socket.once('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.connect(port, host, () => {
+      socket.end();
+      resolve(true);
+    });
+  });
+}
 
 async function isServerListening(baseUrl) {
   try {
-    const res = await fetch(`${baseUrl}/signin`, { method: 'GET', redirect: 'manual' });
+    const res = await fetch(`${baseUrl}/signin`, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(10_000),
+    });
     return res.status >= 200 && res.status < 500;
   } catch {
     return false;
@@ -213,13 +239,41 @@ async function isServerListening(baseUrl) {
 
 async function ensureDevServer(baseUrl, autoServer) {
   if (await isServerListening(baseUrl)) {
+    if (!loggedExistingServer && !currentServerHandle) {
+      console.log(`[ui:capture] Using running dev server at ${baseUrl}.`);
+      loggedExistingServer = true;
+    }
     return currentServerHandle || { startedByUs: false, stop: async () => {} };
   }
+
+  // If the TCP port is already open (e.g., server is mid-startup or compiling), wait for it to respond
+  let port = 3001;
+  let host = '127.0.0.1';
+  try {
+    const parsed = new URL(baseUrl);
+    port = parseInt(parsed.port || '3001', 10);
+    if (parsed.hostname && parsed.hostname !== 'localhost') host = parsed.hostname;
+  } catch {}
+
+  if (await isPortListening(port, host)) {
+    const waitStart = Date.now();
+    while (Date.now() - waitStart < 15_000) {
+      if (await isServerListening(baseUrl)) {
+        if (!loggedExistingServer && !currentServerHandle) {
+          console.log(`[ui:capture] Using running dev server at ${baseUrl}.`);
+          loggedExistingServer = true;
+        }
+        return currentServerHandle || { startedByUs: false, stop: async () => {} };
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
   if (!autoServer) {
     throw new Error(`Dev server is not reachable at ${baseUrl} and --no-server was specified.`);
   }
 
-  console.log(`[ui:capture] Dev server not detected at ${baseUrl}. Starting "pnpm dev"...`);
+  console.log(`[ui:capture] Dev server not detected at ${baseUrl}. Starting persistent "pnpm dev"...`);
   const logFd = fs.openSync('/tmp/dev-server.log', 'a');
   const child = spawn('pnpm', ['dev'], {
     cwd: ROOT,
@@ -228,12 +282,16 @@ async function ensureDevServer(baseUrl, autoServer) {
     detached: true,
   });
   child.unref();
+  try {
+    fs.closeSync(logFd);
+  } catch {}
 
   const start = Date.now();
   const timeoutMs = 60_000;
   while (Date.now() - start < timeoutMs) {
     if (await isServerListening(baseUrl)) {
-      console.log(`[ui:capture] Dev server ready at ${baseUrl} (${((Date.now() - start) / 1000).toFixed(1)}s).`);
+      console.log(`[ui:capture] Dev server ready at ${baseUrl} (${((Date.now() - start) / 1000).toFixed(1)}s) and will remain running.`);
+      loggedExistingServer = true;
       currentServerHandle = {
         startedByUs: true,
         stop: async () => {
@@ -1006,8 +1064,8 @@ async function main() {
     }
     console.log(`[ui:capture] Audit summary    : ${summaryPath}`);
   } finally {
-    if (serverHandle.startedByUs) {
-      console.log('[ui:capture] Stopping temporary dev server...');
+    if (serverHandle.startedByUs && opts.stopServerOnExit) {
+      console.log('[ui:capture] Stopping dev server (--stop-server)...');
       await serverHandle.stop();
     }
   }

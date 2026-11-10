@@ -12,6 +12,7 @@ interface CollapsibleFilterPanelProps {
   feedbackItems?: React.ReactNode[];
   children: React.ReactNode;
   className?: string;
+  contentClassName?: string;
   actions?: React.ReactNode;
   centerContent?: React.ReactNode;
   rightActions?: React.ReactNode;
@@ -25,6 +26,7 @@ export function CollapsibleFilterPanel({
   feedbackItems,
   children,
   className,
+  contentClassName,
   actions,
   centerContent,
   rightActions,
@@ -102,7 +104,12 @@ export function CollapsibleFilterPanel({
 
       {/* Collapsible Content */}
       {isOpen && (
-        <div className="mt-1.5 p-4 bg-background/50 border border-border/40 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div
+          className={cn(
+            "mt-1.5 p-4 bg-background/50 border border-border/40 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-1 duration-200",
+            contentClassName
+          )}
+        >
           {children}
         </div>
       )}

@@ -6,6 +6,7 @@ import { invalidateAfterTransactionChange } from '@/lib/query-invalidation';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Sparkles, Receipt, LayoutList, X, Repeat } from 'lucide-react';
+import type { VisibilityState } from '@tanstack/react-table';
 import TransactionTable from '@/components/features/transactions/transaction-table';
 import FilterBar from '@/components/features/transactions/filter-bar';
 import BulkActionsToolbar from '@/components/features/transactions/bulk-actions-toolbar';
@@ -109,6 +110,18 @@ function TransactionsContent() {
 
   const [customPresets, setCustomPresets] = usePersistentState<TransactionPreset[]>('finance:transactions:customPresets', []);
   const [compactView, setCompactView] = usePersistentState<boolean>('finance:transactions:compactView', false);
+  const [columnVisibility, setColumnVisibility] = usePersistentState<VisibilityState>(
+    'finance:transactions:columnVisibility',
+    {
+      select: true,
+      account: true,
+      accountType: true,
+      category: true,
+      postedDate: false,
+      ai: false,
+      tags: true,
+    }
+  );
 
   const hasUrlView = Boolean(searchParams.get('view'));
   const urlView = searchParams.get('view');
@@ -610,7 +623,7 @@ useEffect(() => {
               <UpcomingBills />
             </Suspense>
           ) : (
-            <>
+            <div className="bg-card border border-border rounded-xl shadow-xs">
               <FilterBar 
                 filters={filters} 
                 onChange={updateFilter} 
@@ -621,10 +634,16 @@ useEffect(() => {
                 onDeletePreset={handleDeletePreset}
                 compactView={compactView}
                 onCompactViewChange={setCompactView}
+                columnVisibility={columnVisibility}
+                onColumnVisibilityChange={setColumnVisibility}
+                onAddTransaction={handleAddTransaction}
                 pendingAiCount={aiSuggestionsActive ? pendingAiCount : 0}
                 aiSuggestionsDismissed={isSuggestionsDismissed}
                 onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
                 onOpenAiSuggestions={() => setAiModalOpen(true)}
+                analysisRunning={aiSuggestionsActive && analysisRunning}
+                analysisProcessed={analysisProcessed}
+                analysisTotal={analysisTotal}
               />
 
               <div className="min-w-0">
@@ -647,6 +666,8 @@ useEffect(() => {
                   onAddTransaction={handleAddTransaction}
                   compactView={compactView}
                   onCompactViewChange={setCompactView}
+                  columnVisibility={columnVisibility}
+                  onColumnVisibilityChange={setColumnVisibility}
                   pendingAiCount={aiSuggestionsActive ? pendingAiCount : 0}
                   aiSuggestionsDismissed={isSuggestionsDismissed}
                   onAiSuggestionsDismissed={handleAiSuggestionsDismiss}
@@ -674,7 +695,7 @@ useEffect(() => {
                   onProposalsUpdated={handleProposalsUpdated}
                 />
               </div>
-            </>
+            </div>
           )}
         </MobileTabSwipeContainer>
       </PageContent>

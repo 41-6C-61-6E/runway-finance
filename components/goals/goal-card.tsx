@@ -130,8 +130,7 @@ export function GoalCard({
     <div
       className={cn(
         "@container relative bg-muted hover:bg-muted/85 rounded-xl border border-border transition-all duration-200 p-4 sm:p-5",
-        isCompleted && "opacity-85",
-        isOverdue && "border-destructive/50 shadow-sm shadow-destructive/5"
+        isCompleted && "opacity-85"
       )}
     >
       {/* Delete Confirmation Overlay */}

@@ -78,7 +78,9 @@ export function SankeyCustomNode({
     return null;
   }
 
-  const isLeftSide = !payload.targetLinks || payload.targetLinks.length === 0;
+  const nodeIdx = nodes ? nodes.findIndex((n) => n.id === payload.id) : -1;
+  const colIndex = (columnMetrics && nodeIdx >= 0) ? (columnMetrics.columns[nodeIdx] ?? -1) : -1;
+  const isLeftSide = colIndex === 0 || (payload.depth !== undefined && payload.depth === 0) || (!payload.sourceLinks || payload.sourceLinks.length === 0);
   const isDimmed = hoveredNode !== null && hoveredNode !== undefined && hoveredNode !== payload.id;
 
   const rawLabel = payload.label ?? payload.name ?? '';
@@ -99,8 +101,6 @@ export function SankeyCustomNode({
         ? `${signPrefix}${formatCurrency(payload.value)}`
         : '';
 
-  const nodeIdx = nodes ? nodes.findIndex((n) => n.id === payload.id) : -1;
-  const colIndex = (columnMetrics && nodeIdx >= 0) ? (columnMetrics.columns[nodeIdx] ?? -1) : -1;
   const offset = (colIndex >= 0 && columnOffsets) ? (columnOffsets[colIndex] ?? 0) : 0;
   const shiftedY = y + offset;
 
@@ -117,7 +117,7 @@ export function SankeyCustomNode({
   const hubBadgeW = Math.min(180, Math.max(width + 40, 140));
   const hubBadgeH = 48;
   const HUB_GAP = 10;
-  const showHubBadge = !isMobile;
+  const showHubBadge = chartWidth >= 480 || !isMobile;
   let hubBadgeX = x + width + HUB_GAP;
   let hubBadgeY = Math.max(2, hubDeltaCenterY - hubBadgeH / 2);
 

@@ -64,10 +64,36 @@ async function main() {
   }
 
   console.log('Starting dev server on port 3001...');
-  const child = spawn('pnpm', ['dev'], { stdio: 'inherit', shell: true });
-  child.on('exit', (code) => {
-    process.exit(code ?? 0);
+  if (process.argv.includes('--foreground')) {
+    const child = spawn('pnpm', ['dev'], { stdio: 'inherit', shell: true });
+    child.on('exit', (code) => {
+      process.exit(code ?? 0);
+    });
+    return;
+  }
+
+  const logFd = fs.openSync('/tmp/dev-server.log', 'a');
+  const child = spawn('pnpm', ['dev'], {
+    env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=8192' },
+    stdio: ['ignore', logFd, logFd],
+    detached: true,
   });
+  child.unref();
+  try {
+    fs.closeSync(logFd);
+  } catch {}
+
+  const start = Date.now();
+  while (Date.now() - start < 60_000) {
+    if (await isPortInUse(3001)) {
+      console.log(`Dev server listening on http://localhost:3001 (PID ${child.pid}, logs: /tmp/dev-server.log).`);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+
+  console.error('Timed out waiting for dev server to listen on port 3001. Check /tmp/dev-server.log.');
+  process.exit(1);
 }
 
 // If invoked directly, run main()

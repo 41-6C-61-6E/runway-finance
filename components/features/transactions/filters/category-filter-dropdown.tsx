@@ -50,15 +50,15 @@ export function CategoryFilterDropdown({
           setCategoryIdsOpen(!categoryIdsOpen);
           if (!categoryIdsOpen) setCategorySearch('');
         }}
-        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+        className={`h-8 px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
           selectedCategoryIds.length > 0
-            ? 'bg-primary/15 border border-primary text-primary'
-            : 'bg-muted/50 border border-input text-foreground hover:bg-muted hover:border-border'
+            ? 'bg-primary/15 border border-primary/50 text-primary shadow-xs'
+            : 'bg-background border border-border/80 text-foreground hover:bg-muted/60 hover:border-border'
         }`}
       >
-        <span className="text-xs">Categories</span>
+        <span>Categories</span>
         {selectedCategoryIds.length > 0 && (
-          <span className="ml-1 px-1.5 py-0.5 text-xs font-semibold bg-primary/25 text-primary rounded-full min-w-[20px] text-center">
+          <span className="px-1.5 py-0.5 text-micro font-semibold bg-primary/25 text-primary rounded-full min-w-[18px] text-center leading-none">
             {selectedCategoryIds.length}
           </span>
         )}

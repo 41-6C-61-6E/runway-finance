@@ -18,6 +18,8 @@ import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { apiFetch } from '@/lib/utils/api-client';
 import { SegPill } from '@/components/ui/seg-pill';
+import { ArrowLeftRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface CategoryData {
   categoryId: string;
@@ -463,6 +465,26 @@ export function CashFlowSankey() {
   const [themeVersion, setThemeVersion] = useState(0);
   const [chartWidth, setChartWidth] = useState(0);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth + 4;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(hasOverflow && el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollContainerRef.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [checkScroll, chartWidth]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -620,7 +642,7 @@ export function CashFlowSankey() {
 
   const margin = useMemo(() => (
     isMobile
-      ? { top: 15, right: 140, bottom: 15, left: 100 }
+      ? { top: 15, right: 140, bottom: 15, left: 110 }
       : { top: 20, right: 160, bottom: 20, left: 160 }
   ), [isMobile]);
 
@@ -757,6 +779,9 @@ export function CashFlowSankey() {
     />
   ), [showPercentages, themeVersion, sankeyData, processedData]);
 
+  const colCount = columnMetrics?.metrics.length || (showParents ? 4 : 3);
+  const minChartWidthClass = colCount >= 4 ? 'min-w-[760px] md:min-w-full' : 'min-w-[640px] md:min-w-full';
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
       <div className="px-3 sm:px-5 py-3 flex flex-wrap items-center justify-center gap-2 border-b border-border bg-muted/20">
@@ -769,9 +794,17 @@ export function CashFlowSankey() {
       </div>
       <ChartTimeframeBar value={timeframe} onChange={setTimeframe} windowNav={showWindowNav ? <DateWindowNav prev={prevWindow} next={nextWindow} nextDisabled={isNextDisabled} label={windowLabel} options={periodOptions} currentValue={windowEnd} onSelect={setWindowEnd} timeframe={timeframe} /> : undefined} />
 
-      <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full touch-pan-y">
-        <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x">
-          <div className="min-w-max h-full px-2 pb-2">
+      <div className="relative w-full overflow-hidden">
+        <div
+          ref={scrollContainerRef}
+          onScroll={checkScroll}
+          className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x touch-pan-x overscroll-x-contain"
+        >
+          <div
+            ref={chartContainerRef}
+            style={{ height: chartHeight }}
+            className={cn('h-full px-2 pb-2 w-full', minChartWidthClass)}
+          >
             {loading ? (
               <LoadingSpinner category="sankey" className="h-[400px]" />
             ) : error ? (
@@ -808,7 +841,25 @@ export function CashFlowSankey() {
             )}
           </div>
         </div>
+        {canScrollLeft && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-card to-transparent z-10"
+          />
+        )}
+        {canScrollRight && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent z-10"
+          />
+        )}
       </div>
+      {(canScrollLeft || canScrollRight) && (
+        <div className="md:hidden flex items-center justify-center gap-1.5 py-1 text-micro text-muted-foreground select-none">
+          <ArrowLeftRight className="w-3 h-3 text-muted-foreground/60" />
+          <span>Swipe chart horizontally to explore flows</span>
+        </div>
+      )}
     </div>
   );
 }

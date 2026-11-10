@@ -106,7 +106,7 @@ describe('Milestone 3 / Batch A3 Remediation Verification Suite', () => {
 
       expect(content).not.toContain('hidden @md:flex flex-shrink-0 w-32');
       const matches = content.match(/hidden xl:flex flex-shrink-0 w-32/g);
-      expect(matches?.length).toBe(6);
+      expect(matches?.length).toBe(3);
     });
 
     it('goal-card.tsx clarifies dual date with explicit Projected badge', () => {

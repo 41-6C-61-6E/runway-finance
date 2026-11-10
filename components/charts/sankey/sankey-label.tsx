@@ -132,14 +132,14 @@ const SankeyLabel = React.forwardRef<SVGGElement, SankeyLabelProps>(function San
     y,
     maxW,
     anchor = 'start',
-    fontSize = 10,
+    fontSize = 11,
     fontWeight = 600,
     lineHeight = 1.25,
     maxLines = 2,
     value,
     className,
     valueClassName,
-    valueSizeFactor = 0.9,
+    valueSizeFactor = 0.91,
     opacity = 1,
     title,
   },
@@ -186,7 +186,7 @@ const SankeyLabel = React.forwardRef<SVGGElement, SankeyLabelProps>(function San
   if (totalLines === 0) return null;
 
   const lineH = fontSize * lineHeight;
-  const valueSize = fontSize * valueSizeFactor;
+  const valueSize = Math.max(10, Math.round(fontSize * valueSizeFactor));
   // Center the whole block (name lines + optional value line) around y.
   const centerY = (i: number) => y + (i - (totalLines - 1) / 2) * lineH;
 

@@ -18,7 +18,6 @@ import { type TimeRange } from '@/components/charts/chart-filters';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Sparkline } from '@/components/ui/sparkline';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
-import { useAccountSubheadings } from '@/lib/hooks/use-account-subheadings';
 import { useUserSettings } from '@/components/user-settings-provider';
 import { isAssetAccount, isLiabilityAccount } from '@/lib/utils/account-scope';
 import { formatCurrency, formatPercent } from '@/lib/utils/format';
@@ -54,7 +53,6 @@ export default function AccountHierarchyTree({
   accountsLoading,
   targetAccountId,
 }: AccountHierarchyTreeProps) {
-  const { hideSubheadings } = useAccountSubheadings();
   const settingsContext = useUserSettings();
   const showAccountTags = settingsContext?.settings?.accountTagVisibility?.accounts !== false;
 
@@ -63,10 +61,6 @@ export default function AccountHierarchyTree({
 
   const [expandedGroups, setExpandedGroups] = usePersistentState<Record<string, boolean>>(
     'finance:accounts:expandedGroups',
-    {}
-  );
-  const [expandedSubgroups, setExpandedSubgroups] = usePersistentState<Record<string, boolean>>(
-    'finance:accounts:expandedSubgroups',
     {}
   );
   const [selectedAccountId, setSelectedAccountId] = usePersistentState<string>(
@@ -154,9 +148,8 @@ export default function AccountHierarchyTree({
     if (filteredAllAccounts && filteredAllAccounts.length > 0) {
       const acc = filteredAllAccounts.find((a) => a.id === effectiveAccountId);
       if (acc) {
-        const { group, subGroup } = getHierarchy(acc.type);
+        const { group } = getHierarchy(acc.type);
         setExpandedGroups((prev) => (prev[group] !== false ? prev : { ...prev, [group]: true }));
-        setExpandedSubgroups((prev) => (prev[`${group}::${subGroup}`] !== false ? prev : { ...prev, [`${group}::${subGroup}`]: true }));
 
         if (!hasAutoScrolledRef.current) {
           hasAutoScrolledRef.current = true;
@@ -176,7 +169,7 @@ export default function AccountHierarchyTree({
       }
     }
     return undefined;
-  }, [effectiveAccountId, filteredAllAccounts, accountsLoading, setExpandedAccounts, setExpandedGroups, setExpandedSubgroups, setSelectedAccountId, setSelectedGroup]);
+  }, [effectiveAccountId, filteredAllAccounts, accountsLoading, setExpandedAccounts, setExpandedGroups, setSelectedAccountId, setSelectedGroup]);
 
   const hierarchyAvailableGroups = useMemo(() => {
     const groups = new Set<string>();
@@ -493,12 +486,11 @@ export default function AccountHierarchyTree({
       // Auto-expand parent group and subgroup immediately on click
       const acc = filteredAllAccounts.find((a) => a.id === accountId);
       if (acc) {
-        const { group, subGroup } = getHierarchy(acc.type);
+        const { group } = getHierarchy(acc.type);
         setExpandedGroups((prev) => (prev[group] !== false ? prev : { ...prev, [group]: true }));
-        setExpandedSubgroups((prev) => (prev[`${group}::${subGroup}`] !== false ? prev : { ...prev, [`${group}::${subGroup}`]: true }));
       }
     }
-  }, [filteredAllAccounts, setSelectedAccountId, setExpandedAccounts, setSelectedGroup, setExpandedGroups, setExpandedSubgroups]);
+  }, [filteredAllAccounts, setSelectedAccountId, setExpandedAccounts, setSelectedGroup, setExpandedGroups]);
 
   // Selecting an account can remove a tall combined panel above it. Once the
   // new account detail has been laid out, keep its row at the top of the view
@@ -793,28 +785,27 @@ export default function AccountHierarchyTree({
                       {isGroupExpanded && (
                         <div className="divide-y divide-border/10 bg-card/5">
                           {(() => {
-                            if (hideSubheadings) {
-                              const flatAccs: Array<{ acc: Account; subgroup: string }> = [];
-                              for (const [subgroup, accs] of subMap.entries()) {
-                                for (const acc of accs) {
-                                  flatAccs.push({ acc, subgroup });
-                                }
+                            const flatAccs: Array<{ acc: Account; subgroup: string }> = [];
+                            for (const [subgroup, accs] of subMap.entries()) {
+                              for (const acc of accs) {
+                                flatAccs.push({ acc, subgroup });
                               }
-                              flatAccs.sort((a, b) => {
-                                const balanceA = a.acc.balance || 0;
-                                const balanceB = b.acc.balance || 0;
-                                return Math.abs(balanceB) - Math.abs(balanceA);
-                              });
-                              return flatAccs.map(({ acc, subgroup }) => {
+                            }
+                            flatAccs.sort((a, b) => {
+                              const balanceA = a.acc.balance || 0;
+                              const balanceB = b.acc.balance || 0;
+                              return Math.abs(balanceB) - Math.abs(balanceA);
+                            });
+                            return flatAccs.map(({ acc, subgroup }) => {
                                 const accStats = getTrendStats([acc]);
                                 const isAccExpanded = effectiveAccountId === acc.id;
                                 const row = (
                                     <div 
                                       id={`account-row-${acc.id}`}
                                       onClick={() => handleAccountSelect(acc.id, isAccExpanded)}
-                                      className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
+                                      className={`w-full flex items-center justify-between px-0 py-2 sm:py-2.5 transition-colors cursor-pointer select-none ${
                                         isAccExpanded 
-                                          ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
+                                          ? 'bg-primary/10 hover:bg-primary/15' 
                                           : 'hover:bg-muted/10'
                                       } ${
                                         acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
@@ -903,14 +894,12 @@ export default function AccountHierarchyTree({
                                       </div>
 
                                       <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                                        {!isAccExpanded && (
                                         <Sparkline 
                                           data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
                                           isPositive={accStats.isPositive} 
                                           width={90}
                                           height={20}
                                         />
-                                        )}
                                       </div>
 
                                       <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
@@ -922,328 +911,22 @@ export default function AccountHierarchyTree({
                                 );
 
                                 return (
-                                  <Fragment key={acc.id}>
-                                    {isAccExpanded ? (
-                                      <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit">
-                                        {row}
-                                        <div className="lg:hidden">
-                                          <AccountTransactions
-                                            accountId={acc.id}
-                                            historyData={historyData}
-                                            isLiability={isLiabilityAccount(acc.type)}
-                                            hierarchyTimeframe={hierarchyTimeframe}
-                                            onHierarchyTimeframeChange={setHierarchyTimeframe}
-                                          />
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      row
-                                    )}
-                                  </Fragment>
-                                );
-                              });
-                            }
-
-                            return Array.from(subMap.entries()).map(([subgroup, accs]) => {
-                              const subStats = getTrendStats(accs);
-
-                              if (accs.length > 1) {
-                                const subKey = `${group}::${subgroup}`;
-                                const isSubExpanded = expandedSubgroups[subKey] ?? true;
-
-                                return (
-                                  <Fragment key={subgroup}>
-                                    <div
-                                      onClick={() => setExpandedSubgroups((prev) => ({ ...prev, [subKey]: !isSubExpanded }))}
-                                      className="w-full flex items-center justify-between px-0 py-2.5 bg-muted/10 hover:bg-muted/20 cursor-pointer select-none transition-colors"
-                                    >
-                                      <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
-                                        <div className="w-4 sm:w-5 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center">
-                                          {isSubExpanded ? (
-                                            <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground/80 flex-shrink-0" />
-                                          ) : (
-                                            <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground/80 flex-shrink-0" />
-                                          )}
-                                        </div>
-                                        <span className="text-xs sm:text-sm font-semibold text-muted-foreground truncate">{subgroup}</span>
-                                        <span className="text-[10px] sm:text-xs text-muted-foreground/50 ml-1">({accs.length})</span>
-                                      </div>
-
-                                      <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                                        <Sparkline 
-                                          data={subStats.historyPoints} 
-                                          isPositive={subStats.isPositive} 
-                                          width={90}
-                                          height={20}
-                                        />
-                                      </div>
-
-                                      <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                                        <p className="font-mono text-xs sm:text-sm font-bold text-muted-foreground blur-number">
-                                          {formatCurrency(subStats.current)}
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    {isSubExpanded && accs.map((acc) => {
-                                      const accStats = getTrendStats([acc]);
-                                      const isAccExpanded = effectiveAccountId === acc.id;
-
-                                      const row = (
-                                          <div 
-                                            id={`account-row-${acc.id}`}
-                                          onClick={() => handleAccountSelect(acc.id, isAccExpanded)}
-                                            className={`w-full flex items-center justify-between px-0 py-2 transition-all cursor-pointer select-none ${
-                                              isAccExpanded 
-                                                ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
-                                                : 'hover:bg-muted/10'
-                                            } ${
-                                              acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
-                                            }`}
-                                          >
-                                            <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-12">
-                                              <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                  <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{acc.name}</span>
-                                                  {acc.syncStatus && acc.syncStatus.status !== 'ok' && (
-                                                    <Tooltip>
-                                                      <TooltipTrigger asChild>
-                                                        <Link 
-                                                          href="/settings?tab=accounts&sub=automatic"
-                                                          className="flex-shrink-0 cursor-pointer"
-                                                          onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                          {acc.syncStatus.status === 'error' ? (
-                                                            <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                                                          ) : (
-                                                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                                          )}
-                                                        </Link>
-                                                      </TooltipTrigger>
-                                                      <TooltipContent side="top" className="max-w-[240px]">
-                                                        <p className="font-semibold text-xs sm:text-sm">{acc.syncStatus.status === 'error' ? 'Connection Error' : 'Sync Warning'}</p>
-                                                        <p className="text-[11px] text-muted-foreground mt-0.5">{acc.syncStatus.reason}</p>
-                                                        <Link 
-                                                          href="/settings?tab=accounts&sub=automatic"
-                                                          className="text-[10px] text-primary hover:underline mt-1 font-semibold block"
-                                                          onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                          Click to investigate in settings
-                                                        </Link>
-                                                      </TooltipContent>
-                                                    </Tooltip>
-                                                  )}
-                                                  {acc.isHidden && (
-                                                    <Tooltip>
-                                                      <TooltipTrigger asChild>
-                                                        <span className="text-micro sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded cursor-help">Hidden</span>
-                                                      </TooltipTrigger>
-                                                      <TooltipContent side="top" className="text-xs">
-                                                        This account is hidden from lists and summaries
-                                                      </TooltipContent>
-                                                    </Tooltip>
-                                                  )}
-                                                  {acc.isExcludedFromNetWorth && (
-                                                    <Tooltip>
-                                                      <TooltipTrigger asChild>
-                                                        <span className="text-micro sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded cursor-help">Excluded</span>
-                                                      </TooltipTrigger>
-                                                      <TooltipContent side="top" className="text-xs">
-                                                        Excluded from Net Worth totals
-                                                      </TooltipContent>
-                                                    </Tooltip>
-                                                  )}
-                                                  {showAccountTags && acc.tags && acc.tags.length > 0 && (
-                                                    <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
-                                                      {acc.tags.map((tag) => (
-                                                        <Tooltip key={tag.id}>
-                                                          <TooltipTrigger asChild>
-                                                            <span
-                                                              className="px-1.5 py-0.2 rounded-full text-micro sm:text-[10px] font-medium border cursor-help"
-                                                              style={{
-                                                                backgroundColor: `${tag.color}15`,
-                                                                color: tag.color,
-                                                                borderColor: `${tag.color}30`
-                                                              }}
-                                                            >
-                                                              #{tag.name}
-                                                            </span>
-                                                          </TooltipTrigger>
-                                                          <TooltipContent side="top" className="text-xs">
-                                                            Account Tag: #{tag.name}
-                                                          </TooltipContent>
-                                                        </Tooltip>
-                                                      ))}
-                                                    </div>
-                                                  )}
-                                                </div>
-                                                <span className="text-[10px] sm:text-xs text-muted-foreground truncate block">{acc.institution || 'Unknown Institution'}</span>
-                                              </div>
-                                            </div>
-
-                                            <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                                              {!isAccExpanded && (
-                                              <Sparkline 
-                                                data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
-                                                isPositive={accStats.isPositive} 
-                                                width={90}
-                                                height={20}
-                                              />
-                                              )}
-                                            </div>
-
-                                            <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                                              <p className="font-mono text-xs sm:text-sm font-bold text-foreground blur-number">
-                                                {formatCurrency(acc.balance)}
-                                              </p>
-                                            </div>
-                                          </div>
-                                      );
-
-                                      return (
-                                        <Fragment key={acc.id}>
-                                          {isAccExpanded ? (
-                                            <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit">
-                                              {row}
-                                              <div className="lg:hidden">
-                                                <AccountTransactions
-                                                  accountId={acc.id}
-                                                  historyData={historyData}
-                                                  isLiability={isLiabilityAccount(acc.type)}
-                                                  hierarchyTimeframe={hierarchyTimeframe}
-                                            onHierarchyTimeframeChange={setHierarchyTimeframe}
-                                                />
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            row
-                                          )}
-                                        </Fragment>
-                                      );
-                                    })}
-                                  </Fragment>
-                                );
-                              }
-
-                              const singleAcc = accs[0];
-                              if (!singleAcc) return null;
-                              const accStats = getTrendStats([singleAcc]);
-                              const isAccExpanded = effectiveAccountId === singleAcc.id;
-
-                              const row = (
-                                  <div 
-                                    id={`account-row-${singleAcc.id}`}
-                                    onClick={() => handleAccountSelect(singleAcc.id, isAccExpanded)}
-                                    className={`w-full flex items-center justify-between px-0 py-2.5 transition-all cursor-pointer select-none ${
-                                      isAccExpanded 
-                                        ? 'bg-primary/10 hover:bg-primary/15 font-medium' 
-                                        : 'hover:bg-muted/10'
-                                    } ${
-                                      singleAcc.isHidden || singleAcc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
-                                    }`}
-                                  >
-                                    <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{singleAcc.name}</span>
-                                          {singleAcc.syncStatus && singleAcc.syncStatus.status !== 'ok' && (
-                                            <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                <Link 
-                                                  href="/settings?tab=accounts&sub=automatic"
-                                                  className="flex-shrink-0 cursor-pointer"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                >
-                                                  {singleAcc.syncStatus.status === 'error' ? (
-                                                    <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                                                  ) : (
-                                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                                  )}
-                                                </Link>
-                                              </TooltipTrigger>
-                                              <TooltipContent side="top" className="max-w-[240px]">
-                                                <p className="font-semibold text-xs sm:text-sm">{singleAcc.syncStatus.status === 'error' ? 'Connection Error' : 'Sync Warning'}</p>
-                                                <p className="text-[11px] text-muted-foreground mt-0.5">{singleAcc.syncStatus.reason}</p>
-                                                <Link 
-                                                  href="/settings?tab=accounts&sub=automatic"
-                                                  className="text-[10px] text-primary hover:underline mt-1 font-semibold block"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                >
-                                                  Click to investigate in settings
-                                                </Link>
-                                              </TooltipContent>
-                                            </Tooltip>
-                                          )}
-                                          {singleAcc.isHidden && (
-                                            <span className="text-micro sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded">Hidden</span>
-                                          )}
-                                          {singleAcc.isExcludedFromNetWorth && (
-                                            <span className="text-micro sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded">Excluded</span>
-                                          )}
-                                          {showAccountTags && singleAcc.tags && singleAcc.tags.length > 0 && (
-                                            <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
-                                              {singleAcc.tags.map((tag) => (
-                                                <span
-                                                  key={tag.id}
-                                                  className="px-1.5 py-0.2 rounded-full text-micro sm:text-[10px] font-medium border"
-                                                  style={{
-                                                    backgroundColor: `${tag.color}15`,
-                                                    color: tag.color,
-                                                    borderColor: `${tag.color}30`
-                                                  }}
-                                                >
-                                                  #{tag.name}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </div>
-                                        <span className="text-[10px] sm:text-xs text-muted-foreground truncate block">
-                                          {singleAcc.institution || 'Unknown Institution'} · {subgroup}
-                                        </span>
-                                      </div>
-                                    </div>
-
-                                    <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                                      {!isAccExpanded && (
-                                      <Sparkline 
-                                        data={singleAcc.isHidden || singleAcc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
-                                        isPositive={accStats.isPositive} 
-                                        width={90}
-                                        height={20}
-                                      />
-                                      )}
-                                    </div>
-
-                                    <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                                      <p className="font-mono text-xs sm:text-sm font-bold text-foreground blur-number">
-                                        {formatCurrency(singleAcc.balance)}
-                                      </p>
-                                    </div>
-                                  </div>
-                              );
-
-                              return (
-                                <Fragment key={singleAcc.id}>
-                                  {isAccExpanded ? (
-                                    <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit">
-                                      {row}
+                                  <div key={acc.id} className={isAccExpanded ? 'account-selected-card' : ''}>
+                                    {row}
+                                    {isAccExpanded && (
                                       <div className="lg:hidden">
                                         <AccountTransactions
-                                          accountId={singleAcc.id}
+                                          accountId={acc.id}
                                           historyData={historyData}
-                                          isLiability={isLiabilityAccount(singleAcc.type)}
+                                          isLiability={isLiabilityAccount(acc.type)}
                                           hierarchyTimeframe={hierarchyTimeframe}
-                                            onHierarchyTimeframeChange={setHierarchyTimeframe}
+                                          onHierarchyTimeframeChange={setHierarchyTimeframe}
                                         />
                                       </div>
-                                    </div>
-                                  ) : (
-                                    row
-                                  )}
-                                </Fragment>
-                              );
-                            });
+                                    )}
+                                  </div>
+                                );
+                              });
                           })()}
                         </div>
                       )}

@@ -11,7 +11,8 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { TrendingUp, TrendingDown, Info, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Info, ChevronDown, ArrowLeftRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
@@ -260,7 +261,27 @@ export function WealthFlowSankey() {
   const [chartMounted, setChartMounted] = useState(false);
   const [selectedNodeDetails, setSelectedNodeDetails] = useState<WealthFlowNode | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const showPercentages = false;
+
+  const checkScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth + 4;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(hasOverflow && el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollContainerRef.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [checkScroll, chartWidth]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -409,7 +430,7 @@ export function WealthFlowSankey() {
 
   const margin = useMemo(
     () => isMobile
-      ? { top: 15, right: 140, bottom: 15, left: 100 }
+      ? { top: 15, right: 140, bottom: 15, left: 110 }
       : { top: 25, right: 180, bottom: 25, left: 180 },
     [isMobile]
   );
@@ -588,31 +609,68 @@ export function WealthFlowSankey() {
             <div className="h-[400px] flex items-center justify-center">
               <ChartEmptyState variant="nodata" description="No data available for the selected range." />
             </div>
-          ) : (
-            <div ref={chartContainerRef} style={{ height: chartHeight }} className="w-full min-w-0">
-              {chartMounted && chartHeight > 0 && (
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                  minWidth={0}
-                  onResize={(w: number) => setChartWidth((prev) => (prev === w ? prev : w))}
-                >
-                  <Sankey
-                    data={processedData}
-                    node={sankeyNode}
-                    link={sankeyLink}
-                    nodeWidth={sankeyNodeWidth}
-                    nodePadding={nodePadding}
-                    margin={margin}
-                    sort={false}
-                    align="left"
+          ) : (() => {
+            const colCount = columnMetrics?.metrics.length ?? (routeThroughAccounts ? 5 : 3);
+            const minChartWidthClass = colCount >= 5 ? 'min-w-[880px] md:min-w-full' : colCount === 4 ? 'min-w-[760px] md:min-w-full' : 'min-w-[640px] md:min-w-full';
+
+            return (
+              <>
+                <div className="relative w-full overflow-hidden">
+                  <div
+                    ref={scrollContainerRef}
+                    onScroll={checkScroll}
+                    className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x touch-pan-x overscroll-x-contain"
                   >
-                    {sankeyTooltip}
-                  </Sankey>
-                </ResponsiveContainer>
-              )}
-            </div>
-          )}
+                    <div
+                      ref={chartContainerRef}
+                      style={{ height: chartHeight }}
+                      className={cn('w-full h-full px-1', minChartWidthClass)}
+                    >
+                      {chartMounted && chartHeight > 0 && (
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          minWidth={0}
+                          onResize={(w: number) => setChartWidth((prev) => (prev === w ? prev : w))}
+                        >
+                          <Sankey
+                            data={processedData}
+                            node={sankeyNode}
+                            link={sankeyLink}
+                            nodeWidth={sankeyNodeWidth}
+                            nodePadding={nodePadding}
+                            margin={margin}
+                            sort={false}
+                            align="left"
+                          >
+                            {sankeyTooltip}
+                          </Sankey>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+                  {canScrollLeft && (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-card to-transparent z-10"
+                    />
+                  )}
+                  {canScrollRight && (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent z-10"
+                    />
+                  )}
+                </div>
+                {(canScrollLeft || canScrollRight) && (
+                  <div className="md:hidden flex items-center justify-center gap-1.5 py-1 text-micro text-muted-foreground select-none">
+                    <ArrowLeftRight className="w-3 h-3 text-muted-foreground/60" />
+                    <span>Swipe chart horizontally to explore flows</span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
 
