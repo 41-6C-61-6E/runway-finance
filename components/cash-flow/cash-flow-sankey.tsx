@@ -559,7 +559,7 @@ export function CashFlowSankey() {
     })();
 
   const navigateToTransactions = (categoryIds: string) => {
-    router.push(`/transactions?startDate=${dateRange.start}&endDate=${dateRange.end}&categoryIds=${categoryIds}`);
+    router.push(`/transactions?startDate=${dateRange.start}&endDate=${dateRange.end}&categoryIds=${categoryIds}&pending=false`);
   };
 
   const handleNodeClick = useCallback((nodeId: string) => {

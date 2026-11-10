@@ -465,6 +465,7 @@ export async function syncConnection(connectionId: string, userId: string, dekOv
             .onConflictDoUpdate({
               target: [transactions.accountId, transactions.externalId],
               set: {
+                date: txData.date,
                 amount: txData.amount,
                 pending: sfTx.pending ?? false,
                 description: txData.description,

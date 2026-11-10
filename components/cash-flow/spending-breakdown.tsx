@@ -186,9 +186,9 @@ export function SpendingBreakdown() {
     const lastDay = new Date(endYear, endMonthStr, 0).getDate();
     const endDate = `${range.end}-${String(lastDay).padStart(2, '0')}`;
     if (categoryId.includes(',')) {
-      router.push(`/transactions?categoryIds=${categoryId}&startDate=${startDate}&endDate=${endDate}`);
+      router.push(`/transactions?categoryIds=${categoryId}&startDate=${startDate}&endDate=${endDate}&pending=false`);
     } else {
-      router.push(`/transactions?categoryId=${categoryId}&startDate=${startDate}&endDate=${endDate}`);
+      router.push(`/transactions?categoryId=${categoryId}&startDate=${startDate}&endDate=${endDate}&pending=false`);
     }
   };
 

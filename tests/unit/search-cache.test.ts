@@ -130,6 +130,8 @@ describe('Search Cache Service', () => {
       date: '2026-05-29',
       ignored: false,
       source: 'simplefin',
+      parentId: undefined,
+      pending: false,
     });
   });
 

@@ -134,7 +134,7 @@ export async function updateMonthlyCashFlowSummaries(userId: string, dek: Uint8A
   let transactionsProcessed = 0;
 
   for (const tx of decryptedTxns) {
-    if (tx.ignored) continue;
+    if (tx.ignored || tx.pending) continue;
     if (!isPaystubEnabled && tx.source === 'paystub') continue;
     if (!tx.accountId) continue;
 
@@ -276,7 +276,7 @@ export async function updateCategorySpendingSummaries(userId: string, dek: Uint8
   const uniqueCategories = new Set<string>();
 
   for (const tx of decryptedTxns) {
-    if (!tx.categoryId || tx.ignored) continue;
+    if (!tx.categoryId || tx.ignored || tx.pending) continue;
     if (!isPaystubEnabled && tx.source === 'paystub') continue;
 
     const category = catById.get(tx.categoryId.toString());
@@ -418,7 +418,7 @@ export async function updateCategoryIncomeSummaries(userId: string, dek: Uint8Ar
   const uniqueCategories = new Set<string>();
 
   for (const tx of decryptedTxns) {
-    if (tx.ignored) continue;
+    if (tx.ignored || tx.pending) continue;
     if (!isPaystubEnabled && tx.source === 'paystub') continue;
 
     // categoryId / accountId columns are non-null uuids with FKs — skip

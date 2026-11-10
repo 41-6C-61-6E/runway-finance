@@ -21,6 +21,7 @@ export interface CachedTransaction {
   ignored: boolean;
   source: string | null;
   parentId: string | null;
+  pending: boolean;
 }
 
 export interface UserCacheEntry {
@@ -150,6 +151,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
           accountId: transactions.accountId,
           date: transactions.date,
           ignored: transactions.ignored,
+          pending: transactions.pending,
           source: transactions.source,
           parentId: transactions.parentId,
           categoryName: categories.name,
@@ -210,6 +212,7 @@ export async function hydrateUserSearchCache(userId: string, dek: Uint8Array): P
               accountId: row.accountId,
               date: row.date,
               ignored: row.ignored ?? false,
+              pending: row.pending ?? false,
               source: row.source,
               parentId: row.parentId,
             });

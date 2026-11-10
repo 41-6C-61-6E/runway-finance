@@ -95,7 +95,7 @@ export async function getSavingsRate(
 
   const accountsWithTransactions = new Set<string>();
   for (const tx of decryptedTxns) {
-    if (!tx.ignored) {
+    if (!tx.ignored && !tx.pending) {
       accountsWithTransactions.add(tx.accountId);
     }
   }
@@ -141,7 +141,7 @@ export async function getSavingsRate(
   };
 
   for (const tx of decryptedTxns) {
-    if (tx.ignored) continue;
+    if (tx.ignored || tx.pending) continue;
     if (!activeAccountIds.has(tx.accountId)) continue;
     if (!isPaystubEnabled && tx.source === 'paystub') continue;
 

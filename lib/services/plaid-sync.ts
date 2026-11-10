@@ -659,6 +659,7 @@ export async function syncPlaidConnection(
         .onConflictDoUpdate({
           target: [transactions.accountId, transactions.externalId],
           set: {
+            date: txData.date,
             amount: txData.amount,
             pending: isPending,
             description: txData.description,
