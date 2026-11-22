@@ -753,7 +753,7 @@ export default function FilterBar({
                 </svg>
               </button>
               {tagIdsOpen && (
-                <div className="absolute top-full right-0 mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
+                <div className="absolute top-full left-0 sm:right-0 sm:left-auto mt-2 w-52 bg-card border border-border rounded-lg shadow-xl z-50 max-h-72 flex flex-col">
                   <div className="p-2 border-b border-border/50">
                     <input
                       type="text"

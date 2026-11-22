@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useRef, Fragment, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, Fragment, useEffect, useLayoutEffect } from 'react';
 import Link from 'next/link';
-import { 
-  ChevronRight, 
-  ChevronDown, 
+import {
+  ChevronRight,
+  ChevronDown,
   Layers,
-  Plus, 
-  AlertCircle, 
+  Plus,
+  AlertCircle,
   AlertTriangle,
   Search,
   X
@@ -37,6 +37,11 @@ const setOptions = {
   serialize: (s: Set<string>) => JSON.stringify(Array.from(s)),
   deserialize: (raw: string) => new Set<string>(JSON.parse(raw)),
 };
+
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+const MOBILE_LAYOUT_BREAKPOINT = 1024;
+const MOBILE_TOP_CLEARANCE = 72;
+const MOBILE_BOTTOM_CLEARANCE = 84;
 
 interface AccountHierarchyTreeProps {
   filteredAllAccounts: Account[];
@@ -100,7 +105,36 @@ export default function AccountHierarchyTree({
   const hierarchyTypesRef = useRef<HTMLDivElement>(null);
   const hierarchyAccountsRef = useRef<HTMLDivElement>(null);
   const hierarchyTagsRef = useRef<HTMLDivElement>(null);
-  const pendingMobileAccountScrollRef = useRef<string | null>(null);
+  const rowElementsRef = useRef<Map<string, HTMLElement>>(new Map());
+  const cardElementsRef = useRef<Map<string, HTMLElement>>(new Map());
+  const pendingMobileScrollRef = useRef<{ key: string; beforeTop: number | null } | null>(null);
+  const smoothScrollRafRef = useRef<number | null>(null);
+  const initialScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasHandledInitialScrollRef = useRef(false);
+  const prevTargetAccountIdRef = useRef<string | null | undefined>(targetAccountId);
+
+  const registerRowEl = useCallback((key: string, el: HTMLElement | null) => {
+    if (el) rowElementsRef.current.set(key, el);
+    else rowElementsRef.current.delete(key);
+  }, []);
+
+  const registerCardEl = useCallback((key: string, el: HTMLElement | null) => {
+    if (el) cardElementsRef.current.set(key, el);
+    else cardElementsRef.current.delete(key);
+  }, []);
+
+  const cancelPendingScrolls = useCallback(() => {
+    if (smoothScrollRafRef.current !== null) {
+      cancelAnimationFrame(smoothScrollRafRef.current);
+      smoothScrollRafRef.current = null;
+    }
+    if (initialScrollTimerRef.current !== null) {
+      clearTimeout(initialScrollTimerRef.current);
+      initialScrollTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => cancelPendingScrolls, [cancelPendingScrolls]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -133,13 +167,17 @@ export default function AccountHierarchyTree({
     return fromExpanded || '';
   }, [targetAccountId, selectedAccountId, expandedAccounts]);
 
-  const hasAutoScrolledRef = useRef(false);
-
   // When an account is active (via URL param or restored from persistent state),
-  // auto-expand its parent group and subgroup so it's visible in the tree, and scroll into view.
+  // auto-expand its parent group so it's visible in the tree, and scroll into view once.
   useEffect(() => {
+    if (targetAccountId !== prevTargetAccountIdRef.current) {
+      prevTargetAccountIdRef.current = targetAccountId;
+      if (targetAccountId) {
+        hasHandledInitialScrollRef.current = false;
+      }
+    }
+
     if (!effectiveAccountId) {
-      hasAutoScrolledRef.current = false;
       return undefined;
     }
 
@@ -151,328 +189,382 @@ export default function AccountHierarchyTree({
         const { group } = getHierarchy(acc.type);
         setExpandedGroups((prev) => (prev[group] !== false ? prev : { ...prev, [group]: true }));
 
-        if (!hasAutoScrolledRef.current) {
-          hasAutoScrolledRef.current = true;
-          const timer = setTimeout(() => {
-            const el = document.getElementById(`account-row-${effectiveAccountId}`);
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              if (!hasHandledInitialScrollRef.current) {
+                hasHandledInitialScrollRef.current = true;
+                if (initialScrollTimerRef.current !== null) {
+                  clearTimeout(initialScrollTimerRef.current);
+                }
+                const targetId = effectiveAccountId;
+                initialScrollTimerRef.current = setTimeout(() => {
+                  initialScrollTimerRef.current = null;
+                  const el =
+                    rowElementsRef.current.get(`account:${targetId}`) ??
+                    document.getElementById(`account-row-${targetId}`);
+                  if (!el) return;
+                  if (window.innerWidth < MOBILE_LAYOUT_BREAKPOINT) {
+                    const targetTop = Math.max(
+                      0,
+                      window.scrollY + el.getBoundingClientRect().top - MOBILE_TOP_CLEARANCE
+                    );
+                    window.scrollTo({ top: targetTop, behavior: 'smooth' });
+                  } else {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }, 150);
+                return () => {
+                  if (initialScrollTimerRef.current !== null) {
+                    clearTimeout(initialScrollTimerRef.current);
+                    initialScrollTimerRef.current = null;
+                    hasHandledInitialScrollRef.current = false;
+                  }
+                };
+              }
+            } else if (!accountsLoading) {
+              // Stored account no longer exists in filtered accounts — reset selection
+              setSelectedAccountId('');
+              setExpandedAccounts({});
+              setSelectedGroup('All Accounts');
             }
-          }, 150);
-          return () => clearTimeout(timer);
-        }
-      } else if (!accountsLoading) {
-        // Stored account no longer exists in filtered accounts — reset selection
-        setSelectedAccountId('');
-        setExpandedAccounts({});
-        setSelectedGroup('All Accounts');
-      }
-    }
+          }
     return undefined;
-  }, [effectiveAccountId, filteredAllAccounts, accountsLoading, setExpandedAccounts, setExpandedGroups, setSelectedAccountId, setSelectedGroup]);
+}, [effectiveAccountId, targetAccountId, filteredAllAccounts, accountsLoading, setExpandedAccounts, setExpandedGroups, setSelectedAccountId, setSelectedGroup]);
 
-  const hierarchyAvailableGroups = useMemo(() => {
-    const groups = new Set<string>();
-    for (const acc of filteredAllAccounts) {
-      if (acc.isHidden) continue;
-      groups.add(getHierarchy(acc.type).group);
-    }
-    return Array.from(groups).sort();
-  }, [filteredAllAccounts]);
+const hierarchyAvailableGroups = useMemo(() => {
+  const groups = new Set<string>();
+  for (const acc of filteredAllAccounts) {
+    if (acc.isHidden) continue;
+    groups.add(getHierarchy(acc.type).group);
+  }
+  return Array.from(groups).sort();
+}, [filteredAllAccounts]);
 
-  const hierarchyAvailableTypes = useMemo(() => {
-    const types = new Set<string>();
-    for (const acc of filteredAllAccounts) {
-      if (acc.isHidden) continue;
-      types.add(getHierarchy(acc.type).subGroup);
-    }
-    return Array.from(types).sort();
-  }, [filteredAllAccounts]);
+const hierarchyAvailableTypes = useMemo(() => {
+  const types = new Set<string>();
+  for (const acc of filteredAllAccounts) {
+    if (acc.isHidden) continue;
+    types.add(getHierarchy(acc.type).subGroup);
+  }
+  return Array.from(types).sort();
+}, [filteredAllAccounts]);
 
-  const hierarchyAvailableAccounts = useMemo(() => {
-    const list = filteredAllAccounts.filter((acc) => !acc.isHidden);
-    return [...list].sort((a, b) => a.name.localeCompare(b.name));
-  }, [filteredAllAccounts]);
+const hierarchyAvailableAccounts = useMemo(() => {
+  const list = filteredAllAccounts.filter((acc) => !acc.isHidden);
+  return [...list].sort((a, b) => a.name.localeCompare(b.name));
+}, [filteredAllAccounts]);
 
-  const getTrendStats = useCallback((accs: Account[]) => {
-    if (historyData.length === 0) {
-      const current = accs.reduce((sum, a) => sum + parseFloat(String(a.balance)), 0);
-      return {
-        current,
-        starting: current,
-        change: 0,
-        percentChange: 0,
-        historyPoints: [],
-        isPositive: true,
-      };
-    }
-
-    const firstAcc = accs[0];
-    const isLiab = firstAcc ? isLiabilityAccount(firstAcc.type) : false;
-    const range = getPreciseDateRange(hierarchyTimeframe);
-    let startIdx = 0;
-    let endIdx = historyData.length - 1;
-
-    if (hierarchyTimeframe !== 'all') {
-      const startStr = range.start;
-      const endStr = range.end;
-
-      const foundStart = historyData.findIndex((d) => d.date >= startStr);
-      if (foundStart !== -1) startIdx = foundStart;
-
-      let foundEnd = historyData.length - 1;
-      for (let i = historyData.length - 1; i >= 0; i--) {
-        if (historyData[i].date <= endStr) {
-          foundEnd = i;
-          break;
-        }
-      }
-      endIdx = foundEnd;
-    }
-
-    const slicedHistory = historyData.slice(startIdx, endIdx + 1);
-    const points = slicedHistory.map((d) => {
-      let sum = 0;
-      for (const acc of accs) {
-        sum += (d[acc.id] ?? 0);
-      }
-      return sum;
-    });
-
-    const starting = points.length > 0 ? Math.abs(points[0]) : 0;
-    const current = points.length > 0 ? Math.abs(points[points.length - 1]) : 0;
-
-    let change = 0;
-    let percentChange = 0;
-    let isPositive = true;
-
-    if (isLiab) {
-      change = current - starting;
-      percentChange = starting !== 0 ? (change / starting) * 100 : 0;
-      isPositive = change <= 0;
-    } else {
-      change = current - starting;
-      percentChange = starting !== 0 ? (change / starting) * 100 : 0;
-      isPositive = change >= 0;
-    }
-
+const getTrendStats = useCallback((accs: Account[]) => {
+  if (historyData.length === 0) {
+    const current = accs.reduce((sum, a) => sum + parseFloat(String(a.balance)), 0);
     return {
       current,
-      starting,
-      change,
-      percentChange,
-      historyPoints: points,
-      isPositive,
+      starting: current,
+      change: 0,
+      percentChange: 0,
+      historyPoints: [],
+      isPositive: true,
     };
-  }, [historyData, hierarchyTimeframe]);
+  }
 
-  const formatChange = (change: number, percentChange: number, isLiab: boolean) => {
-    const absChange = Math.abs(change);
-    const textVal = formatCurrency(absChange);
-    const textPct = formatPercent(percentChange);
-    const isGood = isLiab ? change <= 0 : change >= 0;
+  const firstAcc = accs[0];
+  const isLiab = firstAcc ? isLiabilityAccount(firstAcc.type) : false;
+  const range = getPreciseDateRange(hierarchyTimeframe);
+  let startIdx = 0;
+  let endIdx = historyData.length - 1;
 
-    const sign = change > 0 ? '+' : change < 0 ? '-' : '';
-    return {
-      text: `${sign}${textVal} (${textPct})`,
-      isPositive: isGood,
-    };
+  if (hierarchyTimeframe !== 'all') {
+    const startStr = range.start;
+    const endStr = range.end;
+
+    const foundStart = historyData.findIndex((d) => d.date >= startStr);
+    if (foundStart !== -1) startIdx = foundStart;
+
+    let foundEnd = historyData.length - 1;
+    for (let i = historyData.length - 1; i >= 0; i--) {
+      if (historyData[i].date <= endStr) {
+        foundEnd = i;
+        break;
+      }
+    }
+    endIdx = foundEnd;
+  }
+
+  const slicedHistory = historyData.slice(startIdx, endIdx + 1);
+  const points = slicedHistory.map((d) => {
+    let sum = 0;
+    for (const acc of accs) {
+      sum += (d[acc.id] ?? 0);
+    }
+    return sum;
+  });
+
+  const starting = points.length > 0 ? Math.abs(points[0]) : 0;
+  const current = points.length > 0 ? Math.abs(points[points.length - 1]) : 0;
+
+  let change = 0;
+  let percentChange = 0;
+  let isPositive = true;
+
+  if (isLiab) {
+    change = current - starting;
+    percentChange = starting !== 0 ? (change / starting) * 100 : 0;
+    isPositive = change <= 0;
+  } else {
+    change = current - starting;
+    percentChange = starting !== 0 ? (change / starting) * 100 : 0;
+    isPositive = change >= 0;
+  }
+
+  return {
+    current,
+    starting,
+    change,
+    percentChange,
+    historyPoints: points,
+    isPositive,
   };
+}, [historyData, hierarchyTimeframe]);
 
-  const treeHierarchy = useMemo(() => {
-    const map = new Map<string, Map<string, Account[]>>();
-    const q = searchQuery.toLowerCase().trim();
+const formatChange = (change: number, percentChange: number, isLiab: boolean) => {
+  const absChange = Math.abs(change);
+  const textVal = formatCurrency(absChange);
+  const textPct = formatPercent(percentChange);
+  const isGood = isLiab ? change <= 0 : change >= 0;
 
-    for (const acc of filteredAllAccounts) {
-      if (acc.isHidden) continue;
-      const { group, subGroup } = getHierarchy(acc.type);
+  const sign = change > 0 ? '+' : change < 0 ? '-' : '';
+  return {
+    text: `${sign}${textVal} (${textPct})`,
+    isPositive: isGood,
+  };
+};
 
-      if (q) {
-        const matchesName = acc.name.toLowerCase().includes(q);
-        const matchesInstitution = acc.institution ? acc.institution.toLowerCase().includes(q) : false;
-        const matchesTag = (acc.tags || []).some((t) => t.name.toLowerCase().includes(q));
-        if (!matchesName && !matchesInstitution && !matchesTag) continue;
-      }
+const treeHierarchy = useMemo(() => {
+  const map = new Map<string, Map<string, Account[]>>();
+  const q = searchQuery.toLowerCase().trim();
 
-      if (!map.has(group)) map.set(group, new Map());
-      const subMap = map.get(group)!;
-      if (!subMap.has(subGroup)) subMap.set(subGroup, []);
-      subMap.get(subGroup)!.push(acc);
+  for (const acc of filteredAllAccounts) {
+    if (acc.isHidden) continue;
+    const { group, subGroup } = getHierarchy(acc.type);
+
+    if (q) {
+      const matchesName = acc.name.toLowerCase().includes(q);
+      const matchesInstitution = acc.institution ? acc.institution.toLowerCase().includes(q) : false;
+      const matchesTag = (acc.tags || []).some((t) => t.name.toLowerCase().includes(q));
+      if (!matchesName && !matchesInstitution && !matchesTag) continue;
     }
 
-    for (const subMap of map.values()) {
-      for (const [subGroup, accs] of subMap.entries()) {
-        subMap.set(subGroup, [...accs].sort((a, b) => {
-          const balanceA = a.balance || 0;
-          const balanceB = b.balance || 0;
-          return Math.abs(balanceB) - Math.abs(balanceA);
-        }));
+    if (!map.has(group)) map.set(group, new Map());
+    const subMap = map.get(group)!;
+    if (!subMap.has(subGroup)) subMap.set(subGroup, []);
+    subMap.get(subGroup)!.push(acc);
+  }
+
+  for (const subMap of map.values()) {
+    for (const [subGroup, accs] of subMap.entries()) {
+      subMap.set(subGroup, [...accs].sort((a, b) => {
+        const balanceA = a.balance || 0;
+        const balanceB = b.balance || 0;
+        return Math.abs(balanceB) - Math.abs(balanceA);
+      }));
+    }
+  }
+
+  return map;
+}, [filteredAllAccounts, hierarchySelectedGroups, hierarchySelectedTypes, hierarchySelectedAccounts, hierarchySelectedTags, searchQuery]);
+
+const sortedGroups = useMemo(() => {
+  return Array.from(treeHierarchy.keys()).sort((a, b) => {
+    const ai = GROUP_ORDER.indexOf(a);
+    const bi = GROUP_ORDER.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}, [treeHierarchy]);
+
+// Count of accounts actually visible after all filters + search
+const visibleAccountCount = useMemo(() => {
+  let count = 0;
+  for (const subMap of treeHierarchy.values()) {
+    for (const accs of subMap.values()) count += accs.length;
+  }
+  return count;
+}, [treeHierarchy]);
+
+const hasActiveFilters =
+  hierarchySelectedGroups.size > 0 ||
+  hierarchySelectedTypes.size > 0 ||
+  hierarchySelectedAccounts.size > 0 ||
+  hierarchySelectedTags.size > 0;
+
+const clearAllFilters = useCallback(() => {
+  setHierarchySelectedGroups(new Set());
+  setHierarchySelectedTypes(new Set());
+  setHierarchySelectedAccounts(new Set());
+  setHierarchySelectedTags(new Set());
+  setSearchQuery('');
+}, [setHierarchySelectedGroups, setHierarchySelectedTypes, setHierarchySelectedAccounts, setHierarchySelectedTags]);
+
+// Selected account — drives the desktop side panel (takes precedence over group selection)
+const selectedAccount = useMemo(() => {
+  if (!effectiveAccountId) return null;
+  return filteredAllAccounts.find((a) => a.id === effectiveAccountId) || null;
+}, [effectiveAccountId, filteredAllAccounts]);
+
+// Flat list of all accounts currently visible in the tree hierarchy
+const allVisibleAccounts = useMemo(() => {
+  const list: Account[] = [];
+  for (const subMap of treeHierarchy.values()) {
+    for (const accs of subMap.values()) {
+      list.push(...accs);
+    }
+  }
+  return list;
+}, [treeHierarchy]);
+
+// Selected group — drives the desktop side panel (mutually exclusive with account selection)
+const selectedGroupAccounts = useMemo(() => {
+  if (effectiveAccountId || !selectedGroup || selectedGroup === 'All Accounts') return null;
+  const subMap = treeHierarchy.get(selectedGroup);
+  if (!subMap) return null;
+  const accs: Account[] = [];
+  subMap.forEach((accsInGroup) => accs.push(...accsInGroup));
+  return accs;
+}, [effectiveAccountId, selectedGroup, treeHierarchy]);
+
+const isAllAccountsSelected = !effectiveAccountId && selectedGroup === 'All Accounts';
+
+// Net worth trend stats across all visible accounts
+const allTrendStats = useMemo(() => {
+  if (allVisibleAccounts.length === 0) {
+    return {
+      current: 0,
+      starting: 0,
+      change: 0,
+      percentChange: 0,
+      historyPoints: [],
+      isPositive: true,
+    };
+  }
+
+  if (historyData.length === 0) {
+    const current = allVisibleAccounts.reduce((sum, a) => {
+      const raw = a.balance;
+      const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+      if (!Number.isFinite(num)) return sum;
+      return isAssetAccount(a.type) ? sum + num : sum - Math.abs(num);
+    }, 0);
+    return {
+      current,
+      starting: current,
+      change: 0,
+      percentChange: 0,
+      historyPoints: [],
+      isPositive: true,
+    };
+  }
+
+  const range = getPreciseDateRange(hierarchyTimeframe);
+  let startIdx = 0;
+  let endIdx = historyData.length - 1;
+
+  if (hierarchyTimeframe !== 'all') {
+    const startStr = range.start;
+    const endStr = range.end;
+
+    const foundStart = historyData.findIndex((d) => d.date >= startStr);
+    if (foundStart !== -1) startIdx = foundStart;
+
+    let foundEnd = historyData.length - 1;
+    for (let i = historyData.length - 1; i >= 0; i--) {
+      if (historyData[i].date <= endStr) {
+        foundEnd = i;
+        break;
       }
     }
+    endIdx = foundEnd;
+  }
 
-    return map;
-  }, [filteredAllAccounts, hierarchySelectedGroups, hierarchySelectedTypes, hierarchySelectedAccounts, hierarchySelectedTags, searchQuery]);
-
-  const sortedGroups = useMemo(() => {
-    return Array.from(treeHierarchy.keys()).sort((a, b) => {
-      const ai = GROUP_ORDER.indexOf(a);
-      const bi = GROUP_ORDER.indexOf(b);
-      if (ai !== -1 && bi !== -1) return ai - bi;
-      if (ai !== -1) return -1;
-      if (bi !== -1) return 1;
-      return a.localeCompare(b);
-    });
-  }, [treeHierarchy]);
-
-  // Count of accounts actually visible after all filters + search
-  const visibleAccountCount = useMemo(() => {
-    let count = 0;
-    for (const subMap of treeHierarchy.values()) {
-      for (const accs of subMap.values()) count += accs.length;
-    }
-    return count;
-  }, [treeHierarchy]);
-
-  const hasActiveFilters =
-    hierarchySelectedGroups.size > 0 ||
-    hierarchySelectedTypes.size > 0 ||
-    hierarchySelectedAccounts.size > 0 ||
-    hierarchySelectedTags.size > 0;
-
-  const clearAllFilters = useCallback(() => {
-    setHierarchySelectedGroups(new Set());
-    setHierarchySelectedTypes(new Set());
-    setHierarchySelectedAccounts(new Set());
-    setHierarchySelectedTags(new Set());
-    setSearchQuery('');
-  }, [setHierarchySelectedGroups, setHierarchySelectedTypes, setHierarchySelectedAccounts, setHierarchySelectedTags]);
-
-  // Selected account — drives the desktop side panel (takes precedence over group selection)
-  const selectedAccount = useMemo(() => {
-    if (!effectiveAccountId) return null;
-    return filteredAllAccounts.find((a) => a.id === effectiveAccountId) || null;
-  }, [effectiveAccountId, filteredAllAccounts]);
-
-  // Flat list of all accounts currently visible in the tree hierarchy
-  const allVisibleAccounts = useMemo(() => {
-    const list: Account[] = [];
-    for (const subMap of treeHierarchy.values()) {
-      for (const accs of subMap.values()) {
-        list.push(...accs);
+  const slicedHistory = historyData.slice(startIdx, endIdx + 1);
+  const points = slicedHistory.map((d) => {
+    let net = 0;
+    for (const acc of allVisibleAccounts) {
+      const v = d[acc.id];
+      if (v == null) continue;
+      const num = Number(v) || 0;
+      if (isAssetAccount(acc.type)) {
+        net += num;
+      } else if (isLiabilityAccount(acc.type)) {
+        net -= Math.abs(num);
+      } else {
+        net += num;
       }
     }
-    return list;
-  }, [treeHierarchy]);
+    return net;
+  });
 
-  // Selected group — drives the desktop side panel (mutually exclusive with account selection)
-  const selectedGroupAccounts = useMemo(() => {
-    if (effectiveAccountId || !selectedGroup || selectedGroup === 'All Accounts') return null;
-    const subMap = treeHierarchy.get(selectedGroup);
-    if (!subMap) return null;
-    const accs: Account[] = [];
-    subMap.forEach((accsInGroup) => accs.push(...accsInGroup));
-    return accs;
-  }, [effectiveAccountId, selectedGroup, treeHierarchy]);
+  const starting = points.length > 0 ? points[0] : 0;
+  const current = points.length > 0 ? points[points.length - 1] : 0;
+  const change = current - starting;
+  const percentChange = starting !== 0 ? (change / Math.abs(starting)) * 100 : 0;
+  const isPositive = change >= 0;
 
-  const isAllAccountsSelected = !effectiveAccountId && selectedGroup === 'All Accounts';
-
-    // Net worth trend stats across all visible accounts
-    const allTrendStats = useMemo(() => {
-      if (allVisibleAccounts.length === 0) {
-        return {
-          current: 0,
-          starting: 0,
-          change: 0,
-          percentChange: 0,
-          historyPoints: [],
-          isPositive: true,
-        };
-      }
-
-      if (historyData.length === 0) {
-        const current = allVisibleAccounts.reduce((sum, a) => {
-          const raw = a.balance;
-          const num = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
-          if (!Number.isFinite(num)) return sum;
-          return isAssetAccount(a.type) ? sum + num : sum - Math.abs(num);
-        }, 0);
-        return {
-          current,
-          starting: current,
-          change: 0,
-          percentChange: 0,
-          historyPoints: [],
-          isPositive: true,
-        };
-      }
-
-      const range = getPreciseDateRange(hierarchyTimeframe);
-      let startIdx = 0;
-      let endIdx = historyData.length - 1;
-
-      if (hierarchyTimeframe !== 'all') {
-        const startStr = range.start;
-        const endStr = range.end;
-
-        const foundStart = historyData.findIndex((d) => d.date >= startStr);
-        if (foundStart !== -1) startIdx = foundStart;
-
-        let foundEnd = historyData.length - 1;
-        for (let i = historyData.length - 1; i >= 0; i--) {
-          if (historyData[i].date <= endStr) {
-            foundEnd = i;
-            break;
-          }
-        }
-        endIdx = foundEnd;
-      }
-
-      const slicedHistory = historyData.slice(startIdx, endIdx + 1);
-      const points = slicedHistory.map((d) => {
-        let net = 0;
-        for (const acc of allVisibleAccounts) {
-          const v = d[acc.id];
-          if (v == null) continue;
-          const num = Number(v) || 0;
-          if (isAssetAccount(acc.type)) {
-            net += num;
-          } else if (isLiabilityAccount(acc.type)) {
-            net -= Math.abs(num);
-          } else {
-            net += num;
-          }
-        }
-        return net;
-      });
-
-      const starting = points.length > 0 ? points[0] : 0;
-      const current = points.length > 0 ? points[points.length - 1] : 0;
-      const change = current - starting;
-      const percentChange = starting !== 0 ? (change / Math.abs(starting)) * 100 : 0;
-      const isPositive = change >= 0;
-
-      return {
-        current,
-        starting,
-        change,
-        percentChange,
-        historyPoints: points,
-        isPositive,
-      };
-    }, [allVisibleAccounts, historyData, hierarchyTimeframe]);
+  return {
+    current,
+    starting,
+    change,
+    percentChange,
+    historyPoints: points,
+    isPositive,
+  };
+}, [allVisibleAccounts, historyData, hierarchyTimeframe]);
 
 
 
-  // Group heading click: select the group (drives the detail panel at all viewports)
-  const handleGroupSelect = useCallback((group: string) => {
-    setSelectedAccountId('');
-    setExpandedAccounts({});
-    setSelectedGroup(group);
-  }, [setSelectedAccountId, setExpandedAccounts, setSelectedGroup]);
+const queueMobileScroll = useCallback((key: string) => {
+  hasHandledInitialScrollRef.current = true;
+  cancelPendingScrolls();
+  if (window.innerWidth < MOBILE_LAYOUT_BREAKPOINT) {
+    const headerEl = rowElementsRef.current.get(key);
+    pendingMobileScrollRef.current = {
+      key,
+      beforeTop: headerEl ? headerEl.getBoundingClientRect().top : null,
+    };
+  } else {
+    pendingMobileScrollRef.current = null;
+  }
+}, [cancelPendingScrolls]);
 
-  const handleAccountSelect = useCallback((accountId: string, isExpanded: boolean) => {
-    if (!isExpanded && window.innerWidth < 1024) {
-      pendingMobileAccountScrollRef.current = accountId;
+const clearSelection = useCallback(() => {
+  cancelPendingScrolls();
+  pendingMobileScrollRef.current = null;
+  setSelectedGroup(null);
+  setSelectedAccountId('');
+  setExpandedAccounts({});
+}, [cancelPendingScrolls, setSelectedGroup, setSelectedAccountId, setExpandedAccounts]);
+
+// Group heading click: select the group (drives the detail panel at all viewports)
+const handleGroupSelect = useCallback((group: string) => {
+  const isAlreadySelected = !effectiveAccountId && selectedGroup === group;
+  if (!isAlreadySelected) {
+    queueMobileScroll(`group:${group}`);
+  } else {
+    hasHandledInitialScrollRef.current = true;
+    cancelPendingScrolls();
+    pendingMobileScrollRef.current = null;
+  }
+  setSelectedAccountId('');
+  setExpandedAccounts({});
+  setSelectedGroup(group);
+  }, [effectiveAccountId, selectedGroup, queueMobileScroll, cancelPendingScrolls, setSelectedAccountId, setExpandedAccounts, setSelectedGroup]);
+
+const handleAccountSelect = useCallback((accountId: string, isExpanded: boolean) => {
+    if (!isExpanded) {
+      queueMobileScroll(`account:${accountId}`);
+    } else {
+      hasHandledInitialScrollRef.current = true;
+      cancelPendingScrolls();
+      pendingMobileScrollRef.current = null;
     }
     if (isExpanded) {
       setSelectedAccountId('');
@@ -483,32 +575,91 @@ export default function AccountHierarchyTree({
       setExpandedAccounts({ [accountId]: true });
       setSelectedGroup(null);
 
-      // Auto-expand parent group and subgroup immediately on click
+      // Auto-expand parent group immediately on click
       const acc = filteredAllAccounts.find((a) => a.id === accountId);
       if (acc) {
         const { group } = getHierarchy(acc.type);
         setExpandedGroups((prev) => (prev[group] !== false ? prev : { ...prev, [group]: true }));
       }
     }
-  }, [filteredAllAccounts, setSelectedAccountId, setExpandedAccounts, setSelectedGroup, setExpandedGroups]);
+  }, [filteredAllAccounts, queueMobileScroll, cancelPendingScrolls, setSelectedAccountId, setExpandedAccounts, setSelectedGroup, setExpandedGroups]);
 
-  // Selecting an account can remove a tall combined panel above it. Once the
-  // new account detail has been laid out, keep its row at the top of the view
-  // so the detail the user opened stays visible on mobile.
-  useEffect(() => {
-    const accountId = pendingMobileAccountScrollRef.current;
-    if (!accountId || effectiveAccountId !== accountId || selectedGroup) return undefined;
+  const activeMobileKey = effectiveAccountId
+    ? `account:${effectiveAccountId}`
+    : selectedGroup
+      ? `group:${selectedGroup}`
+      : null;
 
-    pendingMobileAccountScrollRef.current = null;
-    const frame = requestAnimationFrame(() => {
-      document.getElementById(`account-row-${accountId}`)?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
+    // Selecting an account or group on narrow viewports can unmount a tall inline
+    // panel above it. Compensate synchronously before paint so the tapped row stays
+    // anchored, then smoothly nudge only if the opened card overflows the viewport.
+    useIsomorphicLayoutEffect(() => {
+      const pending = pendingMobileScrollRef.current;
+      if (!pending || pending.key !== activeMobileKey) return undefined;
+
+      pendingMobileScrollRef.current = null;
+
+      const getHeaderEl = (key: string): HTMLElement | null => {
+        const mapped = rowElementsRef.current.get(key);
+        if (mapped) return mapped;
+        if (key.startsWith('account:')) {
+          return document.getElementById(`account-row-${key.slice('account:'.length)}`);
+        }
+        return null;
+      };
+
+      const headerEl = getHeaderEl(pending.key);
+      if (!headerEl) return undefined;
+
+      if (pending.beforeTop !== null) {
+        const afterTop = headerEl.getBoundingClientRect().top;
+        const shift = afterTop - pending.beforeTop;
+        if (Math.abs(shift) > 1) {
+          window.scrollTo(0, Math.max(0, window.scrollY + shift));
+        }
+      }
+
+      if (smoothScrollRafRef.current !== null) {
+        cancelAnimationFrame(smoothScrollRafRef.current);
+      }
+
+      smoothScrollRafRef.current = requestAnimationFrame(() => {
+        smoothScrollRafRef.current = null;
+        const currentHeaderEl = getHeaderEl(pending.key);
+        if (!currentHeaderEl) return;
+
+        const currentCardEl = cardElementsRef.current.get(pending.key) ?? currentHeaderEl;
+        const headerRect = currentHeaderEl.getBoundingClientRect();
+        const cardRect = currentCardEl.getBoundingClientRect();
+        const viewportBottom = Math.max(
+          MOBILE_TOP_CLEARANCE + 120,
+          window.innerHeight - MOBILE_BOTTOM_CLEARANCE
+        );
+
+        let deltaY = 0;
+        if (headerRect.top < MOBILE_TOP_CLEARANCE) {
+          deltaY = headerRect.top - MOBILE_TOP_CLEARANCE;
+        } else if (cardRect.bottom > viewportBottom) {
+          const neededDown = cardRect.bottom - viewportBottom;
+          const maxDown = Math.max(0, headerRect.top - MOBILE_TOP_CLEARANCE);
+          deltaY = Math.min(neededDown, maxDown);
+        }
+
+        if (Math.abs(deltaY) > 8) {
+          window.scrollTo({
+            top: Math.max(0, window.scrollY + deltaY),
+            behavior: 'smooth',
+          });
+        }
       });
-    });
 
-    return () => cancelAnimationFrame(frame);
-  }, [effectiveAccountId, selectedGroup]);
+    return () => {
+      if (smoothScrollRafRef.current !== null) {
+        cancelAnimationFrame(smoothScrollRafRef.current);
+        smoothScrollRafRef.current = null;
+      }
+    };
+  }, [activeMobileKey]);
 
   // Selected-group detail (combined chart) — below lg it renders inline under the group heading,
   // identical to how an account's transaction card opens under its row; at lg+ it fills the side column
@@ -520,11 +671,7 @@ export default function AccountHierarchyTree({
         historyData={historyData}
         hierarchyTimeframe={hierarchyTimeframe}
         onHierarchyTimeframeChange={setHierarchyTimeframe}
-        onClose={() => {
-          setSelectedGroup(null);
-          setSelectedAccountId('');
-          setExpandedAccounts({});
-        }}
+        onClose={clearSelection}
       />
     ) : null;
 
@@ -536,444 +683,428 @@ export default function AccountHierarchyTree({
         historyData={historyData}
         hierarchyTimeframe={hierarchyTimeframe}
         onHierarchyTimeframeChange={setHierarchyTimeframe}
-        onClose={() => {
-          setSelectedGroup(null);
-          setSelectedAccountId('');
-          setExpandedAccounts({});
-        }}
+        onClose={clearSelection}
       />
     ) : null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
-      <Card className="@container lg:col-span-5 bg-card/40 backdrop-blur-md border-0 shadow-sm overflow-hidden">
+        <Card className="@container lg:col-span-5 bg-card/40 backdrop-blur-md border-0 shadow-sm overflow-hidden [overflow-anchor:none]">
 
-        <>
-          {accountsLoading ? (
-            <CardContent className="p-2 sm:p-5">
-              <div className="space-y-4">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            </CardContent>
-          ) : filteredAllAccounts.length === 0 ? (
-            <CardContent className="p-2 sm:p-5">
-              <div className="p-12 text-center border border-dashed border-border/40 rounded-xl">
-                <p className="text-muted-foreground text-sm mb-4">No accounts linked yet.</p>
-                <Link
-                  href="/settings?tab=accounts"
-                  className="px-5 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all flex items-center gap-2 mx-auto w-fit"
-                >
-                  <Plus className="w-4 h-4" /> Link Institution
-                </Link>
-              </div>
-            </CardContent>
-          ) : visibleAccountCount === 0 ? (
-            <CardContent className="p-2 sm:p-5">
-              <div className="py-12 text-center border border-dashed border-border/40 rounded-xl space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
-                  <Search className="w-6 h-6" />
+          <>
+            {accountsLoading ? (
+              <CardContent className="p-2 sm:p-5">
+                <div className="space-y-4">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
                 </div>
-                <h3 className="font-semibold text-base text-foreground">No accounts match</h3>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  {searchQuery.trim()
-                    ? `No accounts match "${searchQuery.trim()}" with the current filters.`
-                    : 'No accounts match the current filters.'}
-                </p>
-                <button
-                  type="button"
-                  onClick={clearAllFilters}
-                  className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all mx-auto w-fit"
-                >
-                  Clear Search & Filters
-                </button>
-              </div>
-            </CardContent>
-          ) : (
-            <>
-              <div className="mb-3 bg-muted/50 rounded-xl p-3">
-                <div className="relative w-full max-w-md">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search accounts, institutions, tags..."
-                    className="h-8 w-full pl-8 pr-7 bg-background border border-border rounded-lg text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      aria-label="Clear search"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="border-t border-border/10" />
-              <div className="divide-y divide-border/10">
-                {/* All Accounts Rollup Row */}
-                <div
-                  className={`min-w-0 ${
-                    isAllAccountsSelected
-                      ? 'bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit'
-                      : ''
-                  }`}
-                >
-                  <div
-                    onClick={() => handleGroupSelect('All Accounts')}
-                    className={`w-full flex items-center justify-between px-0 ${
-                      isAllAccountsSelected ? 'py-2.5 sm:py-3.5' : 'py-3.5'
-                    } ${
-                      isAllAccountsSelected
-                        ? 'bg-primary/10 hover:bg-primary/15'
-                        : 'bg-muted/40 hover:bg-muted/60'
-                    } transition-colors cursor-pointer select-none`}
+              </CardContent>
+            ) : filteredAllAccounts.length === 0 ? (
+              <CardContent className="p-2 sm:p-5">
+                <div className="p-12 text-center border border-dashed border-border/40 rounded-xl">
+                  <p className="text-muted-foreground text-sm mb-4">No accounts linked yet.</p>
+                  <Link
+                    href="/settings?tab=accounts"
+                    className="px-5 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all flex items-center gap-2 mx-auto w-fit"
                   >
-                    <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-6">
-                      <div className="flex items-center gap-2.5 min-w-0 truncate py-1">
-                        <Layers
-                          className={`w-4 h-4 flex-shrink-0 ${
-                            isAllAccountsSelected ? 'text-primary' : 'text-muted-foreground'
-                          }`}
+                    <Plus className="w-4 h-4" /> Link Institution
+                  </Link>
+                </div>
+              </CardContent>
+            ) : visibleAccountCount === 0 ? (
+              <CardContent className="p-2 sm:p-5">
+                <div className="py-12 text-center border border-dashed border-border/40 rounded-xl space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                    <Search className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-semibold text-base text-foreground">No accounts match</h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    {searchQuery.trim()
+                      ? `No accounts match "${searchQuery.trim()}" with the current filters.`
+                      : 'No accounts match the current filters.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:opacity-90 transition-all mx-auto w-fit"
+                  >
+                    Clear Search & Filters
+                  </button>
+                </div>
+              </CardContent>
+            ) : (
+              <>
+                <div className="mb-3 bg-muted/50 rounded-xl p-3">
+                  <div className="relative w-full max-w-md">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search accounts, institutions, tags..."
+                      className="h-8 w-full pl-8 pr-7 bg-background border border-border rounded-lg text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        aria-label="Clear search"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-border/10" />
+                <div className="divide-y divide-border/10">
+                  {/* All Accounts Rollup Row */}
+                  <div
+                    ref={(el) => registerCardEl('group:All Accounts', el)}
+                    className={`min-w-0 ${isAllAccountsSelected
+                        ? 'bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit'
+                        : ''
+                      }`}
+                  >
+                    <div
+                      ref={(el) => registerRowEl('group:All Accounts', el)}
+                      onClick={() => handleGroupSelect('All Accounts')}
+                      className={`w-full flex items-center justify-between px-0 ${isAllAccountsSelected ? 'py-2.5 sm:py-3.5' : 'py-3.5'
+                        } ${isAllAccountsSelected
+                          ? 'bg-primary/10 hover:bg-primary/15'
+                          : 'bg-muted/40 hover:bg-muted/60'
+                        } transition-colors cursor-pointer select-none`}
+                    >
+                      <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-6">
+                        <div className="flex items-center gap-2.5 min-w-0 truncate py-1">
+                          <Layers
+                            className={`w-4 h-4 flex-shrink-0 ${isAllAccountsSelected ? 'text-primary' : 'text-muted-foreground'
+                              }`}
+                          />
+                          <span
+                            className={`text-sm sm:text-base font-bold truncate ${isAllAccountsSelected ? 'text-primary' : 'text-foreground'
+                              }`}
+                          >
+                            All Accounts
+                          </span>
+                          <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 flex-shrink-0 font-normal">
+                            {allVisibleAccounts.length}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* All Accounts Sparkline */}
+                      <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                        <Sparkline
+                          data={allTrendStats.historyPoints}
+                          isPositive={allTrendStats.isPositive}
+                          width={90}
+                          height={20}
                         />
-                        <span
-                          className={`text-sm sm:text-base font-bold truncate ${
-                            isAllAccountsSelected ? 'text-primary' : 'text-foreground'
-                          }`}
-                        >
-                          All Accounts
-                        </span>
-                        <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5 flex-shrink-0 font-normal">
-                          {allVisibleAccounts.length}
-                        </span>
+                      </div>
+
+                      <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
+                        <p className="font-mono text-sm sm:text-base font-bold text-foreground blur-number">
+                          {formatCurrency(allTrendStats.current)}
+                        </p>
                       </div>
                     </div>
 
-                    {/* All Accounts Sparkline */}
-                    <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                      <Sparkline
-                        data={allTrendStats.historyPoints}
-                        isPositive={allTrendStats.isPositive}
-                        width={90}
-                        height={20}
-                      />
-                    </div>
-
-                    <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                      <p className="font-mono text-sm sm:text-base font-bold text-foreground blur-number">
-                        {formatCurrency(allTrendStats.current)}
-                      </p>
-                    </div>
+                    {/* Narrow viewports: inline all accounts detail */}
+                    {isAllAccountsSelected && (
+                      <div
+                        id="hierarchy-all-accounts-detail-inline"
+                        className="lg:hidden border-t border-border/10"
+                      >
+                        <AllAccountsDetailPanel
+                          accounts={allVisibleAccounts}
+                          historyData={historyData}
+                          hierarchyTimeframe={hierarchyTimeframe}
+                          onHierarchyTimeframeChange={setHierarchyTimeframe}
+                          onClose={clearSelection}
+                          isInline
+                        />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Narrow viewports: inline all accounts detail */}
-                  {isAllAccountsSelected && (
-                    <div
-                      id="hierarchy-all-accounts-detail-inline"
-                      className="lg:hidden border-t border-border/10"
-                    >
-                      <AllAccountsDetailPanel
-                        accounts={allVisibleAccounts}
-                        historyData={historyData}
-                        hierarchyTimeframe={hierarchyTimeframe}
-                        onHierarchyTimeframeChange={setHierarchyTimeframe}
-                        onClose={() => {
-                          setSelectedGroup(null);
-                          setSelectedAccountId('');
-                          setExpandedAccounts({});
-                        }}
-                        isInline
-                      />
-                    </div>
-                  )}
-                </div>
+                  {sortedGroups.map((group) => {
+                    const subMap = treeHierarchy.get(group);
+                    if (!subMap) return null;
 
-                {sortedGroups.map((group) => {
-                  const subMap = treeHierarchy.get(group);
-                  if (!subMap) return null;
+                    const groupAccounts: Account[] = [];
+                    subMap.forEach((accs) => groupAccounts.push(...accs));
+                    const groupStats = getTrendStats(groupAccounts);
+                    const isGroupExpanded = expandedGroups[group] ?? true;
+                    const isGroupSelected = !effectiveAccountId && selectedGroup === group;
 
-                  const groupAccounts: Account[] = [];
-                  subMap.forEach((accs) => groupAccounts.push(...accs));
-                  const groupStats = getTrendStats(groupAccounts);
-                  const isGroupExpanded = expandedGroups[group] ?? true;
-                  const isGroupSelected = !effectiveAccountId && selectedGroup === group;
-
-                  return (
-                    <div key={group} className="divide-y divide-border/10">
+                    return (
+                      <div key={group} className="divide-y divide-border/10">
                         {/* Group section. When selected (below lg) the heading becomes the top row of a
                             card and the combined detail nests inside — the same treatment an expanded
                             account row gets */}
                         <div
-                          className={`min-w-0 ${
-                            isGroupSelected
+                          ref={(el) => registerCardEl(`group:${group}`, el)}
+                          className={`min-w-0 ${isGroupSelected
                               ? 'bg-sidebar border border-sidebar-border rounded-2xl shadow-sm overflow-hidden text-sidebar-foreground lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none lg:text-inherit'
                               : ''
-                          }`}
+                            }`}
                         >
-                        {/* Group Header Row */}
-                        <div 
-                          onClick={() => {
-                            handleGroupSelect(group);
-                          }}
-                          className={`w-full flex items-center justify-between px-0 ${isGroupSelected ? 'py-2.5 sm:py-3.5' : 'py-3.5'} ${isGroupSelected ? 'bg-primary/10 hover:bg-primary/15' : 'bg-muted/40 hover:bg-muted/60'} transition-colors cursor-pointer select-none`}
-                        >
-                        <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-6">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                                // Collapsing closes the open combined detail, like closing an account's card
-                                if (isGroupExpanded) setSelectedGroup(null);
-                              setExpandedGroups((prev) => ({ ...prev, [group]: !isGroupExpanded }));
+                          {/* Group Header Row */}
+                          <div
+                            ref={(el) => registerRowEl(`group:${group}`, el)}
+                            onClick={() => {
+                              handleGroupSelect(group);
                             }}
-                            className="-m-2.5 p-2.5 w-11 h-11 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
-                            aria-label={isGroupExpanded ? `Collapse ${group}` : `Expand ${group}`}
+                            className={`w-full flex items-center justify-between px-0 ${isGroupSelected ? 'py-2.5 sm:py-3.5' : 'py-3.5'} ${isGroupSelected ? 'bg-primary/10 hover:bg-primary/15' : 'bg-muted/40 hover:bg-muted/60'} transition-colors cursor-pointer select-none`}
                           >
-                            {isGroupExpanded ? (
-                              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
-                            )}
-                          </button>
-                          <span className={`text-sm sm:text-base font-bold truncate ${isGroupSelected ? 'text-primary' : 'text-foreground'}`}>{group}</span>
-                        </div>
+                            <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-6">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Collapsing closes the open combined detail, like closing an account's card
+                                  cancelPendingScrolls();
+                                  pendingMobileScrollRef.current = null;
+                                  if (isGroupExpanded) setSelectedGroup(null);
+                                  setExpandedGroups((prev) => ({ ...prev, [group]: !isGroupExpanded }));
+                                }}
+                                className="-m-2.5 p-2.5 w-11 h-11 mr-1 sm:mr-2 flex-shrink-0 flex items-center justify-center rounded hover:bg-muted/80 transition-colors"
+                                aria-label={isGroupExpanded ? `Collapse ${group}` : `Expand ${group}`}
+                              >
+                                {isGroupExpanded ? (
+                                  <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
+                                )}
+                              </button>
+                              <span className={`text-sm sm:text-base font-bold truncate ${isGroupSelected ? 'text-primary' : 'text-foreground'}`}>{group}</span>
+                            </div>
 
-                        {/* Group Sparkline */}
-                        <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                          <Sparkline 
-                            data={groupStats.historyPoints} 
-                            isPositive={groupStats.isPositive} 
-                            width={90}
-                            height={20}
-                          />
-                        </div>
+                            {/* Group Sparkline */}
+                            <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                              <Sparkline
+                                data={groupStats.historyPoints}
+                                isPositive={groupStats.isPositive}
+                                width={90}
+                                height={20}
+                              />
+                            </div>
 
-                        <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                          <p className="font-mono text-sm sm:text-base font-bold text-foreground blur-number">
-                            {formatCurrency(groupStats.current)}
-                          </p>
-                        </div>
-                      </div>
-
-                        {/* Narrow viewports: selected group's combined chart opens inline under the heading,
-                            identical to how an account's transaction card opens under its row */}
-                        {isGroupSelected && selectedGroupAccounts && (
-                          <div id="hierarchy-group-detail-inline" className="lg:hidden border-t border-border/10">
-                            <GroupDetailPanel
-                              group={selectedGroup}
-                              accounts={selectedGroupAccounts}
-                              historyData={historyData}
-                              hierarchyTimeframe={hierarchyTimeframe}
-                              onHierarchyTimeframeChange={setHierarchyTimeframe}
-                              onClose={() => {
-                                setSelectedGroup(null);
-                                setSelectedAccountId('');
-                                setExpandedAccounts({});
-                              }}
-                              isInline
-                            />
+                            <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
+                              <p className="font-mono text-sm sm:text-base font-bold text-foreground blur-number">
+                                {formatCurrency(groupStats.current)}
+                              </p>
+                            </div>
                           </div>
-                        )}
+
+                          {/* Narrow viewports: selected group's combined chart opens inline under the heading,
+                            identical to how an account's transaction card opens under its row */}
+                          {isGroupSelected && selectedGroupAccounts && (
+                            <div id="hierarchy-group-detail-inline" className="lg:hidden border-t border-border/10">
+                              <GroupDetailPanel
+                                group={selectedGroup}
+                                accounts={selectedGroupAccounts}
+                                historyData={historyData}
+                                hierarchyTimeframe={hierarchyTimeframe}
+                                onHierarchyTimeframeChange={setHierarchyTimeframe}
+                                onClose={clearSelection}
+                                isInline
+                              />
+                            </div>
+                          )}
                         </div>
-                      {/* Subgroups & Accounts - outside shaded card when combined chart is selected */}
-                      {isGroupExpanded && (
-                        <div className="divide-y divide-border/10 bg-card/5">
-                          {(() => {
-                            const flatAccs: Array<{ acc: Account; subgroup: string }> = [];
-                            for (const [subgroup, accs] of subMap.entries()) {
-                              for (const acc of accs) {
-                                flatAccs.push({ acc, subgroup });
+                        {/* Subgroups & Accounts - outside shaded card when combined chart is selected */}
+                        {isGroupExpanded && (
+                          <div className="divide-y divide-border/10 bg-card/5">
+                            {(() => {
+                              const flatAccs: Array<{ acc: Account; subgroup: string }> = [];
+                              for (const [subgroup, accs] of subMap.entries()) {
+                                for (const acc of accs) {
+                                  flatAccs.push({ acc, subgroup });
+                                }
                               }
-                            }
-                            flatAccs.sort((a, b) => {
-                              const balanceA = a.acc.balance || 0;
-                              const balanceB = b.acc.balance || 0;
-                              return Math.abs(balanceB) - Math.abs(balanceA);
-                            });
-                            return flatAccs.map(({ acc, subgroup }) => {
+                              flatAccs.sort((a, b) => {
+                                const balanceA = a.acc.balance || 0;
+                                const balanceB = b.acc.balance || 0;
+                                return Math.abs(balanceB) - Math.abs(balanceA);
+                              });
+                              return flatAccs.map(({ acc, subgroup }) => {
                                 const accStats = getTrendStats([acc]);
                                 const isAccExpanded = effectiveAccountId === acc.id;
                                 const row = (
-                                    <div 
-                                      id={`account-row-${acc.id}`}
-                                      onClick={() => handleAccountSelect(acc.id, isAccExpanded)}
-                                      className={`w-full flex items-center justify-between px-0 py-2 sm:py-2.5 transition-colors cursor-pointer select-none ${
-                                        isAccExpanded 
-                                          ? 'bg-primary/10 hover:bg-primary/15' 
-                                          : 'hover:bg-muted/10'
-                                      } ${
-                                        acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
+                                  <div
+                                    id={`account-row-${acc.id}`}
+                                    ref={(el) => registerRowEl(`account:${acc.id}`, el)}
+                                    onClick={() => handleAccountSelect(acc.id, isAccExpanded)}
+                                    className={`w-full flex items-center justify-between px-0 py-2 sm:py-2.5 transition-colors cursor-pointer select-none ${isAccExpanded
+                                        ? 'bg-primary/10 hover:bg-primary/15'
+                                        : 'hover:bg-muted/10'
+                                      } ${acc.isHidden || acc.isExcludedFromNetWorth ? 'opacity-50 hover:opacity-100' : ''
                                       }`}
-                                    >
-                                      <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{acc.name}</span>
-                                            {acc.syncStatus && acc.syncStatus.status !== 'ok' && (
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <Link 
-                                                    href="/settings?tab=accounts&sub=automatic"
-                                                    className="flex-shrink-0 cursor-pointer"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                  >
-                                                    {acc.syncStatus.status === 'error' ? (
-                                                      <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                                                    ) : (
-                                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                                    )}
-                                                  </Link>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="top" className="max-w-[240px]">
-                                                  <p className="font-semibold text-xs sm:text-sm">{acc.syncStatus.status === 'error' ? 'Connection Error' : 'Sync Warning'}</p>
-                                                  <p className="text-[11px] text-muted-foreground mt-0.5">{acc.syncStatus.reason}</p>
-                                                  <Link 
-                                                    href="/settings?tab=accounts&sub=automatic"
-                                                    className="text-[10px] text-primary hover:underline mt-1 font-semibold block"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                  >
-                                                    Click to investigate in settings
-                                                  </Link>
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            )}
-                                            {acc.isHidden && (
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <span className="text-micro sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded cursor-help">Hidden</span>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="top" className="text-xs">
-                                                  This account is hidden from lists and summaries
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            )}
-                                            {acc.isExcludedFromNetWorth && (
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <span className="text-micro sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded cursor-help">Excluded</span>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="top" className="text-xs">
-                                                  Excluded from Net Worth totals
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            )}
-                                            {showAccountTags && acc.tags && acc.tags.length > 0 && (
-                                              <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
-                                                {acc.tags.map((tag) => (
-                                                  <Tooltip key={tag.id}>
-                                                    <TooltipTrigger asChild>
-                                                      <span
-                                                        className="px-1.5 py-0.2 rounded-full text-micro sm:text-[10px] font-medium border cursor-help"
-                                                        style={{
-                                                          backgroundColor: `${tag.color}15`,
-                                                          color: tag.color,
-                                                          borderColor: `${tag.color}30`
-                                                        }}
-                                                      >
-                                                        #{tag.name}
-                                                      </span>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="top" className="text-xs">
-                                                      Account Tag: #{tag.name}
-                                                    </TooltipContent>
-                                                  </Tooltip>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                          <span className="text-[10px] sm:text-xs text-muted-foreground truncate block">
-                                            {acc.institution || 'Unknown Institution'} · {subgroup}
-                                          </span>
+                                  >
+                                    <div className="flex items-center min-w-0 flex-1 pl-4 sm:pl-8">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{acc.name}</span>
+                                          {acc.syncStatus && acc.syncStatus.status !== 'ok' && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Link
+                                                  href="/settings?tab=accounts&sub=automatic"
+                                                  className="flex-shrink-0 cursor-pointer"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
+                                                  {acc.syncStatus.status === 'error' ? (
+                                                    <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                                  ) : (
+                                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                  )}
+                                                </Link>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="max-w-[240px]">
+                                                <p className="font-semibold text-xs sm:text-sm">{acc.syncStatus.status === 'error' ? 'Connection Error' : 'Sync Warning'}</p>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">{acc.syncStatus.reason}</p>
+                                                <Link
+                                                  href="/settings?tab=accounts&sub=automatic"
+                                                  className="text-[10px] text-primary hover:underline mt-1 font-semibold block"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
+                                                  Click to investigate in settings
+                                                </Link>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          )}
+                                          {acc.isHidden && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <span className="text-micro sm:text-[10px] font-bold text-destructive bg-destructive/10 px-1 rounded cursor-help">Hidden</span>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="text-xs">
+                                                This account is hidden from lists and summaries
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          )}
+                                          {acc.isExcludedFromNetWorth && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <span className="text-micro sm:text-[10px] font-bold text-orange-500 bg-orange-500/10 px-1 rounded cursor-help">Excluded</span>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="text-xs">
+                                                Excluded from Net Worth totals
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          )}
+                                          {showAccountTags && acc.tags && acc.tags.length > 0 && (
+                                            <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
+                                              {acc.tags.map((tag) => (
+                                                <Tooltip key={tag.id}>
+                                                  <TooltipTrigger asChild>
+                                                    <span
+                                                      className="px-1.5 py-0.2 rounded-full text-micro sm:text-[10px] font-medium border cursor-help"
+                                                      style={{
+                                                        backgroundColor: `${tag.color}15`,
+                                                        color: tag.color,
+                                                        borderColor: `${tag.color}30`
+                                                      }}
+                                                    >
+                                                      #{tag.name}
+                                                    </span>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent side="top" className="text-xs">
+                                                    Account Tag: #{tag.name}
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
-                                      </div>
-
-                                      <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
-                                        <Sparkline 
-                                          data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints} 
-                                          isPositive={accStats.isPositive} 
-                                          width={90}
-                                          height={20}
-                                        />
-                                      </div>
-
-                                      <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
-                                        <p className="font-mono text-xs sm:text-sm font-bold text-foreground blur-number">
-                                          {formatCurrency(acc.balance)}
-                                        </p>
+                                        <span className="text-[10px] sm:text-xs text-muted-foreground truncate block">
+                                          {acc.institution || 'Unknown Institution'} · {subgroup}
+                                        </span>
                                       </div>
                                     </div>
+
+                                    <div className="hidden xl:flex flex-shrink-0 w-32 justify-center items-center mx-4">
+                                      <Sparkline
+                                        data={acc.isHidden || acc.isExcludedFromNetWorth ? [] : accStats.historyPoints}
+                                        isPositive={accStats.isPositive}
+                                        width={90}
+                                        height={20}
+                                      />
+                                    </div>
+
+                                    <div className="flex-shrink-0 w-28 sm:w-36 text-right pr-4 sm:pr-6">
+                                      <p className="font-mono text-xs sm:text-sm font-bold text-foreground blur-number">
+                                        {formatCurrency(acc.balance)}
+                                      </p>
+                                    </div>
+                                  </div>
                                 );
 
                                 return (
-                                  <div key={acc.id} className={isAccExpanded ? 'account-selected-card' : ''}>
-                                    {row}
-                                    {isAccExpanded && (
-                                      <div className="lg:hidden">
-                                        <AccountTransactions
-                                          accountId={acc.id}
-                                          historyData={historyData}
-                                          isLiability={isLiabilityAccount(acc.type)}
-                                          hierarchyTimeframe={hierarchyTimeframe}
-                                          onHierarchyTimeframeChange={setHierarchyTimeframe}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                );
+                                    <div
+                                      key={acc.id}
+                                      ref={(el) => registerCardEl(`account:${acc.id}`, el)}
+                                      className={isAccExpanded ? 'account-selected-card' : ''}
+                                    >
+                                      {row}
+                                      {isAccExpanded && (
+                                        <div className="lg:hidden">
+                                          <AccountTransactions
+                                            accountId={acc.id}
+                                            historyData={historyData}
+                                            isLiability={isLiabilityAccount(acc.type)}
+                                            hierarchyTimeframe={hierarchyTimeframe}
+                                            onHierarchyTimeframeChange={setHierarchyTimeframe}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                    );
                               });
                           })()}
-                        </div>
-                      )}
+                                  </div>
+                                )
+                              }
                     </div>
-                  );
+                        );
                 })}
-              </div>
+                      </div>
             </>
           )}
-        </>
+              </>
 
       </Card>
 
-      {/* Desktop side panel: selected group or account detail (2/3 width) */}
-      <div className="hidden lg:block lg:col-span-7 sticky top-[84px] max-h-[calc(100vh-100px)] overflow-y-auto">
-        {accountsLoading ? (
-          <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm p-6 space-y-4">
-            <Skeleton className="h-8 w-1/3" />
-            <Skeleton className="h-10 w-1/2" />
-            <Skeleton className="h-64 w-full" />
+          {/* Desktop side panel: selected group or account detail (2/3 width) */}
+          <div className="hidden lg:block lg:col-span-7 sticky top-[84px] max-h-[calc(100vh-100px)] overflow-y-auto">
+            {accountsLoading ? (
+              <div className="bg-sidebar border border-sidebar-border rounded-2xl shadow-sm p-6 space-y-4">
+                <Skeleton className="h-8 w-1/3" />
+                <Skeleton className="h-10 w-1/2" />
+                <Skeleton className="h-64 w-full" />
+              </div>
+            ) : selectedAccount ? (
+              <AccountDetailPanel
+                account={selectedAccount}
+                historyData={historyData}
+                hierarchyTimeframe={hierarchyTimeframe}
+                onHierarchyTimeframeChange={setHierarchyTimeframe}
+                onClose={clearSelection}
+              />
+            ) : allAccountsDetailPanel ?? groupDetailPanel ?? (
+              <AccountDetailPanel
+                account={null}
+                historyData={historyData}
+                hierarchyTimeframe={hierarchyTimeframe}
+                onHierarchyTimeframeChange={setHierarchyTimeframe}
+                onClose={clearSelection}
+              />
+            )}
           </div>
-        ) : selectedAccount ? (
-          <AccountDetailPanel
-            account={selectedAccount}
-            historyData={historyData}
-            hierarchyTimeframe={hierarchyTimeframe}
-            onHierarchyTimeframeChange={setHierarchyTimeframe}
-            onClose={() => {
-              setSelectedAccountId('');
-              setExpandedAccounts({});
-              setSelectedGroup(null);
-            }}
-          />
-        ) : allAccountsDetailPanel ?? groupDetailPanel ?? (
-          <AccountDetailPanel
-            account={null}
-            historyData={historyData}
-            hierarchyTimeframe={hierarchyTimeframe}
-            onHierarchyTimeframeChange={setHierarchyTimeframe}
-            onClose={() => {
-              setSelectedAccountId('');
-              setExpandedAccounts({});
-              setSelectedGroup(null);
-            }}
-          />
-        )}
-      </div>
-    </div>
-  );
+        </div>
+        );
 }

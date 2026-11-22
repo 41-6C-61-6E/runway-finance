@@ -22,87 +22,39 @@ declare module "@tanstack/react-table" {
     className?: string;
   }
 }
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { getAccountGroupKey } from "@/lib/constants/account-types";
 import { apiFetch } from "@/lib/utils/api-client";
+import { formatAmount as formatCurrencyAmount } from "@/lib/utils/format";
 import { toast } from "sonner";
 import {
-  ChevronUp,
   ChevronDown,
-  ChevronsUpDown,
-  Eye,
-  EyeOff,
-  Settings2,
-  Check,
-  GripVertical,
   Search,
   Sparkles,
-  Plus,
-  Columns2,
-  X,
   AlertCircle,
   RotateCcw,
   Repeat,
 } from "lucide-react";
-import { LoadingSpinner, Spinner } from "@/components/ui/loading-spinner";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SortableHeader } from "@/components/ui/sortable-header";
 import { ClickOutsideBackdrop } from "@/components/ui/modal-overlay";
 import AiCategorizeButton from "@/components/features/transactions/ai-categorize-button";
 import { ListRow } from "@/components/ui/list-row";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { IconButton } from "@/components/ui/icon-button";
-import { ActionButton } from "@/components/ui/action-button";
-
-
-type Transaction = {
-  id: string;
-  date: string;
-  description: string;
-  payee: string | null;
-  amount: string;
-  pending: boolean;
-  postedDate: string | null;
-  categoryId: string | null;
-  categoryName: string | null;
-  categoryColor: string | null;
-  accountName: string | null;
-  accountType?: string | null;
-  reviewed: boolean | null;
-  categorizedByAi: boolean;
-  source?: string;
-  tags?: { id: string; name: string; color: string }[];
-  accountTags?: { id: string; name: string; color: string }[];
-  notes?: string | null;
-  splits?: {
-    id: string;
-    amount: string;
-    description?: string | null;
-    categoryId: string | null;
-    categoryName: string | null;
-    categoryColor: string | null;
-    notes: string | null;
-    tags?: { id: string; name: string; color: string }[];
-    category?: { name: string; color: string } | null;
-  }[];
-};
-
-type Category = {
-  id: string;
-  parentId: string | null;
-  name: string;
-  color: string;
-  isIncome: boolean;
-};
+import { useUserSettings } from "@/components/user-settings-provider";
+import { ALL_COLUMNS, COLUMN_MIN_WIDTHS } from "./table/column-constants";
+import { ProposedRuleDialog } from "./table/proposed-rule-dialog";
+import { CategoryPickerContent } from "./table/category-picker";
+import { TransactionMobileList } from "./table/transaction-mobile-list";
+import {
+  formatSignedTransactionAmount,
+  type Category,
+  type CreateCategoryInput,
+  type FlattenedTransaction,
+  type RecurringPattern,
+  type Transaction,
+} from "./table/types";
 
 async function readErrorMessage(res: Response) {
   const text = await res.text().catch(() => "");
@@ -136,11 +88,6 @@ interface TransactionTableProps {
   analysisProcessed?: number;
   analysisTotal?: number;
 }
-
-import { useUserSettings } from "@/components/user-settings-provider";
-import { Select } from '@/components/ui/select';
-import { ALL_COLUMNS, COLUMN_LABELS, COLUMN_MIN_WIDTHS } from "./table/column-constants";
-import { ProposedRuleDialog } from "./table/proposed-rule-dialog";
 
 export default function TransactionTable({
   filters,
@@ -180,7 +127,7 @@ export default function TransactionTable({
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isFetchError, setIsFetchError] = useState(false);
-  const [recurringPatterns, setRecurringPatterns] = useState<{ id: string; name: string; pattern: string; frequency: string }[]>([]);
+  const [recurringPatterns, setRecurringPatterns] = useState<RecurringPattern[]>([]);
 
   useEffect(() => {
     fetch('/api/recurring?status=active', { credentials: 'include' })
@@ -201,7 +148,7 @@ export default function TransactionTable({
   }, []);
 
 
-  const flattenedTransactions = useMemo(() => {
+  const flattenedTransactions = useMemo<FlattenedTransaction[]>(() => {
     const list: (Transaction & { isSplitChild?: boolean; parentTxId?: string })[] = [];
     for (const tx of transactions) {
       list.push(tx);
@@ -284,7 +231,6 @@ export default function TransactionTable({
     top: number;
     left: number;
   } | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState("");
   const [proposedRule, setProposedRule] = useState<{
     payee: string;
     categoryId: string;
@@ -303,15 +249,6 @@ export default function TransactionTable({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [tableWidth, setTableWidth] = useState<number | string>("100%");
   const limit = 50;
-
-  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryParentId, setNewCategoryParentId] = useState<string | null>(
-    null,
-  );
-  const [newCategoryColor, setNewCategoryColor] = useState("#6366f1");
-  const [newCategoryIsIncome, setNewCategoryIsIncome] = useState(false);
-  const [creatingCategoryLoading, setCreatingCategoryLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -561,25 +498,23 @@ export default function TransactionTable({
       }
       setOpenCategoryTx(null);
       setDropdownPos(null);
-      setCategoryFilter("");
     },
-    [transactions],
+    [transactions, queryClient],
   );
 
   const handleCreateCategory = useCallback(
-    async (txId: string) => {
-      if (!newCategoryName.trim()) return;
-      setCreatingCategoryLoading(true);
+    async (txId: string, input: CreateCategoryInput) => {
+      if (!input.name.trim()) return;
       try {
         const res = await fetch("/api/categories", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            name: newCategoryName.trim(),
-            parentId: newCategoryParentId || null,
-            color: newCategoryColor,
-            isIncome: newCategoryIsIncome,
+            name: input.name.trim(),
+            parentId: input.parentId || null,
+            color: input.color,
+            isIncome: input.isIncome,
           }),
         });
 
@@ -589,7 +524,7 @@ export default function TransactionTable({
           const matchingCat =
             updatedCats.find(
               (c) =>
-                c.name.toLowerCase() === newCategoryName.trim().toLowerCase(),
+                c.name.toLowerCase() === input.name.trim().toLowerCase(),
             ) || updatedCats.find((c) => c.id === createdData.id);
 
           if (matchingCat) {
@@ -603,26 +538,16 @@ export default function TransactionTable({
             await handleSetCategory(
               txId,
               createdData.id,
-              newCategoryName.trim(),
-              newCategoryColor,
+              input.name.trim(),
+              input.color,
             );
           }
-          setIsCreatingCategory(false);
         }
       } catch (err) {
         console.error(err);
-      } finally {
-        setCreatingCategoryLoading(false);
       }
     },
-    [
-      newCategoryName,
-      newCategoryParentId,
-      newCategoryColor,
-      newCategoryIsIncome,
-      fetchCategories,
-      handleSetCategory,
-    ],
+    [fetchCategories, handleSetCategory],
   );
 
 
@@ -821,17 +746,9 @@ export default function TransactionTable({
     };
   }, [loading, transactions.length, total]);
 
-  const formatAmount = (amount: string) => {
-    const num = parseFloat(amount);
-    return {
-      text: new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 2,
-        signDisplay: "exceptZero",
-      }).format(num),
-    };
-  };
+  const formatAmount = (amount: string) => ({
+    text: formatSignedTransactionAmount(amount),
+  });
 
   const totalPages = Math.ceil(total / limit);
 
@@ -1149,9 +1066,6 @@ export default function TransactionTable({
         cell: ({ row }) => {
           const tx = row.original;
           const isOpen = openCategoryTx === tx.id;
-          const parents = categories.filter((c) => !c.parentId || c.parentId === null);
-          const getChildren = (parentId: string) =>
-            categories.filter((c) => c.parentId === parentId);
 
           if (tx.splits && tx.splits.length > 0) {
             return <span className="text-muted-foreground/45">—</span>;
@@ -1209,258 +1123,22 @@ export default function TransactionTable({
                       e.stopPropagation();
                       setOpenCategoryTx(null);
                       setDropdownPos(null);
-                      setCategoryFilter("");
-                      setIsCreatingCategory(false);
                     }}
                   />
                   <div
                     className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
                     style={{ top: dropdownPos.top, left: dropdownPos.left }}
                   >
-                    {isCreatingCategory ? (
-                      <div className="p-3 space-y-2 flex flex-col text-xs">
-                        <div className="font-semibold text-foreground uppercase tracking-wider text-[10px] mb-0.5">
-                          New Category
-                        </div>
-                        <div>
-                          <label className="block text-micro font-medium text-muted-foreground mb-0.5">
-                            Name
-                          </label>
-                          <input
-                            value={newCategoryName}
-                            onChange={(e) => setNewCategoryName(e.target.value)}
-                            placeholder="Category name"
-                            className="w-full px-2 py-1 bg-background border border-input rounded text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-micro font-medium text-muted-foreground mb-0.5">
-                            Parent Category
-                          </label>
-                          <Select
-                            className="h-9 text-[11px] rounded px-2"
-                            value={newCategoryParentId || ""}
-                            onChange={(e) =>
-                              setNewCategoryParentId(e.target.value || null)
-                            }
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <option value="">None (top-level)</option>
-                            {categories
-                              .filter((c) => !c.parentId)
-                              .map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name}
-                                </option>
-                              ))}
-                          </Select>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 pt-0.5">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="color"
-                              value={newCategoryColor}
-                              onChange={(e) =>
-                                setNewCategoryColor(e.target.value)
-                              }
-                              className="w-5 h-5 rounded cursor-pointer border border-input"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <span className="text-micro font-mono text-muted-foreground">
-                              {newCategoryColor}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="checkbox"
-                              id={`table-new-category-income-${tx.id}`}
-                              checked={newCategoryIsIncome}
-                              onChange={(e) =>
-                                setNewCategoryIsIncome(e.target.checked)
-                              }
-                              className="-m-1 p-1 rounded border-border text-primary focus:ring-ring"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <label
-                              htmlFor={`table-new-category-income-${tx.id}`}
-                              className="text-micro font-medium text-muted-foreground"
-                            >
-                              Income
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 pt-2 border-t border-border/50">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsCreatingCategory(false);
-                            }}
-                            className="flex-1 py-1 text-[10px] text-foreground bg-muted hover:bg-accent rounded transition-colors"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCreateCategory(tx.id);
-                            }}
-                            disabled={
-                              creatingCategoryLoading || !newCategoryName.trim()
-                            }
-                            className="flex-1 py-1 text-[10px] font-semibold text-primary-foreground bg-primary rounded hover:opacity-90 disabled:opacity-50 transition-all"
-                          >
-                            {creatingCategoryLoading ? "Saving..." : "Create"}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="relative p-2 border-b border-border">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                          <input
-                            value={categoryFilter}
-                            onChange={(e) => setCategoryFilter(e.target.value)}
-                            placeholder="Search categories..."
-                            className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        <div className="flex-1 overflow-y-auto max-h-56">
-                          {(() => {
-                            const filter = categoryFilter.toLowerCase();
-                            const filteredParents = filter
-                              ? parents.filter(
-                                  (p) =>
-                                    p.name.toLowerCase().includes(filter) ||
-                                    getChildren(p.id).some((c) =>
-                                      c.name.toLowerCase().includes(filter),
-                                    ),
-                                )
-                              : parents;
-
-                            const noResults = filteredParents.length === 0;
-                            return (
-                              <>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSetCategory(tx.id, null, null, null);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors text-left"
-                                >
-                                  None
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setIsCreatingCategory(true);
-                                    setNewCategoryName("");
-                                    setNewCategoryParentId(null);
-                                    setNewCategoryColor("#6366f1");
-                                    setNewCategoryIsIncome(false);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-muted font-medium border-b border-border/50 transition-colors text-left"
-                                >
-                                  + Create new category
-                                </button>
-                                {filteredParents.map((parent) => {
-                                  const childList = filter
-                                    ? getChildren(parent.id).filter((c) =>
-                                        c.name.toLowerCase().includes(filter),
-                                      )
-                                    : getChildren(parent.id);
-                                  if (
-                                    filter &&
-                                    childList.length === 0 &&
-                                    !parent.name.toLowerCase().includes(filter)
-                                  )
-                                    return null;
-                                  return (
-                                    <div key={parent.id}>
-                                      <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-medium text-muted-foreground bg-muted/30">
-                                        <div
-                                          className="w-1.5 h-1.5 rounded-full"
-                                          style={{
-                                            backgroundColor: parent.color,
-                                          }}
-                                        />
-                                        {parent.name}
-                                      </div>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleSetCategory(
-                                            tx.id,
-                                            parent.id,
-                                            parent.name,
-                                            parent.color,
-                                          );
-                                        }}
-                                        className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
-                                          tx.categoryId === parent.id
-                                            ? "text-primary bg-primary/10"
-                                            : "text-foreground/80 hover:bg-muted"
-                                        }`}
-                                      >
-                                        <div
-                                          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                          style={{
-                                            backgroundColor: parent.color,
-                                          }}
-                                        />
-                                        {parent.name}
-                                      </button>
-                                      {childList.map((child) => (
-                                        <button
-                                          key={child.id}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleSetCategory(
-                                              tx.id,
-                                              child.id,
-                                              child.name,
-                                              child.color,
-                                            );
-                                          }}
-                                          className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
-                                            tx.categoryId === child.id
-                                              ? "text-primary bg-primary/10"
-                                              : "text-foreground/80 hover:bg-muted"
-                                          }`}
-                                        >
-                                          <div
-                                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                            style={{
-                                              backgroundColor: child.color,
-                                            }}
-                                          />
-                                          {child.name}
-                                          {tx.categoryId === child.id && (
-                                            <Check className="ml-auto h-3 w-3" />
-                                          )}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  );
-                                })}
-                                {noResults && (
-                                  <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-                                    No categories found
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </>
-                    )}
+                    <CategoryPickerContent
+                      categories={categories}
+                      currentCategoryId={tx.categoryId}
+                      onSelect={(catId, catName, catColor) =>
+                        handleSetCategory(tx.id, catId, catName, catColor)
+                      }
+                      onCreateCategory={(input) =>
+                        handleCreateCategory(tx.id, input)
+                      }
+                    />
                   </div>
                 </>
               )}
@@ -1520,16 +1198,13 @@ export default function TransactionTable({
       categories,
       openCategoryTx,
       handleSetCategory,
-      categoryFilter,
       dropdownPos,
-      isCreatingCategory,
-      newCategoryName,
-      newCategoryParentId,
-      newCategoryColor,
-      newCategoryIsIncome,
-      creatingCategoryLoading,
       handleCreateCategory,
       showRegisterTags,
+      aiConfigured,
+      onAiProposalCreated,
+      recurringPatterns,
+      showAccountTags,
     ],
   );
 
@@ -1606,7 +1281,25 @@ export default function TransactionTable({
             ) : (
 
               <>
-            {effectiveCompactView ? (
+            {isMobile ? (
+              <TransactionMobileList
+                transactions={transactions}
+                flattenedTransactions={flattenedTransactions}
+                total={total}
+                totalAmount={totalAmount}
+                sorting={sorting}
+                onSortingChange={setSorting}
+                categories={categories}
+                recurringPatterns={recurringPatterns}
+                showRegisterTags={showRegisterTags}
+                showAccountTags={showAccountTags}
+                aiConfigured={aiConfigured}
+                onTransactionClick={onTransactionClick}
+                onSetCategory={handleSetCategory}
+                onCreateCategory={handleCreateCategory}
+                onAiProposalCreated={onAiProposalCreated}
+              />
+            ) : effectiveCompactView ? (
               <div className="divide-y divide-border/50">
                 {table.getRowModel().rows.map((row) => {
                   const tx = row.original;
@@ -1615,9 +1308,6 @@ export default function TransactionTable({
                   const formattedDate = new Date(tx.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
                   const txTags = tx.tags ?? [];
                   const isCatOpen = openCategoryTx === tx.id;
-                  const parents = categories.filter((c) => !c.parentId);
-                  const getChildren = (parentId: string) =>
-                    categories.filter((c) => c.parentId === parentId);
 
                   return (
                     <ListRow
@@ -1827,168 +1517,22 @@ export default function TransactionTable({
                                   e.stopPropagation();
                                   setOpenCategoryTx(null);
                                   setDropdownPos(null);
-                                  setCategoryFilter("");
-                                  setIsCreatingCategory(false);
                                 }}
                               />
                               <div
                                 className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
                                 style={{ top: dropdownPos.top, left: dropdownPos.left }}
-                              >                                {isCreatingCategory ? (
-                                  <div className="p-3 space-y-2 flex flex-col text-xs">
-                                    <div className="font-semibold text-foreground uppercase tracking-wider text-[10px] mb-0.5">
-                                      New Category
-                                    </div>
-                                    <div>
-                                      <label className="block text-micro font-medium text-muted-foreground mb-0.5">
-                                        Name
-                                      </label>
-                                      <input
-                                        value={newCategoryName}
-                                        onChange={(e) => setNewCategoryName(e.target.value)}
-                                        placeholder="Category name"
-                                        className="w-full px-2 py-1 bg-background border border-input rounded text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                                        autoFocus
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-micro font-medium text-muted-foreground mb-0.5">
-                                        Parent Category
-                                      </label>
-                                      <Select
-                                        className="h-9 text-[11px] rounded px-2"
-                                        value={newCategoryParentId || ""}
-                                        onChange={(e) => setNewCategoryParentId(e.target.value || null)}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <option value="">None (top-level)</option>
-                                        {categories.filter((c) => !c.parentId).map((p) => (
-                                          <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                      </Select>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2 pt-0.5">
-                                      <div className="flex items-center gap-1">
-                                        <input
-                                          type="color"
-                                          value={newCategoryColor}
-                                          onChange={(e) => setNewCategoryColor(e.target.value)}
-                                          className="w-5 h-5 rounded cursor-pointer border border-input"
-                                          onClick={(e) => e.stopPropagation()}
-                                        />
-                                        <span className="text-micro font-mono text-muted-foreground">{newCategoryColor}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <input
-                                          type="checkbox"
-                                          id={`compact-new-cat-income-${tx.id}`}
-                                          checked={newCategoryIsIncome}
-                                          onChange={(e) => setNewCategoryIsIncome(e.target.checked)}
-                                          className="-m-1 p-1 rounded border-border text-primary focus:ring-ring"
-                                          onClick={(e) => e.stopPropagation()}
-                                        />
-                                        <label htmlFor={`compact-new-cat-income-${tx.id}`} className="text-micro font-medium text-muted-foreground">Income</label>
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-2 pt-2 border-t border-border/50">
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); setIsCreatingCategory(false); }}
-                                        className="flex-1 py-1 text-[10px] text-foreground bg-muted hover:bg-accent rounded transition-colors"
-                                      >
-                                        Cancel
-                                      </button>
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); handleCreateCategory(tx.id); }}
-                                        disabled={creatingCategoryLoading || !newCategoryName.trim()}
-                                        className="flex-1 py-1 text-[10px] font-semibold text-primary-foreground bg-primary rounded hover:opacity-90 disabled:opacity-50 transition-all"
-                                      >
-                                        {creatingCategoryLoading ? "Saving..." : "Create"}
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div className="relative p-2 border-b border-border">
-                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                                      <input
-                                        value={categoryFilter}
-                                        onChange={(e) => setCategoryFilter(e.target.value)}
-                                        placeholder="Search categories..."
-                                        className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                                        autoFocus
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto max-h-56">
-                                      {(() => {
-                                        const filter = categoryFilter.toLowerCase();
-                                        const filteredParents = filter
-                                          ? parents.filter((p) =>
-                                              p.name.toLowerCase().includes(filter) ||
-                                              getChildren(p.id).some((c) => c.name.toLowerCase().includes(filter))
-                                            )
-                                          : parents;
-                                        const noResults = filteredParents.length === 0;
-                                        return (
-                                          <>
-                                            <button
-                                              onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, null, null, null); }}
-                                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors text-left"
-                                            >
-                                              None
-                                            </button>
-                                            <button
-                                              onClick={(e) => { e.stopPropagation(); setIsCreatingCategory(true); setNewCategoryName(""); setNewCategoryParentId(null); setNewCategoryColor("#6366f1"); setNewCategoryIsIncome(false); }}
-                                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-muted font-medium border-b border-border/50 transition-colors text-left"
-                                            >
-                                              + Create new category
-                                            </button>
-                                            {filteredParents.map((parent) => {
-                                              const childList = filter
-                                                ? getChildren(parent.id).filter((c) => c.name.toLowerCase().includes(filter))
-                                                : getChildren(parent.id);
-                                              if (filter && childList.length === 0 && !parent.name.toLowerCase().includes(filter)) return null;
-                                              return (
-                                                <div key={parent.id}>
-                                                  <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-medium text-muted-foreground bg-muted/30">
-                                                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: parent.color }} />
-                                                    {parent.name}
-                                                  </div>
-                                                  <button
-                                                    onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, parent.id, parent.name, parent.color); }}
-                                                    className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
-                                                      tx.categoryId === parent.id ? "text-primary bg-primary/10" : "text-foreground/80 hover:bg-muted"
-                                                    }`}
-                                                  >
-                                                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: parent.color }} />
-                                                    {parent.name}
-                                                  </button>
-                                                  {childList.map((child) => (
-                                                    <button
-                                                      key={child.id}
-                                                      onClick={(e) => { e.stopPropagation(); handleSetCategory(tx.id, child.id, child.name, child.color); }}
-                                                      className={`w-full flex items-center gap-2 px-4 py-1.5 text-xs transition-colors text-left ${
-                                                        tx.categoryId === child.id ? "text-primary bg-primary/10" : "text-foreground/80 hover:bg-muted"
-                                                      }`}
-                                                    >
-                                                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: child.color }} />
-                                                      {child.name}
-                                                      {tx.categoryId === child.id && <Check className="ml-auto h-3 w-3" />}
-                                                    </button>
-                                                  ))}
-                                                </div>
-                                              );
-                                            })}
-                                            {noResults && (
-                                              <div className="px-3 py-4 text-xs text-muted-foreground text-center">No categories found</div>
-                                            )}
-                                          </>
-                                        );
-                                      })()}
-                                    </div>
-                                  </>
-                                )}
+                              >
+                                <CategoryPickerContent
+                                  categories={categories}
+                                  currentCategoryId={tx.categoryId}
+                                  onSelect={(catId, catName, catColor) =>
+                                    handleSetCategory(tx.id, catId, catName, catColor)
+                                  }
+                                  onCreateCategory={(input) =>
+                                    handleCreateCategory(tx.id, input)
+                                  }
+                                />
                               </div>
                             </>
                           )}
@@ -2171,27 +1715,32 @@ export default function TransactionTable({
             )}
 
             {/* Pagination & Summary */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
-              <span className="text-xs text-muted-foreground">
+            {isMobile ? (
+              <div className="px-2 py-3 border-t border-border/60 text-center text-xs text-muted-foreground">
                 {total > 0
-                  ? `Showing ${transactions.length} of ${total} transactions`
+                  ? transactions.length < total
+                    ? `Showing ${transactions.length} of ${total} transactions`
+                    : `All ${total} transactions loaded`
                   : "0 transactions"}
-                {totalAmount === null ? (
-                  <span className="ml-3 pl-3 border-l border-border text-muted-foreground animate-pulse">
-                    Total: Calculating...
-                  </span>
-                ) : totalAmount > 0 ? (
-                  <span className="ml-3 pl-3 border-l border-border font-medium text-foreground">
-                    Total:{" "}
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "USD",
-                      minimumFractionDigits: 2,
-                    }).format(totalAmount)}
-                  </span>
-                ) : null}
-              </span>
-            </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
+                <span className="text-xs text-muted-foreground">
+                  {total > 0
+                    ? `Showing ${transactions.length} of ${total} transactions`
+                    : "0 transactions"}
+                  {totalAmount === null ? (
+                    <span className="ml-3 pl-3 border-l border-border text-muted-foreground animate-pulse">
+                      Total: Calculating...
+                    </span>
+                  ) : totalAmount > 0 ? (
+                    <span className="ml-3 pl-3 border-l border-border font-medium text-foreground">
+                      Total: {formatCurrencyAmount(totalAmount)}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            )}
           </>
         )}
       </>

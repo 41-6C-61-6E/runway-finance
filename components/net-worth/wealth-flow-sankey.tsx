@@ -619,7 +619,7 @@ export function WealthFlowSankey() {
                   <div
                     ref={scrollContainerRef}
                     onScroll={checkScroll}
-                    className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x touch-pan-x overscroll-x-contain"
+                    className="h-full w-full overflow-x-auto overflow-y-hidden scroll-contain-x touch-manipulation overscroll-x-contain"
                   >
                     <div
                       ref={chartContainerRef}

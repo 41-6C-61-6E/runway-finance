@@ -81,6 +81,7 @@ interface TransactionDetailDrawerProps {
 
 import { useUserSettings } from '@/components/user-settings-provider';
 import { Select } from '@/components/ui/select';
+import { buildGoogleSearchUrl } from './table/types';
 
 export default function TransactionDetailDrawer({ transaction, open, onClose, onSuccess, mode, aiConfigured, onAiProposalCreated }: TransactionDetailDrawerProps) {
   const settingsContext = useUserSettings();
@@ -548,7 +549,23 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Description</label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label className="block text-sm font-medium text-foreground">Description</label>
+              {mode === 'edit' && (payee.trim() || description.trim()) && (
+                <a
+                  href={buildGoogleSearchUrl({
+                    payee: payee.trim() || null,
+                    description: description.trim(),
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded-md min-touch-target-inline"
+                >
+                  <Search className="h-3 w-3" />
+                  <span>Look up</span>
+                </a>
+              )}
+            </div>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
