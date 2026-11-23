@@ -83,6 +83,7 @@ interface MortgageInfo {
   originalLoanAmount: number;
   interestRate: number;
   monthlyPayment: number;
+  termMonths?: number;
   extraPrincipal?: number;
   pmi?: number;
   escrow?: number;
@@ -99,7 +100,8 @@ interface Property {
   equity: number;
   ltv: number;
   saleProceeds: number;
-  snapshots: { date: string; value: number }[];
+  snapshots: { date: string; value: number; isSynthetic?: boolean }[];
+  mortgageSnapshots?: { accountId?: string; date: string; value: number; isSynthetic?: boolean }[];
 }
 
 interface PropertyCardProps {
@@ -755,6 +757,10 @@ export function PropertyCard({
                     <MortgagePaydownChart
                       mortgage={selectedMortgage}
                       propertyName={property.name}
+                      propertyPurchaseDate={purchaseDate}
+                      allLinkedMortgages={property.linkedMortgages}
+                      mortgageSnapshots={property.mortgageSnapshots ?? []}
+                      propertySnapshots={property.snapshots ?? []}
                       inline={true}
                     />
                   </div>

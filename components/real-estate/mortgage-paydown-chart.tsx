@@ -10,18 +10,32 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { formatSafeUTCDate } from '@/lib/utils/date';
 import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified } from '@/lib/utils/chart-format';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
+import { useSyntheticData } from '@/lib/hooks/use-synthetic-data';
 import {
   calculateAmortizationSchedule,
   calculateAmortizationWithExtraPayments,
+  calculateMonthlyPIPayment,
+  calculateRemainingPayoffMonths,
+  monthsBetweenDates,
+  getAmortizationPaymentDate,
 } from '@/lib/utils/amortization';
+import {
+  buildMortgagePaydownTimeline,
+  getMortgageMetadataString,
+  getMortgageMetadataNumber,
+  type MortgageSnapshotPoint,
+  type PropertySnapshotPoint,
+  type PaydownTimelinePoint,
+} from '@/lib/utils/mortgage-paydown-timeline';
 import { cn } from '@/lib/utils';
-import { Sparkles, RotateCcw, Calculator, Calendar } from 'lucide-react';
+import { Sparkles, RotateCcw, Calculator } from 'lucide-react';
 
 interface MortgageDetail {
   id: string;
@@ -41,10 +55,30 @@ interface MortgageDetail {
 interface MortgagePaydownChartProps {
   mortgage: MortgageDetail;
   propertyName?: string;
+  propertyPurchaseDate?: string;
+  allLinkedMortgages?: MortgageDetail[];
+  mortgageSnapshots?: MortgageSnapshotPoint[];
+  propertySnapshots?: PropertySnapshotPoint[];
   inline?: boolean;
 }
 
-export function MortgagePaydownChart({ mortgage, propertyName, inline = false }: MortgagePaydownChartProps) {
+const OTHER_MORTGAGE_COLORS = [
+  'var(--color-chart-3)',
+  'var(--color-chart-5)',
+  'var(--color-chart-1)',
+];
+
+export function MortgagePaydownChart({
+  mortgage,
+  propertyName: _propertyName,
+  propertyPurchaseDate,
+  allLinkedMortgages,
+  mortgageSnapshots,
+  propertySnapshots,
+  inline = false,
+}: MortgagePaydownChartProps) {
+  const { isEnabled } = useSyntheticData();
+  const showSynth = isEnabled('realEstate');
   const [extraMonthly, setExtraMonthly] = useState('');
   const [lumpSum, setLumpSum] = useState('');
   const [lumpSumDate, setLumpSumDate] = useState('');
@@ -61,12 +95,16 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
 
   const termMonths = mortgage.termMonths ?? 360;
   const monthlyPayment = mortgage.monthlyPayment;
-  const mortgageStartDate = (mortgage.metadata as any)?.purchaseDate as string ?? '2020-01-01';
+  const todayDate = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const explicitStartDate =
+    getMortgageMetadataString(mortgage.metadata, 'purchaseDate') ||
+    getMortgageMetadataString(mortgage.metadata, 'startDate') ||
+    getMortgageMetadataString(mortgage.metadata, 'originationDate');
+  const mortgageStartDate = explicitStartDate || propertyPurchaseDate || todayDate;
 
-  const escrow = mortgage.escrow ?? 0;
   const pmi = mortgage.pmi ?? 0;
-
   const monthlyPI = monthlyPayment;
+  const currentBalance = Math.abs(mortgage.balance);
 
   useEffect(() => {
     const ep = mortgage.extraPrincipal ?? 0;
@@ -77,24 +115,113 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
     setBiweekly(false);
   }, [mortgage.id, mortgage.extraPrincipal]);
 
-  const originalPropertyPrice = ((mortgage.metadata as any)?.purchasePrice as number) || (mortgage.originalLoanAmount > 0 ? mortgage.originalLoanAmount / 0.8 : undefined);
+  const metaPurchasePrice = getMortgageMetadataNumber(mortgage.metadata, 'purchasePrice');
+  const originalPropertyPrice =
+    (metaPurchasePrice && metaPurchasePrice > 0 ? metaPurchasePrice : undefined) ||
+    (mortgage.originalLoanAmount > 0 ? mortgage.originalLoanAmount / 0.8 : undefined);
 
-  const amortParams = useMemo(() => ({
-    originalBalance: mortgage.originalLoanAmount,
-    annualRate: mortgage.interestRate,
+  const hasStoredSnapshotForSelected = useMemo(() => {
+    return (mortgageSnapshots ?? []).some(
+      (s) =>
+        (showSynth || !s.isSynthetic) &&
+        s.date <= todayDate &&
+        (!s.accountId || s.accountId === mortgage.id)
+    );
+  }, [mortgageSnapshots, showSynth, todayDate, mortgage.id]);
+
+  const hasAnyHistoryForSelected =
+    hasStoredSnapshotForSelected ||
+    (showSynth &&
+      !!explicitStartDate &&
+      explicitStartDate < todayDate &&
+      mortgage.originalLoanAmount > 0);
+
+  const amortParams = useMemo(() => {
+    const effectiveOriginalLoan =
+      mortgage.originalLoanAmount > 0 ? mortgage.originalLoanAmount : currentBalance;
+
+    if (currentBalance > 0 && mortgageStartDate <= todayDate) {
+      const contractualPI =
+        monthlyPI > 0
+          ? monthlyPI
+          : calculateMonthlyPIPayment(effectiveOriginalLoan, mortgage.interestRate, termMonths);
+      const elapsedMonths = monthsBetweenDates(mortgageStartDate, todayDate);
+      const fallbackRemaining = Math.max(1, termMonths - elapsedMonths);
+      const projectionTermMonths = calculateRemainingPayoffMonths(
+        currentBalance,
+        mortgage.interestRate,
+        contractualPI,
+        fallbackRemaining
+      );
+      const nextMonthStart = getAmortizationPaymentDate(`${todayDate.slice(0, 7)}-01`, 1);
+      return {
+        originalBalance: currentBalance,
+        annualRate: mortgage.interestRate,
+        termMonths: projectionTermMonths,
+        monthlyPayment: contractualPI,
+        startDate: nextMonthStart,
+        originalPropertyPrice,
+        monthlyPmi: pmi,
+        elapsedMonths,
+        originalTermMonths: termMonths,
+      };
+    }
+
+    if (currentBalance > 0 && mortgageStartDate > todayDate) {
+      return {
+        originalBalance: effectiveOriginalLoan,
+        annualRate: mortgage.interestRate,
+        termMonths,
+        monthlyPayment: monthlyPI,
+        startDate: mortgageStartDate,
+        originalPropertyPrice,
+        monthlyPmi: pmi,
+      };
+    }
+
+    if (!hasAnyHistoryForSelected && mortgage.originalLoanAmount > 0) {
+      return {
+        originalBalance: mortgage.originalLoanAmount,
+        annualRate: mortgage.interestRate,
+        termMonths,
+        monthlyPayment: monthlyPI,
+        startDate: mortgageStartDate,
+        originalPropertyPrice,
+        monthlyPmi: pmi,
+      };
+    }
+
+    return {
+      originalBalance: 0,
+      annualRate: mortgage.interestRate,
+      termMonths: 0,
+      monthlyPayment: monthlyPI,
+      startDate: mortgageStartDate,
+      originalPropertyPrice,
+      monthlyPmi: pmi,
+    };
+  }, [
+    currentBalance,
+    mortgage.originalLoanAmount,
+    mortgage.interestRate,
+    monthlyPI,
     termMonths,
-    monthlyPayment: monthlyPI,
-    startDate: mortgageStartDate,
+    mortgageStartDate,
+    todayDate,
     originalPropertyPrice,
-    monthlyPmi: pmi,
-  }), [mortgage.originalLoanAmount, mortgage.interestRate, termMonths, monthlyPI, mortgageStartDate, originalPropertyPrice, pmi]);
+    pmi,
+    hasAnyHistoryForSelected,
+  ]);
 
   const { standard, accelerated, standardSummary, acceleratedSummary } = useMemo(
     () => {
       if (!showProjection) {
         const standard = calculateAmortizationSchedule(amortParams);
         const zeroRow = standard.find((r) => r.remainingBalance <= 0);
-        const isNegative = !zeroRow && standard[standard.length - 1]?.remainingBalance > mortgage.originalLoanAmount;
+        const isNegative =
+          amortParams.originalBalance > 0 &&
+          !zeroRow &&
+          (standard[standard.length - 1]?.remainingBalance ?? 0) > amortParams.originalBalance;
         return {
           standard,
           accelerated: [],
@@ -122,37 +249,74 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
         biweekly,
       });
     },
-    [amortParams, showProjection, extraMonthly, lumpSum, lumpSumDate, biweekly, mortgage.originalLoanAmount]
+    [amortParams, showProjection, extraMonthly, lumpSum, lumpSumDate, biweekly]
   );
 
-  const currentBalance = Math.abs(mortgage.balance);
   const payoffProgress = mortgage.originalLoanAmount > 0
     ? ((mortgage.originalLoanAmount - currentBalance) / mortgage.originalLoanAmount) * 100
     : 0;
 
-  const chartDataPoints = useMemo(() => {
-    const datesSet = new Set<string>();
-    standard.forEach((r) => datesSet.add(r.date));
-    accelerated.forEach((r) => datesSet.add(r.date));
-    const dates = Array.from(datesSet).sort();
+  const hasExtraPayments = showProjection && (parseFloat(extraMonthly) > 0 || parseFloat(lumpSum) > 0 || biweekly);
 
-    return dates.map((d) => {
-      const stdPoint = standard.find((r) => r.date === d);
-      const accPoint = accelerated.find((r) => r.date === d);
-      return {
-        date: d,
-        Standard: stdPoint ? stdPoint.remainingBalance : null,
-        'With Extra Payments': accPoint ? accPoint.remainingBalance : null,
-      };
-    });
-  }, [standard, accelerated]);
+  const linkedMortgagesForTimeline = useMemo(
+    () => (allLinkedMortgages && allLinkedMortgages.length > 0 ? allLinkedMortgages : [mortgage]),
+    [allLinkedMortgages, mortgage]
+  );
 
-  const maxBalance = useMemo(() => {
-    const vals = [1];
-    standard.forEach((r) => vals.push(r.remainingBalance));
-    accelerated.forEach((r) => vals.push(r.remainingBalance));
-    return Math.max(...vals);
-  }, [standard, accelerated]);
+  const timeline = useMemo(
+    () =>
+      buildMortgagePaydownTimeline({
+        selectedMortgage: mortgage,
+        allLinkedMortgages: linkedMortgagesForTimeline,
+        mortgageSnapshots: mortgageSnapshots ?? [],
+        propertySnapshots: propertySnapshots ?? [],
+        propertyPurchaseDate,
+        todayDate,
+        showSynthetic: showSynth,
+        standardProjection: standard,
+        acceleratedProjection: accelerated,
+        showAccelerated: hasExtraPayments,
+      }),
+    [
+      mortgage,
+      linkedMortgagesForTimeline,
+      mortgageSnapshots,
+      propertySnapshots,
+      propertyPurchaseDate,
+      todayDate,
+      showSynth,
+      standard,
+      accelerated,
+      hasExtraPayments,
+    ]
+  );
+
+  const chartDataPoints = timeline.points;
+  const maxBalance = timeline.maxBalance;
+
+  const showStandardLine = useMemo(
+    () =>
+      chartDataPoints.some(
+        (pt) => typeof pt.Standard === 'number' && Number.isFinite(pt.Standard)
+      ),
+    [chartDataPoints]
+  );
+
+  const showAcceleratedLine = useMemo(
+    () =>
+      hasExtraPayments &&
+      chartDataPoints.some(
+        (pt) =>
+          typeof pt['With Extra Payments'] === 'number' &&
+          Number.isFinite(pt['With Extra Payments'])
+      ),
+    [hasExtraPayments, chartDataPoints]
+  );
+
+  const renderedSeriesCount =
+    timeline.historicalSeries.length +
+    (showStandardLine ? 1 : 0) +
+    (showAcceleratedLine ? 1 : 0);
 
   const handleReset = useCallback(() => {
     setExtraMonthly('');
@@ -161,8 +325,6 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
     setBiweekly(false);
     setShowProjection(false);
   }, []);
-
-  const hasExtraPayments = showProjection && (parseFloat(extraMonthly) > 0 || parseFloat(lumpSum) > 0 || biweekly);
 
   const formatXAxis = useCallback((tickStr: string) => {
     return formatChartXAxisDate(tickStr, 'all', { isMonthly: true });
@@ -450,11 +612,11 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
 
       {/* ── 3. Amortization Projection Chart ── */}
       {chartDataPoints.length > 0 ? (
-        <div className="h-[230px] pt-1">
+        <div className="h-[270px] pt-1">
           <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 100, height: 100 }}>
             <LineChart
               data={chartDataPoints}
-              margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+              margin={{ top: 22, right: 12, left: 10, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} horizontal={true} />
               <XAxis
@@ -477,14 +639,33 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
               <Tooltip
                 content={({ active, payload }) => {
                   if (!active || !payload || !payload.length) return null;
-                  const dateStr = payload[0].payload.date;
+                  const point = payload[0].payload as PaydownTimelinePoint;
+                  const dateStr = point.date;
                   const formattedDate = formatXAxis(dateStr);
+                  const selectedKey = `mortgage_${mortgage.id}`;
+                  const hasSelectedHistorical = payload.some(
+                    (p) => p.dataKey === selectedKey && p.value !== null && p.value !== undefined
+                  );
+                  const visibleItems = payload.filter((p) => {
+                    if (p.value === null || p.value === undefined) return false;
+                    if (
+                      point.isToday &&
+                      hasSelectedHistorical &&
+                      (p.dataKey === 'Standard' || p.dataKey === 'With Extra Payments')
+                    ) {
+                      return false;
+                    }
+                    return true;
+                  });
+                  if (visibleItems.length === 0) return null;
                   return (
                     <ChartTooltip>
-                      <TooltipHeader>{formattedDate}</TooltipHeader>
-                      {payload.map((p) => (
+                      <TooltipHeader>
+                        {point.isToday ? `${formattedDate} (Today)` : formattedDate}
+                      </TooltipHeader>
+                      {visibleItems.map((p) => (
                         <TooltipRow
-                          key={p.name}
+                          key={String(p.dataKey ?? p.name)}
                           label={String(p.name)}
                           value={formatCurrency(Number(p.value))}
                           color={p.color}
@@ -494,32 +675,69 @@ export function MortgagePaydownChart({ mortgage, propertyName, inline = false }:
                   );
                 }}
               />
-              {showProjection && accelerated.length > 0 && (
+              {renderedSeriesCount > 1 && (
                 <Legend
-                  verticalAlign="top"
-                  align="right"
-                  wrapperStyle={{ paddingBottom: 10, fontSize: 11 }}
+                  verticalAlign="bottom"
+                  align="center"
+                  wrapperStyle={{ paddingTop: 8, fontSize: 11 }}
                 />
               )}
-              <Line
-                type="monotone"
-                dataKey="Standard"
-                name="Standard Payoff"
-                stroke="var(--color-chart-4)"
-                strokeWidth={2}
-                dot={false}
-                connectNulls
-              />
-              {showProjection && accelerated.length > 0 && (
+              {(() => {
+                let otherIndex = 0;
+                return timeline.historicalSeries.map((series) => {
+                  const strokeColor = series.isSelected
+                    ? 'var(--color-chart-4)'
+                    : OTHER_MORTGAGE_COLORS[otherIndex++ % OTHER_MORTGAGE_COLORS.length];
+                  return (
+                    <Line
+                      key={series.id}
+                      type="monotone"
+                      dataKey={series.dataKey}
+                      name={series.name}
+                      stroke={strokeColor}
+                      strokeWidth={series.isSelected ? 2.5 : 2}
+                      dot={false}
+                      legendType="plainline"
+                    />
+                  );
+                });
+              })()}
+              {timeline.todayAnchorDate && (
+                <ReferenceLine
+                  x={timeline.todayAnchorDate}
+                  stroke="var(--color-primary)"
+                  strokeDasharray="4 4"
+                  strokeWidth={1.5}
+                  label={{
+                    value: 'Today',
+                    position: 'top',
+                    fill: 'var(--color-primary)',
+                    fontSize: 11,
+                  }}
+                />
+              )}
+              {showStandardLine && (
+                <Line
+                  type="monotone"
+                  dataKey="Standard"
+                  name="Standard Payoff"
+                  stroke="var(--color-chart-4)"
+                  strokeWidth={2}
+                  strokeDasharray={timeline.hasHistoricalData ? '6 4' : undefined}
+                  dot={false}
+                  legendType="plainline"
+                />
+              )}
+              {showAcceleratedLine && (
                 <Line
                   type="monotone"
                   dataKey="With Extra Payments"
                   name="With Extra Payments"
                   stroke="var(--color-chart-2)"
                   strokeWidth={2}
-                  strokeDasharray="6 4"
+                  strokeDasharray="3 3"
                   dot={false}
-                  connectNulls
+                  legendType="plainline"
                 />
               )}
             </LineChart>

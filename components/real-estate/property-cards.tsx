@@ -30,6 +30,7 @@ interface MortgageInfo {
   originalLoanAmount: number;
   interestRate: number;
   monthlyPayment: number;
+  termMonths?: number;
   metadata?: Record<string, unknown>;
   extraPrincipal?: number;
   pmi?: number;
@@ -47,6 +48,7 @@ interface Property {
   ltv: number;
   saleProceeds: number;
   snapshots: { date: string; value: number; isSynthetic?: boolean }[];
+  mortgageSnapshots?: { accountId?: string; date: string; value: number; isSynthetic?: boolean }[];
 }
 
 interface RealEstateData {
@@ -67,7 +69,7 @@ export function PropertyCards() {
     queryKey: ['real-estate-properties'],
     queryFn: async () => {
       const [reRes, mortRes] = await Promise.all([
-        fetch('/api/real-estate', { credentials: 'include' }),
+        fetch('/api/real-estate?months=600', { credentials: 'include' }),
         fetch('/api/accounts', { credentials: 'include' }),
       ]);
       if (!reRes.ok) throw new Error('Failed to fetch real estate data');

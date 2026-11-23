@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { calculateAmortizationSchedule, calculateAmortizationWithExtraPayments, getAmortizationPaymentDate } from '@/lib/utils/amortization';
+import {
+  calculateAmortizationSchedule,
+  calculateAmortizationWithExtraPayments,
+  calculateMonthlyPIPayment,
+  calculateRemainingPayoffMonths,
+  monthsBetweenDates,
+} from '@/lib/utils/amortization';
 
 describe('amortization utility calculations', () => {
   const params = {
@@ -170,5 +176,56 @@ describe('amortization utility calculations', () => {
     expect(negRateSchedule.length).toBeGreaterThan(0);
     expect(negRateSchedule.every((p) => Number.isFinite(p.remainingBalance))).toBe(true);
     expect(negRateSchedule.at(-1)!.remainingBalance).toBeLessThan(100000);
+  });
+
+  it('calculates monthly P&I payments for fixed-rate and 0% loans', () => {
+    expect(calculateMonthlyPIPayment(300000, 6.0, 360)).toBeCloseTo(1798.65, 2);
+    expect(calculateMonthlyPIPayment(120000, 0, 120)).toBe(1000);
+    expect(calculateMonthlyPIPayment(0, 6.0, 360)).toBe(0);
+    expect(calculateMonthlyPIPayment(300000, 6.0, 0)).toBe(0);
+  });
+
+  it('estimates remaining payoff months for standard, 0%, and negative-amortization loans', () => {
+    // 300k @ 6%, $1798.65/mo -> 360 payments (+2 safety margin => 362)
+    const remaining30Y = calculateRemainingPayoffMonths(300000, 6.0, 1798.65, 360);
+    expect(remaining30Y).toBeGreaterThanOrEqual(360);
+    expect(remaining30Y).toBeLessThanOrEqual(365);
+
+    // 0% loan: $12,000 / $1,000 = 12 months (+1 => 13)
+    expect(calculateRemainingPayoffMonths(12000, 0, 1000, 120)).toBe(13);
+
+    // Negative amortization: $300k @ 12% ($3,000/mo interest) with $1,000/mo payment -> fallback
+    expect(calculateRemainingPayoffMonths(300000, 12, 1000, 240)).toBe(240);
+
+    // Zero balance
+    expect(calculateRemainingPayoffMonths(0, 6.0, 1798.65, 360)).toBe(0);
+  });
+
+  it('computes calendar month differences safely without timezone drift', () => {
+    expect(monthsBetweenDates('2021-10-15', '2026-11-23')).toBe(61);
+    expect(monthsBetweenDates('2025-01-31', '2025-02-01')).toBe(1);
+    expect(monthsBetweenDates('2026-12-01', '2025-01-01')).toBe(0);
+    expect(monthsBetweenDates('', '2026-11-23')).toBe(0);
+  });
+
+  it('adjusts statutory HPA PMI midpoint using elapsedMonths and originalTermMonths', () => {
+    // Original 360-month loan -> midpoint at month 180.
+    // With elapsedMonths=178, remaining midpoint is month 2 (180 - 178 = 2).
+    const schedule = calculateAmortizationSchedule({
+      originalBalance: 280000,
+      annualRate: 6.0,
+      termMonths: 182,
+      monthlyPayment: 1800,
+      startDate: '2026-12-01',
+      originalPropertyPrice: 300000, // 78% LTV = 234k (not reached in month 1 or 2)
+      monthlyPmi: 150,
+      elapsedMonths: 178,
+      originalTermMonths: 360,
+    });
+
+    // Month 1 < 2 -> PMI still charged
+    expect(schedule[0].pmi).toBe(150);
+    // Month 2 >= statutory midpoint (2) -> PMI cancelled
+    expect(schedule[1].pmi).toBe(0);
   });
 });

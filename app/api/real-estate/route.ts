@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   const dek = await getSessionDEK();
   const { searchParams } = new URL(request.url);
   const monthsRaw = parseInt(searchParams.get('months') || '24', 10);
-  const months = Number.isFinite(monthsRaw) ? Math.max(1, Math.min(monthsRaw, 240)) : 24;
+  const months = Number.isFinite(monthsRaw) ? Math.max(1, Math.min(monthsRaw, 600)) : 24;
   // L-1 (2026-08-27 security review): compute the snapshot cutoff in JS and
   // bind it as a parameter, instead of interpolating user input into a SQL
   // INTERVAL via sql.raw.

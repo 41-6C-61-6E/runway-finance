@@ -11,6 +11,8 @@ export interface AmortizationParams {
   startDate: string;
   originalPropertyPrice?: number;
   monthlyPmi?: number;
+  elapsedMonths?: number;
+  originalTermMonths?: number;
 }
 
 export interface AmortizationRow {
@@ -87,7 +89,12 @@ export function calculateAmortizationSchedule(params: AmortizationParams): Amort
   }
 
   const pmiThreshold78 = (originalPropertyPrice && originalPropertyPrice > 0) ? originalPropertyPrice * 0.78 : null;
-  const statutoryMidpointMonth = Math.ceil(termMonths / 2);
+  const effectiveOriginalTerm =
+    params.originalTermMonths && params.originalTermMonths > 0
+      ? params.originalTermMonths
+      : termMonths;
+  const effectiveElapsed = Math.max(0, params.elapsedMonths ?? 0);
+  const statutoryMidpointMonth = Math.max(1, Math.ceil(effectiveOriginalTerm / 2) - effectiveElapsed);
   const monthlyPmiAmount = monthlyPmi && monthlyPmi > 0 ? monthlyPmi : 0;
 
   for (let month = 1; month <= termMonths; month++) {
@@ -177,7 +184,12 @@ export function calculateAmortizationWithExtraPayments(
 
   const pmiThreshold80 = (originalPropertyPrice && originalPropertyPrice > 0) ? originalPropertyPrice * 0.80 : null;
   const pmiThreshold78 = (originalPropertyPrice && originalPropertyPrice > 0) ? originalPropertyPrice * 0.78 : null;
-  const statutoryMidpointMonth = Math.ceil(termMonths / 2);
+  const effectiveOriginalTerm =
+    params.originalTermMonths && params.originalTermMonths > 0
+      ? params.originalTermMonths
+      : termMonths;
+  const effectiveElapsed = Math.max(0, params.elapsedMonths ?? 0);
+  const statutoryMidpointMonth = Math.max(1, Math.ceil(effectiveOriginalTerm / 2) - effectiveElapsed);
   const monthlyPmiAmount = monthlyPmi && monthlyPmi > 0 ? monthlyPmi : 0;
 
   const accelerated: AmortizationRow[] = [];
@@ -286,4 +298,76 @@ export function calculateAmortizationWithExtraPayments(
       isNegativeAmortization: isAcceleratedNegative,
     },
   };
+}
+
+/**
+ * Computes the standard fixed-rate monthly principal & interest payment.
+ */
+export function calculateMonthlyPIPayment(
+  principal: number,
+  annualRate: number,
+  termMonths: number
+): number {
+  if (!Number.isFinite(principal) || principal <= 0 || !Number.isFinite(termMonths) || termMonths <= 0) {
+    return 0;
+  }
+  if (!Number.isFinite(annualRate) || annualRate <= 0) {
+    return principal / termMonths;
+  }
+  const monthlyRate = annualRate / 100 / 12;
+  const factor = Math.pow(1 + monthlyRate, termMonths);
+  return (principal * (monthlyRate * factor)) / (factor - 1);
+}
+
+/**
+ * Estimates remaining monthly payments until payoff given current balance, APR, and monthly P&I.
+ */
+export function calculateRemainingPayoffMonths(
+  balance: number,
+  annualRate: number,
+  monthlyPayment: number,
+  fallbackTermMonths: number
+): number {
+  if (!Number.isFinite(balance) || balance <= 0) return 0;
+  const safeFallback =
+    Number.isFinite(fallbackTermMonths) && fallbackTermMonths > 0
+      ? Math.round(fallbackTermMonths)
+      : 360;
+  const clampedFallback = Math.max(1, Math.min(safeFallback, 600));
+  if (!Number.isFinite(monthlyPayment) || monthlyPayment <= 0) {
+    return clampedFallback;
+  }
+  if (!Number.isFinite(annualRate) || annualRate <= 0) {
+    return Math.min(600, Math.max(1, Math.ceil(balance / monthlyPayment) + 1));
+  }
+  const monthlyRate = annualRate / 100 / 12;
+  const monthlyInterest = balance * monthlyRate;
+  if (monthlyPayment <= monthlyInterest) {
+    return clampedFallback;
+  }
+  const exact = Math.ceil(
+    -Math.log(1 - monthlyInterest / monthlyPayment) / Math.log(1 + monthlyRate)
+  );
+  if (!Number.isFinite(exact)) return clampedFallback;
+  return Math.min(600, Math.max(1, exact + 2));
+}
+
+/**
+ * Safely computes non-negative calendar month difference between two YYYY-MM-DD strings.
+ */
+export function monthsBetweenDates(startDateStr: string, endDateStr: string): number {
+  if (!startDateStr || !endDateStr) return 0;
+  const startParts = startDateStr.split('T')[0].split('-').map(Number);
+  const endParts = endDateStr.split('T')[0].split('-').map(Number);
+  const [startY, startM] = startParts;
+  const [endY, endM] = endParts;
+  if (
+    !Number.isFinite(startY) ||
+    !Number.isFinite(startM) ||
+    !Number.isFinite(endY) ||
+    !Number.isFinite(endM)
+  ) {
+    return 0;
+  }
+  return Math.max(0, (endY - startY) * 12 + (endM - startM));
 }
