@@ -1,7 +1,8 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { Check, Search } from 'lucide-react';
+import { Check, ChevronDown, Search, Sparkles } from 'lucide-react';
+import { ClickOutsideBackdrop } from '@/components/ui/modal-overlay';
 import { Select } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -9,6 +10,7 @@ import {
   DEFAULT_CATEGORY_COLOR,
   dotBgStyle,
   formatSignedTransactionAmount,
+  tagColorStyle,
   type Category,
   type CreateCategoryInput,
   type FlattenedTransaction,
@@ -323,6 +325,98 @@ export function CategoryPickerContent({
         )}
       </div>
     </>
+  );
+}
+
+interface DesktopCategoryCellProps {
+  tx: FlattenedTransaction;
+  categories: Category[];
+  isOpen: boolean;
+  dropdownPos: { top: number; left: number } | null;
+  onToggle: (triggerEl: HTMLElement) => void;
+  onClose: () => void;
+  onSelect: (
+    categoryId: string | null,
+    categoryName: string | null,
+    categoryColor: string | null,
+  ) => void | Promise<void>;
+  onCreateCategory: (input: CreateCategoryInput) => Promise<void>;
+}
+
+/**
+ * Shared desktop category pill and dropdown cell used by both Detailed and
+ * Compact desktop views of TransactionTable.
+ */
+export function DesktopCategoryCell({
+  tx,
+  categories,
+  isOpen,
+  dropdownPos,
+  onToggle,
+  onClose,
+  onSelect,
+  onCreateCategory,
+}: DesktopCategoryCellProps) {
+  return (
+    <div className="relative max-w-full min-w-0">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle(e.currentTarget);
+        }}
+        aria-label={
+          tx.categoryName
+            ? `Change category: ${tx.categoryName}`
+            : 'Assign category'
+        }
+        className="flex items-center gap-1 max-w-full min-w-0 group/cat cursor-pointer rounded-full"
+      >
+        {tx.categoryName ? (
+          <span
+            className="category-pill inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.8125rem] leading-5 font-medium max-w-full min-w-0"
+            style={tagColorStyle(tx.categoryColor)}
+            title={tx.categoryName}
+          >
+            {tx.categorizedByAi && (
+              <Sparkles className="h-3 w-3 shrink-0 opacity-60" />
+            )}
+            <span className="truncate">{tx.categoryName}</span>
+            <ChevronDown className="h-3 w-3 opacity-40 group-hover/cat:opacity-100 transition-opacity shrink-0" />
+          </span>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.8125rem] leading-5 font-medium bg-muted text-muted-foreground group-hover/cat:text-foreground transition-colors max-w-full min-w-0"
+            title="Uncategorized"
+          >
+            <span className="truncate">Uncategorized</span>
+            <ChevronDown className="h-3 w-3 opacity-40 group-hover/cat:opacity-100 transition-opacity shrink-0" />
+          </span>
+        )}
+      </button>
+
+      {isOpen && dropdownPos && (
+        <>
+          <ClickOutsideBackdrop
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+          />
+          <div
+            className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
+            style={{ top: dropdownPos.top, left: dropdownPos.left }}
+          >
+            <CategoryPickerContent
+              categories={categories}
+              currentCategoryId={tx.categoryId}
+              onSelect={onSelect}
+              onCreateCategory={onCreateCategory}
+            />
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

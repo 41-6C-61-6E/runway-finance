@@ -28,7 +28,6 @@ import { apiFetch } from "@/lib/utils/api-client";
 import { formatAmount as formatCurrencyAmount } from "@/lib/utils/format";
 import { toast } from "sonner";
 import {
-  ChevronDown,
   Search,
   Sparkles,
   AlertCircle,
@@ -37,7 +36,6 @@ import {
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SortableHeader } from "@/components/ui/sortable-header";
-import { ClickOutsideBackdrop } from "@/components/ui/modal-overlay";
 import AiCategorizeButton from "@/components/features/transactions/ai-categorize-button";
 import { ListRow } from "@/components/ui/list-row";
 import { TableScroll } from "@/components/ui/table-scroll";
@@ -45,7 +43,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useUserSettings } from "@/components/user-settings-provider";
 import { ALL_COLUMNS, COLUMN_MIN_WIDTHS } from "./table/column-constants";
 import { ProposedRuleDialog } from "./table/proposed-rule-dialog";
-import { CategoryPickerContent } from "./table/category-picker";
+import { DesktopCategoryCell } from "./table/category-picker";
 import { TransactionMobileList } from "./table/transaction-mobile-list";
 import {
   formatSignedTransactionAmount,
@@ -303,11 +301,11 @@ export default function TransactionTable({
 
     const dateWidth = isMobileSize ? 75 : 95;
 
-    let maxCategoryWidth = 90;
+    let maxCategoryWidth = 110;
     for (const tx of transactions) {
       const name = tx.categoryName || "Uncategorized";
-      const charWidth = 6.5;
-      const paddingAndIcons = 55 + (tx.categorizedByAi ? 15 : 0);
+      const charWidth = 7.3;
+      const paddingAndIcons = 60 + (tx.categorizedByAi ? 16 : 0);
       const estimatedWidth = Math.ceil(
         name.length * charWidth + paddingAndIcons,
       );
@@ -315,7 +313,8 @@ export default function TransactionTable({
         maxCategoryWidth = estimatedWidth;
       }
     }
-    const categoryWidth = Math.min(isMobileSize ? 95 : 180, maxCategoryWidth);
+    const maxDesktopCategoryWidth = clientWidth < 1024 ? 185 : 215;
+    const categoryWidth = Math.min(isMobileSize ? 95 : maxDesktopCategoryWidth, maxCategoryWidth);
 
     let maxAmountWidth = 80;
     for (const tx of transactions) {
@@ -552,6 +551,37 @@ export default function TransactionTable({
 
 
 
+
+  const handleToggleCategoryDropdown = useCallback(
+    (txId: string, triggerEl: HTMLElement) => {
+      if (openCategoryTx === txId) {
+        setOpenCategoryTx(null);
+        setDropdownPos(null);
+        return;
+      }
+      const rect = triggerEl.getBoundingClientRect();
+      const dropdownWidth = 224;
+      let left = rect.left;
+      if (left + dropdownWidth > window.innerWidth - 8) {
+        left = window.innerWidth - dropdownWidth - 8;
+      }
+      if (left < 8) left = 8;
+
+      const dropdownHeight = 320; // max-h-80 is 320px
+      let top = rect.bottom + 4;
+      if (rect.bottom + dropdownHeight > window.innerHeight - 16) {
+        top = rect.top - dropdownHeight - 4;
+      }
+      setDropdownPos({ top, left });
+      setOpenCategoryTx(txId);
+    },
+    [openCategoryTx],
+  );
+
+  const handleCloseCategoryDropdown = useCallback(() => {
+    setOpenCategoryTx(null);
+    setDropdownPos(null);
+  }, []);
 
   const fetchTransactions = useCallback(async () => {
     // Abort any active request before starting a new one
@@ -1065,84 +1095,26 @@ export default function TransactionTable({
         meta: { className: "overflow-visible" },
         cell: ({ row }) => {
           const tx = row.original;
-          const isOpen = openCategoryTx === tx.id;
 
           if (tx.splits && tx.splits.length > 0) {
-            return <span className="text-muted-foreground/45">—</span>;
+            return <span className="text-sm text-muted-foreground/45">—</span>;
           }
 
           return (
-            <div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const rect = (
-                    e.currentTarget as HTMLElement
-                  ).getBoundingClientRect();
-                  const dropdownWidth = 224;
-                  let left = rect.left;
-                  if (left + dropdownWidth > window.innerWidth - 8) {
-                    left = window.innerWidth - dropdownWidth - 8;
-                  }
-                  if (left < 8) left = 8;
-
-                  const dropdownHeight = 320; // max-h-80 is 320px
-                  let top = rect.bottom + 4;
-                  if (rect.bottom + dropdownHeight > window.innerHeight - 16) {
-                    top = rect.top - dropdownHeight - 4;
-                  }
-                  setDropdownPos({ top, left });
-                  setOpenCategoryTx(isOpen ? null : tx.id);
-                }}
-                className="flex items-center gap-1 max-w-full group/cat"
-              >
-                {tx.categoryName ? (
-                  <span
-                    className="category-pill px-2 py-0.5 text-xs rounded-full font-medium inline-flex items-center gap-1 whitespace-nowrap truncate max-w-full"
-                    style={{
-                      '--tag-color': tx.categoryColor || "var(--color-primary)",
-                    } as React.CSSProperties}
-                  >
-                    {tx.categorizedByAi && (
-                      <Sparkles className="h-3 w-3 flex-shrink-0 opacity-60" />
-                    )}
-                    {tx.categoryName}
-                    <ChevronDown className="h-3 w-3 opacity-40 group-hover/cat:opacity-100 transition-opacity flex-shrink-0" />
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-xs rounded-full inline-flex items-center gap-1 whitespace-nowrap bg-muted text-muted-foreground group-hover/cat:text-foreground transition-colors">
-                    Uncategorized
-                    <ChevronDown className="h-3 w-3 opacity-40 group-hover/cat:opacity-100 transition-opacity flex-shrink-0" />
-                  </span>
-                )}
-              </button>
-              {isOpen && dropdownPos && (
-                <>
-                  <ClickOutsideBackdrop
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenCategoryTx(null);
-                      setDropdownPos(null);
-                    }}
-                  />
-                  <div
-                    className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
-                    style={{ top: dropdownPos.top, left: dropdownPos.left }}
-                  >
-                    <CategoryPickerContent
-                      categories={categories}
-                      currentCategoryId={tx.categoryId}
-                      onSelect={(catId, catName, catColor) =>
-                        handleSetCategory(tx.id, catId, catName, catColor)
-                      }
-                      onCreateCategory={(input) =>
-                        handleCreateCategory(tx.id, input)
-                      }
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+            <DesktopCategoryCell
+              tx={tx}
+              categories={categories}
+              isOpen={openCategoryTx === tx.id}
+              dropdownPos={dropdownPos}
+              onToggle={(el) => handleToggleCategoryDropdown(tx.id, el)}
+              onClose={handleCloseCategoryDropdown}
+              onSelect={(catId, catName, catColor) =>
+                handleSetCategory(tx.id, catId, catName, catColor)
+              }
+              onCreateCategory={(input) =>
+                handleCreateCategory(tx.id, input)
+              }
+            />
           );
         },
       },
@@ -1200,6 +1172,8 @@ export default function TransactionTable({
       handleSetCategory,
       dropdownPos,
       handleCreateCategory,
+      handleToggleCategoryDropdown,
+      handleCloseCategoryDropdown,
       showRegisterTags,
       aiConfigured,
       onAiProposalCreated,
@@ -1318,7 +1292,7 @@ export default function TransactionTable({
                       className={`px-3 sm:px-4 py-2.5 group ${
                         isPending ? "bg-primary/[0.04] dark:bg-primary/[0.08]" : ""
                       }`}
-                      bodyClassName="grid grid-cols-[auto_minmax(0,1fr)_auto] md:grid-cols-12 gap-x-2 sm:gap-x-3 md:gap-x-4 gap-y-0.5 md:gap-y-0 md:items-center"
+                      bodyClassName="grid grid-cols-[auto_minmax(0,1fr)_auto] md:grid-cols-[4.5rem_minmax(0,1.85fr)_minmax(10rem,1.05fr)_minmax(0,1.1fr)_8.5rem] gap-x-2 sm:gap-x-3 md:gap-x-4 gap-y-0.5 md:gap-y-0 md:items-center"
                       onActivate={() => {
                         const anyTx = tx as any;
                         if (anyTx.isSplitChild && anyTx.parentTxId) {
@@ -1330,13 +1304,13 @@ export default function TransactionTable({
                       }}
                     >
                       {/* Row 1, Col 1 (Mobile) / Col 1 (Desktop): Date */}
-                      <div className="flex items-center gap-1 min-w-0 md:col-span-1 md:order-1">
+                      <div className="flex items-center gap-1 min-w-0 md:order-1">
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
                           {formattedDate}
                         </span>
                       </div>
-                      {/* Row 1, Col 2 (Mobile) / Cols 2-5 (Desktop): Description + pending dot + search spyglass + tags */}
-                      <div className="flex items-center gap-1 min-w-0 overflow-hidden md:col-span-4 md:order-2">
+                      {/* Row 1, Col 2 (Mobile) / Col 2 (Desktop): Description + pending dot + search spyglass + tags */}
+                      <div className="flex items-center gap-1 min-w-0 overflow-hidden md:order-2">
                         {(tx as any).isSplitChild && (
                           <span className="text-muted-foreground/45 select-none pl-3 font-mono">
                             ↳
@@ -1440,8 +1414,8 @@ export default function TransactionTable({
                           </div>
                         )}
                       </div>
-                      {/* Row 1, Col 3 (Mobile) / Cols 11-12 (Desktop): Amount */}
-                      <div className="flex items-center justify-end gap-1 md:col-span-2 md:order-5">
+                      {/* Row 1, Col 3 (Mobile) / Col 5 (Desktop): Amount */}
+                      <div className="flex items-center justify-end gap-1 md:order-5">
                         {tx.categorizedByAi && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1464,88 +1438,39 @@ export default function TransactionTable({
                       {/* Row 2, Col 1: spacer for date alignment on mobile */}
                       <div className="md:hidden" />
 
-                      {/* Row 2, Col 2 (Mobile) / Cols 6-7 (Desktop): Category pill */}
-                      <div className="flex items-center min-w-0 md:col-span-2 md:order-3">
+                      {/* Row 2, Col 2 (Mobile) / Col 3 (Desktop): Category pill */}
+                      <div className="flex items-center gap-1.5 min-w-0 md:order-3">
                         {tx.splits && tx.splits.length > 0 ? (
-                          <span className="text-xs text-muted-foreground/45">—</span>
+                          <span className="text-sm text-muted-foreground/45">—</span>
                         ) : (
-                          <div className="relative">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                const dropdownWidth = 224;
-                                let left = rect.left;
-                                if (left + dropdownWidth > window.innerWidth - 8) {
-                                  left = window.innerWidth - dropdownWidth - 8;
-                                }
-                                if (left < 8) left = 8;
-                                const dropdownHeight = 320;
-                                let top = rect.bottom + 4;
-                                if (rect.bottom + dropdownHeight > window.innerHeight - 16) {
-                                  top = rect.top - dropdownHeight - 4;
-                                }
-                                setDropdownPos({ top, left });
-                                setOpenCategoryTx(isCatOpen ? null : tx.id);
-                              }}
-                              className="flex items-center gap-1 max-w-full group/cat"
-                            >
-                              {tx.categoryName ? (
-                                <span
-                                  className="category-pill px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap inline-flex items-center gap-1"
-                                  style={{
-                                    '--tag-color': tx.categoryColor || "var(--color-primary)",
-                                  } as React.CSSProperties}
-                                >
-                                  {tx.categorizedByAi && (
-                                    <Sparkles className="h-2.5 w-2.5 shrink-0 opacity-60" />
-                                  )}
-                                  {tx.categoryName}
-                                  <ChevronDown className="h-2.5 w-2.5 opacity-40 group-hover/cat:opacity-100 transition-opacity shrink-0" />
-                                </span>
-                              ) : (
-                                <span className="text-[11px] text-muted-foreground italic hover:text-foreground transition-colors inline-flex items-center gap-1">
-                                  Uncategorized
-                                  <ChevronDown className="h-2.5 w-2.5 opacity-30 group-hover/cat:opacity-100 transition-opacity" />
-                                </span>
-                              )}
-                            </button>
-                          {isCatOpen && dropdownPos && (
-                            <>
-                              <ClickOutsideBackdrop
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenCategoryTx(null);
-                                  setDropdownPos(null);
-                                }}
+                          <>
+                            <DesktopCategoryCell
+                              tx={tx}
+                              categories={categories}
+                              isOpen={isCatOpen}
+                              dropdownPos={dropdownPos}
+                              onToggle={(el) => handleToggleCategoryDropdown(tx.id, el)}
+                              onClose={handleCloseCategoryDropdown}
+                              onSelect={(catId, catName, catColor) =>
+                                handleSetCategory(tx.id, catId, catName, catColor)
+                              }
+                              onCreateCategory={(input) =>
+                                handleCreateCategory(tx.id, input)
+                              }
+                            />
+                            {!tx.categoryId && aiConfigured && (
+                              <AiCategorizeButton
+                                transactionId={tx.id}
+                                onSuggested={onAiProposalCreated}
+                                className="shrink-0"
                               />
-                              <div
-                                className="fixed z-50 w-56 bg-card border border-border rounded-lg shadow-xl max-h-80 flex flex-col"
-                                style={{ top: dropdownPos.top, left: dropdownPos.left }}
-                              >
-                                <CategoryPickerContent
-                                  categories={categories}
-                                  currentCategoryId={tx.categoryId}
-                                  onSelect={(catId, catName, catColor) =>
-                                    handleSetCategory(tx.id, catId, catName, catColor)
-                                  }
-                                  onCreateCategory={(input) =>
-                                    handleCreateCategory(tx.id, input)
-                                  }
-                                />
-                              </div>
-                            </>
-                          )}
-                          {!tx.categoryId && !(tx.splits && tx.splits.length > 0) && aiConfigured && (
-                            <AiCategorizeButton transactionId={tx.id} onSuggested={onAiProposalCreated} className="ml-1 shrink-0" />
-                          )}
-                        </div>
-                      )}
-
+                            )}
+                          </>
+                        )}
                       </div>
 
-                      {/* Row 2, Col 3 (Mobile) / Cols 8-10 (Desktop): Account + Tags */}
-                      <div className="flex items-center justify-end md:justify-start gap-1.5 min-w-0 flex-wrap md:col-span-3 md:order-4">
+                      {/* Row 2, Col 3 (Mobile) / Col 4 (Desktop): Account + Tags */}
+                      <div className="flex items-center justify-end md:justify-start gap-1.5 min-w-0 flex-wrap md:order-4">
                         <span
                           className="text-caption md:text-xs text-muted-foreground truncate max-w-[120px] md:max-w-full shrink-0 md:shrink"
                           title={tx.accountName || undefined}

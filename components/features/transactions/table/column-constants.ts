@@ -32,7 +32,7 @@ export const COLUMN_MIN_WIDTHS: Record<string, number> = {
   ai: 30,
   account: 60,
   accountType: 60,
-  category: 80,
+  category: 100,
   tags: 50,
   amount: 70,
 };
