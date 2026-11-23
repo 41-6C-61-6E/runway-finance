@@ -414,7 +414,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
           <SheetTitle>{mode === 'create' ? 'Add Transaction' : 'Transaction Details'}</SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-5">
           {/* Warning Banners */}
           {mode === 'edit' && isSynced && (
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
@@ -684,7 +684,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                           onChange={(e) => setCategorySearch(e.target.value)}
                           placeholder="Search categories..."
                           className="w-full pl-7 pr-2 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                          autoFocus
+                          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
                           onClick={(e) => e.stopPropagation()}
                         />
                       </div>
@@ -814,7 +814,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                         onChange={(e) => setTagSearch(e.target.value)}
                         placeholder="Search tags..."
                         className="w-full px-3 py-1.5 text-xs bg-background border border-input rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                        autoFocus
+                        autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
@@ -934,7 +934,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
 
         {/* Action Buttons (pinned sticky footer) */}
         {(!transaction?.splits || transaction.splits.length === 0) && !isSplitting && (
-          <div className="p-4 border-t shrink-0 sticky bottom-0 bg-background/95 backdrop-blur z-10 space-y-2">
+          <div className="p-3 sm:p-4 border-t shrink-0 sticky bottom-0 bg-background/95 backdrop-blur z-10 flex flex-row-reverse sm:flex-col gap-2">
             <button
               onClick={handleSave}
               disabled={
@@ -945,7 +945,7 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
                 !date ||
                 (mode === 'create' && !accountId)
               }
-              className="w-full px-4 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
+              className="flex-1 sm:w-full px-4 py-2.5 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:opacity-90 disabled:opacity-50 transition-all"
             >
               {saving ? 'Saving...' : mode === 'create' ? 'Add Transaction' : 'Save Changes'}
             </button>
@@ -953,11 +953,19 @@ export default function TransactionDetailDrawer({ transaction, open, onClose, on
             {mode === 'edit' && (
               <button
                 type="button"
+                aria-label={deleting ? 'Deleting...' : 'Delete Transaction'}
                 onClick={() => setDeleteDialogOpen(true)}
                 disabled={saving || deleting}
-                className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10 disabled:opacity-50 cursor-pointer"
+                className="shrink-0 sm:w-full px-3 sm:px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border bg-transparent text-destructive border-destructive/30 hover:bg-destructive/10 disabled:opacity-50 cursor-pointer"
               >
-                {deleting ? 'Deleting...' : 'Delete Transaction'}
+                {deleting ? (
+                  'Deleting...'
+                ) : (
+                  <>
+                    <span className="sm:hidden">Delete</span>
+                    <span className="hidden sm:inline">Delete Transaction</span>
+                  </>
+                )}
               </button>
             )}
           </div>

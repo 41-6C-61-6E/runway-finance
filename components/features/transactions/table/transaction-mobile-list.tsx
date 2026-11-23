@@ -160,8 +160,7 @@ export function TransactionMobileList({
           onActivate={handleOpenParent}
           className={cn(
             'px-1.5 py-3 group',
-            isPending &&
-              'bg-primary/[0.04] dark:bg-primary/[0.08] border-l-2 border-primary/50 pl-2',
+            isPending && 'bg-primary/[0.04] dark:bg-primary/[0.08] rounded-lg',
           )}
           bodyClassName="flex items-start gap-3 w-full min-w-0"
         >
@@ -335,7 +334,7 @@ export function TransactionMobileList({
 
         {/* Split child rows cleanly indented below parent */}
         {splits.length > 0 && (
-          <div className="ml-5 pl-3.5 border-l-2 border-primary/25 divide-y divide-border/30">
+          <div className="ml-5 pl-3.5 border-l-2 border-primary/25">
             {splits.map((split) => {
               const splitAmount = formatSignedTransactionAmount(split.amount);
               const splitNum = parseFloat(split.amount);
@@ -450,14 +449,14 @@ export function TransactionMobileList({
                   </span>
                 )}
               </div>
-              <div className="divide-y divide-border/50">
+              <div className="py-0.5">
                 {section.items.map(renderTransactionItem)}
               </div>
             </section>
           ))}
         </div>
       ) : (
-        <div className="divide-y divide-border/50">
+        <div className="py-0.5">
           {parentItems.map(renderTransactionItem)}
         </div>
       )}

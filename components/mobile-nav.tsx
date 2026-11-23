@@ -103,6 +103,108 @@ export function MobileNav() {
     return () => window.removeEventListener('resize', handleResize);
   }, [isOpen]);
 
+  // Track virtual keyboard visibility via visualViewport so the fixed bottom nav
+  // remains hidden until the keyboard finishes closing, then nudge WebKit to re-pin fixed layers.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const vv = window.visualViewport;
+    let baselineHeight = Math.max(window.innerHeight, vv?.height ?? 0);
+    let lastInnerWidth = window.innerWidth;
+    let wasKeyboardOpen = false;
+    let settleRafId: number | null = null;
+    let focusOutTimerId: number | null = null;
+
+    const scheduleFixedNavSettle = () => {
+      if (settleRafId !== null) {
+        window.cancelAnimationFrame(settleRafId);
+      }
+      settleRafId = window.requestAnimationFrame(() => {
+        settleRafId = null;
+        window.scrollTo(window.scrollX, window.scrollY);
+      });
+    };
+
+    const isEditableFocused = () => {
+      const el = document.activeElement;
+      return (
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        (el instanceof HTMLElement && el.isContentEditable)
+      );
+    };
+
+    const updateKeyboardState = () => {
+      if (window.innerWidth >= MD_BREAKPOINT_PX) {
+        if (wasKeyboardOpen) {
+          wasKeyboardOpen = false;
+          delete document.documentElement.dataset.keyboardOpen;
+        }
+        return;
+      }
+
+      const currentVvHeight = vv?.height ?? window.innerHeight;
+      if (window.innerWidth !== lastInnerWidth) {
+        lastInnerWidth = window.innerWidth;
+        baselineHeight = Math.max(window.innerHeight, currentVvHeight);
+      } else {
+        baselineHeight = Math.max(baselineHeight, window.innerHeight, currentVvHeight);
+      }
+
+      const layoutGap = Math.max(0, window.innerHeight - currentVvHeight);
+      const shrinkGap = Math.max(0, baselineHeight - currentVvHeight);
+      const isOpenNow =
+        layoutGap > 100 || (isEditableFocused() && shrinkGap > 100);
+
+      if (isOpenNow) {
+        document.documentElement.dataset.keyboardOpen = 'true';
+        wasKeyboardOpen = true;
+      } else if (wasKeyboardOpen) {
+        wasKeyboardOpen = false;
+        delete document.documentElement.dataset.keyboardOpen;
+        scheduleFixedNavSettle();
+      }
+    };
+
+    const handleFocusOut = () => {
+      if (window.innerWidth >= MD_BREAKPOINT_PX) return;
+      if (focusOutTimerId !== null) {
+        window.clearTimeout(focusOutTimerId);
+      }
+      focusOutTimerId = window.setTimeout(() => {
+        focusOutTimerId = null;
+        updateKeyboardState();
+        if (
+          !document.documentElement.dataset.keyboardOpen &&
+          vv &&
+          vv.offsetTop > 0
+        ) {
+          scheduleFixedNavSettle();
+        }
+      }, 120);
+    };
+
+    updateKeyboardState();
+    vv?.addEventListener('resize', updateKeyboardState);
+    vv?.addEventListener('scroll', updateKeyboardState);
+    window.addEventListener('resize', updateKeyboardState);
+    document.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      vv?.removeEventListener('resize', updateKeyboardState);
+      vv?.removeEventListener('scroll', updateKeyboardState);
+      window.removeEventListener('resize', updateKeyboardState);
+      document.removeEventListener('focusout', handleFocusOut);
+      if (focusOutTimerId !== null) {
+        window.clearTimeout(focusOutTimerId);
+      }
+      if (settleRafId !== null) {
+        window.cancelAnimationFrame(settleRafId);
+      }
+      delete document.documentElement.dataset.keyboardOpen;
+    };
+  }, []);
+
 
   // Custom home items (minimized bottom nav items)
   const [homeItemIds, setHomeItemIds] = useState<string[]>(['net-worth', 'accounts', 'transactions', 'flows']);
@@ -518,7 +620,7 @@ export function MobileNav() {
 
       {/* Fixed Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] md:hidden bg-sidebar border-t border-sidebar-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)] transform-gpu"
+        className="fixed bottom-0 left-0 right-0 z-40 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] md:hidden bg-sidebar border-t border-sidebar-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
       >
           <div className="max-w-lg mx-auto h-16 flex items-center justify-around gap-1 px-3">
             {shownHomeNavItems.map((item) => {

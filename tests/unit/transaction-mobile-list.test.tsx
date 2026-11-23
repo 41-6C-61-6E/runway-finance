@@ -254,6 +254,15 @@ describe('TransactionMobileList (phone layout)', () => {
     expect(screen.queryByLabelText(/Search on Google/i)).toBeNull();
     expect(container.querySelectorAll('.lucide-chevron-right')).toHaveLength(0);
 
+    // No per-row dividers inside list containers, only date section bottom dividers
+    expect(container.querySelectorAll('.divide-y')).toHaveLength(0);
+    expect(container.querySelectorAll('section .border-b')).toHaveLength(3);
+
+    // Pending row keeps subtle background tint without left vertical accent bar
+    const pendingRow = screen.getByLabelText(/COFFEE SHOP \(pending\)/i);
+    expect(pendingRow.className).toContain('bg-primary/');
+    expect(pendingRow.className).not.toContain('border-l-2');
+
     // Positive vs expense styling
     const positiveEl = screen.getByText('+$2,500.00');
     expect(positiveEl.className).toContain('text-emerald-600');
@@ -326,6 +335,8 @@ describe('TransactionMobileList (phone layout)', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeDefined();
+    expect(document.activeElement?.tagName).not.toBe('INPUT');
+    expect(document.activeElement?.tagName).not.toBe('TEXTAREA');
 
     const groceriesOption = screen.getByRole('button', { name: 'Groceries' });
     fireEvent.click(groceriesOption);
@@ -422,10 +433,16 @@ describe('TransactionMobileList (phone layout)', () => {
       />,
     );
 
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeDefined();
+    expect(document.activeElement?.tagName).not.toBe('INPUT');
+    expect(document.activeElement?.tagName).not.toBe('TEXTAREA');
+
     const lookupLink = await screen.findByRole('link', { name: /Look up/i });
     expect(lookupLink.getAttribute('href')).toBe(
       `https://www.google.com/search?q=${encodeURIComponent('Blue Bottle Coffee SQ *BLUE BOTTLE')}`,
     );
     expect(lookupLink.getAttribute('target')).toBe('_blank');
+    expect(screen.getByRole('button', { name: /Delete Transaction/i })).toBeDefined();
   });
 });

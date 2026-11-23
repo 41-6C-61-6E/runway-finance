@@ -47,14 +47,147 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = 'right', className, children, ...props }, ref) => {
+>(({ side = 'right', className, children, onOpenAutoFocus, onCloseAutoFocus, ...props }, ref) => {
   const isSidePanel = side === 'left' || side === 'right';
+  const isBottomMobileSheet = isSidePanel || side === 'bottom';
+  const contentRef = React.useRef<React.ElementRef<typeof SheetPrimitive.Content> | null>(null);
+
+  const mergedRef = React.useCallback(
+    (node: React.ElementRef<typeof SheetPrimitive.Content> | null) => {
+      contentRef.current = node;
+      if (typeof ref === 'function') {
+        ref(node);
+      } else if (ref) {
+        ref.current = node;
+      }
+    },
+    [ref],
+  );
+
+  React.useEffect(() => {
+    if (!isBottomMobileSheet || typeof window === 'undefined') return undefined;
+    if (window.innerWidth >= 768) return undefined;
+
+    const vv = window.visualViewport;
+    let focusScrollTimer: number | null = null;
+    let baselineHeight = Math.max(window.innerHeight, vv?.height ?? 0);
+    let lastInnerWidth = window.innerWidth;
+
+    const updateViewportVars = () => {
+      const node = contentRef.current;
+      if (!node || !vv) return;
+
+      if (window.innerWidth !== lastInnerWidth) {
+        lastInnerWidth = window.innerWidth;
+        baselineHeight = Math.max(window.innerHeight, vv.height);
+      } else if (vv.height > baselineHeight) {
+        baselineHeight = vv.height;
+      }
+
+      const layoutHeight = window.innerHeight || document.documentElement.clientHeight;
+      const bottomInset = Math.max(0, layoutHeight - (vv.offsetTop + vv.height));
+      const heightShrink = Math.max(0, baselineHeight - vv.height);
+      const keyboardVisible = bottomInset > 80 || heightShrink > 80;
+
+      if (keyboardVisible) {
+        node.style.setProperty('--sheet-vv-bottom', `${Math.round(bottomInset)}px`);
+        node.style.setProperty(
+          '--sheet-vv-max-height',
+          `${Math.max(200, Math.floor(vv.height - 16))}px`,
+        );
+      } else {
+        node.style.removeProperty('--sheet-vv-bottom');
+        node.style.removeProperty('--sheet-vv-max-height');
+      }
+    };
+
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target;
+      if (
+        !(
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement
+        )
+      ) {
+        return;
+      }
+      if (focusScrollTimer !== null) {
+        window.clearTimeout(focusScrollTimer);
+      }
+      focusScrollTimer = window.setTimeout(() => {
+        if (typeof target.scrollIntoView === 'function') {
+          target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 150);
+    };
+
+    updateViewportVars();
+    vv?.addEventListener('resize', updateViewportVars);
+    vv?.addEventListener('scroll', updateViewportVars);
+    const node = contentRef.current;
+    node?.addEventListener('focusin', handleFocusIn);
+
+    return () => {
+      vv?.removeEventListener('resize', updateViewportVars);
+      vv?.removeEventListener('scroll', updateViewportVars);
+      node?.removeEventListener('focusin', handleFocusIn);
+      if (focusScrollTimer !== null) {
+        window.clearTimeout(focusScrollTimer);
+      }
+      if (contentRef.current) {
+        contentRef.current.style.removeProperty('--sheet-vv-bottom');
+        contentRef.current.style.removeProperty('--sheet-vv-max-height');
+      }
+    };
+  }, [isBottomMobileSheet]);
+
+  const handleOpenAutoFocus = (event: Event) => {
+    onOpenAutoFocus?.(event);
+    if (event.defaultPrevented || typeof window === 'undefined') return;
+
+    const isMobileViewport =
+      window.innerWidth < 768 ||
+      (typeof window.matchMedia === 'function' &&
+        window.matchMedia('(pointer: coarse)').matches);
+
+    if (isMobileViewport) {
+      event.preventDefault();
+      contentRef.current?.focus({ preventScroll: true });
+    }
+  };
+
+  const handleCloseAutoFocus = (event: Event) => {
+    if (typeof document !== 'undefined') {
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+        active.blur();
+      }
+    }
+
+    onCloseAutoFocus?.(event);
+    if (event.defaultPrevented) return;
+
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const vv = window.visualViewport;
+      if (vv && vv.offsetTop > 0) {
+        event.preventDefault();
+        requestAnimationFrame(() => {
+          window.scrollTo(window.scrollX, window.scrollY);
+        });
+      }
+    }
+  };
+
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
-        ref={ref}
-        className={`${isSidePanel ? 'sheet-mobile-bottom' : ''} ${sheetVariants({ side, className })}`}
+        ref={mergedRef}
+        tabIndex={-1}
+        onOpenAutoFocus={handleOpenAutoFocus}
+        onCloseAutoFocus={handleCloseAutoFocus}
+        className={`${isSidePanel ? 'sheet-mobile-bottom' : ''} ${side === 'bottom' ? 'sheet-bottom-mobile' : ''} focus:outline-none ${sheetVariants({ side, className })}`}
         {...props}
       >
         {/* Drag handle — visible on mobile for side panels that become bottom sheets */}

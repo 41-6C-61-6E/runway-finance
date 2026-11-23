@@ -580,10 +580,15 @@ html.text-size-lg {
   color: var(--muted-foreground);
 }
 
-/* Hide mobile bottom navigation bar when virtual keyboard is active (editable text input focused in form or dialog) */
+/* Hide mobile bottom navigation bar when virtual keyboard is active (editable text input focused in form or dialog, or visualViewport collapsed).
+ * Use visibility/opacity instead of display:none so WebKit preserves fixed-layer layout geometry when the keyboard closes. */
+html[data-keyboard-open="true"] nav.fixed:not(:focus-within),
+html[data-keyboard-open="true"] .fixed-pagination-dots,
 body:has([role="dialog"] input:focus, [role="dialog"] textarea:focus, form input[type="text"]:focus-visible, form input[type="search"]:focus-visible, form input[type="password"]:focus-visible, form textarea:focus-visible) nav.fixed:not(:focus-within),
 body:has([role="dialog"] input:focus, [role="dialog"] textarea:focus, form input[type="text"]:focus-visible, form input[type="search"]:focus-visible, form input[type="password"]:focus-visible, form textarea:focus-visible) .fixed-pagination-dots {
-  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Mobile gesture conflict prevention utilities */
@@ -785,17 +790,22 @@ button,
   .sheet-mobile-bottom {
     /* Override right-side positioning to bottom sheet */
     top: auto !important;
-    bottom: 0 !important;
+    bottom: var(--sheet-vv-bottom, 0px) !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
-    max-height: 92dvh !important;
+    max-height: var(--sheet-vv-max-height, 90dvh) !important;
     border-radius: 1.25rem 1.25rem 0 0 !important;
     border-left: none !important;
     border-right: none !important;
     border-top: 1px solid var(--border) !important;
+  }
+
+  .sheet-bottom-mobile {
+    bottom: var(--sheet-vv-bottom, 0px) !important;
+    max-height: var(--sheet-vv-max-height, 85dvh) !important;
   }
 
   .sheet-mobile-bottom[data-state="open"] {

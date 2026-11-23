@@ -68,7 +68,7 @@ export function CategoryPickerContent({
 
   if (isCreating) {
     return (
-      <div className="p-3 space-y-2.5 flex flex-col text-xs">
+      <div className="p-3 space-y-2.5 flex flex-col flex-1 min-h-0 overflow-y-auto text-xs">
         <div className="font-semibold text-foreground uppercase tracking-wider text-micro">
           New Category
         </div>
@@ -209,7 +209,7 @@ export function CategoryPickerContent({
         />
       </div>
 
-      <div className={cn('flex-1 overflow-y-auto', listMaxHeightClass)}>
+      <div className={cn('flex-1 min-h-0 overflow-y-auto', listMaxHeightClass)}>
         <button
           type="button"
           onClick={(e) => {
@@ -355,7 +355,7 @@ export function MobileCategoryPickerSheet({
     >
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl max-h-[85dvh] flex flex-col p-4 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3"
+        className="rounded-t-2xl max-h-[85dvh] flex flex-col overflow-hidden p-4 pb-[max(1rem,env(safe-area-inset-bottom))] gap-3"
       >
         {transaction && (
           <>
@@ -378,7 +378,7 @@ export function MobileCategoryPickerSheet({
                 currentCategoryId={transaction.categoryId}
                 autoFocusSearch={false}
                 touchFriendly={true}
-                listMaxHeightClass="max-h-[55dvh]"
+                listMaxHeightClass=""
                 onSelect={async (catId, catName, catColor) => {
                   await onSelect(transaction.id, catId, catName, catColor);
                   onClose();
