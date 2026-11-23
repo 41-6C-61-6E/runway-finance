@@ -383,15 +383,41 @@ html.text-size-lg {
   margin-bottom: 0.25rem;
 }
 
-@utility z-sticky { z-index: 30; }
-@utility z-dropdown { z-index: 40; }
-@utility z-modal-backdrop { z-index: 45; }
-@utility z-modal { z-index: 50; }
-@utility z-popover { z-index: 60; }
-@utility z-overlay { z-index: 100; }
-@utility z-tooltip { z-index: 1000; }
-@utility z-toast { z-index: 5000; }
-@utility z-max { z-index: 10000; }
+@utility z-sticky {
+  z-index: 30;
+}
+
+@utility z-dropdown {
+  z-index: 40;
+}
+
+@utility z-modal-backdrop {
+  z-index: 45;
+}
+
+@utility z-modal {
+  z-index: 50;
+}
+
+@utility z-popover {
+  z-index: 60;
+}
+
+@utility z-overlay {
+  z-index: 100;
+}
+
+@utility z-tooltip {
+  z-index: 1000;
+}
+
+@utility z-toast {
+  z-index: 5000;
+}
+
+@utility z-max {
+  z-index: 10000;
+}
 
 /* Ensure Recharts tooltips disappear when the mouse leaves the chart area */
 /* Only apply on devices with hover (mouse/trackpad), not touch */
@@ -589,6 +615,47 @@ body:has([role="dialog"] input:focus, [role="dialog"] textarea:focus, form input
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+@media (max-width: 767px) {
+
+  body[data-scroll-locked] nav.fixed:not(:focus-within),
+  body[data-scroll-locked] .fixed-pagination-dots {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
+
+/* Floating iOS-style frosted glass circular buttons shared by mobile top and bottom navigation */
+.glass-nav-button {
+  background: color-mix(in srgb, var(--sidebar) 42%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid color-mix(in srgb, var(--sidebar-border) 40%, transparent);
+  box-shadow: 0 4px 16px -4px rgb(0 0 0 / 0.1);
+}
+
+.glass-nav-button-active {
+  background: color-mix(in srgb, var(--primary) 18%, color-mix(in srgb, var(--sidebar) 42%, transparent));
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--primary) 20%, rgb(0 0 0 / 0.1));
+}
+
+[data-theme="dark"] .glass-nav-button,
+[data-theme="moonlight"] .glass-nav-button {
+  background: color-mix(in srgb, var(--sidebar) 40%, transparent);
+  border-color: color-mix(in srgb, var(--sidebar-border) 40%, transparent);
+  box-shadow: 0 4px 16px -4px rgb(0 0 0 / 0.35);
+}
+
+[data-theme="dark"] .glass-nav-button-active,
+[data-theme="moonlight"] .glass-nav-button-active {
+  background: color-mix(in srgb, var(--primary) 22%, color-mix(in srgb, var(--sidebar) 40%, transparent));
+  border-color: color-mix(in srgb, var(--primary) 42%, transparent);
+  box-shadow: 0 4px 16px -4px rgb(0 0 0 / 0.35);
 }
 
 /* Mobile gesture conflict prevention utilities */

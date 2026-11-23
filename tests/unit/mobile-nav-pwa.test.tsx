@@ -79,8 +79,8 @@ describe('MobileNav PWA & Accessibility', () => {
     expect(barLinks).not.toContain('Offline mode (preview)');
   });
 
-  it('renders bottom nav bar with opaque bg-sidebar and safe-area-inset-bottom', () => {
-    const { container } = render(
+  it('renders floating individual frosted-glass nav buttons with compact bottom safe-area padding', () => {
+    const { container, getByLabelText } = render(
       <QueryClientProvider client={queryClient}>
         <MobileSubNavProvider>
           <MobileNav />
@@ -92,10 +92,23 @@ describe('MobileNav PWA & Accessibility', () => {
     expect(nav).not.toBeNull();
     expect(nav?.className).toContain('fixed');
     expect(nav?.className).toContain('bottom-0');
-    expect(nav?.className).toContain('bg-sidebar');
-    expect(nav?.className).not.toContain('bg-sidebar/95');
-    expect(nav?.className).not.toContain('backdrop-blur-xl');
-    expect(nav?.className).toContain('h-[calc(4rem+env(safe-area-inset-bottom))]');
-    expect(nav?.className).toContain('pb-[env(safe-area-inset-bottom)]');
+    expect(nav?.className).toContain('pointer-events-none');
+    expect(nav?.className).toContain('pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)*0.5))]');
+    expect(nav?.className).not.toContain('bg-sidebar');
+    expect(nav?.className).not.toContain('h-[calc(4rem+env(safe-area-inset-bottom))]');
+
+    const netWorthLink = getByLabelText('Net Worth');
+    expect(netWorthLink.className).toContain('pointer-events-auto');
+    expect(netWorthLink.className).toContain('rounded-full');
+    expect(netWorthLink.className).toContain('glass-nav-button-active');
+    expect(netWorthLink.className).toContain('min-w-11');
+    expect(netWorthLink.className).toContain('min-h-11');
+
+    const menuButton = getByLabelText('Open navigation menu');
+    expect(menuButton.className).toContain('pointer-events-auto');
+    expect(menuButton.className).toContain('rounded-full');
+    expect(menuButton.className).toContain('glass-nav-button');
+    expect(menuButton.className).toContain('min-w-11');
+    expect(menuButton.className).toContain('min-h-11');
   });
 });

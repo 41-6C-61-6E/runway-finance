@@ -213,7 +213,7 @@ describe('Milestone 2 / Batch A2 Implementation Verification Suite', () => {
   });
 
   describe('Item 6: Mobile Navigation & Layout iOS Safe Area Clearance', () => {
-    it('includes safe-area-inset-bottom in mobile nav height and padding', () => {
+    it('includes compact safe-area-inset-bottom clearance and glass buttons in mobile nav', () => {
       const { container } = render(
         <QueryClientProvider client={queryClient}>
           <MobileSubNavProvider>
@@ -226,15 +226,17 @@ describe('Milestone 2 / Batch A2 Implementation Verification Suite', () => {
       expect(nav).not.toBeNull();
       expect(nav?.className).toContain('fixed');
       expect(nav?.className).toContain('bottom-0');
-      expect(nav?.className).toContain('h-[calc(4rem+env(safe-area-inset-bottom))]');
-      expect(nav?.className).toContain('pb-[env(safe-area-inset-bottom)]');
-      expect(nav?.className).toContain('bg-sidebar');
+      expect(nav?.className).toContain('pointer-events-none');
+      expect(nav?.className).toContain('pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)*0.5))]');
+      expect(
+        container.querySelectorAll('nav .glass-nav-button, nav .glass-nav-button-active').length,
+      ).toBeGreaterThan(0);
     });
 
     it('includes safe-area-inset-bottom in AuthenticatedLayout bottom padding', () => {
       const layoutPath = path.resolve(__dirname, '../../components/authenticated-layout.tsx');
       const layoutContent = fs.readFileSync(layoutPath, 'utf-8');
-      expect(layoutContent).toContain('pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0');
+      expect(layoutContent).toContain('pb-[calc(4.5rem+max(0.75rem,env(safe-area-inset-bottom,0px)*0.5))] md:pb-0');
     });
   });
 });

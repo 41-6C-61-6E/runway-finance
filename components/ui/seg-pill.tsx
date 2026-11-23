@@ -22,11 +22,15 @@ import { cn } from '@/lib/utils';
 export const glassSurface =
   'bg-sidebar/55 backdrop-blur-md border border-sidebar-border/25';
 
+/** Floating frosted-glass styling shared by mobile top and bottom navigation chrome. */
+export const glassNavButton = 'glass-nav-button';
+export const glassNavButtonActive = 'glass-nav-button-active';
+
 /**
- * Alias of glassSurface — larger fixed chrome (bottom nav bar, top action
- * bar) uses the exact same glass, kept as a named alias for readability.
+ * Shared glass chrome token used by mobile top floating actions (`PageHeader`)
+ * and mobile bottom floating nav (`MobileNav`) for visual continuity.
  */
-export const glassBar = glassSurface;
+export const glassBar = glassNavButton;
 
 /** Base classes shared by every item/button inside a glass capsule. */
 export const glassItemBase =

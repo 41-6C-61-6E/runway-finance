@@ -51,6 +51,12 @@ class MockVisualViewport extends EventTarget {
 describe('MobileNav & Sheet keyboard behavior', () => {
   const originalVisualViewport = window.visualViewport;
   const originalFetch = global.fetch;
+  const originalScrollHeightDescriptor = Object.getOwnPropertyDescriptor(
+    document.documentElement,
+    'scrollHeight',
+  );
+  const originalScrollYDescriptor = Object.getOwnPropertyDescriptor(window, 'scrollY');
+  const originalScrollXDescriptor = Object.getOwnPropertyDescriptor(window, 'scrollX');
   let mockVv: MockVisualViewport;
   let queryClient: QueryClient;
 
@@ -75,6 +81,20 @@ describe('MobileNav & Sheet keyboard behavior', () => {
       configurable: true,
       value: 844,
     });
+    Object.defineProperty(document.documentElement, 'scrollHeight', {
+      configurable: true,
+      value: 2000,
+    });
+    Object.defineProperty(window, 'scrollY', {
+      writable: true,
+      configurable: true,
+      value: 250,
+    });
+    Object.defineProperty(window, 'scrollX', {
+      writable: true,
+      configurable: true,
+      value: 0,
+    });
     Object.defineProperty(window, 'visualViewport', {
       writable: true,
       configurable: true,
@@ -98,16 +118,32 @@ describe('MobileNav & Sheet keyboard behavior', () => {
 
   afterEach(() => {
     delete document.documentElement.dataset.keyboardOpen;
+    document.body.removeAttribute('data-scroll-locked');
     Object.defineProperty(window, 'visualViewport', {
       writable: true,
       configurable: true,
       value: originalVisualViewport,
     });
+    if (originalScrollHeightDescriptor) {
+      Object.defineProperty(
+        document.documentElement,
+        'scrollHeight',
+        originalScrollHeightDescriptor,
+      );
+    } else {
+      delete (document.documentElement as unknown as Record<string, unknown>).scrollHeight;
+    }
+    if (originalScrollYDescriptor) {
+      Object.defineProperty(window, 'scrollY', originalScrollYDescriptor);
+    }
+    if (originalScrollXDescriptor) {
+      Object.defineProperty(window, 'scrollX', originalScrollXDescriptor);
+    }
     global.fetch = originalFetch;
     vi.restoreAllMocks();
   });
 
-  it('renders MobileNav without transform-gpu and tracks keyboard open/close via visualViewport', async () => {
+  it('renders MobileNav glass buttons without transform-gpu and performs 1px scroll round-trip when keyboard closes', async () => {
     const scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     const rafSpy = vi
       .spyOn(window, 'requestAnimationFrame')
@@ -125,7 +161,9 @@ describe('MobileNav & Sheet keyboard behavior', () => {
     expect(nav).not.toBeNull();
     expect(nav?.className).toContain('fixed');
     expect(nav?.className).toContain('bottom-0');
+    expect(nav?.className).toContain('pointer-events-none');
     expect(nav?.className).not.toContain('transform-gpu');
+    expect(container.querySelectorAll('nav .glass-nav-button').length).toBeGreaterThan(0);
 
     act(() => {
       mockVv.height = 480;
@@ -139,7 +177,79 @@ describe('MobileNav & Sheet keyboard behavior', () => {
     });
     expect(document.documentElement.dataset.keyboardOpen).toBeUndefined();
     expect(rafSpy).toHaveBeenCalled();
-    expect(scrollToSpy).toHaveBeenCalledWith(window.scrollX, window.scrollY);
+    expect(scrollToSpy).toHaveBeenNthCalledWith(1, 0, 249);
+    expect(scrollToSpy).toHaveBeenNthCalledWith(2, 0, 250);
+  });
+
+  it('re-pins fixed nav when body data-scroll-locked is removed even without keyboard opening', async () => {
+    const scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MobileNav />
+      </QueryClientProvider>,
+    );
+
+    await act(async () => {
+      document.body.setAttribute('data-scroll-locked', '1');
+    });
+
+    await act(async () => {
+      document.body.removeAttribute('data-scroll-locked');
+    });
+
+    await waitFor(() => {
+      expect(scrollToSpy).toHaveBeenNthCalledWith(1, 0, 249);
+      expect(scrollToSpy).toHaveBeenNthCalledWith(2, 0, 250);
+    });
+  });
+
+  it('prevents SheetContent onCloseAutoFocus from focusing background trigger on mobile when offsetTop is 0', async () => {
+    const Wrapper = () => {
+      const [open, setOpen] = React.useState(false);
+      return (
+        <div>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open Row
+          </button>
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Row Details</SheetTitle>
+              </SheetHeader>
+              <button type="button" onClick={() => setOpen(false)}>
+                Dismiss Sheet
+              </button>
+            </SheetContent>
+          </Sheet>
+        </div>
+      );
+    };
+
+    render(<Wrapper />);
+    const triggerBtn = screen.getByRole('button', { name: 'Open Row' });
+    act(() => {
+      triggerBtn.focus();
+      triggerBtn.click();
+    });
+
+    await screen.findByRole('dialog');
+    const focusSpy = vi.spyOn(triggerBtn, 'focus');
+
+    const dismissBtn = screen.getByRole('button', { name: 'Dismiss Sheet' });
+    act(() => {
+      dismissBtn.click();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(document.activeElement).not.toBe(triggerBtn);
   });
 
   it('prevents auto-focusing inputs on mobile Sheet open while preserving desktop autofocus', async () => {

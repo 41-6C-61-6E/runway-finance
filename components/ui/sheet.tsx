@@ -168,13 +168,14 @@ const SheetContent = React.forwardRef<
     onCloseAutoFocus?.(event);
     if (event.defaultPrevented) return;
 
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      const vv = window.visualViewport;
-      if (vv && vv.offsetTop > 0) {
+    if (typeof window !== 'undefined') {
+      const isMobileViewport =
+        window.innerWidth < 768 ||
+        (typeof window.matchMedia === 'function' &&
+          window.matchMedia('(pointer: coarse)').matches);
+
+      if (isMobileViewport) {
         event.preventDefault();
-        requestAnimationFrame(() => {
-          window.scrollTo(window.scrollX, window.scrollY);
-        });
       }
     }
   };

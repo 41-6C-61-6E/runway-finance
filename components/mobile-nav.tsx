@@ -31,7 +31,6 @@ import {
 import { useHiddenPages, type HiddenPageKey, DEV_MODE_PAGE_KEYS } from '@/lib/hooks/use-hidden-pages';
 import { haptic } from '@/lib/haptics';
 import { useQuery } from '@tanstack/react-query';
-import { glassBar, glassItemBase, glassItemActive, glassItemInactive } from '@/components/ui/seg-pill';
 
 export type NavCategory = 'finances' | 'planning' | 'tools';
 
@@ -78,6 +77,7 @@ export function MobileNav() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const navRef = useRef<HTMLElement | null>(null);
   const { data: devModeData } = useQuery<{ devMode: boolean }>({
     queryKey: ['dev-mode'],
     queryFn: async () => {
@@ -103,8 +103,8 @@ export function MobileNav() {
     return () => window.removeEventListener('resize', handleResize);
   }, [isOpen]);
 
-  // Track virtual keyboard visibility via visualViewport so the fixed bottom nav
-  // remains hidden until the keyboard finishes closing, then nudge WebKit to re-pin fixed layers.
+  // Track virtual keyboard visibility and Radix body scroll-lock transitions so WebKit
+  // tears down and re-pins fixed bottom layers whenever sheets/keyboards dismiss.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
@@ -112,17 +112,33 @@ export function MobileNav() {
     let baselineHeight = Math.max(window.innerHeight, vv?.height ?? 0);
     let lastInnerWidth = window.innerWidth;
     let wasKeyboardOpen = false;
+    let wasScrollLocked = document.body.hasAttribute('data-scroll-locked');
+    let userTouched = false;
     let settleRafId: number | null = null;
-    let focusOutTimerId: number | null = null;
+    let nudgeRestoreRafId: number | null = null;
+    let settleTimers: number[] = [];
+    let focusOutTimers: number[] = [];
 
-    const scheduleFixedNavSettle = () => {
+    const clearSettleTimers = () => {
       if (settleRafId !== null) {
         window.cancelAnimationFrame(settleRafId);
-      }
-      settleRafId = window.requestAnimationFrame(() => {
         settleRafId = null;
-        window.scrollTo(window.scrollX, window.scrollY);
-      });
+      }
+      if (nudgeRestoreRafId !== null) {
+        window.cancelAnimationFrame(nudgeRestoreRafId);
+        nudgeRestoreRafId = null;
+      }
+      for (const timerId of settleTimers) {
+        window.clearTimeout(timerId);
+      }
+      settleTimers = [];
+    };
+
+    const clearFocusOutTimers = () => {
+      for (const timerId of focusOutTimers) {
+        window.clearTimeout(timerId);
+      }
+      focusOutTimers = [];
     };
 
     const isEditableFocused = () => {
@@ -132,6 +148,40 @@ export function MobileNav() {
         el instanceof HTMLTextAreaElement ||
         (el instanceof HTMLElement && el.isContentEditable)
       );
+    };
+
+    const repinFixedNav = (allowScrollNudge: boolean) => {
+      if (window.innerWidth >= MD_BREAKPOINT_PX) return;
+      if (document.documentElement.dataset.keyboardOpen === 'true') return;
+      if (document.body.hasAttribute('data-scroll-locked')) return;
+
+      const nav = navRef.current;
+      if (nav) {
+        // Synchronously detach and reattach the fixed compositor layer in WebKit
+        nav.style.position = 'absolute';
+        void nav.offsetHeight;
+        nav.style.position = '';
+      }
+
+      const hasVvOffset = Boolean(vv && vv.offsetTop > 0);
+      if (
+        (allowScrollNudge || hasVvOffset) &&
+        !userTouched &&
+        document.documentElement.scrollHeight > window.innerHeight
+      ) {
+        const startY = window.scrollY;
+        const nudgeY = startY > 0 ? startY - 1 : 1;
+        window.scrollTo(window.scrollX, nudgeY);
+        if (nudgeRestoreRafId !== null) {
+          window.cancelAnimationFrame(nudgeRestoreRafId);
+        }
+        nudgeRestoreRafId = window.requestAnimationFrame(() => {
+          nudgeRestoreRafId = null;
+          if (!userTouched) {
+            window.scrollTo(window.scrollX, startY);
+          }
+        });
+      }
     };
 
     const updateKeyboardState = () => {
@@ -153,8 +203,10 @@ export function MobileNav() {
 
       const layoutGap = Math.max(0, window.innerHeight - currentVvHeight);
       const shrinkGap = Math.max(0, baselineHeight - currentVvHeight);
-      const isOpenNow =
-        layoutGap > 100 || (isEditableFocused() && shrinkGap > 100);
+      const editableFocused = isEditableFocused();
+      const isOpenNow = wasKeyboardOpen
+        ? layoutGap > 30 || (editableFocused && shrinkGap > 30)
+        : layoutGap > 100 || (editableFocused && shrinkGap > 100);
 
       if (isOpenNow) {
         document.documentElement.dataset.keyboardOpen = 'true';
@@ -162,45 +214,87 @@ export function MobileNav() {
       } else if (wasKeyboardOpen) {
         wasKeyboardOpen = false;
         delete document.documentElement.dataset.keyboardOpen;
-        scheduleFixedNavSettle();
+        scheduleFixedNavSettle(true);
       }
     };
 
-    const handleFocusOut = () => {
-      if (window.innerWidth >= MD_BREAKPOINT_PX) return;
-      if (focusOutTimerId !== null) {
-        window.clearTimeout(focusOutTimerId);
+    function scheduleFixedNavSettle(allowScrollNudge = true) {
+      clearSettleTimers();
+      userTouched = false;
+      settleRafId = window.requestAnimationFrame(() => {
+        settleRafId = null;
+        repinFixedNav(allowScrollNudge);
+      });
+      for (const delay of [180, 420]) {
+        const timerId = window.setTimeout(() => {
+          updateKeyboardState();
+          repinFixedNav(false);
+        }, delay);
+        settleTimers.push(timerId);
       }
-      focusOutTimerId = window.setTimeout(() => {
-        focusOutTimerId = null;
-        updateKeyboardState();
-        if (
-          !document.documentElement.dataset.keyboardOpen &&
-          vv &&
-          vv.offsetTop > 0
-        ) {
-          scheduleFixedNavSettle();
-        }
-      }, 120);
+    }
+
+    const handleFocusOut = (e: FocusEvent) => {
+      if (window.innerWidth >= MD_BREAKPOINT_PX) return;
+      const target = e.target;
+      if (
+        !(
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          (target instanceof HTMLElement && target.isContentEditable)
+        )
+      ) {
+        return;
+      }
+      clearFocusOutTimers();
+      focusOutTimers = [180, 420].map((delay) =>
+        window.setTimeout(() => {
+          updateKeyboardState();
+          if (
+            document.documentElement.dataset.keyboardOpen !== 'true' &&
+            !document.body.hasAttribute('data-scroll-locked')
+          ) {
+            repinFixedNav(Boolean(vv && vv.offsetTop > 0));
+          }
+        }, delay),
+      );
     };
+
+    const handleTouchStart = () => {
+      userTouched = true;
+    };
+
+    const scrollLockObserver = new MutationObserver(() => {
+      const isScrollLocked = document.body.hasAttribute('data-scroll-locked');
+      if (wasScrollLocked && !isScrollLocked) {
+        wasScrollLocked = false;
+        scheduleFixedNavSettle(true);
+      } else {
+        wasScrollLocked = isScrollLocked;
+      }
+    });
+
+    scrollLockObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-scroll-locked'],
+    });
 
     updateKeyboardState();
     vv?.addEventListener('resize', updateKeyboardState);
     vv?.addEventListener('scroll', updateKeyboardState);
     window.addEventListener('resize', updateKeyboardState);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
     document.addEventListener('focusout', handleFocusOut);
 
     return () => {
+      scrollLockObserver.disconnect();
       vv?.removeEventListener('resize', updateKeyboardState);
       vv?.removeEventListener('scroll', updateKeyboardState);
       window.removeEventListener('resize', updateKeyboardState);
+      window.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('focusout', handleFocusOut);
-      if (focusOutTimerId !== null) {
-        window.clearTimeout(focusOutTimerId);
-      }
-      if (settleRafId !== null) {
-        window.cancelAnimationFrame(settleRafId);
-      }
+      clearFocusOutTimers();
+      clearSettleTimers();
       delete document.documentElement.dataset.keyboardOpen;
     };
   }, []);
@@ -214,33 +308,19 @@ export function MobileNav() {
   // auto-fill must not add them back to the home bar.
   const [excludedHomeIds, setExcludedHomeIds] = useState<string[]>([]);
 
-  // How many page buttons the bottom bar can fit at the current viewport width:
-  // the bar spans `viewport - 32px` (16px margin per side) capped at max-w-lg
-  // (512px), minus 12px horizontal padding per side and a 1px border.
-  //
-  // Every button (page buttons and the hamburger) has a min-w-11 (44px)
-  // minimum. The rendered row is N page buttons + the hamburger, i.e.
-  // N + 1 buttons, which fits while (N+1) × 44 + N × gap ≤ contentWidth.
-  // We take the largest such N (floor of 3) so the row can never overflow
-  // and the hamburger always keeps its slot. The buttons are flex-1 (see
-  // the nav below), so they share the leftover space equally and the
-  // spacing redistributes automatically whenever items are added or
-  // removed — nothing ever gets clipped.
-  const HOME_BAR_ITEM_GAP_PX = 8;
-  const HOME_BUTTON_MIN_WIDTH_PX = 44;
+  // How many individual circular glass buttons fit in the floating bottom nav
+  // (48px button width with 12px gaps, 16px horizontal screen margin, capped at 448px):
+  // N page buttons + 1 hamburger button <= barWidth -> floor of 3 page buttons.
+  const HOME_BAR_ITEM_GAP_PX = 12;
+  const HOME_BUTTON_MIN_WIDTH_PX = 48;
   const [homeNavSlotCount, setHomeNavSlotCount] = useState(4);
   useEffect(() => {
     const computeHomeNavSlots = () => {
-      const barWidth = Math.max(240, Math.min(window.innerWidth - 32, 512));
-      const contentWidth = barWidth - 24 - 2;
-      // The rendered row is N page buttons PLUS the hamburger, so the total
-      // is N + 1 buttons — solve (N+1) × 44 + N × gap ≤ contentWidth for N.
+      const barWidth = Math.max(240, Math.min(window.innerWidth - 32, 448));
       const totalButtons = Math.floor(
-        (contentWidth + HOME_BAR_ITEM_GAP_PX) /
+        (barWidth + HOME_BAR_ITEM_GAP_PX) /
         (HOME_BUTTON_MIN_WIDTH_PX + HOME_BAR_ITEM_GAP_PX)
       );
-      // Floor of 3 page buttons keeps the bar from regressing below the old
-      // fixed layout on narrow phones (3 + hamburger fits the 240px min bar).
       setHomeNavSlotCount(Math.max(3, totalButtons - 1));
     };
     computeHomeNavSlots();
@@ -618,40 +698,48 @@ export function MobileNav() {
         }
       ` }} />
 
-      {/* Fixed Bottom Navigation Bar */}
+      {/* Floating Individual Glass Bottom Navigation Buttons */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] md:hidden bg-sidebar border-t border-sidebar-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+        ref={navRef}
+        aria-label="Mobile navigation"
+        className="fixed bottom-0 left-0 right-0 z-40 md:hidden pointer-events-none px-4 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)*0.5))]"
       >
-          <div className="max-w-lg mx-auto h-16 flex items-center justify-around gap-1 px-3">
-            {shownHomeNavItems.map((item) => {
-              const Icon = item.icon;
-              const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
+        <div className="max-w-md mx-auto flex items-center justify-center gap-3">
+          {shownHomeNavItems.map((item) => {
+            const Icon = item.icon;
+            const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-label={item.label}
-                  onClick={() => setPendingHref(item.href)}
-                  className={`flex flex-1 flex-col items-center justify-center p-2 min-w-11 min-h-11 group transition-colors duration-200 ${glassItemBase} ${active ? glassItemActive : glassItemInactive
-                    }`}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                </Link>
-              );
-            })}
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-label={item.label}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => setPendingHref(item.href)}
+                className={`pointer-events-auto inline-flex items-center justify-center h-12 w-12 min-w-11 min-h-11 rounded-full transition-all duration-200 active:scale-95 select-none group ${active
+                  ? 'glass-nav-button-active text-primary'
+                  : 'glass-nav-button text-sidebar-foreground/75 hover:text-sidebar-foreground'
+                  }`}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+              </Link>
+            );
+          })}
 
-            {/* Hamburger Menu Toggle Button */}
-            <button
-              type="button"
-              aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
-              onClick={() => setIsOpen(!isOpen)}
-              className={`flex flex-1 flex-col items-center justify-center p-2 min-w-11 min-h-11 group transition-colors duration-200 ${glassItemBase} ${isOpen ? glassItemActive : glassItemInactive
-                }`}
-            >
-              {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
-            </button>
-          </div>
+          {/* Hamburger Menu Toggle Button */}
+          <button
+            type="button"
+            aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isOpen}
+            onClick={() => setIsOpen(!isOpen)}
+            className={`pointer-events-auto inline-flex items-center justify-center h-12 w-12 min-w-11 min-h-11 rounded-full transition-all duration-200 active:scale-95 select-none group ${isOpen
+              ? 'glass-nav-button-active text-primary'
+              : 'glass-nav-button text-sidebar-foreground/75 hover:text-sidebar-foreground'
+              }`}
+          >
+            {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
+          </button>
+        </div>
       </nav>
 
       {/* Slide-up Menu Drawer Backdrop */}
