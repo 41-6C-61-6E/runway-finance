@@ -343,7 +343,7 @@ export function MobileTabSwipeContainer({
       {/* Pagination dots indicator for tabs on mobile: static and fixed above the floating bottom nav */}
       {showDots && tabs.length > 1 && (
         <div
-          className="fixed bottom-[calc(3.5rem+max(0.75rem,env(safe-area-inset-bottom,0px)*0.5))] left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden fixed-pagination-dots"
+          className="fixed bottom-[calc(3.75rem+max(1rem,env(safe-area-inset-bottom,0px)*0.65))] left-0 right-0 z-40 flex justify-center pointer-events-none md:hidden fixed-pagination-dots"
         >
           <div className="pointer-events-auto">
             <PaginationDots

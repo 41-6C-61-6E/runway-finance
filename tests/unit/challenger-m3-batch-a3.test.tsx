@@ -147,7 +147,7 @@ describe('Milestone 3 / Batch A3 Remediation Verification Suite', () => {
       const filePath = path.join(rootDir, 'components/ui/mobile-view-switcher.tsx');
       const content = fs.readFileSync(filePath, 'utf8');
 
-      expect(content).toContain('bottom-[calc(3.5rem+max(0.75rem,env(safe-area-inset-bottom,0px)*0.5))]');
+      expect(content).toContain('bottom-[calc(3.75rem+max(1rem,env(safe-area-inset-bottom,0px)*0.65))]');
       expect(content).not.toMatch(/className="[^"]*fixed bottom-16[^"]*"/);
     });
 

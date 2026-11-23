@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MobileNav } from '@/components/mobile-nav';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -93,7 +93,7 @@ describe('MobileNav PWA & Accessibility', () => {
     expect(nav?.className).toContain('fixed');
     expect(nav?.className).toContain('bottom-0');
     expect(nav?.className).toContain('pointer-events-none');
-    expect(nav?.className).toContain('pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)*0.5))]');
+    expect(nav?.className).toContain('pb-[max(1rem,calc(env(safe-area-inset-bottom,0px)*0.65))]');
     expect(nav?.className).not.toContain('bg-sidebar');
     expect(nav?.className).not.toContain('h-[calc(4rem+env(safe-area-inset-bottom))]');
 
@@ -108,7 +108,50 @@ describe('MobileNav PWA & Accessibility', () => {
     expect(menuButton.className).toContain('pointer-events-auto');
     expect(menuButton.className).toContain('rounded-full');
     expect(menuButton.className).toContain('glass-nav-button');
+    expect(menuButton.className).toContain('h-13');
+    expect(menuButton.className).toContain('w-13');
     expect(menuButton.className).toContain('min-w-11');
     expect(menuButton.className).toContain('min-h-11');
+  });
+
+  it('fits 4 page items on standard iPhones, expands on larger phones, and keeps Edit Layout 1:1 in sync', () => {
+    const cases = [
+      { width: 390, expectedLinks: 4 },
+      { width: 430, expectedLinks: 4 },
+      { width: 480, expectedLinks: 5 },
+    ];
+
+    for (const { width, expectedLinks } of cases) {
+      Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: width });
+
+      const { container, getByLabelText, getByText, unmount } = render(
+        <QueryClientProvider client={queryClient}>
+          <MobileSubNavProvider>
+            <MobileNav />
+          </MobileSubNavProvider>
+        </QueryClientProvider>
+      );
+
+      const navLinks = Array.from(container.querySelectorAll('nav a'));
+      expect(navLinks).toHaveLength(expectedLinks);
+      expect(container.querySelectorAll('nav a, nav button')).toHaveLength(expectedLinks + 1);
+
+      for (const btn of [...navLinks, getByLabelText('Open navigation menu')]) {
+        expect(btn.className).toContain('h-13');
+        expect(btn.className).toContain('w-13');
+      }
+
+      fireEvent.click(getByLabelText('Open navigation menu'));
+      fireEvent.click(getByText('Edit Layout'));
+
+      const barLabels = navLinks.map((a) => a.getAttribute('aria-label'));
+      const editSlotLabels = Array.from(container.querySelectorAll('[data-slot-index] span')).map(
+        (el) => el.textContent?.trim(),
+      );
+      expect(editSlotLabels).toHaveLength(expectedLinks);
+      expect(editSlotLabels).toEqual(barLabels);
+
+      unmount();
+    }
   });
 });

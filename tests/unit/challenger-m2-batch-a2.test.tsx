@@ -227,7 +227,7 @@ describe('Milestone 2 / Batch A2 Implementation Verification Suite', () => {
       expect(nav?.className).toContain('fixed');
       expect(nav?.className).toContain('bottom-0');
       expect(nav?.className).toContain('pointer-events-none');
-      expect(nav?.className).toContain('pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)*0.5))]');
+      expect(nav?.className).toContain('pb-[max(1rem,calc(env(safe-area-inset-bottom,0px)*0.65))]');
       expect(
         container.querySelectorAll('nav .glass-nav-button, nav .glass-nav-button-active').length,
       ).toBeGreaterThan(0);
@@ -236,7 +236,7 @@ describe('Milestone 2 / Batch A2 Implementation Verification Suite', () => {
     it('includes safe-area-inset-bottom in AuthenticatedLayout bottom padding', () => {
       const layoutPath = path.resolve(__dirname, '../../components/authenticated-layout.tsx');
       const layoutContent = fs.readFileSync(layoutPath, 'utf-8');
-      expect(layoutContent).toContain('pb-[calc(4.5rem+max(0.75rem,env(safe-area-inset-bottom,0px)*0.5))] md:pb-0');
+      expect(layoutContent).toContain('pb-[calc(4.5rem+max(1rem,env(safe-area-inset-bottom,0px)*0.65))] md:pb-0');
     });
   });
 });

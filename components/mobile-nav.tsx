@@ -309,14 +309,15 @@ export function MobileNav() {
   const [excludedHomeIds, setExcludedHomeIds] = useState<string[]>([]);
 
   // How many individual circular glass buttons fit in the floating bottom nav
-  // (48px button width with 12px gaps, 16px horizontal screen margin, capped at 448px):
-  // N page buttons + 1 hamburger button <= barWidth -> floor of 3 page buttons.
-  const HOME_BAR_ITEM_GAP_PX = 12;
-  const HOME_BUTTON_MIN_WIDTH_PX = 48;
+  // (52px button width with 18px minimum spacing, 16px horizontal screen margin, capped at 512px):
+  // N page buttons + 1 hamburger button <= barWidth -> 4 page buttons on regular iPhones
+  // (390-430px), expanding naturally to 5+ on larger phones (440px+) with floor of 3.
+  const HOME_BAR_ITEM_GAP_PX = 18;
+  const HOME_BUTTON_MIN_WIDTH_PX = 52;
   const [homeNavSlotCount, setHomeNavSlotCount] = useState(4);
   useEffect(() => {
     const computeHomeNavSlots = () => {
-      const barWidth = Math.max(240, Math.min(window.innerWidth - 32, 448));
+      const barWidth = Math.max(240, Math.min(window.innerWidth - 32, 512));
       const totalButtons = Math.floor(
         (barWidth + HOME_BAR_ITEM_GAP_PX) /
         (HOME_BUTTON_MIN_WIDTH_PX + HOME_BAR_ITEM_GAP_PX)
@@ -432,9 +433,18 @@ export function MobileNav() {
   }, []);
 
 
+  const persistNavIdList = (key: string, ids: string[]) => {
+    localStorage.setItem(key, JSON.stringify(ids));
+  };
+
   const updateHomeItems = (newIds: string[]) => {
     setHomeItemIds(newIds);
-    localStorage.setItem('mobile-home-nav-items', JSON.stringify(newIds));
+    persistNavIdList('mobile-home-nav-items', newIds);
+  };
+
+  const updateExcludedItems = (nextExcluded: string[]) => {
+    setExcludedHomeIds(nextExcluded);
+    persistNavIdList('mobile-home-nav-excluded', nextExcluded);
   };
 
   const isActive = (href: string) => {
@@ -484,15 +494,8 @@ export function MobileNav() {
           .filter((item) => isItemVisible(item)),
       ].slice(0, homeNavSlotCount);
 
-  // What "Edit Layout" manages: every saved home item, capped to what the
-  // widest phone can show. Extra defaults used to auto-fill the bar at some
-  // widths are intentionally not listed here — they are implicit and can be
-  // removed live from the bar itself.
-  const HOME_BAR_MAX_ITEMS = 10;
-  const homeNavEditItems = homeItemIds
-    .map((id) => ALL_NAV_ITEMS.find((item) => item.id === id))
-    .filter((item): item is NavItem => !!item)
-    .slice(0, HOME_BAR_MAX_ITEMS);
+  // Keep "Edit Layout" 1:1 with the items currently rendered on the bottom bar.
+  const homeNavEditItems = shownHomeNavItems;
   // Pointer event handlers for custom drag and drop
   const handleItemPointerMove = (e: React.PointerEvent) => {
     if (!isEditing) {
@@ -623,7 +626,7 @@ export function MobileNav() {
 
         const uniqueIds = Array.from(new Set(newIds)).slice(0, homeNavSlotCount);
         updateHomeItems(uniqueIds);
-        setExcludedHomeIds((prev) => prev.filter((id) => id !== draggedItem.id));
+        updateExcludedItems(excludedHomeIds.filter((id) => id !== draggedItem.id));
         haptic.success();
       }
 
@@ -648,7 +651,7 @@ export function MobileNav() {
       window.removeEventListener('touchend', handleDrop);
       window.removeEventListener('touchcancel', handleDrop);
     };
-  }, [draggedItem, hoveredSlotIndex, homeItemIds, homeNavSlotCount]);
+  }, [draggedItem, hoveredSlotIndex, homeItemIds, shownHomeNavItems, excludedHomeIds, homeNavSlotCount]);
 
   const handleItemClick = (e: React.MouseEvent) => {
     if (isEditing) {
@@ -664,7 +667,11 @@ export function MobileNav() {
       .filter((_, idx) => idx !== indexToRemove)
       .map(navItem => navItem.id);
     updateHomeItems(newIds);
-    setExcludedHomeIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
+    updateExcludedItems(
+      excludedHomeIds.includes(item.id)
+        ? excludedHomeIds
+        : [...excludedHomeIds, item.id],
+    );
   };
 
   const getWiggleClass = (index: number) => {
@@ -702,9 +709,9 @@ export function MobileNav() {
       <nav
         ref={navRef}
         aria-label="Mobile navigation"
-        className="fixed bottom-0 left-0 right-0 z-40 md:hidden pointer-events-none px-4 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)*0.5))]"
+        className="fixed bottom-0 left-0 right-0 z-40 md:hidden pointer-events-none px-4 pb-[max(1rem,calc(env(safe-area-inset-bottom,0px)*0.65))]"
       >
-        <div className="max-w-md mx-auto flex items-center justify-center gap-3">
+        <div className="max-w-lg mx-auto flex items-center justify-evenly gap-4">
           {shownHomeNavItems.map((item) => {
             const Icon = item.icon;
             const active = pendingHref ? pendingHref === item.href : (isActive(item.href) && !isOpen);
@@ -716,12 +723,12 @@ export function MobileNav() {
                 aria-label={item.label}
                 aria-current={active ? 'page' : undefined}
                 onClick={() => setPendingHref(item.href)}
-                className={`pointer-events-auto inline-flex items-center justify-center h-12 w-12 min-w-11 min-h-11 rounded-full transition-all duration-200 active:scale-95 select-none group ${active
+                className={`pointer-events-auto inline-flex items-center justify-center h-13 w-13 min-w-11 min-h-11 rounded-full transition-all duration-200 active:scale-95 select-none group ${active
                   ? 'glass-nav-button-active text-primary'
                   : 'glass-nav-button text-sidebar-foreground/75 hover:text-sidebar-foreground'
                   }`}
               >
-                <Icon className="h-5 w-5 flex-shrink-0" />
+                <Icon className="h-5.5 w-5.5 flex-shrink-0" />
               </Link>
             );
           })}
@@ -732,12 +739,12 @@ export function MobileNav() {
             aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={isOpen}
             onClick={() => setIsOpen(!isOpen)}
-            className={`pointer-events-auto inline-flex items-center justify-center h-12 w-12 min-w-11 min-h-11 rounded-full transition-all duration-200 active:scale-95 select-none group ${isOpen
+            className={`pointer-events-auto inline-flex items-center justify-center h-13 w-13 min-w-11 min-h-11 rounded-full transition-all duration-200 active:scale-95 select-none group ${isOpen
               ? 'glass-nav-button-active text-primary'
               : 'glass-nav-button text-sidebar-foreground/75 hover:text-sidebar-foreground'
               }`}
           >
-            {isOpen ? <X className="h-5 w-5 flex-shrink-0" /> : <Menu className="h-5 w-5 flex-shrink-0" />}
+            {isOpen ? <X className="h-5.5 w-5.5 flex-shrink-0" /> : <Menu className="h-5.5 w-5.5 flex-shrink-0" />}
           </button>
         </div>
       </nav>
