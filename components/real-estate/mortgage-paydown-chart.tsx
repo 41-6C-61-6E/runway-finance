@@ -70,7 +70,7 @@ const OTHER_MORTGAGE_COLORS = [
 
 export function MortgagePaydownChart({
   mortgage,
-  propertyName: _propertyName,
+  propertyName,
   propertyPurchaseDate,
   allLinkedMortgages,
   mortgageSnapshots,
@@ -413,24 +413,24 @@ export function MortgagePaydownChart({
         {((mortgage.escrow !== undefined && mortgage.escrow > 0) ||
           (mortgage.pmi !== undefined && mortgage.pmi > 0) ||
           (mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0)) && (
-          <div className="pt-2 border-t border-border/40 flex flex-wrap gap-2 text-[10px]">
-            {mortgage.escrow !== undefined && mortgage.escrow > 0 && (
-              <span className="px-2 py-0.5 rounded bg-muted/50 border border-border/40 text-muted-foreground">
-                Escrow: <strong className="font-mono text-foreground blur-number">{formatCurrency(mortgage.escrow)}</strong>
-              </span>
-            )}
-            {mortgage.pmi !== undefined && mortgage.pmi > 0 && (
-              <span className="px-2 py-0.5 rounded bg-muted/50 border border-border/40 text-muted-foreground">
-                PMI: <strong className="font-mono text-foreground blur-number">{formatCurrency(mortgage.pmi)}</strong>
-              </span>
-            )}
-            {mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0 && (
-              <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-medium">
-                Extra Principal: <strong className="font-mono blur-number">{formatCurrency(mortgage.extraPrincipal)}</strong>
-              </span>
-            )}
-          </div>
-        )}
+            <div className="pt-2 border-t border-border/40 flex flex-wrap gap-2 text-[10px]">
+              {mortgage.escrow !== undefined && mortgage.escrow > 0 && (
+                <span className="px-2 py-0.5 rounded bg-muted/50 border border-border/40 text-muted-foreground">
+                  Escrow: <strong className="font-mono text-foreground blur-number">{formatCurrency(mortgage.escrow)}</strong>
+                </span>
+              )}
+              {mortgage.pmi !== undefined && mortgage.pmi > 0 && (
+                <span className="px-2 py-0.5 rounded bg-muted/50 border border-border/40 text-muted-foreground">
+                  PMI: <strong className="font-mono text-foreground blur-number">{formatCurrency(mortgage.pmi)}</strong>
+                </span>
+              )}
+              {mortgage.extraPrincipal !== undefined && mortgage.extraPrincipal > 0 && (
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-medium">
+                  Extra Principal: <strong className="font-mono blur-number">{formatCurrency(mortgage.extraPrincipal)}</strong>
+                </span>
+              )}
+            </div>
+          )}
       </div>
 
       {/* ── 2. Early Payoff Simulator ── */}

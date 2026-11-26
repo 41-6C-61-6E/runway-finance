@@ -5,6 +5,7 @@ import {
   calculateMonthlyPIPayment,
   calculateRemainingPayoffMonths,
   monthsBetweenDates,
+  getAmortizationPaymentDate,
 } from '@/lib/utils/amortization';
 
 describe('amortization utility calculations', () => {
@@ -20,7 +21,7 @@ describe('amortization utility calculations', () => {
     const schedule = calculateAmortizationSchedule(params);
 
     expect(schedule).toHaveLength(360);
-    
+
     // First month payment should have principal and interest
     expect(schedule[0].month).toBe(1);
     expect(schedule[0].date).toBe('2025-01-01');
@@ -66,13 +67,13 @@ describe('amortization utility calculations', () => {
     expect(result.acceleratedSummary.interestSaved).toBeGreaterThan(0);
     expect(result.acceleratedSummary.monthsSaved).toBeGreaterThan(0);
     expect(result.acceleratedSummary.totalPayments).toBeLessThan(360);
-    
+
     // Standard payoff date should be Dec 2054 (360 months from Jan 2025)
     expect(result.standardSummary.payoffDate).toBe('2054-12-01');
-    
+
     // Accelerated payoff date should be earlier than Dec 2054
     expect(result.acceleratedSummary.payoffDate!.localeCompare('2054-12-01')).toBeLessThan(0);
-    
+
     // Total payments under standard should be 360, and accelerated should be less
     expect(result.standardSummary.totalPayments).toBe(360);
     expect(result.acceleratedSummary.totalPayments).toBe(360 - result.acceleratedSummary.monthsSaved);
