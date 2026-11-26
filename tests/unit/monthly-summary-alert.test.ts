@@ -217,7 +217,7 @@ describe('Monthly Summary Report (R12a)', () => {
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
     expect(payload.body).toContain(`${spec.monthLabel}: net worth decreased by $90.12.`);
     expect(payload.body).not.toContain('cash flow');
-    expect(payload.url).toBe(`/flows?timeframe=1m&date=${spec.yearMonth}`);
+    expect(payload.url).toBe(`/flows?tab=wealth&timeframe=1m&date=${spec.yearMonth}`);
   });
 
   it('does not notify when notifyMonthlySummary is disabled', async () => {

@@ -88,4 +88,44 @@ describe('net worth change bars', () => {
       endDate: '2025-06-15',
     });
   });
+
+  it('uses an optional previousPoint baseline for Day 1 in daily view and the first bucket in monthly view', () => {
+    const daily = computeNetWorthChangeBarData(
+      [
+        { date: '2026-06-01', netWorth: 1200 },
+        { date: '2026-06-02', netWorth: 1350 },
+      ],
+      { date: '2026-05-31', netWorth: 1000 }
+    );
+    expect(daily.bucketSize).toBe('daily');
+    expect(daily.barData[0]).toEqual({
+      date: '2026-06-01',
+      startDate: '2026-05-31',
+      endDate: '2026-06-01',
+      change: 200,
+      startNetWorth: 1000,
+      endNetWorth: 1200,
+    });
+
+    const monthly = computeNetWorthChangeBarData(
+      [
+        { date: '2026-01-01', netWorth: 10100 },
+        { date: '2026-01-31', netWorth: 11000 },
+        { date: '2026-02-28', netWorth: 12000 },
+        { date: '2026-03-31', netWorth: 13000 },
+        { date: '2026-04-30', netWorth: 14000 },
+        { date: '2026-05-31', netWorth: 15000 },
+        { date: '2026-06-30', netWorth: 16000 },
+        { date: '2026-07-31', netWorth: 17000 },
+      ],
+      { date: '2025-12-31', netWorth: 10000 }
+    );
+    expect(monthly.bucketSize).toBe('monthly');
+    expect(monthly.barData[0]).toMatchObject({
+      date: '2026-01-01',
+      startNetWorth: 10000,
+      endNetWorth: 11000,
+      change: 1000,
+    });
+  });
 });

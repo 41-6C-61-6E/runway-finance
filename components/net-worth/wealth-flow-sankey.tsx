@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { ResponsiveContainer, Sankey, Tooltip } from 'recharts';
 import { formatCurrency, formatPlainPercent } from '@/lib/utils/format';
+import { buildAccountLink, buildTransactionsLink } from '@/lib/utils/deep-links';
 import { SankeyLabel, computeLabelGutter } from '@/components/charts/sankey/sankey-label';
 import { SankeyCustomNode } from '@/components/charts/sankey/sankey-nodes';
 import { SankeyCustomLink } from '@/components/charts/sankey/sankey-links';
@@ -11,7 +13,7 @@ import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useCardCollapsed } from '@/lib/hooks/use-card-collapsed';
-import { TrendingUp, TrendingDown, Info, ChevronDown, ArrowLeftRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Info, ChevronDown, ArrowLeftRight, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
@@ -19,7 +21,7 @@ import { DateWindowNav } from '@/components/charts/date-window-nav';
 import { apiFetch } from '@/lib/utils/api-client';
 import { SegPill } from '@/components/ui/seg-pill';
 import { ModalBackdrop } from '@/components/ui/modal-overlay';
-import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail } from '@/lib/types/financial';
+import type { WealthFlowData, WealthFlowNode, WealthFlowAccountDetail, WealthFlowSummary } from '@/lib/types/financial';
 
 interface AccountData {
   id: string;
@@ -107,17 +109,21 @@ function routeFlowsThroughAccounts(data: WealthFlowData): WealthFlowData {
 }
 
 function DetailModal({
-  node, onClose, allAccounts,
+  node, onClose, allAccounts, summary, dateRange,
 }: {
   node: WealthFlowNode | null;
   onClose: () => void;
   allAccounts: AccountData[];
+  summary?: WealthFlowSummary | null;
+  dateRange: { start: string; end: string };
 }) {
   if (!node) return null;
 
   const isHub = node.type === 'hub';
   const isIncrease = node.type === 'increase';
   const isDecrease = node.type === 'decrease';
+  const hubIncreases = summary?.totalIncreases ?? (node.visualImbalance !== undefined && node.visualImbalance >= 0 ? node.visualImbalance : 0);
+  const hubDecreases = summary?.totalDecreases ?? (node.visualImbalance !== undefined && node.visualImbalance < 0 ? Math.abs(node.visualImbalance) : 0);
 
   return (
     <ModalBackdrop
@@ -156,7 +162,7 @@ function DetailModal({
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-center">
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Increases</div>
                 <div className="text-sm font-bold text-emerald-500 font-mono mt-1 blur-number">
-                  +{formatCurrency(node.visualImbalance !== undefined && node.visualImbalance >= 0 ? node.visualImbalance : 0)}
+                  +{formatCurrency(hubIncreases)}
                 </div>
               </div>
               <div className="bg-card border border-border/40 rounded-xl p-3 text-center">
@@ -168,7 +174,7 @@ function DetailModal({
               <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 text-center">
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Decreases</div>
                 <div className="text-sm font-bold text-rose-500 font-mono mt-1 blur-number">
-                  -{formatCurrency(node.visualImbalance !== undefined && node.visualImbalance < 0 ? Math.abs(node.visualImbalance) : 0)}
+                  -{formatCurrency(hubDecreases)}
                 </div>
               </div>
             </div>
@@ -206,6 +212,7 @@ function DetailModal({
                       <th className="p-2.5 text-right">Start</th>
                       <th className="p-2.5 text-right">End</th>
                       <th className="p-2.5 text-right">NW Impact</th>
+                      <th className="p-2.5 text-right w-8"><span className="sr-only">Transactions</span></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/30">
@@ -213,11 +220,33 @@ function DetailModal({
                       const nwImpact = isIncrease ? Math.abs(acc.signedNWDelta) : -Math.abs(acc.signedNWDelta);
                       return (
                         <tr key={acc.id} className="hover:bg-muted/10 transition-colors">
-                          <td className="p-2.5 font-medium text-foreground truncate max-w-[120px]">{acc.name}</td>
+                          <td className="p-2.5 font-medium text-foreground max-w-[140px]">
+                            <Link
+                              href={buildAccountLink(acc.id)}
+                              className="truncate block hover:text-primary hover:underline transition-colors"
+                              title={`Open ${acc.name} account`}
+                            >
+                              {acc.name}
+                            </Link>
+                          </td>
                           <td className="p-2.5 text-right font-mono text-muted-foreground blur-number">{formatCurrency(acc.beginningBalance)}</td>
                           <td className="p-2.5 text-right font-mono text-muted-foreground blur-number">{formatCurrency(acc.endingBalance)}</td>
                           <td className={`p-2.5 text-right font-mono font-semibold blur-number ${nwImpact >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {nwImpact >= 0 ? '+' : ''}{formatCurrency(nwImpact)}
+                          </td>
+                          <td className="p-2.5 text-right">
+                            <Link
+                              href={buildTransactionsLink({
+                                accountId: acc.id,
+                                startDate: dateRange.start,
+                                endDate: dateRange.end,
+                              })}
+                              title={`View transactions for ${acc.name} in this period`}
+                              aria-label={`View transactions for ${acc.name}`}
+                              className="inline-flex items-center justify-center p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-accent/60 transition-colors"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                            </Link>
                           </td>
                         </tr>
                       );
@@ -246,7 +275,7 @@ export function WealthFlowSankey() {
   const {
     timeframe, setTimeframe, windowEnd, setWindowEnd,
     nextWindow, prevWindow, isNextDisabled, windowLabel,
-    showWindowNav, periodOptions, dateRange,
+    showWindowNav, periodOptions, dateRange, isCustomRange,
   } = useDateWindow('finance:sankey:timeframe', 'finance:sankey:windowEnd', '1m');
 
   const [wealthFlowData, setWealthFlowData] = useState<WealthFlowData | null>(null);
@@ -320,7 +349,9 @@ export function WealthFlowSankey() {
         setLoading(true);
         setError(null);
 
-        const url = `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}&timeframe=${timeframe}`;
+        const url = isCustomRange
+          ? `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}`
+          : `/api/wealth-flow?startDate=${dateRange.start}&endDate=${dateRange.end}&timeframe=${timeframe}`;
         const data = await apiFetch<WealthFlowData>(url);
         if (isCurrent) setWealthFlowData(data);
       } catch (err) {
@@ -332,7 +363,7 @@ export function WealthFlowSankey() {
 
     fetchData();
     return () => { isCurrent = false; };
-  }, [timeframe, windowEnd, dateRange.start, dateRange.end]);
+  }, [timeframe, windowEnd, dateRange.start, dateRange.end, isCustomRange]);
 
   const displayWealthFlowData = useMemo(() => {
     if (!wealthFlowData) return null;
@@ -529,8 +560,14 @@ export function WealthFlowSankey() {
                     value={`${(node.netWorthChange || 0) >= 0 ? '+' : ''}${formatCurrency(node.netWorthChange || 0)}`}
                     color={(node.netWorthChange || 0) >= 0 ? '#10b981' : '#ef4444'}
                   />
-                  <TooltipRow label="Total Increases" value={formatCurrency(node.visualImbalance !== undefined && node.visualImbalance >= 0 ? node.visualImbalance : 0)} />
-                  <TooltipRow label="Total Decreases" value={formatCurrency(node.visualImbalance !== undefined && node.visualImbalance < 0 ? Math.abs(node.visualImbalance) : 0)} />
+                  <TooltipRow
+                    label="Total Increases"
+                    value={formatCurrency(wealthFlowData?.summary?.totalIncreases ?? (node.visualImbalance !== undefined && node.visualImbalance >= 0 ? node.visualImbalance : 0))}
+                  />
+                  <TooltipRow
+                    label="Total Decreases"
+                    value={formatCurrency(wealthFlowData?.summary?.totalDecreases ?? (node.visualImbalance !== undefined && node.visualImbalance < 0 ? Math.abs(node.visualImbalance) : 0))}
+                  />
                 </>
               ) : (
                 <TooltipRow
@@ -572,7 +609,7 @@ export function WealthFlowSankey() {
         }}
       />
     ),
-    [showPercentages, themeVersion, processedData]
+    [showPercentages, themeVersion, processedData, wealthFlowData?.summary]
   );
 
   const drivers = useMemo(() => {
@@ -777,6 +814,8 @@ export function WealthFlowSankey() {
           node={selectedNodeDetails}
           onClose={() => setSelectedNodeDetails(null)}
           allAccounts={allAccounts}
+          summary={summary}
+          dateRange={dateRange}
         />
       )}
     </>

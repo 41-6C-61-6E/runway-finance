@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { TimeRange } from '@/components/charts/chart-filters';
 import { usePersistentState } from './use-persistent-state';
@@ -11,6 +11,23 @@ const MONTHS_BACK: Record<string, number> = { '1m': 0, '3m': 2, '6m': 5, '1y': 1
 
 // Keep deprecated 1d values for back-compat (deep links / persisted state) but not surfaced in UI
 const VALID_TIMEFRAMES: TimeRange[] = ['7d', '30d', '90d', '1m', '3m', '6m', '1y', '3y', '365d', '5y', 'ytd', 'all', '7d_discrete', '1d', '1d_discrete'];
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const YEAR_MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function formatCustomRangeLabel(start: string, end: string): string {
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  const startDate = new Date(Date.UTC(sy, sm - 1, sd));
+  const endDate = new Date(Date.UTC(ey, em - 1, ed));
+  if (sy === ey) {
+    const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    const endLabel = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    return `${startLabel} – ${endLabel}`;
+  }
+  const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const endLabel = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  return `${startLabel} – ${endLabel}`;
+}
 
 export interface DateWindowState {
   timeframe: TimeRange;
@@ -25,6 +42,7 @@ export interface DateWindowState {
   dateRange: { start: string; end: string };
   periodOptions: { label: string; value: string }[];
   showWindowNav: boolean;
+  isCustomRange: boolean;
 }
 
 export function useDateWindow(
@@ -37,48 +55,72 @@ export function useDateWindow(
   const searchParams = useSearchParams();
 
   // URL search params (e.g. notification deep links like
-  // /flows?timeframe=7d_discrete&date=2026-08-16) are authoritative for the
-  // initial window. They seed the state synchronously — so the very first
-  // data fetch already uses the linked window — and the persisted
-  // (DB/localStorage) chart selections are NOT restored over them. Without
-  // this, a previously saved window (often set by an *earlier* click of the
-  // same deep link) would clobber the linked window after mount.
+  // /flows?timeframe=7d_discrete&date=2026-08-16 or ?month=2026-08) are
+  // authoritative for the initial window. They seed the state synchronously —
+  // so the very first data fetch already uses the linked window — and the
+  // persisted (DB/localStorage) chart selections are NOT restored over them.
+  const urlMonth = useMemo(() => {
+    const paramMonth = searchParams?.get('month');
+    return paramMonth && YEAR_MONTH_RE.test(paramMonth) ? paramMonth : null;
+  }, [searchParams]);
+
   const urlTimeframe = useMemo(() => {
     const paramTf = searchParams?.get('timeframe');
-    return paramTf && (VALID_TIMEFRAMES as string[]).includes(paramTf) ? (paramTf as TimeRange) : null;
-  }, [searchParams]);
+    if (paramTf && (VALID_TIMEFRAMES as string[]).includes(paramTf)) {
+      return paramTf as TimeRange;
+    }
+    if (urlMonth !== null) {
+      return '1m' as TimeRange;
+    }
+    return null;
+  }, [searchParams, urlMonth]);
 
   const urlWindowEnd = useMemo(() => {
     const paramDate = searchParams?.get('date');
-    return paramDate && (/^\d{4}-\d{2}-\d{2}$/.test(paramDate) || /^\d{4}-\d{2}$/.test(paramDate)) ? paramDate : null;
-  }, [searchParams]);
+    if (paramDate && (ISO_DATE_RE.test(paramDate) || /^\d{4}-\d{2}$/.test(paramDate))) {
+      return paramDate;
+    }
+    return urlMonth;
+  }, [searchParams, urlMonth]);
+
+  const urlCustomRange = useMemo(() => {
+    if (urlTimeframe !== null) return null;
+    const start = searchParams?.get('startDate');
+    const end = searchParams?.get('endDate');
+    if (start && end && ISO_DATE_RE.test(start) && ISO_DATE_RE.test(end) && start <= end) {
+      return { start, end };
+    }
+    return null;
+  }, [searchParams, urlTimeframe]);
+
+  const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(urlCustomRange);
 
   const [timeframeState, _setTimeframe, isTimeframeLoaded] = usePersistentState<TimeRange>(
     timeframeKey || '',
     urlTimeframe ?? defaultTimeframe,
-    { skipRestore: urlTimeframe !== null },
+    { skipRestore: urlTimeframe !== null || urlCustomRange !== null },
   );
   const initialTimeframe = controlledTimeframe !== undefined ? controlledTimeframe : (urlTimeframe ?? defaultTimeframe);
-  const [windowEnd, setWindowEnd, isWindowEndLoaded] = usePersistentState<string>(
+  const [windowEnd, _setWindowEnd, isWindowEndLoaded] = usePersistentState<string>(
     windowEndKey,
     urlWindowEnd ?? snapToPeriod(currentMonth, initialTimeframe),
-    { skipRestore: urlWindowEnd !== null },
+    { skipRestore: urlWindowEnd !== null || urlCustomRange !== null },
   );
 
   const timeframe = controlledTimeframe !== undefined ? controlledTimeframe : timeframeState;
 
   const setTimeframe = (tf: TimeRange) => {
+    setCustomRange(null);
     if (controlledTimeframe === undefined) {
       _setTimeframe(tf);
     }
-    setWindowEnd(snapToPeriod(windowEnd, tf));
+    _setWindowEnd(snapToPeriod(windowEnd, tf));
   };
 
-  // Identity of the URLSearchParams object for which the URL-params sync
-  // effect below has already run. Next.js gives a new object per distinct
-  // URL, so comparing by identity "applies once per URL" with no
-  // re-serialization or string-parsing work.
-  const appliedSearchParamsRef = useRef<URLSearchParams | null>(null);
+  const setWindowEnd = (ym: string) => {
+    setCustomRange(null);
+    _setWindowEnd(ym);
+  };
 
   // Serialized URL params for which the URL-params sync effect below has
   // already run. String comparison (instead of object identity) is robust
@@ -97,6 +139,12 @@ export function useDateWindow(
     if (appliedUrlKeyRef.current === urlKey) return;
     appliedUrlKeyRef.current = urlKey;
 
+    if (urlCustomRange !== null) {
+      setCustomRange(urlCustomRange);
+    } else if (urlTimeframe !== null || urlWindowEnd !== null) {
+      setCustomRange(null);
+    }
+
     // Compare against current state so applying on mount is a no-op; only a
     // genuine param change (a new deep link after client-side navigation)
     // persists.
@@ -107,9 +155,9 @@ export function useDateWindow(
     // Compare against current state so re-applying the same value on mount
     // is a no-op; only a genuine param change persists.
     if (urlWindowEnd !== null && urlWindowEnd !== windowEnd) {
-      setWindowEnd(urlWindowEnd);
+      _setWindowEnd(urlWindowEnd);
     }
-  }, [searchParams, controlledTimeframe, _setTimeframe, setWindowEnd, timeframeState]);
+  }, [searchParams, controlledTimeframe, _setTimeframe, _setWindowEnd, timeframeState, windowEnd, urlTimeframe, urlWindowEnd, urlCustomRange]);
 
   useEffect(() => {
     // When the window end came straight from the URL (e.g. a notification
@@ -117,24 +165,29 @@ export function useDateWindow(
     // force-snapping it would silently change the linked window. Only snap
     // persisted monthly values (e.g. after the user switches to a discrete
     // timeframe, which already snaps synchronously in setTimeframe).
-    if (urlWindowEnd !== null) return;
+    if (urlWindowEnd !== null || urlCustomRange !== null) return;
     if (!isWindowEndLoaded || (controlledTimeframe === undefined && !isTimeframeLoaded)) return;
     const snapped = snapToPeriod(windowEnd, timeframe);
     if (snapped !== windowEnd) {
-      setWindowEnd(snapped);
+      _setWindowEnd(snapped);
     }
-  }, [timeframe, windowEnd, setWindowEnd, urlWindowEnd, isWindowEndLoaded, isTimeframeLoaded, controlledTimeframe]);
+  }, [timeframe, windowEnd, _setWindowEnd, urlWindowEnd, urlCustomRange, isWindowEndLoaded, isTimeframeLoaded, controlledTimeframe]);
 
-  // Auto-migrate deprecated 1d values persisted in DB/localStorage
+  // Auto-migrate deprecated 1d values persisted in DB/localStorage,
+  // but preserve explicit 1d_discrete deep links from the URL.
   useEffect(() => {
     if (controlledTimeframe !== undefined) return;
-    if (timeframeState === ('1d' as TimeRange)) _setTimeframe('7d' as TimeRange);
-    else if (timeframeState === ('1d_discrete' as TimeRange)) _setTimeframe('1m' as TimeRange);
-  }, [timeframeState, controlledTimeframe, _setTimeframe]);
+    if (timeframeState === ('1d' as TimeRange) && urlTimeframe !== '1d') {
+      _setTimeframe('7d' as TimeRange);
+    } else if (timeframeState === ('1d_discrete' as TimeRange) && urlTimeframe !== '1d_discrete') {
+      _setTimeframe('1m' as TimeRange);
+    }
+  }, [timeframeState, controlledTimeframe, _setTimeframe, urlTimeframe]);
 
   const shift = WINDOW_SPAN[timeframe] ?? 1;
 
   const prevWindow = () => {
+    setCustomRange(null);
     if (timeframe === '1d_discrete') {
       const dateParts = windowEnd.split('-');
       const y = Number(dateParts[0]);
@@ -142,7 +195,7 @@ export function useDateWindow(
       const d = dateParts[2] ? Number(dateParts[2]) : 1;
       const prevDate = new Date(y, m - 1, d);
       prevDate.setDate(prevDate.getDate() - 1);
-      setWindowEnd(`${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`);
+      _setWindowEnd(`${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`);
       return;
     }
     if (timeframe === '7d_discrete') {
@@ -152,16 +205,17 @@ export function useDateWindow(
       const d = dateParts[2] ? Number(dateParts[2]) : 1;
       const prevDate = new Date(y, m - 1, d);
       prevDate.setDate(prevDate.getDate() - 7);
-      setWindowEnd(`${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`);
+      _setWindowEnd(`${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`);
       return;
     }
     const [y, m] = windowEnd.split('-').map(Number);
     const d = new Date(y, m - 1, 1);
     d.setMonth(d.getMonth() - shift);
-    setWindowEnd(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    _setWindowEnd(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
   const nextWindow = () => {
+    setCustomRange(null);
     if (timeframe === '1d_discrete') {
       const dateParts = windowEnd.split('-');
       const y = Number(dateParts[0]);
@@ -174,7 +228,7 @@ export function useDateWindow(
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       if (nextStr <= todayStr) {
-        setWindowEnd(nextStr);
+        _setWindowEnd(nextStr);
       }
       return;
     }
@@ -190,9 +244,9 @@ export function useDateWindow(
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       if (nextStr <= todayStr) {
-        setWindowEnd(nextStr);
+        _setWindowEnd(nextStr);
       } else {
-        setWindowEnd(todayStr);
+        _setWindowEnd(todayStr);
       }
       return;
     }
@@ -205,10 +259,11 @@ export function useDateWindow(
     const nextStart = new Date(next.getFullYear(), next.getMonth() - mb, 1);
     const nextStartStr = `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, '0')}`;
     
-    if (nextStartStr <= currentMonth) setWindowEnd(nextStr);
+    if (nextStartStr <= currentMonth) _setWindowEnd(nextStr);
   };
 
   const isNextDisabled = useMemo(() => {
+    if (customRange !== null) return true;
     if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '90d' || timeframe === '365d') return true;
     if (timeframe === '1d_discrete' || timeframe === '7d_discrete') {
       const today = new Date();
@@ -221,16 +276,26 @@ export function useDateWindow(
     const mb = MONTHS_BACK[timeframe] ?? 0;
     const nextStart = new Date(nextEnd.getFullYear(), nextEnd.getMonth() - mb, 1);
     return `${nextStart.getFullYear()}-${String(nextStart.getMonth() + 1).padStart(2, '0')}` > currentMonth;
-  }, [timeframe, windowEnd, shift, currentMonth]);
+  }, [customRange, timeframe, windowEnd, shift, currentMonth]);
 
-  const showWindowNav = timeframe !== 'all' && timeframe !== 'ytd';
+  const showWindowNav = customRange !== null || (timeframe !== 'all' && timeframe !== 'ytd');
 
-  const windowLabel = useMemo(() => getPeriodLabel(windowEnd, timeframe), [windowEnd, timeframe]);
+  const windowLabel = useMemo(
+    () => (customRange ? formatCustomRangeLabel(customRange.start, customRange.end) : getPeriodLabel(windowEnd, timeframe)),
+    [customRange, windowEnd, timeframe]
+  );
 
-  const monthRange = useMemo(() => getMonthRange(timeframe, windowEnd), [timeframe, windowEnd]);
-  const dateRange = useMemo(() => getPreciseDateRange(timeframe, windowEnd), [timeframe, windowEnd]);
+  const monthRange = useMemo(
+    () => (customRange ? { start: customRange.start.slice(0, 7), end: customRange.end.slice(0, 7) } : getMonthRange(timeframe, windowEnd)),
+    [customRange, timeframe, windowEnd]
+  );
+  const dateRange = useMemo(
+    () => customRange ?? getPreciseDateRange(timeframe, windowEnd),
+    [customRange, timeframe, windowEnd]
+  );
 
   const periodOptions = useMemo(() => {
+    if (customRange !== null) return [];
     if (timeframe === 'all' || timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '90d' || timeframe === '365d' || timeframe === '1d_discrete' || timeframe === '7d_discrete') return [];
     const options: { label: string; value: string }[] = [];
     const count = timeframe === '1m' ? 24 : 12;
@@ -246,7 +311,7 @@ export function useDateWindow(
       cursor.setMonth(cursor.getMonth() - shift);
     }
     return options;
-  }, [timeframe, shift]);
+  }, [customRange, timeframe, shift]);
 
   return {
     timeframe,
@@ -261,5 +326,6 @@ export function useDateWindow(
     dateRange,
     periodOptions,
     showWindowNav,
+    isCustomRange: customRange !== null,
   };
 }

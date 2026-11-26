@@ -4,6 +4,7 @@ import { userSettings, netWorthSnapshots, sentNotifications } from '@/lib/db/sch
 import { eq, and, desc } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { calculateWealthFlow } from '@/lib/services/wealth-flow';
+import { buildWealthFlowLink } from '@/lib/utils/deep-links';
 import { logger } from '@/lib/logger';
 import { sendPushNotification } from '../transport';
 
@@ -165,7 +166,7 @@ export async function checkWeeklyNetWorthChangeAndNotify(userId: string, dek: Ui
       userId,
       `Weekly Net Worth Alert ${arrow}`,
       `Your net worth ${direction} by ${formattedDiff} ${timePhrase}.`,
-      `/flows?timeframe=7d_discrete&date=${snapshotDateStr}`,
+      buildWealthFlowLink({ timeframe: '7d_discrete', date: snapshotDateStr }),
       'weekly_net_worth_change',
       weeklyKey
     );

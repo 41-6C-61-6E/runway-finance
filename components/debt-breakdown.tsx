@@ -12,6 +12,7 @@ import { useUserSettings } from '@/components/user-settings-provider';
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { SegPill } from '@/components/ui/seg-pill';
+import { buildTransactionsLink } from '@/lib/utils/deep-links';
 
 const CHART_COLOR_MAP = [
   'var(--color-chart-1)',
@@ -113,6 +114,7 @@ interface AccountData {
 
 interface CategoryEntry {
   key: string;
+  accountIds: string[];
   label: string;
   color: string;
   amount: number;
@@ -155,7 +157,7 @@ export function DebtBreakdown() {
     const makeCategories = (colorMap: Record<string, { label: string }>, isDebt: boolean): CategoryEntry[] => {
       const map = isDebt ? DEBT_COLOR_MAP : CHART_COLOR_MAP;
       const otherMap = isDebt ? ASSET_DISPLAY_CATEGORIES : DEBT_DISPLAY_CATEGORIES;
-      const merged: Record<string, { types: Set<string>; label: string; amount: number }> = {};
+      const merged: Record<string, { types: Set<string>; accountIds: string[]; label: string; amount: number }> = {};
       for (const acc of reportableAccounts) {
         const rawBalance = typeof acc.balance === 'string' ? parseFloat(acc.balance) : acc.balance;
         const normType = acc.type.toLowerCase();
@@ -170,9 +172,10 @@ export function DebtBreakdown() {
         const converted = convertCurrency(rawBalance, acc.currency || 'USD', baseCurrency);
         const val = isDebt ? Math.abs(converted) : converted;
         if (val <= 0) continue;
-        const g = (merged[catInfo.label] ||= { types: new Set<string>(), label: catInfo.label, amount: 0 });
+        const g = (merged[catInfo.label] ||= { types: new Set<string>(), accountIds: [], label: catInfo.label, amount: 0 });
         g.amount += val;
         g.types.add(acc.type);
+        if (acc.id) g.accountIds.push(acc.id);
       }
       return Object.values(merged)
         .sort((a, b) => b.amount - a.amount)
@@ -208,6 +211,7 @@ export function DebtBreakdown() {
         name: cat.label,
         value: cat.amount,
         key: cat.key,
+        accountIds: cat.accountIds,
         color: cat.color,
       })),
     [activeCategories]
@@ -219,11 +223,19 @@ export function DebtBreakdown() {
       value: cat.amount,
       color: cat.color,
       key: cat.key,
+      accountIds: cat.accountIds,
     }));
   }, [activeCategories]);
 
-  const handleClick = (accountType: string) => {
-    router.push(`/transactions?accountTypes=${accountType}`);
+  const handleClick = (accountTypeOrIds: string | string[], accountIds?: string[]) => {
+    const ids = Array.isArray(accountTypeOrIds) ? accountTypeOrIds : accountIds;
+    if (ids && ids.length > 0) {
+      router.push(buildTransactionsLink({ accountIds: ids }));
+      return;
+    }
+    if (typeof accountTypeOrIds === 'string' && accountTypeOrIds) {
+      router.push(buildTransactionsLink({ accountTypes: accountTypeOrIds }));
+    }
   };
 
   const srSummary = useMemo(() => {
@@ -300,8 +312,10 @@ export function DebtBreakdown() {
                       stroke="none"
                       isAnimationActive={false}
                       onClick={(data) => {
-                        const key = data.key || (data.payload && data.payload.key);
-                        if (key) handleClick(key);
+                        const payload = data.payload as { key?: string; accountIds?: string[] } | undefined;
+                        const key = (data as { key?: string }).key || payload?.key;
+                        const ids = (data as { accountIds?: string[] }).accountIds || payload?.accountIds;
+                        if (ids?.length || key) handleClick(key || '', ids);
                       }}
                       className="cursor-pointer"
                     >
@@ -343,7 +357,7 @@ export function DebtBreakdown() {
                   <div
                     key={cat.label}
                     className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
-                    onClick={() => handleClick(cat.key)}
+                    onClick={() => handleClick(cat.key, cat.accountIds)}
                   >
                     <span
                       className="w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -394,7 +408,7 @@ export function DebtBreakdown() {
                       const showPct = height > 54;
                       const r = 3;
                       return (
-                        <g key={`tm-${index}`} style={{ cursor: 'pointer' }} onClick={() => item.key && handleClick(String(item.key))}>
+                        <g key={`tm-${index}`} style={{ cursor: 'pointer' }} onClick={() => (item.accountIds?.length || item.key) && handleClick(String(item.key), item.accountIds)}>
                           <defs>
                             <clipPath id={`net-worth-tm-label-${index}`}>
                               <rect x={x + 4} y={y + 2} width={Math.max(0, width - 8)} height={Math.max(0, height - 4)} />
@@ -462,7 +476,7 @@ export function DebtBreakdown() {
                         <div
                           key={cat.label}
                           className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-2 py-1.5 transition-colors"
-                          onClick={() => handleClick(cat.key)}
+                          onClick={() => handleClick(cat.key, cat.accountIds)}
                         >
                           <span
                             className="w-3 h-3 rounded-sm flex-shrink-0 border border-border"

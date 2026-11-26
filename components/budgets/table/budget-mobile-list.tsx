@@ -24,7 +24,8 @@ interface BudgetMobileListProps {
   incomeBudgets: BudgetData[];
   expenseBudgets: BudgetData[];
   flashCategoryId: string | null;
-  getTxUrl: (coveredCatIds?: string[], catId?: string) => string;
+  getTxUrl: (coveredCatIds?: string[], catId?: string, rangeOverride?: { startDate: string; endDate: string }) => string;
+  getBudgetRangeOverride?: (b: BudgetData) => { startDate: string; endDate: string } | undefined;
   periodType: string;
   periodKey: string;
   periodSuffix: string;
@@ -45,6 +46,7 @@ export function BudgetMobileList({
   expenseBudgets,
   flashCategoryId,
   getTxUrl,
+  getBudgetRangeOverride,
   periodType,
   periodKey,
   periodSuffix,
@@ -120,6 +122,7 @@ export function BudgetMobileList({
         </div>
       )}
       {incomeBudgets.map((b) => {
+        const envRange = getBudgetRangeOverride?.(b);
         return (
           <div
             key={b.id}
@@ -133,7 +136,7 @@ export function BudgetMobileList({
                   style={{ backgroundColor: b.categoryColor }}
                 />
                 <Link
-                  href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
+                  href={getTxUrl(b.coveredCategoryIds, b.categoryId, envRange)}
                   title={b.categoryName}
                   className="text-foreground font-medium text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch]"
                 >
@@ -145,6 +148,8 @@ export function BudgetMobileList({
                   categoryName={b.categoryName}
                   periodType={periodType}
                   periodKey={periodKey}
+                  startDateOverride={envRange?.startDate}
+                  endDateOverride={envRange?.endDate}
                 />
                 {b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (
                   <span
@@ -190,6 +195,7 @@ export function BudgetMobileList({
       )}
       {expenseBudgets.map((b) => {
         const isEE = b.isEverythingElse || b.isCatchAll || b.categoryName.toLowerCase() === 'everything else';
+        const envRange = getBudgetRangeOverride?.(b);
         return (
           <div
             key={b.id}
@@ -207,7 +213,8 @@ export function BudgetMobileList({
                     isEE && b.groupedBreakout && b.groupedBreakout.length > 0
                       ? b.groupedBreakout.map((i) => i.categoryId)
                       : b.coveredCategoryIds,
-                    b.categoryId
+                    b.categoryId,
+                    envRange
                   )}
                   title={b.categoryName}
                   className="text-foreground font-semibold text-sm budget-fade hover:text-primary hover:underline transition-colors min-w-[12ch]"
@@ -220,6 +227,8 @@ export function BudgetMobileList({
                   categoryName={b.categoryName}
                   periodType={periodType}
                   periodKey={periodKey}
+                  startDateOverride={envRange?.startDate}
+                  endDateOverride={envRange?.endDate}
                 />
                 {isEnvelope(b) && renderEnvelopeBadge(b)}
                 {!isEE && !isEnvelope(b) && b.nativePeriodType && b.nativePeriodType !== periodType && b.nativeAmount !== undefined && (

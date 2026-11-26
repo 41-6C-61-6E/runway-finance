@@ -12,6 +12,7 @@ import { filterReportableAccounts, computeNetWorthTotals } from '@/lib/utils/acc
 import { useUserSettings } from '@/components/user-settings-provider';
 import { formatInTimezone } from '@/lib/utils/timeframe';
 import { TYPE_HIERARCHY, GROUP_ORDER } from '@/lib/constants/account-types';
+import { buildTransactionsLink } from '@/lib/utils/deep-links';
 
 const SUB_GROUP_TO_TYPES: Record<string, string[]> = {};
 const GROUP_TO_TYPES: Record<string, string[]> = {};
@@ -172,7 +173,17 @@ export default function AccountsSidebar() {
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30" />
                 )}
               </button>
-              <button onClick={() => router.push(`/transactions?accountTypes=${SUB_GROUP_TO_TYPES[subGroup]?.join(',')}`)} className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer">
+              <button
+                onClick={() => {
+                  const accountIds = accs.map((a) => a.id).filter(Boolean);
+                  if (accountIds.length > 0) {
+                    router.push(buildTransactionsLink({ accountIds }));
+                  } else if (SUB_GROUP_TO_TYPES[subGroup]?.length) {
+                    router.push(buildTransactionsLink({ accountTypes: SUB_GROUP_TO_TYPES[subGroup] }));
+                  }
+                }}
+                className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer"
+              >
                 <span className="text-[13px] font-semibold text-muted-foreground/70 truncate">{subGroup}</span>
               </button>
               <span className="font-mono text-[13px] blur-number text-foreground/70">{subGroupFmt.sign}{subGroupFmt.text}</span>
@@ -338,7 +349,14 @@ export default function AccountsSidebar() {
                       )}
                     </button>
                     <button
-                      onClick={() => router.push(`/transactions?accountTypes=${GROUP_TO_TYPES[group]?.join(',')}`)}
+                      onClick={() => {
+                        const accountIds = Array.from(subMap.values()).flat().map((a) => a.id).filter(Boolean);
+                        if (accountIds.length > 0) {
+                          router.push(buildTransactionsLink({ accountIds }));
+                        } else if (GROUP_TO_TYPES[group]?.length) {
+                          router.push(buildTransactionsLink({ accountTypes: GROUP_TO_TYPES[group] }));
+                        }
+                      }}
                       className="flex items-center gap-1.5 flex-1 min-w-0 text-left cursor-pointer"
                     >
                       <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest truncate">

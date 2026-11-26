@@ -227,7 +227,10 @@ export function RecentActivity({ transactions, startDate, endDate, value, onValu
                     return (
                       <a
                         key={tx.id}
-                        href={buildDeepLink({ search: tx.payee || tx.description })}
+                        href={buildTransactionsDeepLink(tx.date, shiftDaysUTC(tx.date, 1), {
+                          search: tx.payee || tx.description,
+                          accountId: tx.accountId,
+                        })}
                         title={`${filterLabel} entry — click to view in Transactions`}
                         className="flex items-center justify-between py-2.5 first:pt-0 gap-3 block group transition-colors hover:bg-muted/20 -mx-2 px-2 rounded-md"
                       >

@@ -39,6 +39,7 @@ export type FilterState = {
   startDate: string | null;
   endDate: string | null;
   pending: string | null;
+  ignored: string | null;
   reviewed: string | null;
   minAmount: string | null;
   maxAmount: string | null;
@@ -79,6 +80,7 @@ function TransactionsContent() {
     startDate: searchParams.get('startDate') ?? null,
     endDate: searchParams.get('endDate') ?? null,
     pending: searchParams.get('pending') ?? null,
+    ignored: searchParams.get('ignored') ?? null,
     reviewed: searchParams.get('reviewed') ?? null,
     minAmount: searchParams.get('minAmount') ?? null,
     maxAmount: searchParams.get('maxAmount') ?? null,
@@ -317,6 +319,7 @@ useEffect(() => {
       startDate: preset.filters.startDate ?? null,
       endDate: preset.filters.endDate ?? null,
       pending: preset.filters.pending ?? null,
+      ignored: preset.filters.ignored ?? null,
       reviewed: preset.filters.reviewed ?? null,
       minAmount: preset.filters.minAmount ?? null,
       maxAmount: preset.filters.maxAmount ?? null,
@@ -381,6 +384,10 @@ useEffect(() => {
 
   useEffect(() => {
     const params = new URLSearchParams();
+    const existingView = searchParamsRef.current.get('view');
+    const existingAi = searchParamsRef.current.get('aiSuggestions');
+    if (existingView) params.set('view', existingView);
+    if (existingAi) params.set('aiSuggestions', existingAi);
     if (filters.accountId) params.set('accountId', filters.accountId);
     if (filters.accountIds) params.set('accountIds', filters.accountIds);
     if (filters.accountTypes) params.set('accountTypes', filters.accountTypes);
@@ -396,6 +403,7 @@ useEffect(() => {
     if (filters.startDate) params.set('startDate', filters.startDate);
     if (filters.endDate) params.set('endDate', filters.endDate);
     if (filters.pending) params.set('pending', filters.pending);
+    if (filters.ignored) params.set('ignored', filters.ignored);
     if (filters.reviewed) params.set('reviewed', filters.reviewed);
     if (filters.minAmount) params.set('minAmount', filters.minAmount);
     if (filters.maxAmount) params.set('maxAmount', filters.maxAmount);
@@ -427,10 +435,13 @@ useEffect(() => {
           .filter((c) => c.hideFromTransactions)
           .map((c) => c.id);
         if (hiddenIds.length > 0) {
-          const hiddenStr = hiddenIds.join(',');
           setFilters((prev) => {
-            if (prev.excludeCategoryIds === hiddenStr) return prev;
-            return { ...prev, excludeCategoryIds: hiddenStr };
+            const existing = prev.excludeCategoryIds
+              ? prev.excludeCategoryIds.split(',').map((id) => id.trim()).filter(Boolean)
+              : [];
+            const merged = Array.from(new Set([...existing, ...hiddenIds])).join(',');
+            if (prev.excludeCategoryIds === merged) return prev;
+            return { ...prev, excludeCategoryIds: merged };
           });
         }
       })
@@ -443,6 +454,7 @@ useEffect(() => {
   const spCategoryId = searchParams.get('categoryId');
   const spCategoryIds = searchParams.get('categoryIds');
   const spExcludeCategoryIds = searchParams.get('excludeCategoryIds');
+  const spExcludeTagIds = searchParams.get('excludeTagIds');
   const spTagId = searchParams.get('tagId');
   const spTagIds = searchParams.get('tagIds');
   const spAccountTagIds = searchParams.get('accountTagIds');
@@ -451,6 +463,7 @@ useEffect(() => {
   const spStartDate = searchParams.get('startDate');
   const spEndDate = searchParams.get('endDate');
   const spPending = searchParams.get('pending');
+  const spIgnored = searchParams.get('ignored');
   const spReviewed = searchParams.get('reviewed');
   const spMinAmount = searchParams.get('minAmount');
   const spMaxAmount = searchParams.get('maxAmount');
@@ -466,6 +479,7 @@ useEffect(() => {
       const categoryId = spCategoryId ?? null;
       const categoryIds = spCategoryIds ?? null;
       const excludeCategoryIds = spExcludeCategoryIds ?? null;
+      const excludeTagIds = spExcludeTagIds ?? null;
       const tagId = spTagId ?? null;
       const tagIds = spTagIds ?? null;
       const accountTagIds = spAccountTagIds ?? null;
@@ -474,6 +488,7 @@ useEffect(() => {
       const startDate = spStartDate ?? null;
       const endDate = spEndDate ?? null;
       const pending = spPending ?? null;
+      const ignored = spIgnored ?? null;
       const reviewed = spReviewed ?? null;
       const minAmount = spMinAmount ?? null;
       const maxAmount = spMaxAmount ?? null;
@@ -487,6 +502,7 @@ useEffect(() => {
         prev.categoryId === categoryId &&
         prev.categoryIds === categoryIds &&
         prev.excludeCategoryIds === excludeCategoryIds &&
+        prev.excludeTagIds === excludeTagIds &&
         prev.tagId === tagId &&
         prev.tagIds === tagIds &&
         prev.accountTagIds === accountTagIds &&
@@ -495,6 +511,7 @@ useEffect(() => {
         prev.startDate === startDate &&
         prev.endDate === endDate &&
         prev.pending === pending &&
+        prev.ignored === ignored &&
         prev.reviewed === reviewed &&
         prev.minAmount === minAmount &&
         prev.maxAmount === maxAmount &&
@@ -504,9 +521,9 @@ useEffect(() => {
       ) {
         return prev;
       }
-      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, excludeCategoryIds, tagId, tagIds, accountTagIds, search, type, startDate, endDate, pending, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
+      return { ...prev, accountId, accountIds, accountTypes, categoryId, categoryIds, excludeCategoryIds, excludeTagIds, tagId, tagIds, accountTagIds, search, type, startDate, endDate, pending, ignored, reviewed, minAmount, maxAmount, categorizedByAi, sort, order };
     });
-    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spExcludeCategoryIds, spTagId, spTagIds, spAccountTagIds, spSearch, spType, spStartDate, spEndDate, spPending, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
+    }, [spAccountId, spAccountIds, spAccountTypes, spCategoryId, spCategoryIds, spExcludeCategoryIds, spExcludeTagIds, spTagId, spTagIds, spAccountTagIds, spSearch, spType, spStartDate, spEndDate, spPending, spIgnored, spReviewed, spMinAmount, spMaxAmount, spCategorizedByAi, spSort, spOrder]);
 
   const updateFilter = useCallback((key: keyof FilterState, value: string | null) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -529,6 +546,7 @@ useEffect(() => {
       startDate: null,
       endDate: null,
       pending: null,
+      ignored: null,
       reviewed: null,
       minAmount: null,
       maxAmount: null,

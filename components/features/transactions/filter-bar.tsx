@@ -14,6 +14,8 @@ type FilterState = {
   accountTypes: string | null;
   categoryId: string | null;
   categoryIds: string | null;
+  excludeCategoryIds?: string | null;
+  excludeTagIds?: string | null;
   tagId: string | null;
   tagIds: string | null;
   accountTagIds: string | null;
@@ -22,6 +24,7 @@ type FilterState = {
   startDate: string | null;
   endDate: string | null;
   pending: string | null;
+  ignored?: string | null;
   reviewed: string | null;
   minAmount: string | null;
   maxAmount: string | null;
@@ -396,6 +399,7 @@ export default function FilterBar({
     if (selectedAccountTagIds.length > 0) pills.push(`Account Tags (${selectedAccountTagIds.length})`);
     if (filters.minAmount || filters.maxAmount) pills.push('Amount');
     if (filters.pending === 'true') pills.push('Pending');
+    if (filters.ignored === 'true') pills.push('Ignored');
     if (filters.type) pills.push(filters.type === 'income' ? 'Income' : 'Expense');
     if (filters.categorizedByAi === 'true') pills.push('AI');
     return pills;

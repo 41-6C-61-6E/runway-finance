@@ -1,9 +1,11 @@
 import React, { useState } from "react";
+import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowRightLeft, ChevronDown, Info } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, ExternalLink, Info, Receipt } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/format";
 import { formatChartXAxisDate } from "@/lib/utils/chart-format";
 import { formatSafeUTCDate } from "@/lib/utils/date";
+import { buildCashFlowLink, buildTransactionsLink } from "@/lib/utils/deep-links";
 
 interface CashFlowBreakdownModalProps {
   selectedPoint: any;
@@ -15,6 +17,10 @@ export function CashFlowBreakdownModal({ selectedPoint, timeframe, onClose }: Ca
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
   if (!selectedPoint) return null;
   const selectedCashFlowPoint = selectedPoint;
+  const [ymYear, ymMonth] = String(selectedCashFlowPoint.yearMonth).split('-').map(Number);
+  const lastDay = ymYear && ymMonth ? new Date(ymYear, ymMonth, 0).getDate() : 31;
+  const monthStart = `${selectedCashFlowPoint.yearMonth}-01`;
+  const monthEnd = `${selectedCashFlowPoint.yearMonth}-${String(lastDay).padStart(2, '0')}`;
 
   return (
         <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
@@ -66,10 +72,20 @@ export function CashFlowBreakdownModal({ selectedPoint, timeframe, onClose }: Ca
                       </div>
                     </div>
                     {expandedBucket === 'income' && (
-                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
+                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs" onClick={(e) => e.stopPropagation()}>
                         {selectedCashFlowPoint.details?.income?.length > 0 ? (
                           selectedCashFlowPoint.details.income.map((tx: any, idx: number) => (
-                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
+                            <Link
+                              key={idx}
+                              href={buildTransactionsLink({
+                                search: tx.description,
+                                startDate: tx.date?.slice(0, 10) || monthStart,
+                                endDate: tx.date?.slice(0, 10) || monthEnd,
+                                pending: false,
+                                ignored: false,
+                              })}
+                              className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0 hover:bg-muted/20 -mx-2 px-2 rounded transition-colors"
+                            >
                               <div className="flex flex-col">
                                 <span className="font-medium text-foreground">{tx.description}</span>
                                 <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
@@ -77,7 +93,7 @@ export function CashFlowBreakdownModal({ selectedPoint, timeframe, onClose }: Ca
                               <span className="font-mono font-medium text-primary">
                                 +{formatCurrency(Math.abs(tx.amount))}
                               </span>
-                            </div>
+                            </Link>
                           ))
                         ) : (
                           <div className="text-muted-foreground text-center py-3 italic">No income transactions found in this period.</div>
@@ -102,10 +118,20 @@ export function CashFlowBreakdownModal({ selectedPoint, timeframe, onClose }: Ca
                       </div>
                     </div>
                     {expandedBucket === 'expenses' && (
-                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs">
+                      <div className="bg-muted/10 border-t border-border px-4 py-2 space-y-1.5 text-xs" onClick={(e) => e.stopPropagation()}>
                         {selectedCashFlowPoint.details?.expenses?.length > 0 ? (
                           selectedCashFlowPoint.details.expenses.map((tx: any, idx: number) => (
-                            <div key={idx} className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0">
+                            <Link
+                              key={idx}
+                              href={buildTransactionsLink({
+                                search: tx.description,
+                                startDate: tx.date?.slice(0, 10) || monthStart,
+                                endDate: tx.date?.slice(0, 10) || monthEnd,
+                                pending: false,
+                                ignored: false,
+                              })}
+                              className="flex justify-between gap-4 py-1.5 border-b border-border/10 last:border-0 hover:bg-muted/20 -mx-2 px-2 rounded transition-colors"
+                            >
                               <div className="flex flex-col">
                                 <span className="font-medium text-foreground">{tx.description}</span>
                                 <span className="text-[10px] text-muted-foreground">{tx.accountName} • {formatSafeUTCDate(tx.date, { month: 'short', day: 'numeric' })}</span>
@@ -113,7 +139,7 @@ export function CashFlowBreakdownModal({ selectedPoint, timeframe, onClose }: Ca
                               <span className="font-mono font-medium text-destructive">
                                 -{formatCurrency(Math.abs(tx.amount))}
                               </span>
-                            </div>
+                            </Link>
                           ))
                         ) : (
                           <div className="text-muted-foreground text-center py-3 italic">No expense transactions found in this period.</div>
@@ -137,6 +163,25 @@ export function CashFlowBreakdownModal({ selectedPoint, timeframe, onClose }: Ca
                 <span>
                   <strong>Calculation Formula:</strong> Net Cash Flow is computed as Total Income minus Total Expenses. Standard category exclusion rules (e.g. transfers) are automatically applied to reflect true household cash inflows and outflows.
                 </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Link
+                  href={buildTransactionsLink({ startDate: monthStart, endDate: monthEnd, pending: false, ignored: false })}
+                  onClick={onClose}
+                  className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg py-2 transition-colors"
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>View in Transactions</span>
+                </Link>
+                <Link
+                  href={buildCashFlowLink({ timeframe: '1m', date: selectedCashFlowPoint.yearMonth })}
+                  onClick={onClose}
+                  className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg py-2 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Cash Flow Sankey</span>
+                </Link>
               </div>
             </div>
           </DialogContent>

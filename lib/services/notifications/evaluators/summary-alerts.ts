@@ -4,6 +4,7 @@ import { userSettings, monthlyCashFlow, sentNotifications } from '@/lib/db/schem
 import { eq, and, sql } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { calculateWealthFlow } from '@/lib/services/wealth-flow';
+import { buildWealthFlowLink } from '@/lib/utils/deep-links';
 import { formatCurrency } from '@/lib/utils/format';
 import { logger } from '@/lib/logger';
 import { sendPushNotification } from '../transport';
@@ -130,7 +131,7 @@ export async function checkMonthlySummaryAndNotify(
       userId,
       `Monthly Summary: ${monthLabel}`,
       body,
-      `/flows?timeframe=1m&date=${yearMonth}`,
+      buildWealthFlowLink({ timeframe: '1m', date: yearMonth }),
       'monthly_summary',
       `monthly_summary:${yearMonth}`
     );

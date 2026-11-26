@@ -10,6 +10,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
 import { useUserSettings } from '@/components/user-settings-provider';
+import { buildTransactionsLink } from '@/lib/utils/deep-links';
 import { isValidPeriodKey, convertPeriodKeyForType, type PeriodType } from './budget-period-selector';
 
 export function getPeriodDateRange(periodType: string, periodKey: string) {
@@ -50,6 +51,9 @@ interface BudgetItemTransactionsIconProps {
   categoryName: string;
   periodType: string;
   periodKey: string;
+  startDateOverride?: string;
+  endDateOverride?: string;
+  periodLabelOverride?: string;
   className?: string;
 }
 
@@ -68,6 +72,9 @@ export function BudgetItemTransactionsIcon({
   categoryName,
   periodType,
   periodKey,
+  startDateOverride,
+  endDateOverride,
+  periodLabelOverride,
   className,
 }: BudgetItemTransactionsIconProps) {
   const router = useRouter();
@@ -108,29 +115,26 @@ export function BudgetItemTransactionsIcon({
     }, 300);
   };
 
-  const { startDate, endDate, label: periodLabel } = useMemo(
+  const periodRange = useMemo(
     () => getPeriodDateRange(periodType, periodKey),
     [periodType, periodKey]
   );
+  const startDate = startDateOverride || periodRange.startDate;
+  const endDate = endDateOverride || periodRange.endDate;
+  const periodLabel = periodLabelOverride || periodRange.label;
 
   const hasCategoryFilter = Boolean(categoryId || (categoryIds && categoryIds.length > 0));
 
   const targetUrl = useMemo(() => {
-    const params = new URLSearchParams();
-    if (categoryIds && categoryIds.length > 0) {
-      params.set('categoryIds', categoryIds.join(','));
-    } else if (categoryId) {
-      params.set('categoryId', categoryId);
-    }
-    if (excludedTagIds.length > 0) {
-      params.set('excludeTagIds', excludedTagIds.join(','));
-    }
-    if (excludedCategoryIds.length > 0) {
-      params.set('excludeCategoryIds', excludedCategoryIds.join(','));
-    }
-    params.set('startDate', startDate);
-    params.set('endDate', endDate);
-    return `/transactions?${params.toString()}`;
+    return buildTransactionsLink({
+      categoryId: categoryIds && categoryIds.length > 0 ? undefined : categoryId,
+      categoryIds: categoryIds && categoryIds.length > 0 ? categoryIds : undefined,
+      excludeTagIds: excludedTagIds,
+      excludeCategoryIds: excludedCategoryIds,
+      startDate,
+      endDate,
+      ignored: false,
+    });
   }, [categoryId, categoryIds, startDate, endDate, excludedTagIds, excludedCategoryIds]);
 
   const { data, isLoading, isError } = useQuery({
@@ -159,6 +163,7 @@ export function BudgetItemTransactionsIcon({
       }
       params.set('startDate', startDate);
       params.set('endDate', endDate);
+      params.set('ignored', 'false');
       params.set('limit', '5');
       params.set('sort', 'date');
       params.set('order', 'desc');
@@ -268,18 +273,28 @@ export function BudgetItemTransactionsIcon({
                 const numAmt = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
                 const isIncomeTx = !isNaN(numAmt) && numAmt > 0;
                 const displayTitle = tx.payee || tx.description || 'Transaction';
+                const txLink = buildTransactionsLink({
+                  search: displayTitle,
+                  startDate: tx.date,
+                  endDate: tx.date,
+                  categoryId: categoryIds && categoryIds.length > 0 ? undefined : categoryId,
+                  categoryIds: categoryIds && categoryIds.length > 0 ? categoryIds : undefined,
+                  excludeTagIds: excludedTagIds,
+                  excludeCategoryIds: excludedCategoryIds,
+                  ignored: false,
+                });
 
                 return (
                   <Link
                     key={tx.id}
-                    href={`/transactions?search=${encodeURIComponent(displayTitle)}`}
+                    href={txLink}
                     onClick={(e) => {
                       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
                         return;
                       }
                       e.preventDefault();
                       setOpen(false);
-                      router.push(`/transactions?search=${encodeURIComponent(displayTitle)}`);
+                      router.push(txLink);
                     }}
                     className="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg hover:bg-accent/50 transition-colors gap-2 cursor-pointer"
                   >

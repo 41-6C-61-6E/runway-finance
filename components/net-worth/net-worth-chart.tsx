@@ -27,7 +27,10 @@ import {
 } from '@/lib/utils/chart-aggregation';
 import {
   computeNetWorthChangeBarData,
+  type NetWorthChangeBarDataPoint,
+  type NetWorthChangeBucketSize,
 } from '@/lib/utils/net-worth-change-bars';
+import { buildNetWorthChangeBarLink, buildWealthFlowLink } from '@/lib/utils/deep-links';
 import { ChartTooltip, TooltipRow, TooltipHeader } from '@/components/charts/chart-tooltip';
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -52,6 +55,10 @@ interface ChartPoint {
 interface ChartResponse {
   data: ChartPoint[];
   categories: string[];
+  changeBars?: {
+    barData: NetWorthChangeBarDataPoint[];
+    bucketSize: NetWorthChangeBucketSize;
+  };
   summary: {
     current: number;
     previous: number;
@@ -80,7 +87,7 @@ export function NetWorthChart() {
   const [showPercent, setShowPercent] = usePersistentState<boolean>('finance:net-worth-chart:show-percent', false);
 
   const handleNavigateToFlows = useCallback(() => {
-    router.push(`/flows?timeframe=${timeframe}`);
+    router.push(buildWealthFlowLink({ timeframe }));
   }, [timeframe, router]);
 
   useEffect(() => {
@@ -182,8 +189,8 @@ export function NetWorthChart() {
   }, [processedData]);
 
   const { barData, bucketSize } = useMemo(
-    () => computeNetWorthChangeBarData(chartData),
-    [chartData]
+    () => chartResponse?.changeBars ?? computeNetWorthChangeBarData(chartData),
+    [chartResponse?.changeBars, chartData]
   );
 
   const barDataWithPercent = useMemo(() => {
@@ -248,7 +255,11 @@ export function NetWorthChart() {
 
     const handleClick = () => {
       if (payload.date) {
-        router.push(`/flows?timeframe=1d_discrete&date=${payload.date}`);
+        if (bucketSize === 'quarterly' || bucketSize === 'yearly') {
+          router.push(buildWealthFlowLink({ timeframe: '1m', date: payload.date.slice(0, 7) }));
+        } else {
+          router.push(buildWealthFlowLink({ timeframe: '1d_discrete', date: payload.date }));
+        }
       } else {
         handleNavigateToFlows();
       }
@@ -266,15 +277,11 @@ export function NetWorthChart() {
         style={{ cursor: 'pointer' }}
       />
     );
-  }, [handleNavigateToFlows, router]);
+  }, [bucketSize, handleNavigateToFlows, router]);
 
-  const handleBarClick = useCallback((entry: any) => {
-    if (bucketSize === 'daily' && entry.endDate) {
-      router.push(`/flows?timeframe=1d_discrete&date=${entry.endDate}`);
-    } else {
-      router.push(`/flows?timeframe=${timeframe}`);
-    }
-  }, [bucketSize, timeframe, router]);
+  const handleBarClick = useCallback((entry: NetWorthChangeBarDataPoint) => {
+    router.push(buildNetWorthChangeBarLink(entry, bucketSize));
+  }, [bucketSize, router]);
 
   const areaTicks = useMemo(() => getChartXTicksUnified(processedData, timeframe, isMobile), [processedData, timeframe, isMobile]);
 
@@ -357,6 +364,9 @@ export function NetWorthChart() {
         )}
         <TooltipRow label="Starting Net Worth" value={formatCurrency(point.startNetWorth)} color="var(--color-chart-1)" />
         <TooltipRow label="Ending Net Worth" value={formatCurrency(point.endNetWorth)} color="var(--color-chart-1)" />
+        <div className="mt-1.5 pt-1 border-t border-border/30 text-[10px] text-muted-foreground/80">
+          Click bar to view wealth flow
+        </div>
       </ChartTooltip>
     );
   }, [showPercent]);

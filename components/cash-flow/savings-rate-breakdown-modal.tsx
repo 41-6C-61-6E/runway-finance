@@ -1,9 +1,11 @@
 import React, { useState } from "react";
+import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PiggyBank, ChevronDown, Info } from "lucide-react";
+import { PiggyBank, ChevronDown, ExternalLink, Info, Receipt } from "lucide-react";
 import { formatCurrency, formatPlainPercent } from "@/lib/utils/format";
 import { formatChartXAxisDate } from "@/lib/utils/chart-format";
 import { formatSafeUTCDate } from "@/lib/utils/date";
+import { buildCashFlowLink, buildTransactionsLink } from "@/lib/utils/deep-links";
 
 interface SavingsRateBreakdownModalProps {
   selectedPoint: any;
@@ -15,6 +17,10 @@ export function SavingsRateBreakdownModal({ selectedPoint, timeframe, onClose }:
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
   if (!selectedPoint) return null;
   const selectedSavingsPoint = selectedPoint;
+  const [ymYear, ymMonth] = String(selectedSavingsPoint.yearMonth).split('-').map(Number);
+  const lastDay = ymYear && ymMonth ? new Date(ymYear, ymMonth, 0).getDate() : 31;
+  const monthStart = `${selectedSavingsPoint.yearMonth}-01`;
+  const monthEnd = `${selectedSavingsPoint.yearMonth}-${String(lastDay).padStart(2, '0')}`;
 
   return (
         <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
@@ -218,6 +224,25 @@ export function SavingsRateBreakdownModal({ selectedPoint, timeframe, onClose }:
                 <div>
                   <strong>Calculation Formula:</strong> Savings Rate is computed as (Total Tracked Savings / Total Income) × 100%. Debt principal reductions (e.g. mortgage/loans) are accounted for as cash outflows in cash flow analysis and accrue to net worth via liability reduction.
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Link
+                  href={buildTransactionsLink({ startDate: monthStart, endDate: monthEnd, pending: false, ignored: false })}
+                  onClick={onClose}
+                  className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg py-2 transition-colors"
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>View in Transactions</span>
+                </Link>
+                <Link
+                  href={buildCashFlowLink({ timeframe: '1m', date: selectedSavingsPoint.yearMonth })}
+                  onClick={onClose}
+                  className="flex items-center justify-center gap-1.5 w-full text-xs font-semibold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg py-2 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Cash Flow Sankey</span>
+                </Link>
               </div>
             </div>
           </DialogContent>

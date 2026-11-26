@@ -5,6 +5,7 @@ import { ResponsiveContainer, Sankey, Tooltip } from 'recharts';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatPlainPercent } from '@/lib/utils/format';
+import { buildTransactionsLink } from '@/lib/utils/deep-links';
 import { SankeyLabel, computeLabelGutter } from '@/components/charts/sankey/sankey-label';
 import { SankeyCustomNode } from '@/components/charts/sankey/sankey-nodes';
 import { SankeyCustomLink } from '@/components/charts/sankey/sankey-links';
@@ -552,28 +553,58 @@ export function CashFlowSankey() {
     }
   }, [timeframe, windowEnd, allCategoryInfo, showParents, dateRange.start, dateRange.end]);
 
-  const getNodeCategoryId = (nodeId: string): string | undefined =>
-    (() => {
-      const node = sankeyData?.nodes.find((n) => n.id === nodeId);
-      return node?.sourceCategoryId || node?.categoryId;
-    })();
-
-  const navigateToTransactions = (categoryIds: string) => {
-    router.push(`/transactions?startDate=${dateRange.start}&endDate=${dateRange.end}&categoryIds=${categoryIds}&pending=false`);
-  };
+  const navigateToNodeTransactions = useCallback((node: SankeyNode | undefined) => {
+    if (!node) return;
+    const categoryIds = node.sourceCategoryId || node.categoryId;
+    if (!categoryIds) return;
+    const flowType = node.categoryId?.endsWith('::income')
+      ? 'income'
+      : node.categoryId?.endsWith('::expense')
+        ? 'expense'
+        : undefined;
+    router.push(
+      buildTransactionsLink({
+        startDate: dateRange.start,
+        endDate: dateRange.end,
+        categoryIds,
+        type: flowType,
+        pending: false,
+        ignored: false,
+      })
+    );
+  }, [dateRange.start, dateRange.end, router]);
 
   const handleNodeClick = useCallback((nodeId: string) => {
     if (nodeId === '__available_funds__' || nodeId === '__savings__' || nodeId === '__deficit__') return;
-    const categoryId = getNodeCategoryId(nodeId);
-    if (categoryId) navigateToTransactions(categoryId);
-  }, [sankeyData, dateRange]);
+    const node = sankeyData?.nodes.find((n) => n.id === nodeId);
+    navigateToNodeTransactions(node);
+  }, [sankeyData, navigateToNodeTransactions]);
 
   const handleLinkClick = useCallback((sourceId: string, targetId: string) => {
-    const s = getNodeCategoryId(sourceId);
-    const t = getNodeCategoryId(targetId);
-    const ids = [s, t].filter(Boolean).join(',');
-    if (ids) navigateToTransactions(ids);
-  }, [sankeyData, dateRange]);
+    const sourceNode = sankeyData?.nodes.find((n) => n.id === sourceId);
+    const targetNode = sankeyData?.nodes.find((n) => n.id === targetId);
+    const isParentNode = (id: string) => id.startsWith('inc_parent_') || id.startsWith('exp_parent_');
+    const isSyntheticNode = (id: string) => id === '__available_funds__' || id === '__savings__' || id === '__deficit__';
+
+    // When clicking a ribbon between a parent node and a child node, drill down
+    // to the specific child category rather than merging all siblings via parent.
+    if (isParentNode(sourceId) && targetNode && !isSyntheticNode(targetId)) {
+      navigateToNodeTransactions(targetNode);
+      return;
+    }
+    if (isParentNode(targetId) && sourceNode && !isSyntheticNode(sourceId)) {
+      navigateToNodeTransactions(sourceNode);
+      return;
+    }
+
+    if (sourceNode && !isSyntheticNode(sourceId) && (sourceNode.sourceCategoryId || sourceNode.categoryId)) {
+      navigateToNodeTransactions(sourceNode);
+      return;
+    }
+    if (targetNode && !isSyntheticNode(targetId) && (targetNode.sourceCategoryId || targetNode.categoryId)) {
+      navigateToNodeTransactions(targetNode);
+    }
+  }, [sankeyData, navigateToNodeTransactions]);
 
   const processedData = useMemo(() => {
     if (!sankeyData) return { nodes: [], links: [] };

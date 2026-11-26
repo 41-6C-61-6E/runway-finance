@@ -5,6 +5,7 @@ import { eq, and, or, isNull, gte, lt, inArray } from 'drizzle-orm';
 import { decryptField } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { sendPushNotification } from '../transport';
+import { buildBudgetLink } from '@/lib/utils/deep-links';
 
 function parseNotificationPeriodRange(keyOrDate: string | null | undefined): { start: string; end: string } {
   if (!keyOrDate) {
@@ -245,6 +246,12 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
         const warningThresholdAmount = budget.amount * (threshold / 100);
         const escalationThresholdAmount = budget.amount * 1.25;
 
+        const alertUrl = buildBudgetLink({
+          categoryId: budgetCatId,
+          periodType: pType,
+          periodKey: bounds.periodKey,
+        });
+
         if (actualSpent >= escalationThresholdAmount) {
           const escalationKey = `budget:${bounds.periodKey}:${budgetCatId}:125`;
           const roundedActual = Math.round(actualSpent);
@@ -254,7 +261,7 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
             userId,
             `Budget Significantly Over: ${budget.categoryName}`,
             `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget}${timeframeWord} budget for ${budget.categoryName}.`,
-            `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
+            alertUrl,
             'budget_alert',
             escalationKey
           );
@@ -266,7 +273,7 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
             userId,
             `Budget Exceeded: ${budget.categoryName}`,
             `You've spent $${roundedActual} of your $${roundedBudget}${timeframeWord} budget for ${budget.categoryName}.`,
-            `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
+            alertUrl,
             'budget_alert',
             exceededKey
           );
@@ -279,7 +286,7 @@ export async function checkBudgetsAndNotify(userId: string, dek: Uint8Array) {
             userId,
             `Budget Warning: ${budget.categoryName}`,
             `You've spent $${roundedActual} (${actualPercentage}%) of your $${roundedBudget} budget for ${budget.categoryName}.`,
-            `/budgets?categoryId=${encodeURIComponent(budgetCatId)}`,
+            alertUrl,
             'budget_alert',
             warningKey
           );

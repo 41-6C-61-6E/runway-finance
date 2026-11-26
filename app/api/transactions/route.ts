@@ -429,10 +429,10 @@ export async function GET(request: Request) {
   if (filters.accountTypes) {
     const types = filters.accountTypes
       .split(",")
-      .map((t) => t.trim())
+      .map((t) => t.trim().toLowerCase())
       .filter(Boolean);
     if (types.length > 0) {
-      whereConditions.push(inArray(accounts.type, types));
+      whereConditions.push(inArray(sql`lower(${accounts.type})`, types));
     }
   }
   if (filters.startDate) {

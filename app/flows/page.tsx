@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, Suspense, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { ChartSkeleton } from '@/components/ui/skeleton';
 
 const WealthFlowSankey = dynamic(
@@ -29,13 +30,65 @@ import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 
 type Tab = 'wealth' | 'cash' | 'income';
 
+const parseTab = (value: string | null): Tab =>
+  value === 'cash' || value === 'income' ? value : 'wealth';
+
 function FlowsContent() {
   const { isVisible } = useChartVisibility();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const showWealth = isVisible('wealthFlowSankey');
   const showCash = isVisible('cashFlowSankey');
   const showIncome = isVisible('incomeExpenseChart');
 
-  const [activeTab, setActiveTab] = usePersistentState<Tab>('finance:flows:activeTab', 'wealth');
+  const hasUrlTab = searchParams?.has('tab') ?? false;
+  const hasLegacyWealthParams =
+    !hasUrlTab &&
+    Boolean(
+      searchParams?.get('timeframe') ||
+        searchParams?.get('date') ||
+        searchParams?.get('startDate') ||
+        searchParams?.get('month')
+    );
+  const initialTab: Tab = hasUrlTab ? parseTab(searchParams?.get('tab') ?? null) : 'wealth';
+
+  const [activeTab, setActiveTab] = usePersistentState<Tab>(
+    'finance:flows:activeTab',
+    initialTab,
+    { skipRestore: hasUrlTab || hasLegacyWealthParams }
+  );
+
+  const handleTabChange = (tabId: string) => {
+    const nextTab = parseTab(tabId);
+    setActiveTab(nextTab);
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    params.set('tab', nextTab);
+    params.delete('timeframe');
+    params.delete('date');
+    params.delete('startDate');
+    params.delete('endDate');
+    params.delete('month');
+    const qs = params.toString();
+    router.replace(qs ? `/flows?${qs}` : '/flows', { scroll: false });
+  };
+
+  useEffect(() => {
+    if (!searchParams) return;
+    if (searchParams.has('tab')) {
+      const fromUrl = parseTab(searchParams.get('tab'));
+      setActiveTab((prev) => (prev === fromUrl ? prev : fromUrl));
+    } else if (
+      searchParams.get('timeframe') ||
+      searchParams.get('date') ||
+      searchParams.get('startDate') ||
+      searchParams.get('month')
+    ) {
+      if (showWealth) {
+        setActiveTab((prev) => (prev === 'wealth' ? prev : 'wealth'));
+      }
+    }
+  }, [searchParams, showWealth, setActiveTab]);
 
   useEffect(() => {
     const visible: Tab[] = [];
@@ -45,7 +98,7 @@ function FlowsContent() {
     if (visible.length > 0 && !visible.includes(activeTab)) {
       setActiveTab(visible[0]);
     }
-  }, [showWealth, showCash, showIncome, activeTab]);
+  }, [showWealth, showCash, showIncome, activeTab, setActiveTab]);
 
   const availableTabs = [
     showWealth && { id: 'wealth', label: 'Wealth' },
@@ -61,14 +114,14 @@ function FlowsContent() {
           <MobileTabSwipeContainer
             tabs={availableTabs}
             activeTabId={activeTab}
-            onTabChange={(tabId) => setActiveTab(tabId as Tab)}
+            onTabChange={handleTabChange}
             header={
               availableTabs.length > 1 ? (
                 <div className="mb-3 sm:mb-3.5">
                   <AppTabs
                     tabs={availableTabs}
                     activeTab={activeTab}
-                    onChange={(tabId) => setActiveTab(tabId as Tab)}
+                    onChange={handleTabChange}
                     variant="underline"
                   />
                 </div>

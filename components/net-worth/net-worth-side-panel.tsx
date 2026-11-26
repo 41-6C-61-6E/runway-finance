@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { buildWealthFlowLink } from '@/lib/utils/deep-links';
 import { formatCurrency } from '@/lib/utils/format';
 import { formatCompactCurrency, formatPlainPercent } from '@/lib/utils/format';
 import { isAssetAccount, isReportableAccount } from '@/lib/utils/account-scope';
@@ -325,7 +327,11 @@ export function NetWorthSidePanel() {
                 <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono blur-number">
                   {formatCurrency(totals.netWorth)}
                 </span>
-                <div className="flex items-center gap-1.5 mt-1">
+                <Link
+                  href={buildWealthFlowLink({ timeframe: '365d' })}
+                  className="inline-flex items-center gap-1.5 mt-1 group hover:opacity-85 transition-opacity"
+                  title="View 1-year wealth flow"
+                >
                     <div
                       className={cn(
                         'inline-flex items-center gap-0.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border font-mono',
@@ -338,8 +344,8 @@ export function NetWorthSidePanel() {
                       <span className="blur-number">{formatCurrency(Math.abs(deltas.netWorth))}</span>
                       <span className="opacity-80">({deltas.pctNetWorth >= 0 ? '+' : ''}{formatPlainPercent(deltas.pctNetWorth)})</span>
                     </div>
-                    <span className="text-[11px] text-muted-foreground">past 1 year</span>
-                  </div>
+                    <span className="text-[11px] text-muted-foreground group-hover:text-primary transition-colors">past 1 year</span>
+                  </Link>
                 </div>
               </div>
             </ChartHoverTooltip>

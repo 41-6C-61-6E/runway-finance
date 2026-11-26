@@ -143,7 +143,8 @@ export function getPeriodLabel(ym: string, timeframe: TimeRange): string {
     const cleanEndStr = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : `${dateStr.slice(0, 7)}-01`;
     const [ey, em, ed] = cleanEndStr.split('-').map(Number);
     const endDate = new Date(ey, em - 1, ed);
-    const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startDate = new Date(ey, em - 1, ed);
+    startDate.setDate(startDate.getDate() - 7);
     const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const endLabel = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     return `${startLabel} – ${endLabel}`;

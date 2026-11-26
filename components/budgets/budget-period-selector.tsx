@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
 import { AppTabs } from '@/components/ui/app-tabs';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -151,8 +152,54 @@ export function getKeyLabel(type: PeriodType, key: string): string {
 }
 
 export function BudgetPeriodProvider({ children }: { children: ReactNode }) {
-  const [periodType, setPeriodType] = usePersistentState<PeriodType>('finance:budgets:periodType', 'monthly');
-  const [storedPeriodKey, setStoredPeriodKey] = usePersistentState<string>('finance:budgets:periodKey', getCurrentKey('monthly'));
+  const searchParams = useSearchParams();
+
+  const urlPeriod = useMemo(() => {
+    const monthParam = searchParams?.get('month');
+    if (monthParam && isValidPeriodKey('monthly', monthParam)) {
+      return { type: 'monthly' as PeriodType, key: monthParam };
+    }
+    const rawType = searchParams?.get('periodType');
+    const rawKey = searchParams?.get('periodKey');
+    const validType: PeriodType | null =
+      rawType === 'monthly' || rawType === 'quarterly' || rawType === 'yearly' ? rawType : null;
+    if (validType && rawKey && isValidPeriodKey(validType, rawKey)) {
+      return { type: validType, key: rawKey };
+    }
+    if (validType) {
+      return { type: validType, key: getCurrentKey(validType) };
+    }
+    if (rawKey) {
+      if (isValidPeriodKey('monthly', rawKey)) return { type: 'monthly' as PeriodType, key: rawKey };
+      if (isValidPeriodKey('quarterly', rawKey)) return { type: 'quarterly' as PeriodType, key: rawKey };
+      if (isValidPeriodKey('yearly', rawKey)) return { type: 'yearly' as PeriodType, key: rawKey };
+    }
+    return null;
+  }, [searchParams]);
+
+  const hasUrlPeriod = urlPeriod !== null;
+  const [periodType, setPeriodType] = usePersistentState<PeriodType>(
+    'finance:budgets:periodType',
+    urlPeriod?.type ?? 'monthly',
+    { skipRestore: hasUrlPeriod }
+  );
+  const [storedPeriodKey, setStoredPeriodKey] = usePersistentState<string>(
+    'finance:budgets:periodKey',
+    urlPeriod?.key ?? getCurrentKey('monthly'),
+    { skipRestore: hasUrlPeriod }
+  );
+
+  const appliedUrlKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!searchParams) return;
+    const urlKey = searchParams.toString();
+    if (appliedUrlKeyRef.current === urlKey) return;
+    appliedUrlKeyRef.current = urlKey;
+    if (urlPeriod) {
+      if (urlPeriod.type !== periodType) setPeriodType(urlPeriod.type);
+      if (urlPeriod.key !== storedPeriodKey) setStoredPeriodKey(urlPeriod.key);
+    }
+  }, [searchParams, urlPeriod, periodType, storedPeriodKey, setPeriodType, setStoredPeriodKey]);
 
   // Ensure periodKey provided to components is always strictly valid for active periodType
   const periodKey = isValidPeriodKey(periodType, storedPeriodKey)

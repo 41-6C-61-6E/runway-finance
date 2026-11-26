@@ -13,9 +13,9 @@ import { formatChartYAxisCurrency, formatChartXAxisDate, getChartXTicksUnified, 
 import { type TimeRange } from '@/components/charts/chart-filters';
 import { ChartTimeframeBar } from '@/components/charts/chart-timeframe-bar';
 import { usePersistentState } from '@/lib/hooks/use-persistent-state';
-import { getMonthRange } from '@/lib/utils/date-window';
 import { useDateWindow } from '@/lib/hooks/use-date-window';
 import { DateWindowNav } from '@/components/charts/date-window-nav';
+import { buildTransactionsLink } from '@/lib/utils/deep-links';
 
 import { usePrivacyMode } from '@/components/privacy-mode-provider';
 import { SegPill } from '@/components/ui/seg-pill';
@@ -180,15 +180,28 @@ export function SpendingBreakdown() {
   };
 
   const handleClick = (categoryId: string) => {
-    const range = getMonthRange(timeframe, windowEnd);
-    const startDate = `${range.start}-01`;
-    const [endYear, endMonthStr] = range.end.split('-').map(Number);
-    const lastDay = new Date(endYear, endMonthStr, 0).getDate();
-    const endDate = `${range.end}-${String(lastDay).padStart(2, '0')}`;
     if (categoryId.includes(',')) {
-      router.push(`/transactions?categoryIds=${categoryId}&startDate=${startDate}&endDate=${endDate}&pending=false`);
+      router.push(
+        buildTransactionsLink({
+          categoryIds: categoryId,
+          startDate: dateRange.start,
+          endDate: dateRange.end,
+          type: 'expense',
+          pending: false,
+          ignored: false,
+        })
+      );
     } else {
-      router.push(`/transactions?categoryId=${categoryId}&startDate=${startDate}&endDate=${endDate}&pending=false`);
+      router.push(
+        buildTransactionsLink({
+          categoryId,
+          startDate: dateRange.start,
+          endDate: dateRange.end,
+          type: 'expense',
+          pending: false,
+          ignored: false,
+        })
+      );
     }
   };
 

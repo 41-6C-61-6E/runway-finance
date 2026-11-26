@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi, describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import FlowsPage from '@/app/flows/page';
+
+const mockReplace = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: mockReplace,
+  }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
+}));
 
 // Mock the heavy chart components with lightweight markers so we can
 // assert which panels are mounted.
@@ -52,6 +61,11 @@ vi.mock('@/components/page-content', () => ({
  *     the active one because opacity < 1 creates stacking contexts.
  */
 describe('Flows page tabs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.history.pushState({}, '', '/flows');
+  });
+
   it('shows only the Wealth chart initially', () => {
     render(<FlowsPage />);
     expect(screen.getByTestId('wealth-chart')).toBeTruthy();
@@ -105,5 +119,24 @@ describe('Flows page tabs', () => {
       document.querySelectorAll('main [aria-hidden="true"]')
     );
     expect(hiddenPanels).toHaveLength(0);
+  });
+
+  it('selects tab from ?tab= URL parameter and forces wealth for legacy ?timeframe= deep links', () => {
+    window.history.pushState({}, '', '/flows?tab=cash&timeframe=1m&date=2026-06');
+    const cashView = render(<FlowsPage />);
+    expect(screen.getByTestId('cash-chart')).toBeTruthy();
+    expect(screen.queryByTestId('wealth-chart')).toBeNull();
+    cashView.unmount();
+
+    window.history.pushState({}, '', '/flows?tab=income');
+    const incomeView = render(<FlowsPage />);
+    expect(screen.getByTestId('income-chart')).toBeTruthy();
+    expect(screen.queryByTestId('wealth-chart')).toBeNull();
+    incomeView.unmount();
+
+    window.history.pushState({}, '', '/flows?timeframe=1m&date=2026-06');
+    render(<FlowsPage />);
+    expect(screen.getByTestId('wealth-chart')).toBeTruthy();
+    expect(screen.queryByTestId('cash-chart')).toBeNull();
   });
 });

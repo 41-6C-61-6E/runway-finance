@@ -17,6 +17,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { useUserSettings } from '@/components/user-settings-provider';
 import { useMemo } from 'react';
 import { isEnvelopeRow, type EnvelopeBudgetRow } from '@/lib/utils/budget-envelope';
+import { buildTransactionsLink } from '@/lib/utils/deep-links';
 
 interface BudgetData {
   id: string;
@@ -323,21 +324,15 @@ export function BudgetSummary() {
 
   const { startDate, endDate } = getPeriodDateRange(periodType, periodKey);
   const getTxUrl = (catIds?: string[], catId?: string) => {
-    const params = new URLSearchParams();
-    if (catIds && catIds.length > 0) {
-      params.set('categoryIds', catIds.join(','));
-    } else if (catId) {
-      params.set('categoryId', catId);
-    }
-    if (excludedTagIds.length > 0) {
-      params.set('excludeTagIds', excludedTagIds.join(','));
-    }
-    if (excludedCategoryIds.length > 0) {
-      params.set('excludeCategoryIds', excludedCategoryIds.join(','));
-    }
-    params.set('startDate', startDate);
-    params.set('endDate', endDate);
-    return `/transactions?${params.toString()}`;
+    return buildTransactionsLink({
+      categoryId: catIds && catIds.length > 0 ? undefined : catId,
+      categoryIds: catIds && catIds.length > 0 ? catIds : undefined,
+      excludeTagIds: excludedTagIds,
+      excludeCategoryIds: excludedCategoryIds,
+      startDate,
+      endDate,
+      ignored: false,
+    });
   };
 
   let alertHref: string | null = null;
@@ -348,7 +343,14 @@ export function BudgetSummary() {
   // They are visible row-level and via the "Excludes X envelope" footnote.
   if (totalExpenseActual > totalExpenseBudgeted) {
     alertText = `Overall spending has exceeded total budget by ${formatCurrency(totalExpenseActual - totalExpenseBudgeted)}`;
-    alertHref = `/budgets`;
+    alertHref = buildTransactionsLink({
+      startDate,
+      endDate,
+      type: 'expense',
+      excludeTagIds: excludedTagIds,
+      excludeCategoryIds: excludedCategoryIds,
+      ignored: false,
+    });
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
   } else if (significantOverBudgets.length === 1) {
     alertText = `1 category over budget (${significantOverBudgets[0].categoryName})`;
@@ -360,7 +362,16 @@ export function BudgetSummary() {
     alertClass = 'text-destructive bg-destructive/10 border-destructive/20 hover:bg-destructive/15';
   } else if (healthStatus.label === 'Watch Budget Pace') {
     alertText = `Discretionary spending is ahead of its budget pace`;
-    alertHref = `/budgets`;
+    const discretionaryCatIds = variableExpenseBudgets.map((b) => b.categoryId).filter(Boolean);
+    alertHref = buildTransactionsLink({
+      categoryIds: discretionaryCatIds.length > 0 ? discretionaryCatIds : undefined,
+      startDate,
+      endDate,
+      type: 'expense',
+      excludeTagIds: excludedTagIds,
+      excludeCategoryIds: excludedCategoryIds,
+      ignored: false,
+    });
     alertClass = 'text-amber-500 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15';
   }
 

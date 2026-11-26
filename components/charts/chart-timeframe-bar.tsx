@@ -243,6 +243,14 @@ export function ChartTimeframeBar({ value, onChange, presets, windowNav, classNa
           </div>
         )}
         <div className="flex items-center gap-1 bg-muted/40 p-0.5 rounded-full border border-border/40 shrink-0">
+          {value === '1d_discrete' && (
+            <span
+              title="1-day window"
+              className="px-2.5 py-1 rounded-full text-xs font-semibold leading-none whitespace-nowrap min-h-[26px] inline-flex items-center justify-center bg-primary text-primary-foreground shadow-sm"
+            >
+              1D
+            </span>
+          )}
           {visible.map(p => {
             const active = value === p.value;
             return (

@@ -15,6 +15,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 const mockSp = {
   get: vi.fn((key: string) => new URLSearchParams(window.location.search).get(key)),
+  toString: vi.fn(() => new URLSearchParams(window.location.search).toString()),
 };
 vi.mock('next/navigation', () => ({
   useSearchParams: () => mockSp,
@@ -272,5 +273,41 @@ describe('useDateWindow — URL deep-link authority (weekly net worth alert)', (
     expect(read().windowEnd).toBe('2026-08-23');
 
     vi.useRealTimers();
+  });
+
+  it('preserves 1d_discrete URL deep links instead of auto-migrating to 1m', async () => {
+    setUrl('/flows', { tab: 'wealth', timeframe: '1d_discrete', date: '2026-08-15' });
+
+    const { read } = renderHarness();
+    await settle();
+
+    expect(read()).toEqual({
+      timeframe: '1d_discrete',
+      windowEnd: '2026-08-15',
+      start: '2026-08-15',
+      end: '2026-08-15',
+    });
+  });
+
+  it('supports ?month=YYYY-MM alias and custom ?startDate=&endDate= range that clears on navigation', async () => {
+    setUrl('/spending', { month: '2026-06' });
+    const monthRender = renderHarness();
+    expect(monthRender.read()).toEqual({
+      timeframe: '1m',
+      windowEnd: '2026-06',
+      start: '2026-06-01',
+      end: '2026-06-30',
+    });
+    monthRender.utils.unmount();
+
+    setUrl('/flows', { tab: 'wealth', startDate: '2026-11-22', endDate: '2026-11-26' });
+    const customRender = renderHarness();
+    expect(customRender.read().start).toBe('2026-11-22');
+    expect(customRender.read().end).toBe('2026-11-26');
+
+    act(() => {
+      prevWindowRef.current();
+    });
+    expect(customRender.read().start).not.toBe('2026-11-22');
   });
 });

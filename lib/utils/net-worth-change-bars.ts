@@ -71,9 +71,12 @@ function computeBucketSize(days: number): NetWorthChangeBucketSize {
 }
 
 export function computeNetWorthChangeBarData(
-  data: ChangeBarChartPoint[]
+  data: ChangeBarChartPoint[],
+  previousPoint?: ChangeBarChartPoint | null
 ): { barData: NetWorthChangeBarDataPoint[]; bucketSize: NetWorthChangeBucketSize } {
-  if (data.length < 2) return { barData: [], bucketSize: 'daily' };
+  if (data.length === 0) return { barData: [], bucketSize: 'daily' };
+  const hasBaseline = Boolean(previousPoint && previousPoint.date < data.reduce((min, d) => (d.date < min ? d.date : min), data[0].date));
+  if (data.length < 2 && !hasBaseline) return { barData: [], bucketSize: 'daily' };
 
   const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
 
@@ -84,6 +87,16 @@ export function computeNetWorthChangeBarData(
 
   if (bucketSize === 'daily') {
     const barData: NetWorthChangeBarDataPoint[] = [];
+    if (previousPoint && previousPoint.date < sorted[0].date) {
+      barData.push({
+        date: sorted[0].date,
+        startDate: previousPoint.date,
+        endDate: sorted[0].date,
+        change: sorted[0].netWorth - previousPoint.netWorth,
+        startNetWorth: previousPoint.netWorth,
+        endNetWorth: sorted[0].netWorth,
+      });
+    }
     for (let i = 1; i < sorted.length; i++) {
       barData.push({
         date: sorted[i].date,
@@ -106,7 +119,8 @@ export function computeNetWorthChangeBarData(
   }
 
   const barData: NetWorthChangeBarDataPoint[] = [];
-  let previousEndPoint: ChangeBarChartPoint | null = null;
+  let previousEndPoint: ChangeBarChartPoint | null =
+    previousPoint && previousPoint.date < sorted[0].date ? previousPoint : null;
   const sortedBuckets = Array.from(buckets.entries()).sort(([a], [b]) => a.localeCompare(b));
   const overallEndDate = sorted[sorted.length - 1].date;
 

@@ -134,7 +134,7 @@ export async function calculateWealthFlow(
   );
 
   let dayBeforeStr: string;
-  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '365d' || timeframe === '7d_discrete') {
+  if (timeframe === '1d' || timeframe === '7d' || timeframe === '30d' || timeframe === '90d' || timeframe === '365d' || timeframe === '7d_discrete') {
     dayBeforeStr = startDateStr;
   } else {
     // For calendar months (1m, 3m, 6m, 1y, ytd) and discrete 1-day (1d_discrete),
@@ -156,14 +156,17 @@ export async function calculateWealthFlow(
   // Discrete windows (1d_discrete / 7d_discrete) represent a fixed "window
   // ending on date X" — they must always be computed from snapshots so the
   // result is stable and matches what alerts/reports computed the same way
-  // (e.g. the weekly net worth alert deep-links here). Rolling timeframes
-  // still use live account balances when the window ends on today, so they
-  // keep reflecting the latest un-synced state.
+  // (e.g. the weekly net worth alert deep-links here). Non-discrete timeframes
+  // whose window includes today use live account balances for the ending
+  // state so the current month/quarter/year matches the Net Worth chart.
   const isDiscreteTimeframe = timeframe === '1d_discrete' || timeframe === '7d_discrete';
   const todayStr = isDiscreteTimeframe ? null : formatInTimezone(new Date(), userTz);
 
-  const getBalances = async (targetDate: string, accountIds: string[]) => {
-    if (todayStr !== null && targetDate === todayStr) {
+  const getBalances = async (targetDate: string, accountIds: string[], allowCurrentWindowLive = false) => {
+    const useLive =
+      todayStr !== null &&
+      (targetDate === todayStr || (allowCurrentWindowLive && startDateStr <= todayStr && endDateStr >= todayStr));
+    if (useLive) {
       const result: Record<string, number> = {};
       for (const id of accountIds) {
         const acc = accountsMap.get(id);
@@ -176,8 +179,8 @@ export async function calculateWealthFlow(
     return getBalancesOnDate(db, userId, targetDate, accountIds, dek);
   };
 
-  const beginningBalances = await getBalances(dayBeforeStr, beginningAccountIds);
-  const endingBalances = await getBalances(endDateStr, endingAccountIds);
+  const beginningBalances = await getBalances(dayBeforeStr, beginningAccountIds, false);
+  const endingBalances = await getBalances(endDateStr, endingAccountIds, true);
 
   let beginningNetWorth = 0;
   let endingNetWorth = 0;

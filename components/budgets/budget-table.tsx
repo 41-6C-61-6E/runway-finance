@@ -24,6 +24,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { ChartEmptyState } from '@/components/charts/chart-empty-state';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { useUserSettings } from '@/components/user-settings-provider';
+import { buildTransactionsLink } from '@/lib/utils/deep-links';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Select } from '@/components/ui/select';
@@ -42,22 +43,34 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
   const { startDate, endDate } = useMemo(() => getPeriodDateRange(periodType, periodKey), [periodType, periodKey]);
   const periodSuffix = periodType === 'yearly' ? '/yr' : periodType === 'quarterly' ? '/quarter' : '/mo';
 
-  const getTxUrl = useCallback((catIds?: string[], catId?: string) => {
-    const params = new URLSearchParams();
-    if (catIds && catIds.length > 0) {
-      params.set('categoryIds', catIds.join(','));
-    } else if (catId) {
-      params.set('categoryId', catId);
+  const getBudgetRangeOverride = useCallback((b: BudgetData) => {
+    if (!isEnvelope(b) || !b.nativePeriodType) return undefined;
+    if (b.envelopeStart && b.envelopeEnd) {
+      return {
+        startDate: b.envelopeStart,
+        endDate: b.envelopeEnd < endDate ? b.envelopeEnd : endDate,
+      };
     }
-    if (excludedTagIds.length > 0) {
-      params.set('excludeTagIds', excludedTagIds.join(','));
+    if (b.nativePeriodKey) {
+      const r = getPeriodDateRange(b.nativePeriodType, b.nativePeriodKey);
+      return {
+        startDate: r.startDate,
+        endDate: r.endDate < endDate ? r.endDate : endDate,
+      };
     }
-    if (excludedCategoryIds.length > 0) {
-      params.set('excludeCategoryIds', excludedCategoryIds.join(','));
-    }
-    params.set('startDate', startDate);
-    params.set('endDate', endDate);
-    return `/transactions?${params.toString()}`;
+    return undefined;
+  }, [endDate]);
+
+  const getTxUrl = useCallback((catIds?: string[], catId?: string, rangeOverride?: { startDate: string; endDate: string }) => {
+    return buildTransactionsLink({
+      categoryId: catIds && catIds.length > 0 ? undefined : catId,
+      categoryIds: catIds && catIds.length > 0 ? catIds : undefined,
+      excludeTagIds: excludedTagIds,
+      excludeCategoryIds: excludedCategoryIds,
+      startDate: rangeOverride?.startDate || startDate,
+      endDate: rangeOverride?.endDate || endDate,
+      ignored: false,
+    });
   }, [startDate, endDate, excludedTagIds, excludedCategoryIds]);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -519,6 +532,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
             expenseBudgets={expenseBudgets}
             flashCategoryId={flashCategoryId}
             getTxUrl={getTxUrl}
+            getBudgetRangeOverride={getBudgetRangeOverride}
             periodType={periodType}
             periodKey={periodKey}
             periodSuffix={periodSuffix}
@@ -586,6 +600,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                     {incomeBudgets.map((b) => {
                       const isTargetMet = b.remaining >= 0;
                       const envSub = envelopeSubText(b);
+                      const envRange = getBudgetRangeOverride(b);
                       const envMeta = isEnvelope(b) && b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
                       const incomeProgressColor = envMeta
                         ? envMeta.barClass
@@ -599,7 +614,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                               <div className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-white/30 shadow-[0_0_0_1px_color-mix(in_srgb,var(--border)_30%,transparent)]" style={{ backgroundColor: b.categoryColor }} />
                               <div className="relative min-w-0 flex-1 flex items-center">
                                 <Link
-                                  href={getTxUrl(b.coveredCategoryIds, b.categoryId)}
+                                  href={getTxUrl(b.coveredCategoryIds, b.categoryId, envRange)}
                                   title={b.categoryName}
                                   className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate block flex-1 sm:group-hover/row:pr-7 transition-[padding]"
                                 >
@@ -611,6 +626,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                   categoryName={b.categoryName}
                                   periodType={periodType}
                                   periodKey={periodKey}
+                                  startDateOverride={envRange?.startDate}
+                                  endDateOverride={envRange?.endDate}
                                   className="sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
                                 />
                               </div>
@@ -692,6 +709,7 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                           ? 'bg-amber-500'
                           : 'budget-progress-fill';
                       const envSub = envelopeSubText(b);
+                      const envRange = getBudgetRangeOverride(b);
                       const envMeta = b.envelopeStatus ? ENVELOPE_STATUS_META[b.envelopeStatus] : null;
                       const envBarClass = envMeta?.barClass ?? (isOver ? 'bg-destructive' : 'bg-primary');
                       return (
@@ -706,7 +724,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                       isEE && b.groupedBreakout && b.groupedBreakout.length > 0
                                         ? b.groupedBreakout.map((i) => i.categoryId)
                                         : b.coveredCategoryIds,
-                                      b.categoryId
+                                      b.categoryId,
+                                      envRange
                                     )}
                                     title={b.categoryName}
                                     className="text-foreground font-semibold hover:text-primary hover:underline transition-colors min-w-0 truncate block flex-1 sm:group-hover/row:pr-7 transition-[padding]"
@@ -719,6 +738,8 @@ export function BudgetTable({ targetCategoryId }: { targetCategoryId?: string | 
                                     categoryName={b.categoryName}
                                     periodType={periodType}
                                     periodKey={periodKey}
+                                    startDateOverride={envRange?.startDate}
+                                    endDateOverride={envRange?.endDate}
                                     className="sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2"
                                   />
                                 </div>

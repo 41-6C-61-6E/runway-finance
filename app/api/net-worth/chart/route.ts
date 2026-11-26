@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { accounts, netWorthSnapshots, userSettings } from '@/lib/db/schema';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, desc } from 'drizzle-orm';
 import { logger } from '@/lib/logger';
 import { aggregateChartData, AggregatablePoint } from '@/lib/utils/chart-aggregation';
+import { computeNetWorthChangeBarData, type ChangeBarChartPoint } from '@/lib/utils/net-worth-change-bars';
 import { getSessionDEK } from '@/lib/crypto-context';
 import { decryptRows } from '@/lib/crypto';
 import { filterReportableAccounts, computeNetWorthTotals, computeCategoryBreakdown } from '@/lib/utils/account-scope';
@@ -91,6 +92,7 @@ export async function GET(request: Request) {
         const payload = {
           data: [],
           categories: [],
+          changeBars: { barData: [], bucketSize: 'daily' },
           summary: {
             current: 0,
             previous: 0,
@@ -133,6 +135,7 @@ export async function GET(request: Request) {
       const payload = {
         data: [currentSnapshot],
         categories: Array.from(allBreakdownCategories),
+        changeBars: { barData: [], bucketSize: 'daily' },
         summary: {
           current: netWorth,
           previous: netWorth,
@@ -192,6 +195,38 @@ export async function GET(request: Request) {
       }
     }
 
+    // Fetch the latest snapshot strictly before startStr so the first change bar
+    // uses the prior period's closing balance (matching Wealth Flow's dayBeforeStr).
+    const previousSnapRows = await getDb()
+      .select({
+        snapshotDate: netWorthSnapshots.snapshotDate,
+        netWorth: netWorthSnapshots.netWorth,
+      })
+      .from(netWorthSnapshots)
+      .where(
+        and(
+          eq(netWorthSnapshots.userId, userId),
+          lt(netWorthSnapshots.snapshotDate, startStr)
+        )
+      )
+      .orderBy(desc(netWorthSnapshots.snapshotDate))
+      .limit(1);
+
+    let previousSnapshot: ChangeBarChartPoint | null = null;
+    if (previousSnapRows.length > 0) {
+      const decryptedPrev = await decryptRows('net_worth_snapshots', previousSnapRows, dek);
+      previousSnapshot = {
+        date: decryptedPrev[0].snapshotDate,
+        netWorth: parseFloat(decryptedPrev[0].netWorth) || 0,
+      };
+    }
+
+    // Compute change bars from exact unaggregated daily snapshots before area smoothing/aggregation
+    const changeBars = computeNetWorthChangeBarData(
+      formattedData.map((p) => ({ date: p.date, netWorth: Number(p.netWorth) })),
+      previousSnapshot
+    );
+
     // Calculate summary stats from aggregated data
     const current = formattedData[formattedData.length - 1];
     const previous = formattedData.length > 1 ? formattedData[0] : current;
@@ -206,6 +241,7 @@ export async function GET(request: Request) {
     const payload = {
       data: aggregated,
       categories: [],
+      changeBars,
       summary: {
         current: currentNetWorth,
         previous: previousNetWorth,

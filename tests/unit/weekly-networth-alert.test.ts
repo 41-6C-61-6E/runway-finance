@@ -186,7 +186,7 @@ describe('Weekly Net Worth Change Alert', () => {
     // when the snapshot happens to be from today.
     expect(payload.body).toContain('for the week ending Aug 2, 2026');
     expect(payload.body).not.toContain('in the last week');
-    expect(payload.url).toContain('/flows?timeframe=7d_discrete&date=2026-08-02');
+    expect(payload.url).toContain('/flows?tab=wealth&timeframe=7d_discrete&date=2026-08-02');
   });
 
   it('should not notify if net worth change is below 1 cent', async () => {

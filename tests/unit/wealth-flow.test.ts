@@ -557,4 +557,42 @@ describe('wealth-flow service (snapshot-only)', () => {
     expect(result.summary.totalDecreases).toBe(5000);
     expect(result.summary.totalIncreases - result.summary.totalDecreases).toBe(result.summary.netWorthChange);
   });
+
+  it('uses live account balances for ending state when a non-discrete calendar month includes today', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-15T12:00:00-04:00'));
+
+    mockState.mockAccounts = [
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false, balance: '4500.00' },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '3000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-07-14', balance: '4000.00' },
+    );
+
+    const result = await runWealthFlow('2026-07-01', '2026-07-31', undefined, '1m');
+
+    expect(result.summary.beginningNetWorth).toBe(3000);
+    expect(result.summary.endingNetWorth).toBe(4500);
+    expect(result.summary.netWorthChange).toBe(1500);
+
+    vi.useRealTimers();
+  });
+
+  it('does not subtract 1 extra day from startDate for 90d rolling timeframe', async () => {
+    mockState.mockAccounts = [
+      { id: 'checking-1', userId: 'user_1', name: 'Checking', type: 'checking', currency: 'USD', isHidden: false, isExcludedFromNetWorth: false },
+    ];
+    mockState.mockAccountSnapshots.push(
+      { accountId: 'checking-1', snapshotDate: '2026-03-31', balance: '1000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-04-01', balance: '2000.00' },
+      { accountId: 'checking-1', snapshotDate: '2026-06-30', balance: '3500.00' },
+    );
+
+    const result = await runWealthFlow('2026-04-01', '2026-06-30', undefined, '90d');
+
+    expect(result.summary.beginningNetWorth).toBe(2000);
+    expect(result.summary.endingNetWorth).toBe(3500);
+    expect(result.summary.netWorthChange).toBe(1500);
+  });
 });

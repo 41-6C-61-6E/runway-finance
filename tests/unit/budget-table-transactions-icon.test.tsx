@@ -226,14 +226,14 @@ describe('BudgetItemTransactionsIcon and Budget Table Row Hover Integration', ()
 
     const viewAllLink = await screen.findByRole('link', { name: /view all \(1\) transactions/i });
     expect(viewAllLink).toBeDefined();
-    expect(viewAllLink.getAttribute('href')).toBe('/transactions?categoryId=cat-groceries&startDate=2026-08-01&endDate=2026-08-31');
+    expect(viewAllLink.getAttribute('href')).toBe('/transactions?categoryId=cat-groceries&startDate=2026-08-01&endDate=2026-08-31&ignored=false');
 
     fireEvent.click(viewAllLink);
 
-    expect(mockPush).toHaveBeenCalledWith('/transactions?categoryId=cat-groceries&startDate=2026-08-01&endDate=2026-08-31');
+    expect(mockPush).toHaveBeenCalledWith('/transactions?categoryId=cat-groceries&startDate=2026-08-01&endDate=2026-08-31&ignored=false');
   });
 
-  it('navigates to /transactions?search=... when clicking an individual transaction in the tooltip', async () => {
+  it('navigates to /transactions scoped to date and category when clicking an individual transaction in the tooltip', async () => {
     Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1200 });
 
     render(
@@ -255,6 +255,6 @@ describe('BudgetItemTransactionsIcon and Budget Table Row Hover Integration', ()
     expect(txLink).not.toBeNull();
     fireEvent.click(txLink!);
 
-    expect(mockPush).toHaveBeenCalledWith("/transactions?search=Trader%20Joe's");
+    expect(mockPush).toHaveBeenCalledWith("/transactions?categoryId=cat-groceries&search=Trader+Joe%27s&startDate=2026-08-15&endDate=2026-08-15&ignored=false");
   });
 });
